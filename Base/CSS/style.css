@@ -1,0 +1,134 @@
+/* --- 全局与字体设定：营造书卷气 --- */
+body {
+    font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+    line-height: 1.9; /* 更舒展的行间距 */
+    background-color: #fbfaf7; /* 类似米黄色的护眼纸张背景 */
+    color: #3a3a3a; /* 更柔和的深灰色正文 */
+    margin: 0;
+    padding: 0;
+    font-size: 17px; /* 稍大一点的字号，便于阅读 */
+}
+
+/* --- 核心容器：如同书页的版心 --- */
+.container {
+    max-width: 800px;
+    margin: 3rem auto; /* 上下留出更多呼吸空间 */
+    padding: 3rem 4rem;
+    background-color: #ffffff;
+    border: 1px solid #eaeaea;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.03);
+}
+
+/* --- 标题样式：典雅庄重 --- */
+h1, h2, h3 {
+    font-family: 'Songti SC', 'STSong', 'SimSun', serif; /* 标题使用宋体，更具古典美 */
+    color: #1a1a1a;
+    font-weight: 600;
+    margin-top: 2.5em;
+    margin-bottom: 1.2em;
+    padding-bottom: 0.6em;
+    border-bottom: 1px solid #eaeaea;
+}
+
+h1 {
+    font-size: 2.6em;
+    text-align: center;
+    border-bottom: 2px solid #ccc;
+    margin-top: 1em;
+}
+
+h1 small {
+    font-size: 0.5em;
+    font-weight: 400;
+    color: #666;
+    display: block;
+    margin-top: 0.5rem;
+    font-family: -apple-system, sans-serif; /* 英文副标题使用无衬线体 */
+}
+
+h2 {
+    font-size: 2em;
+}
+
+h3 {
+    font-size: 1.6em;
+    border-bottom: none;
+}
+
+/* --- 文本元素：精细打磨 --- */
+p {
+    margin-bottom: 1.5em;
+    text-align: justify; /* 两端对齐，更具书籍感 */
+}
+
+blockquote {
+    text-align: center;
+    font-size: 1.2em;
+    font-family: 'KaiTi', 'STKaiti', serif; /* 引用使用楷体 */
+    color: #555;
+    border: none;
+    padding: 1em 0;
+    margin: 2.5em 0;
+}
+
+blockquote p {
+    margin: 0;
+    text-align: center;
+}
+
+hr {
+    border: 0;
+    height: 1px;
+    background-image: linear-gradient(to right, rgba(0, 0, 0, 0), rgba(0, 0, 0, 0.1), rgba(0, 0, 0, 0));
+    margin: 4em 0;
+}
+
+ul {
+    padding-left: 25px;
+}
+
+li {
+    margin-bottom: 0.8em;
+}
+
+strong {
+    font-weight: 600;
+    color: #a74141; /* 使用一种沉稳的暗红色作为强调 */
+}
+
+/* --- 链接与页脚 --- */
+a {
+    color: #5b87a9; /* 更为内敛的蓝色 */
+    text-decoration: none;
+    border-bottom: 1px dotted #5b87a9;
+    transition: all 0.3s ease;
+}
+
+a:hover {
+    color: #a74141;
+    border-bottom: 1px solid #a74141;
+}
+
+/* --- 新增的讨论区入口：作为文章的有机延伸 --- */
+.discussion-link-section {
+    margin-top: 4rem;
+    padding-top: 2rem;
+    border-top: 1px solid #eaeaea;
+    text-align: center;
+}
+
+.discussion-link-section p {
+    text-align: center;
+    font-size: 1.1em;
+    color: #444;
+}
+
+/* --- 页脚 --- */
+.footer {
+    text-align: center;
+    margin-top: 4em;
+    padding-top: 2em;
+    font-size: 0.9em;
+    color: #888;
+    border-top: 1px solid #eee;
+}
