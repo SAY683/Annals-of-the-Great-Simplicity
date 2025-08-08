@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>文献阅览室 - PDF.js 阅读器</title>
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        body {
+            background-color: #fbfaf7;
+            font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+        }
+
+        .pdf-container {
+            max-width: 900px;
+            margin: 3rem auto;
+            padding: 2rem 3rem;
+            background: #fff;
+            border: 1px solid #eaeaea;
+            border-radius: 8px;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.05);
+        }
+
+        h1 {
+            text-align: center;
+            font-family: 'Songti SC', 'STSong', serif;
+            margin-bottom: 2rem;
+        }
+
+        .pdf-link {
+            display: block;
+            margin: 1rem 0;
+            font-size: 1.1em;
+            color: #5b87a9;
+            border: 1px solid #5b87a9;
+            padding: 0.6em 1em;
+            border-radius: 4px;
+            text-align: center;
+            text-decoration: none;
+            transition: all 0.3s ease;
+        }
+
+        .pdf-link:hover {
+            color: #fff;
+            background-color: #5b87a9;
+        }
+    </style>
+</head>
+<body>
+<div class="pdf-container">
+    <h1>📚 文献阅览室</h1>
+    <div id="pdf-list"></div>
+    <a class="pdf-link" href="index.html">返回主页</a>
+</div>
+
+<script>
+    /*
+    ==========================
+    📚 PDF 文件列表
+    作用：
+    - 集中管理所有要展示的 PDF
+    - 只需改这里，就能自动生成阅读链接
+    注意：
+    - file 为 GitHub Raw 直链（需 URL 编码）
+    - title 为显示名称
+    ==========================
+    */
+    const pdfFiles = [
+        {
+            title: "源始",
+            file: "https://raw.githubusercontent.com/SAY683/Annals-of-the-Great-Simplicity/main/Miscellanies/%E6%BA%90%E5%A7%8B.pdf"
+        },
+        {
+            title: "P0P1-VTS模型",
+            file: "https://raw.githubusercontent.com/SAY683/Annals-of-the-Great-Simplicity/main/Miscellanies/P0P1-VTS%E6%A8%A1%E5%9E%8B.pdf"
+        }
+    ];
+
+    // PDF.js 官方在线阅读器基础地址
+    const pdfJsViewer = "https://mozilla.github.io/pdf.js/web/viewer.html?file=";
+
+    // 动态生成 PDF 阅读链接
+    const listContainer = document.getElementById("pdf-list");
+    pdfFiles.forEach(pdf => {
+        const link = document.createElement("a");
+        link.className = "pdf-link";
+        link.href = pdfJsViewer + encodeURIComponent(pdf.file);
+        link.textContent = `阅读《${pdf.title}》`;
+        link.target = "_blank";
+        listContainer.appendChild(link);
+    });
+</script>
+</body>
+</html>

@@ -132,3 +132,68 @@ a:hover {
     color: #888;
     border-top: 1px solid #eee;
 }
+
+
+/*
+==========================
+📚 文献阅览室入口样式
+作用：
+- 让入口区域居中显示
+- 使用卡片式布局，配合项目整体书卷风格
+==========================
+*/
+
+/* 外层容器：让卡片居中 */
+.pdf-link-section {
+    margin-top: 4em; /* 与上方正文留足间距 */
+    display: flex;
+    justify-content: center; /* 居中对齐 */
+}
+
+/* 卡片本身样式 */
+.pdf-link-card {
+    max-width: 600px;
+    background-color: #ffffff;
+    border: 1px solid #eaeaea;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.04);
+    padding: 2rem 2.5rem;
+    text-align: center;
+    border-radius: 8px; /* 柔和圆角 */
+}
+
+/* 卡片标题样式 */
+.pdf-link-title {
+    font-family: 'Songti SC', 'STSong', 'SimSun', serif; /* 宋体，古典感 */
+    font-size: 1.6em;
+    font-weight: bold;
+    color: #5b87a9; /* 与整体配色一致的蓝色 */
+    margin-bottom: 0.8em;
+    border-bottom: 1px solid #eaeaea; /* 底部分割线 */
+    padding-bottom: 0.4em;
+}
+
+/* 说明文字样式 */
+.pdf-link-card p {
+    font-size: 1em;
+    color: #555; /* 柔和灰色，避免刺眼 */
+    margin-bottom: 1.5em;
+}
+
+/* 跳转按钮样式 */
+.pdf-link-button {
+    display: inline-block;
+    font-size: 1.1em;
+    color: #5b87a9;
+    border: 1px solid #5b87a9;
+    padding: 0.5em 1.5em;
+    border-radius: 4px;
+    text-decoration: none;
+    transition: all 0.3s ease; /* 鼠标悬停平滑过渡 */
+}
+
+/* 鼠标悬停按钮效果 */
+.pdf-link-button:hover {
+    color: #fff;
+    background-color: #5b87a9;
+    border-color: #5b87a9;
+}
