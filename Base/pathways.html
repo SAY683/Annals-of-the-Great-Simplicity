@@ -1,19 +1,19 @@
 <!DOCTYPE html>
-<html lang="zh">
+<html lang="zh-CN">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>阅读路径 — Annals of the Great Simplicity</title>
-  <link rel="stylesheet" href="CSS/style.css">
+  <link rel="stylesheet" href="CSS/style.css"/>
 </head>
 <body>
   <div class="pathway-wrap" data-theme="auto">
     <header>
       <h1>思想路径导航</h1>
-      <p>推荐的阅读与探索顺序，现代 / 炼金两种模式。</p>
-      <div class="progress">
-        <div id="progressFill" class="progress-fill"></div>
-        <span id="progressLabel">0%</span>
+      <p>推荐的阅读顺序：从总览 → 核心 PDF → 现代/炼金分歧 → 回到支点页沉淀。</p>
+      <div class="progress" style="position:relative;height:8px;background:rgba(127,167,205,0.18);border-radius:20px;overflow:hidden;">
+        <div id="progressFill" class="progress-fill" style="height:100%;width:0;background:#8fc1e6;"></div>
+        <span id="progressLabel" style="position:absolute;right:8px;top:-20px;font-size:12px;opacity:.8;">0%</span>
       </div>
     </header>
 
@@ -24,25 +24,30 @@
       </aside>
 
       <section class="pathway-map">
+        <div class="map-toolbar">
+          <button id="zoomOut" aria-label="缩小">A−</button>
+          <button id="zoomReset" aria-label="重置">100%</button>
+          <button id="zoomIn" aria-label="放大">A+</button>
+        </div>
         <div id="svgMap"></div>
       </section>
 
-      <section class="pathway-detail panel">
+      <section class="pathway-detail panel" style="padding:14px;border-radius:14px;">
         <h2 id="detailTitle">请选择一个节点</h2>
         <p id="detailDesc"></p>
-        <div id="detailTags"></div>
-        <div class="actions">
-          <button id="openLink">打开</button>
-          <button id="markRead">标记已读</button>
-          <button id="nextBtn">下一个</button>
+        <div id="detailTags" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
+        <div class="actions" style="display:flex;gap:8px;margin-top:10px;">
+          <button id="openLink" class="btn">打开</button>
+          <button id="markRead" class="btn">标记已读</button>
+          <button id="nextBtn" class="btn">下一个</button>
         </div>
       </section>
     </main>
 
-    <footer>
-      <button id="markAll">全部标记已读</button>
-      <button id="resetAll">重置</button>
-      <button id="exportProgress">导出进度</button>
+    <footer style="margin-top:18px;display:flex;gap:8px;flex-wrap:wrap;">
+      <button id="markAll" class="btn">全部标记已读</button>
+      <button id="resetAll" class="btn">重置</button>
+      <button id="exportProgress" class="btn">导出进度</button>
     </footer>
   </div>
 
