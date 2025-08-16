@@ -360,3 +360,126 @@ a:hover {
 /* 让侧栏列表更疏朗 */
 #nodesList .node { padding: 10px 8px; border-radius: 10px; }
 #nodesList .node:hover { background: rgba(127,167,205,0.08); }
+
+/* ===============================
+  Pathways page scoped styles
+  Scope root: #pathways-root (see pathways.html)
+  Append this block to style.css (末尾)
+  =============================== */
+
+#pathways-root {
+  --pw-bg-dark: linear-gradient(180deg, rgba(2,10,18,0.92), rgba(4,16,26,0.86));
+  --pw-fg-dark: #eaf6ff;
+  --pw-fg-light: #0b2633;
+  --pw-accent: #66a6d6;
+  font-family: "Noto Sans SC", "Microsoft YaHei", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  color: var(--pw-fg-dark);
+}
+
+/* container */
+#pathways-root.pathway-wrap {
+  background: var(--pw-bg-dark);
+  padding: 2rem;
+  border-radius: 10px;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.45);
+  border: 1px solid rgba(255,255,255,0.02);
+}
+
+/* light-mode override (manual or auto detection) */
+#pathways-root.light-mode {
+  background: linear-gradient(180deg,#fff,#fbfbff);
+  color: var(--pw-fg-light);
+  box-shadow: 0 8px 20px rgba(0,0,0,0.05);
+}
+
+/* layout */
+#pathways-root .pathway-main {
+  display: grid;
+  grid-template-columns: 320px 1fr 380px;
+  gap: 18px;
+}
+@media (max-width: 980px) {
+  #pathways-root .pathway-main { grid-template-columns: 1fr; }
+}
+
+/* left list */
+#pathways-root #nodesList { margin-top: 0.6rem; }
+#pathways-root .node {
+  padding: 10px 12px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background .15s ease, transform .08s ease;
+  display: block;
+  text-decoration: none;
+  color: inherit;
+  border: 1px solid rgba(255,255,255,0.02);
+  margin-bottom: .5rem;
+  background: rgba(255,255,255,0.01);
+}
+#pathways-root .node:hover { transform: translateY(-2px); background: rgba(110,161,200,0.03); }
+#pathways-root .node.active { border-color: rgba(110,161,200,0.18); background: linear-gradient(90deg, rgba(110,161,200,0.04), rgba(143,193,230,0.02)); }
+
+#pathways-root .node h3 { margin:0; font-size:1rem; line-height:1.3; display:flex; justify-content:space-between; gap:8px; }
+#pathways-root .node p { margin:.35rem 0 0 0; color: rgba(230,245,255,0.9); font-size:.92rem; }
+#pathways-root.light-mode .node p { color: rgba(12,38,51,0.88); }
+
+/* small icon link on list */
+#pathways-root .node .ext {
+  opacity:0.85; font-size:0.86rem; color:inherit; text-decoration:none;
+  border-left:1px solid rgba(255,255,255,0.03); padding-left:8px; margin-left:8px;
+}
+#pathways-root.light-mode .node .ext { border-left-color: rgba(0,0,0,0.04); }
+
+/* map container */
+#pathways-root .pathway-map { position: relative; min-height: 420px; border-radius:10px; overflow:hidden; background: rgba(255,255,255,0.01); border: 1px solid rgba(255,255,255,0.02); }
+
+/* map toolbar (zoom) */
+#pathways-root .map-toolbar { position:absolute; right:12px; top:12px; z-index:10; display:flex; gap:6px; }
+#pathways-root .map-toolbar button {
+  padding:6px 8px; border-radius:7px; border:1px solid rgba(255,255,255,0.04);
+  background: rgba(255,255,255,0.02); color:inherit; cursor:pointer; font-size:13px;
+}
+#pathways-root.light-mode .map-toolbar button { background: rgba(0,0,0,0.03); border-color: rgba(0,0,0,0.06); }
+
+/* svg label styling for foreignObject wrapper */
+#pathways-root svg .label-outer {
+  display: block;
+}
+#pathways-root .labelbox {
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.25;
+  color: inherit;
+  background: rgba(0,0,0,0.36);
+  padding:6px 8px;
+  border-radius:8px;
+  max-width: 280px;
+  box-sizing: border-box;
+  color: #eaf6ff;
+}
+#pathways-root.light-mode .labelbox { background: rgba(255,255,255,0.92); color: #0b2633; border: 1px solid rgba(0,0,0,0.04); }
+
+/* circle */
+#pathways-root svg circle { stroke: rgba(255,255,255,0.06); stroke-width:0.24; }
+
+/* right detail panel */
+#pathways-root .panel { padding:14px; border-radius:10px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.02); }
+#pathways-root.light-mode .panel { background: #fff; border-color: rgba(0,0,0,0.04); }
+
+/* tags */
+#pathways-root .tag {
+  display:inline-block; padding:.18rem .45rem; border-radius:6px; margin-right:.4rem;
+  background: rgba(255,255,255,0.02); color: #9fd2f0; font-size:.85rem; border: 1px solid rgba(255,255,255,0.02);
+}
+#pathways-root.light-mode .tag { background: rgba(10,20,30,0.03); color: #0b2633; border-color: rgba(10,20,30,0.06); }
+
+/* small helpers */
+#pathways-root .small { font-size:.88rem; color: rgba(190,220,240,0.9); }
+#pathways-root.light-mode .small { color: rgba(60,90,110,0.9); }
+
+/* responsive tweaks */
+@media (max-width: 980px) {
+  #pathways-root .panel { margin-top: 12px; }
+  #pathways-root .labelbox { font-size: 15px; }
+}
