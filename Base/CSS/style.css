@@ -362,3 +362,71 @@ button.primary {
   .map { height:320px; }
   .pathway-wrap { padding: 1.2rem; margin: 1.2rem; }
 }
+
+/* -----------------------------
+  Pathways: contrast & light-mode handling + label styles
+  Append to end of style.css
+   ----------------------------- */
+
+/* Light-mode variants (for pages using white background) */
+.pathway-wrap.light-mode {
+  background: linear-gradient(180deg, #ffffff, #fbfbff);
+  color: #0b2130;
+  border: 1px solid rgba(10,20,30,0.04);
+  box-shadow: 0 6px 20px rgba(0,0,0,0.04);
+}
+
+.pathway-wrap.light-mode .panel {
+  background: linear-gradient(180deg,#fff,#fcfcff);
+  color: #0b2130;
+  border: 1px solid rgba(10,20,30,0.03);
+}
+
+.pathway-wrap.light-mode .node h3,
+.pathway-wrap.light-mode .node p,
+.pathway-wrap.light-mode .detail,
+.pathway-wrap.light-mode .tag,
+.pathway-wrap.light-mode .small,
+.pathway-wrap.light-mode .footnote {
+  color: #0b2633;
+  opacity: 0.95;
+}
+
+/* Ensure nodes readable on both modes */
+.node h3 { color: inherit; }
+.node p { color: inherit; opacity: 0.9; }
+
+/* SVG label baseline & style */
+#svgMap svg text {
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+  font-size: 2.2px; /* this is in SVG coordinate space (viewBox 100x60) */
+  fill: currentColor; /* inherits from container for light/dark */
+  pointer-events: none;
+  paint-order: stroke markers fill;
+  stroke: rgba(0,0,0,0.18);
+  stroke-width: 0.06;
+}
+
+/* stronger circle outline for contrast */
+#svgMap svg circle {
+  stroke: rgba(0,0,0,0.18);
+}
+
+/* fallback - if text still small on some displays, allow css increase */
+@media (min-width:1200px) {
+  #svgMap svg text { font-size: 2.8px; }
+}
+
+/* small tweak to ensure tag readability in light mode */
+.pathway-wrap.light-mode .tag {
+  background: rgba(10,20,30,0.03);
+  border: 1px solid rgba(10,20,30,0.06);
+  color:#0b2633;
+}
+
+/* keep existing primary/hover button visuals but adapt color */
+.pathway-wrap.light-mode button.btn {
+  background: rgba(10,20,30,0.02);
+  color: #0b2633;
+  border: 1px solid rgba(10,20,30,0.06);
+}
