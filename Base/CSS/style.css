@@ -197,3 +197,39 @@ a:hover {
     background-color: #5b87a9;
     border-color: #5b87a9;
 }
+
+/* -------------------------
+   微型入口（mini-entry）样式
+   低侵入、保留书卷氛围
+   ------------------------- */
+.mini-entry-wrap {
+  margin-top: 0.6rem;
+  margin-bottom: 1.2rem;
+  text-align: left;            /* 与正文保持一致的流向 */
+}
+
+.mini-entry {
+  color: #6ea1c8;              /* 与站点已有按钮色系保持一致 */
+  text-decoration: none;
+  font-size: 0.95rem;
+  border-bottom: 1px dotted rgba(110,161,200,0.25);
+  padding-bottom: 2px;
+  transition: all 160ms ease;
+  font-weight: 500;
+  letter-spacing: .2px;
+  display: inline-block;
+}
+
+.mini-entry:hover {
+  color: #5b87a9;
+  background: rgba(110,161,200,0.03);
+  border-radius: 4px;
+  box-shadow: 0 1px 0 rgba(0,0,0,0.02);
+  transform: translateY(-1px);
+}
+
+/* 响应式微调 */
+@media (max-width: 768px) {
+  .mini-entry { font-size: 1rem; }
+  .mini-entry-wrap { text-align: left; }
+}
