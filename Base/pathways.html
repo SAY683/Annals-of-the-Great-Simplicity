@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>阅读路径 — Annals of the Great Simplicity</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="pathway-wrap" data-theme="auto">
+    <header>
+      <h1>思想路径导航</h1>
+      <p>推荐的阅读与探索顺序，现代 / 炼金两种模式。</p>
+      <div class="progress">
+        <div id="progressFill" class="progress-fill"></div>
+        <span id="progressLabel">0%</span>
+      </div>
+    </header>
+
+    <main class="pathway-main">
+      <aside class="pathway-list">
+        <h2>路径节点</h2>
+        <div id="nodesList"></div>
+      </aside>
+
+      <section class="pathway-map">
+        <div id="svgMap"></div>
+      </section>
+
+      <section class="pathway-detail panel">
+        <h2 id="detailTitle">请选择一个节点</h2>
+        <p id="detailDesc"></p>
+        <div id="detailTags"></div>
+        <div class="actions">
+          <button id="openLink">打开</button>
+          <button id="markRead">标记已读</button>
+          <button id="nextBtn">下一个</button>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <button id="markAll">全部标记已读</button>
+      <button id="resetAll">重置</button>
+      <button id="exportProgress">导出进度</button>
+    </footer>
+  </div>
+
+  <script src="JS/pathways.js"></script>
+</body>
+</html>

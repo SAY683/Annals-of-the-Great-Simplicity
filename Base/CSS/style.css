@@ -197,3 +197,69 @@ a:hover {
     background-color: #5b87a9;
     border-color: #5b87a9;
 }
+
+/* ===== Pathways: high-contrast & robust label styles ===== */
+.pathway-wrap {
+  --pw-fg-dark: #dfe9f5;
+  --pw-fg-light: #0b2633;
+  --pw-stroke-dark: rgba(0,0,0,0.28);
+  --pw-stroke-light: rgba(0,0,0,0.20);
+  --pw-chip-dark: rgba(255,255,255,0.08);
+  --pw-chip-light: rgba(10,20,30,0.03);
+  --pw-chip-border-light: rgba(10,20,30,0.08);
+}
+
+.pathway-wrap.light-mode,
+.pathway-wrap[data-theme="light"] {
+  color: var(--pw-fg-light);
+}
+.pathway-wrap:not(.light-mode):not([data-theme="light"]),
+.pathway-wrap[data-theme="dark"] {
+  color: var(--pw-fg-dark);
+}
+
+.pathway-wrap.light-mode .panel {
+  background: linear-gradient(180deg,#fff,#fcfcff);
+  color: var(--pw-fg-light);
+  border: 1px solid rgba(10,20,30,0.05);
+  box-shadow: 0 6px 20px rgba(0,0,0,0.04);
+}
+.pathway-wrap.light-mode .tag {
+  background: var(--pw-chip-light);
+  border: 1px solid var(--pw-chip-border-light);
+  color: var(--pw-fg-light);
+}
+
+.node h3 { line-height: 1.35; }
+.node p  { line-height: 1.55; opacity: .92; }
+
+#svgMap svg text {
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+  font-size: 2.8px;
+  fill: currentColor;
+  pointer-events: none;
+  paint-order: stroke fill;
+  stroke: rgba(0,0,0,0.22);
+  stroke-width: 0.10;
+}
+
+#svgMap svg .label-bg {
+  rx: 0.8; ry: 0.8;
+  pointer-events: none;
+  fill: rgba(0,0,0,0.35);
+}
+.pathway-wrap.light-mode #svgMap svg .label-bg,
+.pathway-wrap[data-theme="light"] #svgMap svg .label-bg {
+  fill: rgba(255,255,255,0.68);
+  stroke: rgba(0,0,0,0.04);
+  stroke-width: 0.1;
+}
+
+#svgMap svg circle {
+  stroke: rgba(0,0,0,0.22);
+  stroke-width: 0.25;
+}
+
+@media (min-width: 1200px) {
+  #svgMap svg text { font-size: 3.2px; }
+}
