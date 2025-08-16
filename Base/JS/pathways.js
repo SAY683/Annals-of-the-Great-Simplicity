@@ -236,3 +236,29 @@ document.addEventListener('DOMContentLoaded', function () {
   window._pathways = { nodes, state, saveState, selectNode };
 
 });
+
+// Optional: 微交互增强（添加到 js/pathways.js 末尾）
+(function(){
+  const svgContainer = document.getElementById('svgMap');
+  if(!svgContainer) return;
+  svgContainer.addEventListener('mouseover', function(e){
+    const t = e.target;
+    if(t.tagName === 'circle') {
+      t.setAttribute('r', 4.6);
+      t.setAttribute('fill', '#9fd2f0');
+    }
+  });
+  svgContainer.addEventListener('mouseout', function(e){
+    const t = e.target;
+    if(t.tagName === 'circle') {
+      // 恢复：若对应节点已读，用已读色，否则用默认
+      const gid = t.parentNode.getAttribute('data-id');
+      if(window._pathways && window._pathways.state && window._pathways.state.read && window._pathways.state.read[gid]) {
+        t.setAttribute('fill', '#6ea1c8');
+      } else {
+        t.setAttribute('fill', '#1e6f9a');
+      }
+      t.setAttribute('r', 2.6);
+    }
+  });
+})();
