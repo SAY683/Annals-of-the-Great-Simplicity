@@ -278,7 +278,9 @@ h2 + p::first-letter {
     line-height: 0.8;
     margin-top: 0.05em;
     margin-right: 0.1em;
-    color: #3a3a3a;
+    color: #a74141; /* 使用主题中的暗红色，如同朱墨批注，典雅庄重 */
+    font-weight: 600; /* 给予字母微妙的加重，使其更有存在感 */
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.1); /* 添加极淡的阴影，营造油墨微凸的质感 */
 }
 
 /* --- 响应式设计：优化移动端体验 --- */
