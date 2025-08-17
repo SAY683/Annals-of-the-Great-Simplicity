@@ -303,18 +303,18 @@ a:hover {
     padding-bottom: 0;   /* 移除底部内边距 */
 }
 
-/* --- 【新增】首字下沉效果，增强书籍质感 --- */
+/* --- 【优化】首字下沉效果（精准控制版） --- */
 /* 
- * 选择器 h2 + p 的意思是：定位到任何一个 h2 标签紧邻的下一个 p 标签。
- * ::first-letter 是一个伪元素，专门用来选择该段落的第一个字母。
+ * 现在，这个样式只会应用在拥有 "drop-cap" 类的 p 标签上。
 */
-h2 + p::first-letter {
-    font-family: 'Songti SC', 'STSong', serif; /* 使用与标题相同的衬线字体，保持风格统一 */
-    font-size: 3.8em;       /* 字体大小，您可以根据喜好微调，比如 3.5em 或 4em */
-    font-weight: 600;       /* 字体加粗 */
-    float: left;            /* 这是实现文字环绕效果的关键 */
-    line-height: 0.8;       /* 调整行高，让首字与段落的顶部更好地对齐 */
-    padding-top: 0.1em;     /* 微调顶部内边距，使其在视觉上更舒适 */
-    padding-right: 0.15em;  /* 在首字的右边留出一点空隙，避免与后续文字挤在一起 */
-    color: #a74141;         /* 使用您主题中的强调色，营造出古典手抄本的感觉 */
+.drop-cap::first-letter {
+    font-family: 'Songti SC', 'STSong', serif;
+    font-size: 3.8em;
+    font-weight: 600;
+    float: left;
+    line-height: 0.85;      /* 微调行高，优化对齐 */
+    padding-top: 0.05em;    /* 略微增加顶部内边距 */
+    padding-right: 0.12em;  /* 调整右侧间距 */
+    padding-bottom: 0.05em; /* 增加底部一点空间，防止与下一行过于贴近 */
+    color: #a74141;
 }
