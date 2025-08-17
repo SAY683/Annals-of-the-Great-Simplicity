@@ -301,6 +301,7 @@ a:hover {
     margin-top: 0;       /* 移除标题顶部的默认边距，使其紧随图腾 */
     border-bottom: none; /* 移除标题下方的横线，因为图腾已经起到了视觉分隔作用 */
     padding-bottom: 0;   /* 移除底部内边距 */
+<<<<<<< HEAD
 }
 
 /* --- 【优化】首字下沉效果（精准控制版） --- */
@@ -317,4 +318,6 @@ a:hover {
     padding-right: 0.12em;  /* 调整右侧间距 */
     padding-bottom: 0.05em; /* 增加底部一点空间，防止与下一行过于贴近 */
     color: #a74141;
+=======
+>>>>>>> parent of 6656ff7 (Update style.css)
 }
