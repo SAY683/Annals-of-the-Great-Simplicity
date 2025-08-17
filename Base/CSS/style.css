@@ -270,7 +270,7 @@ a:hover {
     opacity: 1;
 }
 
-/* --- 【新增】美学微调：首字下沉 --- */
+/* --- 美学微调：首字下沉 --- */
 h2 + p::first-letter {
     font-family: 'Songti SC', 'STSong', serif;
     font-size: 3.8em;
