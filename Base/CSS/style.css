@@ -270,17 +270,17 @@ a:hover {
     opacity: 1;
 }
 
-/* --- 美学微调：首字下沉 --- */
-h2 + p::first-letter {
+/* --- 美学微调：正文章节首字下沉 --- */
+h2:not(:first-of-type) + p::first-letter {
     font-family: 'Songti SC', 'STSong', serif;
     font-size: 3.8em;
     float: left;
     line-height: 0.8;
     margin-top: 0.05em;
     margin-right: 0.1em;
-    color: #a74141; /* 使用主题中的暗红色，如同朱墨批注，典雅庄重 */
-    font-weight: 600; /* 给予字母微妙的加重，使其更有存在感 */
-    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.1); /* 添加极淡的阴影，营造油墨微凸的质感 */
+    color: #a74141;
+    font-weight: 600;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.1);
 }
 
 /* --- 响应式设计：优化移动端体验 --- */
@@ -310,7 +310,7 @@ h2 + p::first-letter {
         max-width: 120px;
     }
 
-    h2 + p::first-letter {
-        font-size: 3.5em; /* 在移动端稍微缩小下沉字体 */
+    h2:not(:first-of-type) + p::first-letter {
+        font-size: 3.5em;
     }
 }
