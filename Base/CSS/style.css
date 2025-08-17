@@ -1,18 +1,18 @@
 /* --- 全局与字体设定：营造书卷气 --- */
 body {
     font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
-    line-height: 1.9; /* 更舒展的行间距 */
-    background-color: #fbfaf7; /* 类似米黄色的护眼纸张背景 */
-    color: #3a3a3a; /* 更柔和的深灰色正文 */
+    line-height: 1.9;
+    background-color: #fbfaf7;
+    color: #3a3a3a;
     margin: 0;
     padding: 0;
-    font-size: 17px; /* 稍大一点的字号，便于阅读 */
+    font-size: 17px;
 }
 
 /* --- 核心容器：如同书页的版心 --- */
 .container {
     max-width: 800px;
-    margin: 3rem auto; /* 上下留出更多呼吸空间 */
+    margin: 3rem auto;
     padding: 3rem 4rem;
     background-color: #ffffff;
     border: 1px solid #eaeaea;
@@ -21,7 +21,7 @@ body {
 
 /* --- 标题样式：典雅庄重 --- */
 h1, h2, h3 {
-    font-family: 'Songti SC', 'STSong', 'SimSun', serif; /* 标题使用宋体，更具古典美 */
+    font-family: 'Songti SC', 'STSong', 'SimSun', serif;
     color: #1a1a1a;
     font-weight: 600;
     margin-top: 2.5em;
@@ -43,7 +43,7 @@ h1 small {
     color: #666;
     display: block;
     margin-top: 0.5rem;
-    font-family: -apple-system, sans-serif; /* 英文副标题使用无衬线体 */
+    font-family: -apple-system, sans-serif;
 }
 
 h2 {
@@ -58,13 +58,13 @@ h3 {
 /* --- 文本元素：精细打磨 --- */
 p {
     margin-bottom: 1.5em;
-    text-align: justify; /* 两端对齐，更具书籍感 */
+    text-align: justify;
 }
 
 blockquote {
     text-align: center;
     font-size: 1.2em;
-    font-family: 'KaiTi', 'STKaiti', serif; /* 引用使用楷体 */
+    font-family: 'KaiTi', 'STKaiti', serif;
     color: #555;
     border: none;
     padding: 1em 0;
@@ -93,12 +93,12 @@ li {
 
 strong {
     font-weight: 600;
-    color: #a74141; /* 使用一种沉稳的暗红色作为强调 */
+    color: #a74141;
 }
 
 /* --- 链接样式 --- */
 a {
-    color: #5b87a9; /* 更为内敛的蓝色 */
+    color: #5b87a9;
     text-decoration: none;
     border-bottom: 1px dotted #5b87a9;
     transition: all 0.3s ease;
@@ -109,7 +109,7 @@ a:hover {
     border-bottom: 1px solid #a74141;
 }
 
-/* --- 新增的讨论区入口：作为文章的有机延伸 --- */
+/* --- 新增的讨论区入口 --- */
 .discussion-link-section {
     margin-top: 4rem;
     padding-top: 2rem;
@@ -148,10 +148,9 @@ a:hover {
     padding: 2rem 2.5rem;
     text-align: center;
     border-radius: 8px;
-    transition: all 0.3s ease-in-out; /* 新增：为悬停动效准备 */
+    transition: all 0.3s ease-in-out;
 }
 
-/* 新增：卡片悬停动效 */
 .pdf-link-card:hover {
     transform: translateY(-5px);
     box-shadow: 0 8px 25px rgba(0, 0, 0, 0.07);
@@ -224,7 +223,7 @@ a:hover {
     background-color: #5b87a9;
 }
 
-/* --- 【新增】返回顶部按钮样式 --- */
+/* --- 返回顶部按钮样式 --- */
 #back-to-top {
     position: fixed;
     bottom: 25px;
@@ -253,8 +252,26 @@ a:hover {
     border-bottom: none;
 }
 
+/* --- 【新增】图腾徽记样式 --- */
+.totem-container {
+    text-align: center;
+    margin-bottom: 2rem; /* 在图腾和主标题之间创造一些空间 */
+}
 
-/* --- 【新增】响应式设计：优化移动端体验 --- */
+.totem-image {
+    max-width: 150px; /* 控制图片最大宽度，避免过大 */
+    height: auto;
+    border-radius: 50%; /* 让图腾呈圆形，更像一个徽章 */
+    opacity: 0.85; /* 略微降低不透明度，使其更好地融入纸张背景 */
+    transition: opacity 0.3s ease;
+}
+
+.totem-image:hover {
+    opacity: 1; /* 鼠标悬停时完全显示 */
+}
+
+
+/* --- 响应式设计：优化移动端体验 --- */
 @media (max-width: 768px) {
     body {
         font-size: 16px;
@@ -276,48 +293,9 @@ a:hover {
     .pdf-link-card {
         padding: 1.5rem;
     }
-}
-
-/* --- 【新增】带图腾的章节标题样式 --- */
-.section-header-with-totem {
-    text-align: center; /* 让容器内的所有内容（图片和文字）都居中对齐 */
-    margin-top: 4rem;   /* 与上方引言保持足够的间距 */
-}
-
-.header-totem-icon {
-    display: block;
-    margin: 0 auto 1.5rem auto; /* 水平居中，并与下方的标题拉开 1.5rem 的距离 */
-    max-width: 120px;           /* 将图腾尺寸缩小，作为精致的徽章，而非大幅插图。您可以微调此数值 */
-    height: auto;
-    opacity: 0.85;              /* 降低一点不透明度，让它更柔和地融入背景 */
     
-    /* [可选] 如果想让图腾呈圆形徽章效果，请保留下面两行。如果想保持原状，请删除它们 */
-    border-radius: 50%;         /* 使图片变为圆形 */
-    object-fit: cover;          /* 确保非方形图片在圆形状态下也能良好显示，不会被拉伸 */
-}
-
-/* 调整被图腾包裹的 h2 标题的默认样式 */
-.section-header-with-totem h2 {
-    margin-top: 0;       /* 移除标题顶部的默认边距，使其紧随图腾 */
-    border-bottom: none; /* 移除标题下方的横线，因为图腾已经起到了视觉分隔作用 */
-    padding-bottom: 0;   /* 移除底部内边距 */
-<<<<<<< HEAD
-}
-
-/* --- 【优化】首字下沉效果（精准控制版） --- */
-/* 
- * 现在，这个样式只会应用在拥有 "drop-cap" 类的 p 标签上。
-*/
-.drop-cap::first-letter {
-    font-family: 'Songti SC', 'STSong', serif;
-    font-size: 3.8em;
-    font-weight: 600;
-    float: left;
-    line-height: 0.85;      /* 微调行高，优化对齐 */
-    padding-top: 0.05em;    /* 略微增加顶部内边距 */
-    padding-right: 0.12em;  /* 调整右侧间距 */
-    padding-bottom: 0.05em; /* 增加底部一点空间，防止与下一行过于贴近 */
-    color: #a74141;
-=======
->>>>>>> parent of 6656ff7 (Update style.css)
+    /* 移动端图腾可以适当缩小 */
+    .totem-image {
+        max-width: 120px;
+    }
 }

@@ -4,32 +4,31 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>文献阅览室 - PDF.js 阅读器</title>
-    <!-- 链接到唯一的、已整合的样式文件 -->
-    <link rel="stylesheet" href="css/style.css">
-    <!-- 新增：网站 Favicon 图标链接 -->
-    <link rel="icon" href="favicon.ico" type="image/x-icon">
-    <!-- 优化：内联样式已移至 style.css，此处不再需要 <style> 标签 -->
+    <link rel="stylesheet" href="CSS/style.css">
 </head>
 <body>
+
 <div class="pdf-container">
+
+    <!-- 图腾徽记，作为页面的视觉统一元素 -->
+    <div class="totem-container">
+        <img src="images/totem.png" alt="太易内在宇宙图腾" class="totem-image">
+    </div>
+
+    <!-- 紧随其后的是页面标题 -->
     <h1>📚 文献阅览室</h1>
+
     <div id="pdf-list"></div>
     <a class="pdf-link" href="index.html">返回主页</a>
+
 </div>
 
-<!-- 新增：返回顶部按钮 -->
 <a href="#" id="back-to-top" title="返回顶部">↑</a>
 
 <script>
     /*
     ==========================
     📚 PDF 文件列表
-    作用：
-    - 集中管理所有要展示的 PDF
-    - 只需改这里，就能自动生成阅读链接
-    注意：
-    - file 为 GitHub Raw 直链（需 URL 编码）
-    - title 为显示名称
     ==========================
     */
     const pdfFiles = [
@@ -51,11 +50,9 @@
         }
     ];
 
-    // PDF.js 官方在线阅读器基础地址
     const pdfJsViewer = "https://mozilla.github.io/pdf.js/web/viewer.html?file=";
-
-    // 动态生成 PDF 阅读链接
     const listContainer = document.getElementById("pdf-list");
+
     pdfFiles.forEach(pdf => {
         const link = document.createElement("a");
         link.className = "pdf-link";
@@ -66,7 +63,7 @@
     });
 </script>
 
-<!-- 新增：链接到通用 JS 文件 -->
-<script src="js/main.js"></script>
+<script src="JS/main.js"></script>
+
 </body>
 </html>
