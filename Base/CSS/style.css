@@ -96,7 +96,7 @@ strong {
     color: #a74141; /* 使用一种沉稳的暗红色作为强调 */
 }
 
-/* --- 链接与页脚 --- */
+/* --- 链接样式 --- */
 a {
     color: #5b87a9; /* 更为内敛的蓝色 */
     text-decoration: none;
@@ -123,7 +123,7 @@ a:hover {
     color: #444;
 }
 
-/* --- 页脚 --- */
+/* --- 页脚 (使用 footer 标签) --- */
 .footer {
     text-align: center;
     margin-top: 4em;
@@ -133,24 +133,13 @@ a:hover {
     border-top: 1px solid #eee;
 }
 
-
-/*
-==========================
-📚 文献阅览室入口样式
-作用：
-- 让入口区域居中显示
-- 使用卡片式布局，配合项目整体书卷风格
-==========================
-*/
-
-/* 外层容器：让卡片居中 */
+/* --- 文献阅览室入口卡片样式 --- */
 .pdf-link-section {
-    margin-top: 4em; /* 与上方正文留足间距 */
+    margin-top: 4em;
     display: flex;
-    justify-content: center; /* 居中对齐 */
+    justify-content: center;
 }
 
-/* 卡片本身样式 */
 .pdf-link-card {
     max-width: 600px;
     background-color: #ffffff;
@@ -158,28 +147,32 @@ a:hover {
     box-shadow: 0 5px 15px rgba(0, 0, 0, 0.04);
     padding: 2rem 2.5rem;
     text-align: center;
-    border-radius: 8px; /* 柔和圆角 */
+    border-radius: 8px;
+    transition: all 0.3s ease-in-out; /* 新增：为悬停动效准备 */
 }
 
-/* 卡片标题样式 */
+/* 新增：卡片悬停动效 */
+.pdf-link-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.07);
+}
+
 .pdf-link-title {
-    font-family: 'Songti SC', 'STSong', 'SimSun', serif; /* 宋体，古典感 */
+    font-family: 'Songti SC', 'STSong', 'SimSun', serif;
     font-size: 1.6em;
     font-weight: bold;
-    color: #5b87a9; /* 与整体配色一致的蓝色 */
+    color: #5b87a9;
     margin-bottom: 0.8em;
-    border-bottom: 1px solid #eaeaea; /* 底部分割线 */
+    border-bottom: 1px solid #eaeaea;
     padding-bottom: 0.4em;
 }
 
-/* 说明文字样式 */
 .pdf-link-card p {
     font-size: 1em;
-    color: #555; /* 柔和灰色，避免刺眼 */
+    color: #555;
     margin-bottom: 1.5em;
 }
 
-/* 跳转按钮样式 */
 .pdf-link-button {
     display: inline-block;
     font-size: 1.1em;
@@ -188,12 +181,124 @@ a:hover {
     padding: 0.5em 1.5em;
     border-radius: 4px;
     text-decoration: none;
-    transition: all 0.3s ease; /* 鼠标悬停平滑过渡 */
+    transition: all 0.3s ease;
 }
 
-/* 鼠标悬停按钮效果 */
 .pdf-link-button:hover {
     color: #fff;
     background-color: #5b87a9;
     border-color: #5b87a9;
+}
+
+/* --- 【整合】pdf-viewer.html 页面专属样式 --- */
+.pdf-container {
+    max-width: 900px;
+    margin: 3rem auto;
+    padding: 2rem 3rem;
+    background: #fff;
+    border: 1px solid #eaeaea;
+    border-radius: 8px;
+    box-shadow: 0 5px 20px rgba(0, 0, 0, 0.05);
+}
+
+.pdf-container h1 {
+    font-family: 'Songti SC', 'STSong', serif;
+    margin-bottom: 2rem;
+}
+
+.pdf-link {
+    display: block;
+    margin: 1rem 0;
+    font-size: 1.1em;
+    color: #5b87a9;
+    border: 1px solid #5b87a9;
+    padding: 0.6em 1em;
+    border-radius: 4px;
+    text-align: center;
+    text-decoration: none;
+    transition: all 0.3s ease;
+}
+
+.pdf-link:hover {
+    color: #fff;
+    background-color: #5b87a9;
+}
+
+/* --- 【新增】返回顶部按钮样式 --- */
+#back-to-top {
+    position: fixed;
+    bottom: 25px;
+    right: 25px;
+    display: none;
+    width: 40px;
+    height: 40px;
+    line-height: 40px;
+    text-align: center;
+    font-size: 20px;
+    font-family: 'Songti SC', serif;
+    color: #fff;
+    background-color: rgba(91, 135, 169, 0.7);
+    border: none;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    text-decoration: none;
+    border-bottom: none;
+}
+
+#back-to-top:hover {
+    background-color: rgb(91, 135, 169);
+    transform: translateY(-2px);
+    border-bottom: none;
+}
+
+
+/* --- 【新增】响应式设计：优化移动端体验 --- */
+@media (max-width: 768px) {
+    body {
+        font-size: 16px;
+    }
+
+    .container, .pdf-container {
+        padding: 2rem 1.5rem;
+        margin: 1.5rem auto;
+    }
+
+    h1 {
+        font-size: 2em;
+    }
+
+    h2 {
+        font-size: 1.6em;
+    }
+
+    .pdf-link-card {
+        padding: 1.5rem;
+    }
+}
+
+/* --- 【新增】带图腾的章节标题样式 --- */
+.section-header-with-totem {
+    text-align: center; /* 让容器内的所有内容（图片和文字）都居中对齐 */
+    margin-top: 4rem;   /* 与上方引言保持足够的间距 */
+}
+
+.header-totem-icon {
+    display: block;
+    margin: 0 auto 1.5rem auto; /* 水平居中，并与下方的标题拉开 1.5rem 的距离 */
+    max-width: 120px;           /* 将图腾尺寸缩小，作为精致的徽章，而非大幅插图。您可以微调此数值 */
+    height: auto;
+    opacity: 0.85;              /* 降低一点不透明度，让它更柔和地融入背景 */
+    
+    /* [可选] 如果想让图腾呈圆形徽章效果，请保留下面两行。如果想保持原状，请删除它们 */
+    border-radius: 50%;         /* 使图片变为圆形 */
+    object-fit: cover;          /* 确保非方形图片在圆形状态下也能良好显示，不会被拉伸 */
+}
+
+/* 调整被图腾包裹的 h2 标题的默认样式 */
+.section-header-with-totem h2 {
+    margin-top: 0;       /* 移除标题顶部的默认边距，使其紧随图腾 */
+    border-bottom: none; /* 移除标题下方的横线，因为图腾已经起到了视觉分隔作用 */
+    padding-bottom: 0;   /* 移除底部内边距 */
 }

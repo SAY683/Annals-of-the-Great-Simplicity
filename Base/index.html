@@ -5,7 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>太易：一部内在宇宙的编年史 (Annals of the Great Simplicity)</title>
     <!-- 链接到我们全新的“书籍装帧”样式文件 -->
-    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="CSS/style.css">
+    <!-- 新增：网站 Favicon 图标链接 -->
+    <link rel="icon" href="favicon.ico" type="image/x-icon">
 </head>
 <body>
 
@@ -21,7 +23,11 @@
 
     <hr>
 
-    <h2>前言：一份行者的心路札记</h2>
+        <!-- 新增：带图腾的章节标题容器 -->
+    <div class="section-header-with-totem">
+        <img src="IMAGE/totem.png" alt="行者心路图腾徽章" class="header-totem-icon">
+        <h2>前言：一份行者的心路札记</h2>
+    </div>
     <p>欢迎步入这片由意识与体验交织而成的风景。</p>
     <p>
         这并非一套僵硬的学说，而是我——一位求索者——在生命长河中，以独有的语汇和视角，对存在奥秘的持续叩问与尝试解读。我不敢断言其为放之四海而皆准的真理，然其精神内核，已与我心深深共鸣。</p>
@@ -101,13 +107,19 @@
               rel="noopener noreferrer"><strong>进入沙龙，开启对话 &rarr;</strong></a></p>
     </section>
 
-    <!-- 页脚部分保持不变 -->
-    <div class="footer">
+    <!-- 优化：页脚部分使用 footer 标签 -->
+    <footer class="footer">
         <p><a href="https://github.com/SAY683/Annals-of-the-Great-Simplicity/tags" target="_blank"
               rel="noopener noreferrer">版本历史 (Version History)</a></p>
-    </div>
+    </footer>
 
 </div>
+
+<!-- 新增：返回顶部按钮 -->
+<a href="#" id="back-to-top" title="返回顶部">↑</a>
+
+<!-- 新增：链接到通用 JS 文件 -->
+<script src="JS/main.js"></script>
 
 </body>
 </html>

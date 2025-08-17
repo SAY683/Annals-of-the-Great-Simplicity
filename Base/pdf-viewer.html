@@ -4,47 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>文献阅览室 - PDF.js 阅读器</title>
+    <!-- 链接到唯一的、已整合的样式文件 -->
     <link rel="stylesheet" href="css/style.css">
-    <style>
-        body {
-            background-color: #fbfaf7;
-            font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
-        }
-
-        .pdf-container {
-            max-width: 900px;
-            margin: 3rem auto;
-            padding: 2rem 3rem;
-            background: #fff;
-            border: 1px solid #eaeaea;
-            border-radius: 8px;
-            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.05);
-        }
-
-        h1 {
-            text-align: center;
-            font-family: 'Songti SC', 'STSong', serif;
-            margin-bottom: 2rem;
-        }
-
-        .pdf-link {
-            display: block;
-            margin: 1rem 0;
-            font-size: 1.1em;
-            color: #5b87a9;
-            border: 1px solid #5b87a9;
-            padding: 0.6em 1em;
-            border-radius: 4px;
-            text-align: center;
-            text-decoration: none;
-            transition: all 0.3s ease;
-        }
-
-        .pdf-link:hover {
-            color: #fff;
-            background-color: #5b87a9;
-        }
-    </style>
+    <!-- 新增：网站 Favicon 图标链接 -->
+    <link rel="icon" href="favicon.ico" type="image/x-icon">
+    <!-- 优化：内联样式已移至 style.css，此处不再需要 <style> 标签 -->
 </head>
 <body>
 <div class="pdf-container">
@@ -52,6 +16,9 @@
     <div id="pdf-list"></div>
     <a class="pdf-link" href="index.html">返回主页</a>
 </div>
+
+<!-- 新增：返回顶部按钮 -->
+<a href="#" id="back-to-top" title="返回顶部">↑</a>
 
 <script>
     /*
@@ -98,5 +65,8 @@
         listContainer.appendChild(link);
     });
 </script>
+
+<!-- 新增：链接到通用 JS 文件 -->
+<script src="js/main.js"></script>
 </body>
 </html>
