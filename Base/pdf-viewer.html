@@ -4,45 +4,83 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>文献阅览室 - PDF.js 阅读器</title>
-    <link rel="stylesheet" href="CSS/style.css">
+    <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
 
 <div class="pdf-container">
 
     <div class="totem-container">
-        <img src="IMAGE/totem.png" alt="" class="totem-image">
+        <img src="images/totem.png" alt="" class="totem-image">
     </div>
 
     <h1>📚 文献阅览室</h1>
 
-    <div id="pdf-list"></div>
+    <div id="pdf-list">
+        <p style="text-align: center; color: #888;">正在校验文献链接，请稍候...</p>
+    </div>
     <a class="pdf-link" href="index.html">返回主页</a>
 
 </div>
 
 <a href="#" id="back-to-top" title="返回顶部">↑</a>
 
-<!-- 1. 首先引入存储 PDF 列表的数据文件 -->
-<script src="JS/pdf-data.js"></script>
+<script src="js/pdf-data.js"></script>
 
-<!-- 2. 然后，再执行使用这些数据的页面逻辑 -->
 <script>
     const pdfJsViewer = "https://mozilla.github.io/pdf.js/web/viewer.html?file=";
     const listContainer = document.getElementById("pdf-list");
 
-    pdfFiles.forEach(pdf => {
-        const link = document.createElement("a");
-        link.className = "pdf-link";
-        link.href = pdfJsViewer + encodeURIComponent(pdf.file);
-        link.textContent = `阅读《${pdf.title}》`;
-        link.target = "_blank";
-        listContainer.appendChild(link);
-    });
+    // 智能选择最佳PDF链接的函数
+    async function getBestPdfUrl(pdf) {
+        const remoteUrl = pdf.remoteFile;
+        // 构建本地文件的绝对URL
+        const localUrl = new URL(pdf.localFile, window.location.href).href;
+
+        // 设置一个2500毫秒（2.5秒）的超时Promise
+        const timeoutPromise = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('Timeout')), 2500)
+        );
+
+        try {
+            // 使用Promise.race，看是fetch成功还是超时先发生
+            const response = await Promise.race([
+                fetch(remoteUrl, { mode: 'no-cors' }), // no-cors模式用于快速探测，不读取内容
+                timeoutPromise
+            ]);
+            // 如果fetch成功，则使用速度更快的远程链接
+            console.log(`'${pdf.title}' 使用远程链接.`);
+            return remoteUrl;
+        } catch (error) {
+            // 如果超时或fetch失败，则回退到本地链接
+            console.log(`'${pdf.title}' 链接超时或失败, 回退至本地链接.`);
+            return localUrl;
+        }
+    }
+
+    // 异步生成所有链接
+    async function generateLinks() {
+        // 清空“加载中”的提示
+        listContainer.innerHTML = '';
+
+        for (const pdf of pdfFiles) {
+            const bestUrl = await getBestPdfUrl(pdf);
+
+            const link = document.createElement("a");
+            link.className = "pdf-link";
+            link.href = pdfJsViewer + encodeURIComponent(bestUrl);
+            link.textContent = `阅读《${pdf.title}》`;
+            link.target = "_blank";
+            listContainer.appendChild(link);
+        }
+    }
+
+    // 启动链接生成过程
+    generateLinks();
+
 </script>
 
-<!-- 3. 最后引入全站通用的交互脚本 -->
-<script src="JS/main.js"></script>
+<script src="js/main.js"></script>
 
 </body>
 </html>
