@@ -37,9 +37,9 @@
         // 构建本地文件的绝对URL
         const localUrl = new URL(pdf.localFile, window.location.href).href;
 
-        // 设置一个2500毫秒（2.5秒）的超时Promise
+        // 设置一个2000毫秒（2秒）的超时Promise
         const timeoutPromise = new Promise((_, reject) =>
-            setTimeout(() => reject(new Error('Timeout')), 2500)
+            setTimeout(() => reject(new Error('Timeout')), 2000)
         );
 
         try {
