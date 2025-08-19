@@ -435,3 +435,99 @@ html {
         display: none;
     }
 }
+
+/* --- 【新增】移动端目录触发按钮 --- */
+#mobile-directory-trigger {
+    display: none; /* 默认在桌面端隐藏 */
+    position: fixed;
+    top: 15px;
+    right: 15px;
+    width: 44px;
+    height: 44px;
+    background-color: rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border: 1px solid #eaeaea;
+    border-radius: 50%;
+    color: #3a3a3a;
+    font-size: 24px;
+    line-height: 44px;
+    text-align: center;
+    cursor: pointer;
+    z-index: 1001; /* 要比滑入菜单的层级高 */
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    transition: transform 0.3s ease;
+}
+
+#mobile-directory-trigger:active {
+    transform: scale(0.9);
+}
+
+/* --- 【修改】响应式媒体查询 --- */
+@media (max-width: 1024px) {
+    /* 1. 在移动端隐藏桌面版圆点目录 */
+    .floating-directory {
+        /* 将其变形为滑入式菜单 */
+        position: fixed;
+        top: 0;
+        right: 0;
+        width: 280px;
+        height: 100%;
+        background-color: rgba(251, 250, 247, 0.95);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        transform: translateX(100%); /* 默认隐藏在屏幕右侧 */
+        transition: transform 0.4s ease;
+        padding: 80px 30px;
+        box-shadow: -5px 0 20px rgba(0, 0, 0, 0.1);
+        opacity: 1; /* 确保可见 */
+        display: block; /* 覆盖原来的 display: none */
+    }
+
+    /* 当菜单打开时 (JS会添加 .is-open 类) */
+    .floating-directory.is-open {
+        transform: translateX(0); /* 滑入屏幕 */
+    }
+
+    .floating-directory ul {
+        text-align: left;
+    }
+    
+    .floating-directory li {
+        margin: 25px 0;
+    }
+
+    /* 移动端菜单项使用完整的文字 */
+    .floating-directory a {
+        width: auto;
+        height: auto;
+        background: none;
+        border-radius: 0;
+        font-size: 18px; /* 更大的字体，便于点击 */
+        font-weight: bold;
+        color: #5b87a9;
+        /* 使用 data-title 的内容作为菜单文字 */
+        content: attr(data-title);
+    }
+    
+    /* 移动端菜单不再需要圆点和悬停放大效果 */
+    .floating-directory a:hover, .floating-directory a.active {
+        transform: none;
+        box-shadow: none;
+        background-color: transparent;
+        color: #a74141;
+    }
+    
+    .floating-directory a::after {
+        display: none; /* 隐藏桌面版的悬停文字标签 */
+    }
+
+    .floating-directory a::before {
+        display: none; /* 隐藏桌面版的激活竖线 */
+    }
+
+    /* 2. 在移动端显示触发按钮 */
+    #mobile-directory-trigger {
+        display: block;
+    }
+}
