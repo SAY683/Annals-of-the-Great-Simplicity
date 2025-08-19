@@ -314,3 +314,34 @@ h2:not(:first-of-type) + p::first-letter {
         font-size: 3.5em;
     }
 }
+
+/* --- 【新增】美学升级：PDF 阅览室加载动画 --- */
+.loader-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem 0;
+}
+
+.loader {
+    width: 32px;
+    height: 32px;
+    border: 4px solid #eaeaea; /* 旋转轨道的颜色 */
+    border-top-color: #5b87a9; /* 旋转活动部分的颜色，与主题链接色一致 */
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-bottom: 1rem;
+}
+
+.loading-text {
+    text-align: center;
+    color: #888;
+    font-size: 0.95em;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}

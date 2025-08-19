@@ -16,9 +16,14 @@
 
     <h1>📚 文献阅览室</h1>
 
+    <!-- 升级：使用新的加载动画和文本 -->
     <div id="pdf-list">
-        <p style="text-align: center; color: #888;">正在校验文献链接，请稍候...</p>
+        <div class="loader-container">
+            <div class="loader"></div>
+            <p class="loading-text">正在校验文献链接，请稍候...</p>
+        </div>
     </div>
+    
     <a class="pdf-link" href="index.html">返回主页</a>
 
 </div>
@@ -31,40 +36,43 @@
     const pdfJsViewer = "https://mozilla.github.io/pdf.js/web/viewer.html?file=";
     const listContainer = document.getElementById("pdf-list");
 
-    // 智能选择最佳PDF链接的函数
+    // 智能选择最佳PDF链接的函数 (此函数保持不变)
     async function getBestPdfUrl(pdf) {
         const remoteUrl = pdf.remoteFile;
-        // 构建本地文件的绝对URL
         const localUrl = new URL(pdf.localFile, window.location.href).href;
 
-        // 设置一个1000毫秒（1秒）的超时Promise
+          // 设置一个1800毫秒（1.8秒）的超时Promise
         const timeoutPromise = new Promise((_, reject) =>
-            setTimeout(() => reject(new Error('Timeout')), 1000)
+            setTimeout(() => reject(new Error('Timeout')), 1800)
         );
 
         try {
-            // 使用Promise.race，看是fetch成功还是超时先发生
-            const response = await Promise.race([
-                fetch(remoteUrl, { mode: 'no-cors' }), // no-cors模式用于快速探测，不读取内容
+            await Promise.race([
+                fetch(remoteUrl, { mode: 'no-cors' }),
                 timeoutPromise
             ]);
-            // 如果fetch成功，则使用速度更快的远程链接
             console.log(`'${pdf.title}' 使用远程链接.`);
             return remoteUrl;
         } catch (error) {
-            // 如果超时或fetch失败，则回退到本地链接
             console.log(`'${pdf.title}' 链接超时或失败, 回退至本地链接.`);
             return localUrl;
         }
     }
 
-    // 异步生成所有链接
-    async function generateLinks() {
-        // 清空“加载中”的提示
+    // 升级：并行生成所有链接
+    async function generateLinksParallel() {
+        // 1. 创建一个包含所有检测任务 (Promise) 的数组
+        const checkPromises = pdfFiles.map(pdf => getBestPdfUrl(pdf));
+        
+        // 2. 使用 Promise.all 等待所有检测任务并行完成
+        const bestUrls = await Promise.all(checkPromises);
+        
+        // 3. 清空加载动画
         listContainer.innerHTML = '';
 
-        for (const pdf of pdfFiles) {
-            const bestUrl = await getBestPdfUrl(pdf);
+        // 4. 一次性将所有已确认的链接渲染到页面上
+        pdfFiles.forEach((pdf, index) => {
+            const bestUrl = bestUrls[index]; // 从结果数组中获取对应的最佳链接
 
             const link = document.createElement("a");
             link.className = "pdf-link";
@@ -72,11 +80,11 @@
             link.textContent = `阅读《${pdf.title}》`;
             link.target = "_blank";
             listContainer.appendChild(link);
-        }
+        });
     }
 
-    // 启动链接生成过程
-    generateLinks();
+    // 启动并行链接生成过程
+    generateLinksParallel();
 
 </script>
 
