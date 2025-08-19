@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>太易词典 & 心得札记 - Annals of the Great Simplicity</title>
+    <link rel="stylesheet" href="CSS/style.css">
+</head>
+<body>
+
+<div class="container">
+
+    <div class="totem-container">
+        <img src="IMAGE/totem.png" alt="" class="totem-image">
+    </div>
+
+    <h1>太易词典 & 心得札记</h1>
+
+    <h2 id="glossary-section">太易词典：符号之钥</h2>
+    <div id="glossary-container">
+        <!-- 词典内容将由 JS 动态加载于此 -->
+    </div>
+
+    <hr>
+
+    <h2 id="insights-section">心得札记</h2>
+    <div id="insights-container">
+        <!-- 心得体会内容将由 JS 动态加载于此 -->
+    </div>
+
+    <footer class="footer">
+        <p><a href="index.html">返回主页</a></p>
+    </footer>
+
+</div>
+
+<!-- 彩蛋的隐藏浮层 (美学升级版) -->
+<div id="secret-overlay">
+    <div class="secret-content">
+        <!-- 新增: 优雅的SVG问号图标 -->
+        <svg class="secret-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"></circle>
+            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+        </svg>
+        <!-- 将问题分行，便于逐行浮现 -->
+        <p class="secret-line-1">为何要信我呢？</p>
+        <p class="secret-line-2">信信之道在何处呢？</p>
+        <small>(再次点击以关闭)</small>
+    </div>
+</div>
+
+<a href="#" id="back-to-top" title="返回顶部">↑</a>
+
+<!-- 必须按此顺序引入脚本 -->
+<script src="JS/glossary-data.js"></script>
+<script src="JS/insights-data.js"></script>
+<script src="JS/glossary-loader.js"></script>
+<script src="JS/main.js"></script>
+
+</body>
+</html>

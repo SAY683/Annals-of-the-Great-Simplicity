@@ -531,3 +531,226 @@ html {
         display: block;
     }
 }
+
+/* --- 【新增】词典与心得页面样式 --- */
+
+/* 复用并统一卡片链接样式 */
+.link-card-section {
+    margin-top: 4em;
+    display: flex;
+    justify-content: center;
+}
+
+.link-card {
+    max-width: 600px;
+    background-color: #ffffff;
+    border: 1px solid #eaeaea;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.04);
+    padding: 2rem 2.5rem;
+    text-align: center;
+    border-radius: 8px;
+    transition: all 0.3s ease-in-out;
+}
+
+.link-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.07);
+}
+
+.link-card-title {
+    font-family: 'Songti SC', 'STSong', 'SimSun', serif;
+    font-size: 1.6em;
+    font-weight: bold;
+    color: #5b87a9;
+    margin-bottom: 0.8em;
+    border-bottom: 1px solid #eaeaea;
+    padding-bottom: 0.4em;
+}
+
+.link-card p {
+    font-size: 1em;
+    color: #555;
+    margin-bottom: 1.5em;
+}
+
+.link-card-button {
+    display: inline-block;
+    font-size: 1.1em;
+    color: #5b87a9;
+    border: 1px solid #5b87a9;
+    padding: 0.5em 1.5em;
+    border-radius: 4px;
+    text-decoration: none;
+    transition: all 0.3s ease;
+}
+
+.link-card-button:hover {
+    color: #fff;
+    background-color: #5b87a9;
+    border-color: #5b87a9;
+}
+
+/* 词典定义列表样式 */
+dl {
+    margin: 2em 0;
+}
+
+dt {
+    font-family: 'Songti SC', 'STSong', serif;
+    font-size: 1.3em;
+    font-weight: 600;
+    color: #a74141;
+    margin-top: 2em;
+}
+
+dd {
+    margin-left: 0;
+    padding-bottom: 1.5em;
+    border-bottom: 1px dotted #ccc;
+}
+
+/* 心得卡片样式 */
+.insight-card {
+    margin-bottom: 3em;
+}
+
+.insight-title {
+    border-bottom: none;
+    margin-bottom: 0.5em;
+}
+
+.insight-content {
+    text-align: justify;
+}
+
+/* 彩蛋样式 */
+.secret-key {
+    color: #3b3b3a; /* 与正文颜色 #3a3a3a 只有极细微的差别 */
+    cursor: pointer;
+    border-bottom: 1px dotted #555;
+}
+
+.secret-key:hover {
+    color: #a74141;
+    border-bottom-color: #a74141;
+}
+
+#secret-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.85);
+    backdrop-filter: blur(5px);
+    -webkit-backdrop-filter: blur(5px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.5s ease, visibility 0.5s ease;
+    z-index: 2000;
+    cursor: pointer;
+}
+
+#secret-overlay.visible {
+    opacity: 1;
+    visibility: visible;
+}
+
+/* 覆盖并重置 secret-content 的样式 */
+.secret-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+/* SVG 图标样式 */
+.secret-icon {
+    width: 64px;
+    height: 64px;
+    color: rgba(251, 250, 247, 0.8);
+    margin-bottom: 2.5rem;
+    opacity: 0;
+    transform: scale(0.8);
+}
+
+/* 问题文本的通用样式 */
+.secret-content p {
+    font-family: 'KaiTi', 'STKaiti', serif;
+    font-size: 1.8em;
+    color: #fbfaf7;
+    text-align: center;
+    line-height: 2;
+    opacity: 0;
+    transform: translateY(15px);
+}
+
+.secret-content small {
+    opacity: 0;
+    transform: translateY(15px);
+}
+
+/* 当浮层变得可见时，触发内部元素的动画 */
+#secret-overlay.visible .secret-icon {
+    animation: fadeInScale 0.8s ease-out forwards;
+}
+
+#secret-overlay.visible .secret-line-1 {
+    animation: fadeInUp 0.8s 0.5s ease-out forwards; /* 延迟0.5秒出现 */
+}
+
+#secret-overlay.visible .secret-line-2 {
+    animation: fadeInUp 0.8s 1.2s ease-out forwards; /* 延迟1.2秒出现 */
+}
+
+#secret-overlay.visible small {
+    animation: fadeInUp 0.8s 2.0s ease-out forwards; /* 最后出现 */
+}
+
+/* 定义动画 */
+@keyframes fadeInScale {
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+@keyframes fadeInUp {
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* --- 【新增】美学微调：统一卡片主副标题样式 --- */
+.link-card-title small {
+    display: block;
+    font-size: 0.6em;
+    font-weight: 400;
+    color: #666;
+    margin-top: 0.5rem;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; /* 副标题使用无衬线体，形成对比美感 */
+}
+
+/* --- 【新增】美学统一：心得札记采用主页正文风格 --- */
+.insight-content::first-letter {
+    font-family: 'Songti SC', 'STSong', serif;
+    font-size: 3.8em;
+    float: left;
+    line-height: 0.8;
+    margin-top: 0.05em;
+    margin-right: 0.1em;
+    color: #a74141;
+    font-weight: 600;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+/* 确保在移动端也进行适配 */
+@media (max-width: 768px) {
+    .insight-content::first-letter {
+        font-size: 3.5em;
+    }
+}
