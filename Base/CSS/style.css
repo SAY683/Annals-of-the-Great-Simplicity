@@ -345,3 +345,93 @@ h2:not(:first-of-type) + p::first-letter {
         transform: rotate(360deg);
     }
 }
+
+/* --- 【新增】交互升级：悬浮微型目录 (美学升级版) --- */
+
+/* 启用全局平滑滚动 */
+html {
+    scroll-behavior: smooth;
+}
+
+.floating-directory {
+    position: fixed;
+    top: 50%;
+    right: 30px; /* 稍微增加与边缘的距离 */
+    transform: translateY(-50%);
+    z-index: 100;
+    opacity: 0; /* 默认透明，通过JS控制其浮现 */
+    transition: opacity 0.5s ease;
+}
+
+/* 当页面向下滚动时，JS会添加 .visible 类 */
+.floating-directory.visible {
+    opacity: 1;
+}
+
+.floating-directory ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.floating-directory li {
+    margin: 20px 0; /* 增加圆点之间的垂直间距 */
+}
+
+/* 默认状态的圆点 */
+.floating-directory a {
+    display: block;
+    width: 8px;
+    height: 8px;
+    background-color: #ccc; /* 默认颜色更柔和 */
+    border-radius: 50%;
+    transition: all 0.3s ease;
+    /* 移除所有文字和下划线效果 */
+    text-decoration: none;
+    border-bottom: none;
+    font-size: 0;
+}
+
+/* 鼠标悬停在圆点上时 */
+.floating-directory a:hover {
+    transform: scale(1.5); /* 放大效果 */
+}
+
+/* 当前章节对应的“激活”圆点 */
+.floating-directory a.active {
+    background-color: #a74141; /* 变为主题红色 */
+    transform: scale(1.8); /* 激活时更大更醒目 */
+    box-shadow: 0 0 10px rgba(167, 65, 65, 0.5); /* 添加辉光效果 */
+}
+
+/* 悬停时浮现的文字标签 (Tooltip) */
+.floating-directory a::after {
+    content: attr(data-title); /* 从 data-title 属性获取文字 */
+    position: absolute;
+    top: 50%;
+    right: 100%;
+    transform: translateY(-50%);
+    margin-right: 15px; /* 与圆点的间距 */
+    padding: 5px 12px;
+    background-color: rgba(58, 58, 58, 0.9); /* 深色背景 */
+    color: #fbfaf7; /* 柔和的白色文字 */
+    font-family: 'Songti SC', 'STSong', serif;
+    font-size: 14px;
+    white-space: nowrap;
+    border-radius: 4px;
+    opacity: 0; /* 默认隐藏 */
+    visibility: hidden;
+    transition: opacity 0.3s ease, visibility 0.3s ease;
+}
+
+.floating-directory a:hover::after {
+    opacity: 1; /* 悬停时显示 */
+    visibility: visible;
+}
+
+/* 在小屏幕上（如平板和手机）自动隐藏目录，避免遮挡内容 */
+@media (max-width: 1024px) {
+    .floating-directory {
+        display: none;
+    }
+}
