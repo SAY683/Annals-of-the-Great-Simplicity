@@ -4,9 +4,12 @@ const path = require('path');
 const { execSync } = require('child_process');
 
 // --- 配置区 ---
+// 您的 GitHub 用户名和仓库名
 const GITHUB_USER = 'SAY683';
 const GITHUB_REPO = 'Annals-of-the-Great-Simplicity';
-const SOURCE_DIRS = ['Miscellanies', '.'];
+// 需要扫描PDF的源文件夹 (相对于项目根目录)
+const SOURCE_DIRS = ['Miscellanies']; // '.' 代表根目录（现暂且不展示）
+// 最终生成的js数据文件要输出到哪里
 const OUTPUT_FILE = path.join('Base', 'JS', 'pdf-data.js');
 // -----------------
 
