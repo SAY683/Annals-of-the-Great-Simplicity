@@ -12,6 +12,8 @@ cp *.pdf Base/Miscellanies/
 
 # 3. 从根目录的 Miscellanies 文件夹复制所有PDF
 echo "Copying source Miscellanies PDFs to Base/Miscellanies..."
+
+# 4. 告诉脚本复制 Miscellanies 文件夹里的所有PDF
 cp Miscellanies/*.pdf Base/Miscellanies/
 
 echo "File copy script finished successfully."
