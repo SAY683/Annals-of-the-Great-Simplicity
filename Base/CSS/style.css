@@ -754,3 +754,24 @@ dd {
         font-size: 3.5em;
     }
 }
+
+/* --- 【新增】阅读模式切换器样式 --- */
+#mode-switcher {
+    text-align: center;
+    margin: -1rem 0 2.5rem 0; /* 调整位置，使其在标题和列表之间 */
+    font-size: 0.9em;
+    color: #888;
+}
+
+#mode-toggle-button {
+    color: #5b87a9;
+    font-weight: 600;
+    cursor: pointer;
+    border-bottom: 1px dotted #5b87a9;
+    text-decoration: none;
+}
+
+#mode-toggle-button:hover {
+    color: #a74141;
+    border-bottom-color: #a74141;
+}

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>文献阅览室 - PDF.js 阅读器</title>
+    <title>文献阅览室 - Annals of the Great Simplicity</title>
     <link rel="stylesheet" href="CSS/style.css">
 </head>
 <body>
@@ -16,11 +16,18 @@
 
     <h1>📚 文献阅览室</h1>
 
-    <!-- 升级：使用新的加载动画和文本 -->
+    <!-- 【新增】阅读模式切换器 -->
+    <div id="mode-switcher">
+        <span id="mode-text">网络不佳？可切换至</span>
+        <a href="#" id="mode-toggle-button">[ 大陆直连 ]</a>
+        <span id="mode-suffix">模式</span>
+    </div>
+
     <div id="pdf-list">
+        <!-- 初始加载动画 -->
         <div class="loader-container">
             <div class="loader"></div>
-            <p class="loading-text">正在校验文献链接，请稍候...</p>
+            <p class="loading-text">正在为您准备最佳链接...</p>
         </div>
     </div>
     
@@ -35,56 +42,80 @@
 <script>
     const pdfJsViewer = "https://mozilla.github.io/pdf.js/web/viewer.html?file=";
     const listContainer = document.getElementById("pdf-list");
+    const modeSwitcher = document.getElementById("mode-switcher");
+    const modeText = document.getElementById("mode-text");
+    const modeToggleButton = document.getElementById("mode-toggle-button");
 
-    // 智能选择最佳PDF链接的函数 (此函数保持不变)
-    async function getBestPdfUrl(pdf) {
-        const remoteUrl = pdf.remoteFile;
-        const localUrl = new URL(pdf.localFile, window.location.href).href;
+    // 1. 状态管理：从 sessionStorage 读取模式，默认为 'remote' (高速网络)
+    let currentMode = sessionStorage.getItem('readingMode') || 'remote';
 
-          // 设置一个1800毫秒（1.8秒）的超时Promise
-        const timeoutPromise = new Promise((_, reject) =>
-            setTimeout(() => reject(new Error('Timeout')), 1800)
-        );
-
-        try {
-            await Promise.race([
-                fetch(remoteUrl, { mode: 'no-cors' }),
-                timeoutPromise
-            ]);
-            console.log(`'${pdf.title}' 使用远程链接.`);
-            return remoteUrl;
-        } catch (error) {
-            console.log(`'${pdf.title}' 链接超时或失败, 回退至本地链接.`);
-            return localUrl;
+    // 2. UI 更新函数：根据当前模式更新切换器的文本
+    function updateSwitcherUI() {
+        if (currentMode === 'remote') {
+            modeText.textContent = '网络不佳？可切换至';
+            modeToggleButton.textContent = '[ 大陆直连 ]';
+        } else {
+            modeText.textContent = '当前为 [大陆直连] 模式，可切换至';
+            modeToggleButton.textContent = '[ 高速网络 ]';
         }
     }
 
-    // 升级：并行生成所有链接
-    async function generateLinksParallel() {
-        // 1. 创建一个包含所有检测任务 (Promise) 的数组
-        const checkPromises = pdfFiles.map(pdf => getBestPdfUrl(pdf));
-        
-        // 2. 使用 Promise.all 等待所有检测任务并行完成
-        const bestUrls = await Promise.all(checkPromises);
-        
-        // 3. 清空加载动画
+    // 3. 链接渲染核心函数：根据指定模式生成链接列表
+    async function renderLinks(mode) {
+        // a. 显示加载动画
+        listContainer.innerHTML = `
+            <div class="loader-container">
+                <div class="loader"></div>
+                <p class="loading-text">${mode === 'remote' ? '正在为您准备最佳链接...' : '正在加载本地文库...'}</p>
+            </div>`;
+
+        // b. 根据模式，准备链接获取任务 (Promises)
+        const urlPromises = pdfFiles.map(pdf => {
+            const localUrl = new URL(pdf.localFile, window.location.href).href;
+            if (mode === 'local') {
+                // 本地模式：直接返回本地链接，无需等待
+                return Promise.resolve(localUrl);
+            } else {
+                // 远程模式：执行竞速测试
+                const remoteUrl = pdf.remoteFile;
+                const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 1500));
+                return Promise.race([fetch(remoteUrl, { mode: 'no-cors' }), timeoutPromise])
+                    .then(() => remoteUrl) // 成功则使用远程
+                    .catch(() => localUrl); // 失败则回退到本地
+            }
+        });
+
+        // c. 等待所有链接准备就绪
+        const urls = await Promise.all(urlPromises);
+
+        // d. 清空加载动画并渲染最终链接
         listContainer.innerHTML = '';
-
-        // 4. 一次性将所有已确认的链接渲染到页面上
         pdfFiles.forEach((pdf, index) => {
-            const bestUrl = bestUrls[index]; // 从结果数组中获取对应的最佳链接
-
             const link = document.createElement("a");
             link.className = "pdf-link";
-            link.href = pdfJsViewer + encodeURIComponent(bestUrl);
+            link.href = pdfJsViewer + encodeURIComponent(urls[index]);
             link.textContent = `阅读《${pdf.title}》`;
             link.target = "_blank";
             listContainer.appendChild(link);
         });
     }
 
-    // 启动并行链接生成过程
-    generateLinksParallel();
+    // 4. 切换按钮的事件监听
+    modeToggleButton.addEventListener('click', (e) => {
+        e.preventDefault();
+        // 切换模式
+        currentMode = (currentMode === 'remote') ? 'local' : 'remote';
+        // 存储新模式到 sessionStorage
+        sessionStorage.setItem('readingMode', currentMode);
+        // 更新UI
+        updateSwitcherUI();
+        // 以新模式重新渲染所有链接
+        renderLinks(currentMode);
+    });
+
+    // 5. 页面初始加载
+    updateSwitcherUI();
+    renderLinks(currentMode);
 
 </script>
 
