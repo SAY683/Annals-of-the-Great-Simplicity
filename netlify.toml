@@ -1,0 +1,17 @@
+# netlify.toml
+
+# 这是我们告诉 Netlify 构建流程的核心配置
+[build]
+  command = "npm run build"
+  publish = "Base/"
+
+# 【新增】CORS Headers 配置
+[[headers]]
+  for = "/Miscellanies/*.pdf" # 匹配 /Miscellanies/ 文件夹下所有 .pdf 文件
+  [headers.values]
+    Access-Control-Allow-Origin = "*" # 允许所有源访问这些PDF文件
+
+[[headers]]
+  for = "/*.pdf" # 匹配根目录下所有 .pdf 文件 (如果您根目录也有PDF的话)
+  [headers.values]
+    Access-Control-Allow-Origin = "*"
