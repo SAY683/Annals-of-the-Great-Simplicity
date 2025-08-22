@@ -1,0 +1,9 @@
+{
+  "name": "annals-of-the-great-simplicity-builder",
+  "version": "1.0.0",
+  "description": "Build script for the project.",
+  "private": true,
+  "scripts": {
+    "build": "node generate-pdf-data.js && sh Base/build.sh"
+  }
+}
