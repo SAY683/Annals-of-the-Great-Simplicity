@@ -776,47 +776,62 @@ dd {
     border-bottom-color: #a74141;
 }
 
-/* --- 【新增】PDF Viewer 页面专属壁纸 (美学优化版) --- */
+/* --- 【新增】PDF Viewer 页面专属背景氛围 --- */
 
-/* 1. 为 viewer-page 的 body 设置背景 */
+/* 1. 为 viewer-page 的 body 设置经过“处理”的背景 */
 .viewer-page {
-    background-image: linear-gradient(rgba(11, 23, 36, 0.4), rgba(58, 43, 43, 0.4)), url('../IMAGE/glossary-bg.png');
-    /* 
-       ↑↑ 关键优化：在图片上叠加了一层从深蓝到暗红的半透明渐变蒙版，
-          使其色调与您的主题色 (蓝色链接 a, 红色强调 strong) 产生共鸣。
-    */
+    position: relative; /* 为伪元素蒙版定位 */
+    background-image: url('../IMAGE/glossary-bg.png'); /* 保持图片源 */
     background-size: cover;
     background-position: center center;
     background-attachment: fixed;
     background-repeat: no-repeat;
 }
 
-/* 2. 重塑内容容器，实现通透的“磨砂玻璃”效果 */
+/* 2. 【核心优化】创建一层覆盖整个页面的“氛围蒙版” */
+.viewer-page::before {
+    content: '';
+    position: fixed; /* 固定在视窗上 */
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: -1; /* 将其置于所有内容的下方 */
+    
+    /* a. 柔和的纯色背景 */
+    background-color: #fbfaf7; /* 使用您网站的主背景色 */
+    
+    /* b. 将壁纸作为半透明的纹理叠加上去，并降低饱和度 */
+    background-image: 
+        linear-gradient(rgba(251, 250, 247, 0.85), rgba(251, 250, 247, 0.85)), /* 叠加一层85%不透明的主背景色，大幅弱化壁纸 */
+        url('../IMAGE/glossary-bg.png');
+    background-size: cover;
+    background-position: center center;
+    background-attachment: fixed;
+    
+    /* c. 降低壁纸的视觉冲击力 */
+    filter: saturate(40%) brightness(1.1); /* 大幅降低饱和度，并略微提亮，使其更像一种“质感” */
+}
+
+/* 3. 让内容容器与氛围背景融合得更自然 */
 .viewer-page .pdf-container {
-    background-color: rgba(251, 250, 247, 0.85); /* 更高的透明度 */
-    backdrop-filter: blur(10px); /* 更强的模糊效果，突出主体 */
-    -webkit-backdrop-filter: blur(10px);
-    border: 1px solid rgba(255, 255, 255, 0.2); /* 使用柔和的亮色边框 */
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3); /* 更具纵深感的阴影 */
+    /* 之前是 0.92 的白色，现在我们让它更透明，更能透出背景的质感 */
+    background-color: rgba(255, 255, 255, 0.85); 
+    border: 1px solid rgba(234, 234, 234, 0.7); /* 边框也略微透明 */
+    box-shadow: 0 5px 25px rgba(0, 0, 0, 0.07); /* 阴影可以稍微加强，以突出层次 */
 }
 
-/* 3. 增强核心元素的视觉清晰度和立体感 */
-.viewer-page .pdf-container h1,
-.viewer-page .pdf-container .pdf-link {
-    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.2); /* 为标题和链接添加更清晰的阴影 */
+/* 4. （可选）为 pdf-container 增加一个微妙的边框光晕 */
+.viewer-page .pdf-container {
+    position: relative;
 }
 
-/* 4. 让链接卡片在磨砂背景上更突出 */
-.viewer-page .pdf-container .pdf-link {
-    background-color: rgba(255, 255, 255, 0.3); /* 链接本身也带一点半透明背景 */
-    border-color: rgba(91, 135, 169, 0.7); /* 边框也带透明度 */
-    transition: all 0.3s ease;
-}
-
-.viewer-page .pdf-container .pdf-link:hover {
-    background-color: #5b87a9; /* 悬停时变为不透明，提供清晰的反馈 */
-    color: #fff;
-    border-color: #5b87a9;
-    box-shadow: 0 4px 15px rgba(91, 135, 169, 0.4);
-    transform: translateY(-2px);
+.viewer-page .pdf-container::before {
+    content: '';
+    position: absolute;
+    top: -2px; left: -2px; right: -2px; bottom: -2px;
+    background: linear-gradient(to bottom, #fff, transparent);
+    border-radius: 10px; /* 比容器的圆角稍大 */
+    z-index: -1;
+    opacity: 0.5;
 }
