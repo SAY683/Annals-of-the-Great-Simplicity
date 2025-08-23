@@ -776,62 +776,47 @@ dd {
     border-bottom-color: #a74141;
 }
 
-/* --- 【新增】PDF Viewer 页面专属背景氛围 --- */
+/* --- 【新增】PDF Viewer 页面专属“窗景”氛围 --- */
 
-/* 1. 为 viewer-page 的 body 设置经过“处理”的背景 */
+/* 1. 准备好 body，为伪元素定位 */
 .viewer-page {
-    position: relative; /* 为伪元素蒙版定位 */
-    background-image: url('../IMAGE/glossary-bg.png'); /* 保持图片源 */
-    background-size: cover;
-    background-position: center center;
-    background-attachment: fixed;
-    background-repeat: no-repeat;
+    position: relative;
+    /* 移除直接在 body 上的背景设置，交由伪元素全权处理 */
+    background: #fbfaf7; /* 保留一个纯色基础背景 */
 }
 
-/* 2. 【核心优化】创建一层覆盖整个页面的“氛围蒙版” */
+/* 2. 【核心】创建“窗外风景”伪元素层 */
 .viewer-page::before {
     content: '';
-    position: fixed; /* 固定在视窗上 */
+    position: fixed;
     top: 0;
     left: 0;
     width: 100%;
     height: 100%;
-    z-index: -1; /* 将其置于所有内容的下方 */
-    
-    /* a. 柔和的纯色背景 */
-    background-color: #fbfaf7; /* 使用您网站的主背景色 */
-    
-    /* b. 将壁纸作为半透明的纹理叠加上去，并降低饱和度 */
-    background-image: 
-        linear-gradient(rgba(251, 250, 247, 0.85), rgba(251, 250, 247, 0.85)), /* 叠加一层85%不透明的主背景色，大幅弱化壁纸 */
-        url('../IMAGE/glossary-bg.png');
+    z-index: -1; /* 确保它在所有内容的绝对底层 */
+
+    background-image: url('../IMAGE/glossary-bg.png');
     background-size: cover;
     background-position: center center;
-    background-attachment: fixed;
     
-    /* c. 降低壁纸的视觉冲击力 */
-    filter: saturate(40%) brightness(1.1); /* 大幅降低饱和度，并略微提亮，使其更像一种“质感” */
+    /* a. 【窗景之魂】施加强烈的高斯模糊 */
+    filter: blur(8px); /* 8px 是一个很好的起始值，可以根据图片调整 */
+    
+    /* b. 【锦上添花】略微放大背景，防止模糊后边缘出现空白 */
+    transform: scale(1.05); 
 }
 
-/* 3. 让内容容器与氛围背景融合得更自然 */
+/* 3. 【核心】将内容容器变为“毛玻璃” */
 .viewer-page .pdf-container {
-    /* 之前是 0.92 的白色，现在我们让它更透明，更能透出背景的质感 */
-    background-color: rgba(255, 255, 255, 0.85); 
-    border: 1px solid rgba(234, 234, 234, 0.7); /* 边框也略微透明 */
-    box-shadow: 0 5px 25px rgba(0, 0, 0, 0.07); /* 阴影可以稍微加强，以突出层次 */
-}
-
-/* 4. （可选）为 pdf-container 增加一个微妙的边框光晕 */
-.viewer-page .pdf-container {
-    position: relative;
-}
-
-.viewer-page .pdf-container::before {
-    content: '';
-    position: absolute;
-    top: -2px; left: -2px; right: -2px; bottom: -2px;
-    background: linear-gradient(to bottom, #fff, transparent);
-    border-radius: 10px; /* 比容器的圆角稍大 */
-    z-index: -1;
-    opacity: 0.5;
+    /* a. 半透明的背景，让“窗景”透过来 */
+    background-color: rgba(255, 255, 255, 0.75);
+    
+    /* b. 【毛玻璃之魂】对容器背后的内容施加模糊和色彩增强 */
+    backdrop-filter: blur(4px) saturate(180%); 
+    -webkit-backdrop-filter: blur(4px) saturate(180%);
+    
+    /* c. 更具质感的边框和阴影 */
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.1);
+    border-radius: 12px; /* 稍大的圆角更柔和 */
 }
