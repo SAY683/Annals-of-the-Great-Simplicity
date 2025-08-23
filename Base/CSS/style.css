@@ -775,3 +775,42 @@ dd {
     color: #a74141;
     border-bottom-color: #a74141;
 }
+
+/* --- 【新增】Glossary 页面专属壁纸 --- */
+
+/* 1. 为 glossary-page 的 body 设置背景 */
+.glossary-page {
+    /* 设置背景图片路径 */
+    background-image: url('../IMAGE/glossary-bg.png');
+    
+    /* 关键属性，让背景图固定且覆盖全屏 */
+    background-size: cover;
+    background-position: center center;
+    background-attachment: fixed;
+    background-repeat: no-repeat;
+}
+
+/* 2. 为内容容器添加半透明背景，以保证文字可读性 */
+.glossary-page .container {
+    background-color: rgba(255, 255, 255, 0.92); /* 带有很高不透明度的白色背景 */
+    backdrop-filter: blur(3px); /* 轻微的毛玻璃效果，提升质感 */
+    -webkit-backdrop-filter: blur(3px);
+}
+
+/* 3. 在暗夜模式下的适配 (如果您未来添加暗夜模式) */
+/* 这是一个预留的样式，您可以先放着，以备后用 */
+/*
+body.dark-mode .glossary-page .container {
+    background-color: rgba(30, 30, 30, 0.92);
+}
+*/
+
+/* 4. 如果壁纸比较亮，可能需要增强文字阴影来保证可读性 */
+.glossary-page h1,
+.glossary-page h2,
+.glossary-page dt,
+.glossary-page dd,
+.glossary-page .insight-title,
+.glossary-page .insight-content {
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
