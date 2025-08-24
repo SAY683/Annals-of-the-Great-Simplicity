@@ -8,7 +8,7 @@ const { execSync } = require('child_process');
 const GITHUB_USER = 'SAY683';
 const GITHUB_REPO = 'Annals-of-the-Great-Simplicity';
 // 需要扫描PDF的源文件夹 (相对于项目根目录)
-const SOURCE_DIRS = ['Miscellanies',"Core Magician"]; // '.' 代表根目录（现[功能暂缓]暂不展示）
+const SOURCE_DIRS = ['Miscellanies',"Core-Magician"]; // '.' 代表根目录（现[功能暂缓]暂不展示）
 // 最终生成的js数据文件要输出到哪里
 const OUTPUT_FILE = path.join('Base', 'JS', 'pdf-data.js');
 // -----------------

@@ -16,6 +16,6 @@ echo "Copying source Miscellanies PDFs to Base/Miscellanies..."
 # 4. 告诉脚本复制 Miscellanies 文件夹里的所有PDF
 cp Miscellanies/*.pdf Base/Miscellanies/
 # 4.1 告诉脚本复制 Core Magician 文件夹里的所有PDF
-cp Core Magician/*.pdf Base/Miscellanies/
+cp Core-Magician/*.pdf Base/Miscellanies/
 
 echo "File copy script finished successfully."
