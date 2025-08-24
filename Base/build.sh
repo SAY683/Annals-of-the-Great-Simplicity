@@ -6,14 +6,16 @@
 # 1. 确保目标目录存在
 mkdir -p Base/Miscellanies
 
-# 2. 从根目录复制所有PDF
-echo "Copying root PDFs to Base/Miscellanies..."
-cp *.pdf Base/Miscellanies/
+# 2. 从根目录复制所有PDF(功能暂缓)
+# echo "Copying root PDFs to Base/Miscellanies..."
+# cp *.pdf Base/Miscellanies/
 
 # 3. 从根目录的 Miscellanies 文件夹复制所有PDF
 echo "Copying source Miscellanies PDFs to Base/Miscellanies..."
 
 # 4. 告诉脚本复制 Miscellanies 文件夹里的所有PDF
 cp Miscellanies/*.pdf Base/Miscellanies/
+# 4.1 告诉脚本复制 Core Magician 文件夹里的所有PDF
+cp Core Magician/*.pdf Base/Miscellanies/
 
 echo "File copy script finished successfully."
