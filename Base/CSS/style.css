@@ -98,9 +98,9 @@ strong {
 
 /* --- 链接样式 --- */
 a {
-    color: #5b87a9;
+    color: #0B6A7A;
     text-decoration: none;
-    border-bottom: 1px dotted #5b87a9;
+    border-bottom: 1px dotted #0B6A7A;
     transition: all 0.3s ease;
 }
 
@@ -133,14 +133,16 @@ a:hover {
     border-top: 1px solid #eee;
 }
 
-/* --- 文献阅览室入口卡片样式 --- */
-.pdf-link-section {
+/* --- 文献阅览室与词典入口卡片样式 --- */
+.pdf-link-section,
+.link-card-section {
     margin-top: 4em;
     display: flex;
     justify-content: center;
 }
 
-.pdf-link-card {
+.pdf-link-card,
+.link-card {
     max-width: 600px;
     background-color: #ffffff;
     border: 1px solid #eaeaea;
@@ -151,42 +153,47 @@ a:hover {
     transition: all 0.3s ease-in-out;
 }
 
-.pdf-link-card:hover {
+.pdf-link-card:hover,
+.link-card:hover {
     transform: translateY(-5px);
     box-shadow: 0 8px 25px rgba(0, 0, 0, 0.07);
 }
 
-.pdf-link-title {
+.pdf-link-title,
+.link-card-title {
     font-family: 'Songti SC', 'STSong', 'SimSun', serif;
     font-size: 1.6em;
     font-weight: bold;
-    color: #5b87a9;
+    color: #0B6A7A;
     margin-bottom: 0.8em;
     border-bottom: 1px solid #eaeaea;
     padding-bottom: 0.4em;
 }
 
-.pdf-link-card p {
+.pdf-link-card p,
+.link-card p {
     font-size: 1em;
     color: #555;
     margin-bottom: 1.5em;
 }
 
-.pdf-link-button {
+.pdf-link-button,
+.link-card-button {
     display: inline-block;
     font-size: 1.1em;
-    color: #5b87a9;
-    border: 1px solid #5b87a9;
+    color: #0B6A7A;
+    border: 1px solid #0B6A7A;
     padding: 0.5em 1.5em;
     border-radius: 4px;
     text-decoration: none;
     transition: all 0.3s ease;
 }
 
-.pdf-link-button:hover {
+.pdf-link-button:hover,
+.link-card-button:hover {
     color: #fff;
-    background-color: #5b87a9;
-    border-color: #5b87a9;
+    background-color: #0B6A7A;
+    border-color: #0B6A7A;
 }
 
 /* --- pdf-viewer.html 页面专属样式 --- */
@@ -209,8 +216,8 @@ a:hover {
     display: block;
     margin: 1rem 0;
     font-size: 1.1em;
-    color: #5b87a9;
-    border: 1px solid #5b87a9;
+    color: #0B6A7A;
+    border: 1px solid #0B6A7A;
     padding: 0.6em 1em;
     border-radius: 4px;
     text-align: center;
@@ -220,7 +227,7 @@ a:hover {
 
 .pdf-link:hover {
     color: #fff;
-    background-color: #5b87a9;
+    background-color: #0B6A7A;
 }
 
 /* --- 返回顶部按钮样式 --- */
@@ -236,18 +243,18 @@ a:hover {
     font-size: 20px;
     font-family: 'Songti SC', serif;
     color: #fff;
-    background-color: rgba(91, 135, 169, 0.7);
+    background-color: rgba(11, 106, 122, 0.7);
     border: none;
     border-radius: 50%;
     cursor: pointer;
     transition: all 0.3s ease;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
     text-decoration: none;
     border-bottom: none;
 }
 
 #back-to-top:hover {
-    background-color: rgb(91, 135, 169);
+    background-color: rgb(11, 106, 122);
     transform: translateY(-2px);
     border-bottom: none;
 }
@@ -271,7 +278,7 @@ a:hover {
 }
 
 /* --- 美学微调：正文章节首字下沉 --- */
-h2:not(:first-of-type) + p::first-letter {
+h2:not(:first-of-type)+p::first-letter {
     font-family: 'Songti SC', 'STSong', serif;
     font-size: 3.8em;
     float: left;
@@ -283,39 +290,7 @@ h2:not(:first-of-type) + p::first-letter {
     text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.1);
 }
 
-/* --- 响应式设计：优化移动端体验 --- */
-@media (max-width: 768px) {
-    body {
-        font-size: 16px;
-    }
-
-    .container, .pdf-container {
-        padding: 2rem 1.5rem;
-        margin: 1.5rem auto;
-    }
-
-    h1 {
-        font-size: 2em;
-    }
-
-    h2 {
-        font-size: 1.6em;
-    }
-
-    .pdf-link-card {
-        padding: 1.5rem;
-    }
-    
-    .totem-image {
-        max-width: 120px;
-    }
-
-    h2:not(:first-of-type) + p::first-letter {
-        font-size: 3.5em;
-    }
-}
-
-/* --- 【新增】美学升级：PDF 阅览室加载动画 --- */
+/* --- 美学升级：PDF 阅览室加载动画 --- */
 .loader-container {
     display: flex;
     flex-direction: column;
@@ -327,8 +302,8 @@ h2:not(:first-of-type) + p::first-letter {
 .loader {
     width: 32px;
     height: 32px;
-    border: 4px solid #eaeaea; /* 旋转轨道的颜色 */
-    border-top-color: #5b87a9; /* 旋转活动部分的颜色，与主题链接色一致 */
+    border: 4px solid #eaeaea;
+    border-top-color: #0B6A7A;
     border-radius: 50%;
     animation: spin 1s linear infinite;
     margin-bottom: 1rem;
@@ -346,9 +321,7 @@ h2:not(:first-of-type) + p::first-letter {
     }
 }
 
-/* --- 【新增】交互升级：悬浮微型目录 (美学升级版) --- */
-
-/* 启用全局平滑滚动 */
+/* --- 交互升级：悬浮微型目录 (美学升级版) --- */
 html {
     scroll-behavior: smooth;
 }
@@ -356,14 +329,13 @@ html {
 .floating-directory {
     position: fixed;
     top: 50%;
-    right: 30px; /* 稍微增加与边缘的距离 */
+    right: 30px;
     transform: translateY(-50%);
     z-index: 100;
-    opacity: 0; /* 默认透明，通过JS控制其浮现 */
+    opacity: 0;
     transition: opacity 0.5s ease;
 }
 
-/* 当页面向下滚动时，JS会添加 .visible 类 */
 .floating-directory.visible {
     opacity: 1;
 }
@@ -375,70 +347,58 @@ html {
 }
 
 .floating-directory li {
-    margin: 20px 0; /* 增加圆点之间的垂直间距 */
+    margin: 20px 0;
 }
 
-/* 默认状态的圆点 */
 .floating-directory a {
     display: block;
     width: 8px;
     height: 8px;
-    background-color: #ccc; /* 默认颜色更柔和 */
+    background-color: #ccc;
     border-radius: 50%;
     transition: all 0.3s ease;
-    /* 移除所有文字和下划线效果 */
     text-decoration: none;
     border-bottom: none;
     font-size: 0;
 }
 
-/* 鼠标悬停在圆点上时 */
 .floating-directory a:hover {
-    transform: scale(1.5); /* 放大效果 */
+    transform: scale(1.5);
 }
 
-/* 当前章节对应的“激活”圆点 */
 .floating-directory a.active {
-    background-color: #a74141; /* 变为主题红色 */
-    transform: scale(1.8); /* 激活时更大更醒目 */
-    box-shadow: 0 0 10px rgba(167, 65, 65, 0.5); /* 添加辉光效果 */
+    background-color: #a74141;
+    transform: scale(1.8);
+    box-shadow: 0 0 10px rgba(167, 65, 65, 0.5);
 }
 
-/* 悬停时浮现的文字标签 (Tooltip) */
 .floating-directory a::after {
-    content: attr(data-title); /* 从 data-title 属性获取文字 */
+    content: attr(data-title);
     position: absolute;
     top: 50%;
     right: 100%;
     transform: translateY(-50%);
-    margin-right: 15px; /* 与圆点的间距 */
+    margin-right: 15px;
     padding: 5px 12px;
-    background-color: rgba(58, 58, 58, 0.9); /* 深色背景 */
-    color: #fbfaf7; /* 柔和的白色文字 */
+    background-color: rgba(58, 58, 58, 0.9);
+    color: #fbfaf7;
     font-family: 'Songti SC', 'STSong', serif;
     font-size: 14px;
     white-space: nowrap;
     border-radius: 4px;
-    opacity: 0; /* 默认隐藏 */
+    opacity: 0;
     visibility: hidden;
     transition: opacity 0.3s ease, visibility 0.3s ease;
 }
 
 .floating-directory a:hover::after {
-    opacity: 1; /* 悬停时显示 */
+    opacity: 1;
     visibility: visible;
 }
 
-/* 在小屏幕上（如平板和手机）自动隐藏目录，避免遮挡内容 */
-@media (max-width: 1024px) {
-    .floating-directory {
-        display: none;
-    }
-}
-
-/* --- 【新增】移动端目录触发按钮 --- */
+/* --- 移动端目录触发按钮 --- */
 #mobile-directory-trigger {
-    display: none; /* 默认在桌面端隐藏 */
+    display: none;
     position: fixed;
     top: 15px;
     right: 15px;
@@ -454,7 +414,7 @@ html {
     line-height: 44px;
     text-align: center;
     cursor: pointer;
-    z-index: 1001; /* 要比滑入菜单的层级高 */
+    z-index: 1001;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
     transition: transform 0.3s ease;
 }
@@ -463,134 +423,7 @@ html {
     transform: scale(0.9);
 }
 
-/* --- 【修改】响应式媒体查询 --- */
-@media (max-width: 1024px) {
-    /* 1. 在移动端隐藏桌面版圆点目录 */
-    .floating-directory {
-        /* 将其变形为滑入式菜单 */
-        position: fixed;
-        top: 0;
-        right: 0;
-        width: 280px;
-        height: 100%;
-        background-color: rgba(251, 250, 247, 0.95);
-        backdrop-filter: blur(10px);
-        -webkit-backdrop-filter: blur(10px);
-        transform: translateX(100%); /* 默认隐藏在屏幕右侧 */
-        transition: transform 0.4s ease;
-        padding: 80px 30px;
-        box-shadow: -5px 0 20px rgba(0, 0, 0, 0.1);
-        opacity: 1; /* 确保可见 */
-        display: block; /* 覆盖原来的 display: none */
-    }
-
-    /* 当菜单打开时 (JS会添加 .is-open 类) */
-    .floating-directory.is-open {
-        transform: translateX(0); /* 滑入屏幕 */
-    }
-
-    .floating-directory ul {
-        text-align: left;
-    }
-    
-    .floating-directory li {
-        margin: 25px 0;
-    }
-
-    /* 移动端菜单项使用完整的文字 */
-    .floating-directory a {
-        width: auto;
-        height: auto;
-        background: none;
-        border-radius: 0;
-        font-size: 18px; /* 更大的字体，便于点击 */
-        font-weight: bold;
-        color: #5b87a9;
-        /* 使用 data-title 的内容作为菜单文字 */
-        content: attr(data-title);
-    }
-    
-    /* 移动端菜单不再需要圆点和悬停放大效果 */
-    .floating-directory a:hover, .floating-directory a.active {
-        transform: none;
-        box-shadow: none;
-        background-color: transparent;
-        color: #a74141;
-    }
-    
-    .floating-directory a::after {
-        display: none; /* 隐藏桌面版的悬停文字标签 */
-    }
-
-    .floating-directory a::before {
-        display: none; /* 隐藏桌面版的激活竖线 */
-    }
-
-    /* 2. 在移动端显示触发按钮 */
-    #mobile-directory-trigger {
-        display: block;
-    }
-}
-
-/* --- 【新增】词典与心得页面样式 --- */
-
-/* 复用并统一卡片链接样式 */
-.link-card-section {
-    margin-top: 4em;
-    display: flex;
-    justify-content: center;
-}
-
-.link-card {
-    max-width: 600px;
-    background-color: #ffffff;
-    border: 1px solid #eaeaea;
-    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.04);
-    padding: 2rem 2.5rem;
-    text-align: center;
-    border-radius: 8px;
-    transition: all 0.3s ease-in-out;
-}
-
-.link-card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.07);
-}
-
-.link-card-title {
-    font-family: 'Songti SC', 'STSong', 'SimSun', serif;
-    font-size: 1.6em;
-    font-weight: bold;
-    color: #5b87a9;
-    margin-bottom: 0.8em;
-    border-bottom: 1px solid #eaeaea;
-    padding-bottom: 0.4em;
-}
-
-.link-card p {
-    font-size: 1em;
-    color: #555;
-    margin-bottom: 1.5em;
-}
-
-.link-card-button {
-    display: inline-block;
-    font-size: 1.1em;
-    color: #5b87a9;
-    border: 1px solid #5b87a9;
-    padding: 0.5em 1.5em;
-    border-radius: 4px;
-    text-decoration: none;
-    transition: all 0.3s ease;
-}
-
-.link-card-button:hover {
-    color: #fff;
-    background-color: #5b87a9;
-    border-color: #5b87a9;
-}
-
-/* 词典定义列表样式 */
+/* --- 词典与心得页面样式 --- */
 dl {
     margin: 2em 0;
 }
@@ -609,7 +442,6 @@ dd {
     border-bottom: 1px dotted #ccc;
 }
 
-/* 心得卡片样式 */
 .insight-card {
     margin-bottom: 3em;
 }
@@ -623,9 +455,9 @@ dd {
     text-align: justify;
 }
 
-/* 彩蛋样式 */
+/* --- 彩蛋样式 --- */
 .secret-key {
-    color: #3b3b3a; /* 与正文颜色 #3a3a3a 只有极细微的差别 */
+    color: #3b3b3a;
     cursor: pointer;
     border-bottom: 1px dotted #555;
 }
@@ -659,7 +491,6 @@ dd {
     visibility: visible;
 }
 
-/* 覆盖并重置 secret-content 的样式 */
 .secret-content {
     display: flex;
     flex-direction: column;
@@ -667,7 +498,6 @@ dd {
     justify-content: center;
 }
 
-/* SVG 图标样式 */
 .secret-icon {
     width: 64px;
     height: 64px;
@@ -677,7 +507,6 @@ dd {
     transform: scale(0.8);
 }
 
-/* 问题文本的通用样式 */
 .secret-content p {
     font-family: 'KaiTi', 'STKaiti', serif;
     font-size: 1.8em;
@@ -693,24 +522,22 @@ dd {
     transform: translateY(15px);
 }
 
-/* 当浮层变得可见时，触发内部元素的动画 */
 #secret-overlay.visible .secret-icon {
     animation: fadeInScale 0.8s ease-out forwards;
 }
 
 #secret-overlay.visible .secret-line-1 {
-    animation: fadeInUp 0.8s 0.5s ease-out forwards; /* 延迟0.5秒出现 */
+    animation: fadeInUp 0.8s 0.5s ease-out forwards;
 }
 
 #secret-overlay.visible .secret-line-2 {
-    animation: fadeInUp 0.8s 1.2s ease-out forwards; /* 延迟1.2秒出现 */
+    animation: fadeInUp 0.8s 1.2s ease-out forwards;
 }
 
 #secret-overlay.visible small {
-    animation: fadeInUp 0.8s 2.0s ease-out forwards; /* 最后出现 */
+    animation: fadeInUp 0.8s 2.0s ease-out forwards;
 }
 
-/* 定义动画 */
 @keyframes fadeInScale {
     to {
         opacity: 1;
@@ -725,17 +552,17 @@ dd {
     }
 }
 
-/* --- 【新增】美学微调：统一卡片主副标题样式 --- */
+/* --- 美学微调：统一卡片主副标题样式 --- */
 .link-card-title small {
     display: block;
     font-size: 0.6em;
     font-weight: 400;
     color: #666;
     margin-top: 0.5rem;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; /* 副标题使用无衬线体，形成对比美感 */
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
-/* --- 【新增】美学统一：心得札记采用主页正文风格 --- */
+/* --- 美学统一：心得札记采用主页正文风格 --- */
 .insight-content::first-letter {
     font-family: 'Songti SC', 'STSong', serif;
     font-size: 3.8em;
@@ -748,26 +575,19 @@ dd {
     text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.1);
 }
 
-/* 确保在移动端也进行适配 */
-@media (max-width: 768px) {
-    .insight-content::first-letter {
-        font-size: 3.5em;
-    }
-}
-
-/* --- 【新增】阅读模式切换器样式 --- */
+/* --- 阅读模式切换器样式 --- */
 #mode-switcher {
     text-align: center;
-    margin: -1rem 0 2.5rem 0; /* 调整位置，使其在标题和列表之间 */
+    margin: -1rem 0 2.5rem 0;
     font-size: 0.9em;
     color: #888;
 }
 
 #mode-toggle-button {
-    color: #5b87a9;
+    color: #0B6A7A;
     font-weight: 600;
     cursor: pointer;
-    border-bottom: 1px dotted #5b87a9;
+    border-bottom: 1px dotted #0B6A7A;
     text-decoration: none;
 }
 
@@ -776,16 +596,12 @@ dd {
     border-bottom-color: #a74141;
 }
 
-/* --- 【新增】PDF Viewer 页面专属“窗景”氛围 --- */
-
-/* 1. 准备好 body，为伪元素定位 */
+/* --- PDF Viewer 页面专属“窗景”氛围 --- */
 .viewer-page {
     position: relative;
-    /* 移除直接在 body 上的背景设置，交由伪元素全权处理 */
-    background: #fbfaf7; /* 保留一个纯色基础背景 */
+    background: #fbfaf7;
 }
 
-/* 2. 【核心】创建“窗外风景”伪元素层 */
 .viewer-page::before {
     content: '';
     position: fixed;
@@ -793,30 +609,113 @@ dd {
     left: 0;
     width: 100%;
     height: 100%;
-    z-index: -1; /* 确保它在所有内容的绝对底层 */
-
+    z-index: -1;
     background-image: url('../IMAGE/glossary-bg.png');
     background-size: cover;
     background-position: center center;
-    
-    /* a. 【窗景之魂】施加强烈的高斯模糊 */
-    filter: blur(8px); /* 8px 是一个很好的起始值，可以根据图片调整 */
-    
-    /* b. 【锦上添花】略微放大背景，防止模糊后边缘出现空白 */
-    transform: scale(1.05); 
+    filter: blur(8px);
+    transform: scale(1.05);
 }
 
-/* 3. 【核心】将内容容器变为“毛玻璃” */
 .viewer-page .pdf-container {
-    /* a. 半透明的背景，让“窗景”透过来 */
     background-color: rgba(255, 255, 255, 0.75);
-    
-    /* b. 【毛玻璃之魂】对容器背后的内容施加模糊和色彩增强 */
-    backdrop-filter: blur(4px) saturate(180%); 
+    backdrop-filter: blur(4px) saturate(180%);
     -webkit-backdrop-filter: blur(4px) saturate(180%);
-    
-    /* c. 更具质感的边框和阴影 */
     border: 1px solid rgba(255, 255, 255, 0.4);
     box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.1);
-    border-radius: 12px; /* 稍大的圆角更柔和 */
+    border-radius: 12px;
+}
+
+/* --- 响应式媒体查询 --- */
+@media (max-width: 1024px) {
+    .floating-directory {
+        position: fixed;
+        top: 0;
+        right: 0;
+        width: 280px;
+        height: 100%;
+        background-color: rgba(251, 250, 247, 0.95);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        transform: translateX(100%);
+        transition: transform 0.4s ease;
+        padding: 80px 30px;
+        box-shadow: -5px 0 20px rgba(0, 0, 0, 0.1);
+        opacity: 1;
+        display: block;
+    }
+
+    .floating-directory.is-open {
+        transform: translateX(0);
+    }
+
+    .floating-directory ul {
+        text-align: left;
+    }
+
+    .floating-directory li {
+        margin: 25px 0;
+    }
+
+    .floating-directory a {
+        width: auto;
+        height: auto;
+        background: none;
+        border-radius: 0;
+        font-size: 18px;
+        font-weight: bold;
+        color: #0B6A7A;
+        content: attr(data-title);
+    }
+
+    .floating-directory a:hover,
+    .floating-directory a.active {
+        transform: none;
+        box-shadow: none;
+        background-color: transparent;
+        color: #a74141;
+    }
+
+    .floating-directory a::after,
+    .floating-directory a::before {
+        display: none;
+    }
+
+    #mobile-directory-trigger {
+        display: block;
+    }
+}
+
+@media (max-width: 768px) {
+    body {
+        font-size: 16px;
+    }
+
+    .container,
+    .pdf-container {
+        padding: 2rem 1.5rem;
+        margin: 1.5rem auto;
+    }
+
+    h1 {
+        font-size: 2em;
+    }
+
+    h2 {
+        font-size: 1.6em;
+    }
+
+    .pdf-link-card,
+    .link-card {
+        padding: 1.5rem;
+    }
+
+    .totem-image {
+        max-width: 120px;
+    }
+
+    h2:not(:first-of-type)+p::first-letter,
+    .insight-content::first-letter {
+        font-size: 3.5em;
+    }
 }
