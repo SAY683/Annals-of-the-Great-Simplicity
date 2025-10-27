@@ -59,12 +59,15 @@
     </div>
 
     <!-- 输出与下载区域 -->
-    <div class="output-controls">
+     <div class="output-controls">
         <div class="input-group">
             <label for="layout-name">为此排盘命名:</label>
             <input type="text" id="layout-name" placeholder="例如：初始之探寻">
         </div>
-        <button id="download-btn" class="link-card-button">生成并下载排盘 (JSON)</button>
+        <div class="button-group">
+            <button id="reset-btn" class="link-card-button secondary">重置排盘</button>
+            <button id="download-btn" class="link-card-button" disabled>生成并下载排盘 (JSON)</button>
+        </div>
     </div>
 
 
