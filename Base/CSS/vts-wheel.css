@@ -1,6 +1,12 @@
-/* START OF FILE CSS/vts-wheel.css (FINAL REVISION) */
+/* START OF FILE CSS/vts-wheel.css (FINAL COMPREHENSIVE VERSION) */
 
-/* --- 互动区总布局与引言 --- */
+/* ==========================================================================
+   1. 桌面端与通用样式 (Desktop & Common Styles)
+   --------------------------------------------------------------------------
+   定义了在所有屏幕尺寸下通用的基础样式和桌面端的大屏布局。
+   ========================================================================== */
+
+/* --- 互动区域总布局与引言 --- */
 .vts-interactive-area {
     display: flex;
     justify-content: space-between;
@@ -17,7 +23,7 @@
     line-height: 2;
 }
 
-/* --- 两侧原型库 --- */
+/* --- 两侧的原型库 --- */
 .archetype-bank {
     width: 200px;
     padding: 15px;
@@ -28,14 +34,13 @@
     flex-direction: column;
     gap: 12px;
     min-height: 500px;
-    transition: background-color 0.3s ease; /* 新增：拖拽悬停反馈 */
+    transition: background-color 0.3s ease;
 }
-/* 新增：当有卡片拖拽到库上方时的样式 */
 .archetype-bank.drag-over {
-    background-color: #f7f5f0;
+    background-color: #f7f5f0; /* 拖拽悬停时的反馈 */
 }
 
-/* --- 可拖拽原型卡片 --- */
+/* --- 可拖拽的原型卡片 --- */
 .archetype-item {
     padding: 12px 15px;
     background-color: #fff;
@@ -45,12 +50,13 @@
     text-align: center;
     font-family: 'Songti SC', 'STSong', serif;
     font-size: 1.1em;
-    user-select: none;
+    user-select: none; /* 防止拖动时选中文本 */
     transition: all 0.3s ease;
-    border-left-width: 4px;
+    border-left-width: 4px; /* 为分组色泽预留位置 */
 }
-.archetype-item.group-left { border-left-color: #c9b79c; }
-.archetype-item.group-right { border-left-color: #a1b5c4; }
+/* 卡牌分组色泽渲染 */
+.archetype-item.group-left { border-left-color: #c9b79c; } /* 暖金色，如旧书卷 */
+.archetype-item.group-right { border-left-color: #a1b5c4; } /* 冷蓝色，如远山 */
 
 .archetype-item:hover {
     transform: translateY(-3px);
@@ -67,9 +73,17 @@
     margin-top: 4px;
 }
 
+/* 拖拽状态样式 (跨平台兼容修复) */
 .archetype-item.dragging {
-    opacity: 0.0; /* 优化：拖拽时原位置卡片直接消失，由拖拽镜像代替 */
-    cursor: grabbing;
+    /* 
+     * 不再使用 opacity: 0。而是让原卡片变为一个半透明、略微放大的“幽灵”状态。
+     * - 在桌面端：此状态会被 JS 创建的幻象覆盖，用户不可见。
+     * - 在移动端：若 JS 创建幻象失败，用户将直接拖动此“幽灵”状态的卡片，
+     *   确保了视觉反馈的连续性，解决了“消失”问题。
+     */
+    opacity: 0.4;
+    transform: scale(1.05);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
 }
 
 /* --- 中央 VTS 轮盘 --- */
@@ -81,23 +95,22 @@
     align-items: center;
 }
 
-/* --- 放置目标的插槽 (核心优化) --- */
+/* --- 放置目标的插槽 --- */
 .drop-zone {
     width: 100%;
     max-width: 280px;
     min-height: 150px;
     border: 1px solid #ccc;
     border-radius: 12px;
-    /* 核心修改：使用 Flexbox 来完美居中内容 */
     display: flex;
     align-items: center;
     justify-content: center;
     transition: all 0.3s ease;
     position: relative;
-    padding: 1rem; /* 内部留白 */
+    padding: 1rem;
     box-sizing: border-box;
 }
-
+/* 三阶氛围渲染 */
 #drop-zone-v { background: radial-gradient(ellipse at center, rgba(255, 248, 220, 0.5) 0%, rgba(255, 255, 255, 0) 70%); border-color: #e0d8c6; }
 #drop-zone-t { background: radial-gradient(ellipse at center, rgba(220, 235, 245, 0.4) 0%, rgba(255, 255, 255, 0) 70%); border-color: #c4d0d9; }
 #drop-zone-s { background: radial-gradient(ellipse at center, rgba(230, 220, 235, 0.4) 0%, rgba(255, 255, 255, 0) 70%); border-color: #d1c9d6; }
@@ -105,83 +118,124 @@
 .zone-info {
     text-align: center;
     color: #aaa;
-    transition: opacity 0.4s ease, color 0.3s ease; /* 优化：动画效果 */
-    pointer-events: none;
-    position: absolute; /* 让其不占据布局空间 */
+    transition: opacity 0.4s ease, color 0.3s ease;
+    pointer-events: none; /* 确保拖放事件能穿透到父级 */
+    position: absolute;   /* 不占据布局空间，允许卡片完美居中 */
 }
 .zone-info .zone-title { font-family: 'Times New Roman', serif; font-size: 2.2em; margin: 0 0 0.2em 0; font-weight: normal; border: none; padding: 0; }
 .zone-info .zone-title small { font-size: 0.5em; color: #ccc; }
 .zone-info .zone-concepts { font-family: 'Songti SC', 'STSong', serif; font-size: 1.1em; margin: 0; }
 .zone-info .zone-entropy { font-family: -apple-system, sans-serif; font-size: 0.9em; margin-top: 0.5em; letter-spacing: 1px; }
 
+/* 拖拽悬停在插槽上方的样式 */
 .drop-zone.drag-over { transform: scale(1.02); box-shadow: 0 0 20px rgba(0, 0, 0, 0.05); }
 .drop-zone.drag-over .zone-info { color: #333; }
 #drop-zone-v.drag-over { border-color: #a74141; }
 #drop-zone-t.drag-over { border-color: #0B6A7A; }
 #drop-zone-s.drag-over { border-color: #5a4a6e; }
 
-/* 核心优化：使用状态类控制插槽外观 */
+/* 当插槽中有卡片时，隐藏描述文字 */
 .drop-zone.has-item .zone-info {
-    opacity: 0; /* 卡片进入，描述文字优雅淡出 */
+    opacity: 0;
 }
-
-/* 放入插槽的卡片不再需要绝对定位 */
+/* 放入插槽的卡片样式 */
 .drop-zone .archetype-item {
-    cursor: grab; /* 优化：放入后依然可拖拽 */
+    cursor: grab; /* 放入后依然可拖拽 */
     width: 90%;
 }
 
-/* --- 输出与下载区域 --- */
-.output-controls { margin-top: 4em; padding-top: 2em; border-top: 1px solid #eaeaea; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 20px; }
+/* --- 输出与控制区域 --- */
+.output-controls { margin-top: 4em; padding-top: 2em; border-top: 1px solid #eaeaea; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 25px; }
 .input-group { display: flex; align-items: center; gap: 10px; font-size: 1.1em; }
 .input-group label { font-family: 'Songti SC', 'STSong', serif; color: #3a3a3a; }
 .input-group input[type="text"] { padding: 8px 12px; border: 1px solid #ccc; border-radius: 4px; font-size: 1em; min-width: 250px; transition: border-color 0.3s, box-shadow 0.3s; }
 .input-group input[type="text"]:focus { outline: none; border-color: #0B6A7A; box-shadow: 0 0 0 2px rgba(11, 106, 122, 0.2); }
 
-/* 响应式 */
+.button-group { display: flex; gap: 15px; justify-content: center; }
+.link-card-button:disabled { background-color: #f5f5f5; border-color: #ddd; color: #aaa; cursor: not-allowed; transform: none; box-shadow: none; }
+.link-card-button:disabled:hover { background-color: #f5f5f5; color: #aaa; }
+.link-card-button.secondary { background-color: transparent; color: #666; border-color: #ccc; }
+.link-card-button.secondary:hover { background-color: #f5f5f5; color: #333; border-color: #bbb; }
+
+
+/* ==========================================================================
+   2. 移动端适配优化 (Mobile Adaptation Optimization)
+   --------------------------------------------------------------------------
+   当屏幕宽度小于等于768px时，应用这些规则来重构布局，
+   以提供最佳的移动端触摸体验。
+   ========================================================================== */
+
 @media (max-width: 768px) {
-    .vts-interactive-area { flex-direction: column; align-items: center; }
-    .archetype-bank { width: 100%; flex-direction: row; flex-wrap: wrap; justify-content: center; min-height: auto; }
-    .vts-wheel { width: 100%; margin: 2em 0; }
-}
-/* END OF FILE CSS/vts-wheel.css (FINAL REVISION) */
-/* 请将以下样式添加到 CSS/vts-wheel.css 文件的末尾 */
 
-/* --- 【新增】输出控制区域优化 --- */
-.output-controls {
-    gap: 25px; /* 增加间距 */
+    /* 1. 重构主布局为垂直堆叠 */
+    .vts-interactive-area {
+        flex-direction: column;
+        gap: 0; /* 取消桌面端的gap，手动控制margin */
+    }
+    
+    .intro-text {
+        line-height: 1.8; /* 调整行高，更适合小屏幕 */
+    }
+
+    /* 2. 重构原型库布局，解决移动端拖拽滚动的核心问题 */
+    .archetype-bank {
+        width: 100%;
+        flex-direction: row;     /* 让卡片横向排列 */
+        flex-wrap: wrap;         /* 允许换行 */
+        justify-content: center;
+        min-height: auto;        /* 取消最小高度限制 */
+        padding: 10px;
+        box-sizing: border-box;
+    }
+    
+    /* 使用 CSS order 属性在视觉上重新排序元素，无需改变HTML */
+    #bank-left {
+        order: 1; /* 视觉顺序第一 (顶部) */
+        margin-bottom: 2.5em;
+    }
+    .vts-wheel {
+        order: 2; /* 视觉顺序第二 (中间) */
+        width: 100%;
+    }
+    #bank-right {
+        order: 3; /* 视觉顺序第三 (底部) */
+        margin-top: 2.5em;
+    }
+
+    /* 3. 优化卡片和插槽的尺寸与间距，使其更适合触摸操作 */
+    .archetype-item {
+        font-size: 1em;
+        padding: 10px;
+        flex-grow: 1;     /* 让卡片在行内有弹性 */
+        min-width: 120px; /* 设置最小宽度，避免过度挤压 */
+        max-width: 150px;
+    }
+    
+    .drop-zone {
+        min-height: 120px;
+        max-width: 100%;
+    }
+
+    /* 4. 优化底部的输出与控制区域 */
+    .input-group {
+        flex-direction: column; /* 垂直堆叠标签和输入框 */
+        gap: 8px;
+        width: 100%;
+    }
+    .input-group input[type="text"] {
+        width: 100%;
+        min-width: auto;
+        box-sizing: border-box;
+    }
+    
+    .button-group {
+        flex-direction: column; /* 垂直堆叠按钮 */
+        width: 100%;
+    }
+    .link-card-button {
+        width: 100%;
+        box-sizing: border-box;
+    }
 }
 
-.button-group {
-    display: flex;
-    gap: 15px;
-    justify-content: center;
-}
-
-/* 禁用状态的按钮样式 */
-.link-card-button:disabled {
-    background-color: #f5f5f5;
-    border-color: #ddd;
-    color: #aaa;
-    cursor: not-allowed;
-    transform: none;
-    box-shadow: none;
-}
-
-.link-card-button:disabled:hover {
-    background-color: #f5f5f5;
-    color: #aaa;
-}
-
-/* “重置”按钮的次要样式 */
-.link-card-button.secondary {
-    background-color: transparent;
-    color: #666;
-    border-color: #ccc;
-}
-
-.link-card-button.secondary:hover {
-    background-color: #f5f5f5;
-    color: #333;
-    border-color: #bbb;
-}
+/* END OF FILE CSS/vts-wheel.css (FINAL COMPREHENSIVE VERSION) */
