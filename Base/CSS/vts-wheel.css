@@ -1,15 +1,23 @@
-/* START OF FILE CSS/vts-wheel.css */
+/* START OF FILE CSS/vts-wheel.css (FINAL REVISION) */
 
-/* --- 互动区域总布局 --- */
+/* --- 互动区总布局与引言 --- */
 .vts-interactive-area {
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
-    margin: 4em 0;
+    margin: 3em 0;
     gap: 20px;
 }
+.intro-text {
+    text-align: center;
+    margin: -1em auto 2.5em;
+    max-width: 600px;
+    font-family: 'KaiTi', 'STKaiti', serif;
+    color: #555;
+    line-height: 2;
+}
 
-/* --- 两侧的原型库 --- */
+/* --- 两侧原型库 --- */
 .archetype-bank {
     width: 200px;
     padding: 15px;
@@ -19,10 +27,15 @@
     display: flex;
     flex-direction: column;
     gap: 12px;
-    min-height: 450px; /* 确保有足够的高度 */
+    min-height: 500px;
+    transition: background-color 0.3s ease; /* 新增：拖拽悬停反馈 */
+}
+/* 新增：当有卡片拖拽到库上方时的样式 */
+.archetype-bank.drag-over {
+    background-color: #f7f5f0;
 }
 
-/* --- 可拖拽的原型卡片 --- */
+/* --- 可拖拽原型卡片 --- */
 .archetype-item {
     padding: 12px 15px;
     background-color: #fff;
@@ -32,16 +45,19 @@
     text-align: center;
     font-family: 'Songti SC', 'STSong', serif;
     font-size: 1.1em;
+    user-select: none;
     transition: all 0.3s ease;
-    user-select: none; /* 防止拖动时选中文本 */
+    border-left-width: 4px;
 }
+.archetype-item.group-left { border-left-color: #c9b79c; }
+.archetype-item.group-right { border-left-color: #a1b5c4; }
 
 .archetype-item:hover {
-    border-color: #a74141;
-    color: #a74141;
-    transform: translateY(-2px);
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+    transform: translateY(-3px);
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.06);
 }
+.archetype-item.group-left:hover { border-color: #a74141; border-left-color: #a74141; color: #a74141; }
+.archetype-item.group-right:hover { border-color: #0B6A7A; border-left-color: #0B6A7A; color: #0B6A7A; }
 
 .archetype-item .sub-name {
     display: block;
@@ -51,12 +67,9 @@
     margin-top: 4px;
 }
 
-/* 正在被拖拽的卡片的样式 */
 .archetype-item.dragging {
-    opacity: 0.5;
+    opacity: 0.0; /* 优化：拖拽时原位置卡片直接消失，由拖拽镜像代替 */
     cursor: grabbing;
-    background-color: #f0f0f0;
-    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
 }
 
 /* --- 中央 VTS 轮盘 --- */
@@ -64,108 +77,71 @@
     flex-grow: 1;
     display: flex;
     flex-direction: column;
-    gap: 20px;
+    gap: 25px;
     align-items: center;
 }
 
-/* --- 放置目标的插槽 --- */
+/* --- 放置目标的插槽 (核心优化) --- */
 .drop-zone {
     width: 100%;
-    max-width: 250px;
-    min-height: 140px;
-    background-color: #fff;
-    border: 2px dashed #ccc;
+    max-width: 280px;
+    min-height: 150px;
+    border: 1px solid #ccc;
     border-radius: 12px;
+    /* 核心修改：使用 Flexbox 来完美居中内容 */
     display: flex;
     align-items: center;
     justify-content: center;
     transition: all 0.3s ease;
     position: relative;
+    padding: 1rem; /* 内部留白 */
+    box-sizing: border-box;
 }
 
-.drop-zone .slot-label {
-    position: absolute;
-    top: 10px;
-    left: 15px;
-    font-size: 2em;
-    font-family: 'Times New Roman', serif;
-    font-weight: bold;
-    color: #eaeaea;
-    z-index: 1;
-    transition: color 0.3s ease;
+#drop-zone-v { background: radial-gradient(ellipse at center, rgba(255, 248, 220, 0.5) 0%, rgba(255, 255, 255, 0) 70%); border-color: #e0d8c6; }
+#drop-zone-t { background: radial-gradient(ellipse at center, rgba(220, 235, 245, 0.4) 0%, rgba(255, 255, 255, 0) 70%); border-color: #c4d0d9; }
+#drop-zone-s { background: radial-gradient(ellipse at center, rgba(230, 220, 235, 0.4) 0%, rgba(255, 255, 255, 0) 70%); border-color: #d1c9d6; }
+
+.zone-info {
+    text-align: center;
+    color: #aaa;
+    transition: opacity 0.4s ease, color 0.3s ease; /* 优化：动画效果 */
+    pointer-events: none;
+    position: absolute; /* 让其不占据布局空间 */
+}
+.zone-info .zone-title { font-family: 'Times New Roman', serif; font-size: 2.2em; margin: 0 0 0.2em 0; font-weight: normal; border: none; padding: 0; }
+.zone-info .zone-title small { font-size: 0.5em; color: #ccc; }
+.zone-info .zone-concepts { font-family: 'Songti SC', 'STSong', serif; font-size: 1.1em; margin: 0; }
+.zone-info .zone-entropy { font-family: -apple-system, sans-serif; font-size: 0.9em; margin-top: 0.5em; letter-spacing: 1px; }
+
+.drop-zone.drag-over { transform: scale(1.02); box-shadow: 0 0 20px rgba(0, 0, 0, 0.05); }
+.drop-zone.drag-over .zone-info { color: #333; }
+#drop-zone-v.drag-over { border-color: #a74141; }
+#drop-zone-t.drag-over { border-color: #0B6A7A; }
+#drop-zone-s.drag-over { border-color: #5a4a6e; }
+
+/* 核心优化：使用状态类控制插槽外观 */
+.drop-zone.has-item .zone-info {
+    opacity: 0; /* 卡片进入，描述文字优雅淡出 */
 }
 
-/* 当有元素拖拽到插槽上方时的样式 */
-.drop-zone.drag-over {
-    border-color: #0B6A7A;
-    background-color: #f0f8fa;
-}
-
-.drop-zone.drag-over .slot-label {
-    color: #0B6A7A;
-}
-
-/* 插槽里已放置的卡片样式 */
+/* 放入插槽的卡片不再需要绝对定位 */
 .drop-zone .archetype-item {
-    cursor: default;
+    cursor: grab; /* 优化：放入后依然可拖拽 */
     width: 90%;
 }
 
 /* --- 输出与下载区域 --- */
-.output-controls {
-    margin-top: 4em;
-    padding-top: 2em;
-    border-top: 1px solid #eaeaea;
-    text-align: center;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 20px;
-}
+.output-controls { margin-top: 4em; padding-top: 2em; border-top: 1px solid #eaeaea; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 20px; }
+.input-group { display: flex; align-items: center; gap: 10px; font-size: 1.1em; }
+.input-group label { font-family: 'Songti SC', 'STSong', serif; color: #3a3a3a; }
+.input-group input[type="text"] { padding: 8px 12px; border: 1px solid #ccc; border-radius: 4px; font-size: 1em; min-width: 250px; transition: border-color 0.3s, box-shadow 0.3s; }
+.input-group input[type="text"]:focus { outline: none; border-color: #0B6A7A; box-shadow: 0 0 0 2px rgba(11, 106, 122, 0.2); }
 
-.input-group {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    font-size: 1.1em;
-}
-
-.input-group label {
-    font-family: 'Songti SC', 'STSong', serif;
-    color: #3a3a3a;
-}
-
-.input-group input[type="text"] {
-    padding: 8px 12px;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    font-size: 1em;
-    min-width: 250px;
-    transition: border-color 0.3s, box-shadow 0.3s;
-}
-
-.input-group input[type="text"]:focus {
-    outline: none;
-    border-color: #0B6A7A;
-    box-shadow: 0 0 0 2px rgba(11, 106, 122, 0.2);
-}
-
-/* 响应式调整 */
+/* 响应式 */
 @media (max-width: 768px) {
-    .vts-interactive-area {
-        flex-direction: column;
-        align-items: center;
-    }
-    .archetype-bank {
-        width: 100%;
-        flex-direction: row;
-        flex-wrap: wrap;
-        justify-content: center;
-        min-height: auto;
-    }
-    .vts-wheel {
-        width: 100%;
-        margin: 2em 0;
-    }
+    .vts-interactive-area { flex-direction: column; align-items: center; }
+    .archetype-bank { width: 100%; flex-direction: row; flex-wrap: wrap; justify-content: center; min-height: auto; }
+    .vts-wheel { width: 100%; margin: 2em 0; }
 }
-/* END OF FILE CSS/vts-wheel.css */
+/* END OF FILE CSS/vts-wheel.css (FINAL REVISION) */
