@@ -1,0 +1,72 @@
+<!-- START OF FILE vts-wheel.html -->
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VTS 原型之轮 - Annals of the Great Simplicity</title>
+    <link rel="stylesheet" href="CSS/style.css">
+    <link rel="stylesheet" href="CSS/vts-wheel.css">
+</head>
+<body>
+
+<div class="container">
+
+    <div class="totem-container">
+        <img src="IMAGE/totem_icon.png" alt="" class="totem-image">
+    </div>
+
+    <h1>VTS 原型之轮</h1>
+    <p style="text-align: center; margin-top: -1em; color: #666;">
+        请从两侧的“原型库”中，将代表性的原型拖拽至中央的 V (Vision/愿景)、T (Tactic/战术)、S (Strategy/战略) 之位，以构建您的心识图谱。
+    </p>
+
+    <div class="vts-interactive-area">
+        <!-- 左侧原型库 -->
+        <div class="archetype-bank" id="bank-left">
+            <!-- 原型将由 JS 动态加载 -->
+        </div>
+
+        <!-- 中央 VTS 轮盘 -->
+        <div class="vts-wheel">
+            <div class="drop-zone" id="drop-zone-v" data-slot="V">
+                <span class="slot-label">V</span>
+            </div>
+            <div class="drop-zone" id="drop-zone-t" data-slot="T">
+                <span class="slot-label">T</span>
+            </div>
+            <div class="drop-zone" id="drop-zone-s" data-slot="S">
+                <span class="slot-label">S</span>
+            </div>
+        </div>
+
+        <!-- 右侧原型库 -->
+        <div class="archetype-bank" id="bank-right">
+            <!-- 原型将由 JS 动态加载 -->
+        </div>
+    </div>
+
+    <!-- 输出与下载区域 -->
+    <div class="output-controls">
+        <div class="input-group">
+            <label for="layout-name">为此排盘命名:</label>
+            <input type="text" id="layout-name" placeholder="例如：初始之探寻">
+        </div>
+        <button id="download-btn" class="link-card-button">生成并下载排盘 (JSON)</button>
+    </div>
+
+
+    <footer class="footer">
+        <p><a href="glossary.html">返回词典</a> | <a href="index.html">返回主页</a></p>
+    </footer>
+
+</div>
+
+<a href="#" id="back-to-top" title="返回顶部">↑</a>
+
+<script src="JS/vts-wheel.js"></script>
+<script src="JS/main.js"></script> 
+
+</body>
+</html>
+<!-- END OF FILE vts-wheel.html -->

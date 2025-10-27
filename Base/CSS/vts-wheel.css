@@ -1,0 +1,171 @@
+/* START OF FILE CSS/vts-wheel.css */
+
+/* --- 互动区域总布局 --- */
+.vts-interactive-area {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin: 4em 0;
+    gap: 20px;
+}
+
+/* --- 两侧的原型库 --- */
+.archetype-bank {
+    width: 200px;
+    padding: 15px;
+    background-color: #fdfcf9;
+    border: 1px solid #eaeaea;
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-height: 450px; /* 确保有足够的高度 */
+}
+
+/* --- 可拖拽的原型卡片 --- */
+.archetype-item {
+    padding: 12px 15px;
+    background-color: #fff;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    cursor: grab;
+    text-align: center;
+    font-family: 'Songti SC', 'STSong', serif;
+    font-size: 1.1em;
+    transition: all 0.3s ease;
+    user-select: none; /* 防止拖动时选中文本 */
+}
+
+.archetype-item:hover {
+    border-color: #a74141;
+    color: #a74141;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+}
+
+.archetype-item .sub-name {
+    display: block;
+    font-size: 0.8em;
+    font-family: "PingFang SC", sans-serif;
+    color: #666;
+    margin-top: 4px;
+}
+
+/* 正在被拖拽的卡片的样式 */
+.archetype-item.dragging {
+    opacity: 0.5;
+    cursor: grabbing;
+    background-color: #f0f0f0;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+}
+
+/* --- 中央 VTS 轮盘 --- */
+.vts-wheel {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    align-items: center;
+}
+
+/* --- 放置目标的插槽 --- */
+.drop-zone {
+    width: 100%;
+    max-width: 250px;
+    min-height: 140px;
+    background-color: #fff;
+    border: 2px dashed #ccc;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+    position: relative;
+}
+
+.drop-zone .slot-label {
+    position: absolute;
+    top: 10px;
+    left: 15px;
+    font-size: 2em;
+    font-family: 'Times New Roman', serif;
+    font-weight: bold;
+    color: #eaeaea;
+    z-index: 1;
+    transition: color 0.3s ease;
+}
+
+/* 当有元素拖拽到插槽上方时的样式 */
+.drop-zone.drag-over {
+    border-color: #0B6A7A;
+    background-color: #f0f8fa;
+}
+
+.drop-zone.drag-over .slot-label {
+    color: #0B6A7A;
+}
+
+/* 插槽里已放置的卡片样式 */
+.drop-zone .archetype-item {
+    cursor: default;
+    width: 90%;
+}
+
+/* --- 输出与下载区域 --- */
+.output-controls {
+    margin-top: 4em;
+    padding-top: 2em;
+    border-top: 1px solid #eaeaea;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+}
+
+.input-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 1.1em;
+}
+
+.input-group label {
+    font-family: 'Songti SC', 'STSong', serif;
+    color: #3a3a3a;
+}
+
+.input-group input[type="text"] {
+    padding: 8px 12px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 1em;
+    min-width: 250px;
+    transition: border-color 0.3s, box-shadow 0.3s;
+}
+
+.input-group input[type="text"]:focus {
+    outline: none;
+    border-color: #0B6A7A;
+    box-shadow: 0 0 0 2px rgba(11, 106, 122, 0.2);
+}
+
+/* 响应式调整 */
+@media (max-width: 768px) {
+    .vts-interactive-area {
+        flex-direction: column;
+        align-items: center;
+    }
+    .archetype-bank {
+        width: 100%;
+        flex-direction: row;
+        flex-wrap: wrap;
+        justify-content: center;
+        min-height: auto;
+    }
+    .vts-wheel {
+        width: 100%;
+        margin: 2em 0;
+    }
+}
+/* END OF FILE CSS/vts-wheel.css */
