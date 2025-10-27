@@ -166,6 +166,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function generateAndDownloadJSON() {
         const layoutName = elements.layoutNameInput.value.trim() || '未命名排盘';
         
+         // 1. 构建JSON的基础结构
         const result = {
             layout_name: layoutName,
             creation_timestamp: new Date().toISOString(),
@@ -177,6 +178,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         };
 
+        // 2. 遍历插槽，填充排盘信息
         elements.dropZones.forEach(zone => {
             const slot = zone.dataset.slot;
             const item = zone.querySelector('.archetype-item');
@@ -193,6 +195,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
+        // 3. 将构建好的对象转换为JSON字符串并触发下载
         const jsonString = JSON.stringify(result, null, 4);
         const blob = new Blob([jsonString], { type: 'application/json;charset=utf-8' });
         const url = URL.createObjectURL(blob);
