@@ -166,35 +166,33 @@ document.addEventListener('DOMContentLoaded', () => {
     function generateAndDownloadJSON() {
         const layoutName = elements.layoutNameInput.value.trim() || '未命名排盘';
         
-        // 1. 构建JSON的基础结构
         const result = {
             layout_name: layoutName,
             creation_timestamp: new Date().toISOString(),
-            vts_model_definitions: vtsData, // 包含VTS框架的定义，用于理解排盘
+            vts_model_definitions: vtsData,
             chart: {
-                V: null, // Vision Slot
-                T: null, // Tactic Slot
-                S: null  // Strategy Slot
+                V: null,
+                T: null,
+                S: null
             }
         };
 
-        // 2. 遍历插槽，填充排盘信息
         elements.dropZones.forEach(zone => {
-            const slot = zone.dataset.slot; // 'V', 'T', or 'S'
+            const slot = zone.dataset.slot;
             const item = zone.querySelector('.archetype-item');
             if (item) {
-                // 查找被选中原型的完整数据
                 const itemData = archetypesData.find(a => a.id === item.dataset.id);
                 
-                // 创建一个干净的定义副本，剔除仅用于UI的'group'属性
-                const { group, ...definition } = itemData;
+                // 【核心修复】使用对象解构赋值，在创建副本时同时剔除 'id' 和 'group' 属性。
+                // `...definition` 是剩余参数语法，它会将 itemData 中除了 id 和 group 之外的所有属性
+                // 收集到一个名为 definition 的新对象中。
+                const { id, group, ...definition } = itemData;
                 
-                // 将这份完整的、整理后的定义信息填入对应的槽位
+                // 将这份纯净的、不含内部ID的定义信息填入对应的槽位
                 result.chart[slot] = definition;
             }
         });
 
-        // 3. 将构建好的对象转换为JSON字符串并触发下载
         const jsonString = JSON.stringify(result, null, 4);
         const blob = new Blob([jsonString], { type: 'application/json;charset=utf-8' });
         const url = URL.createObjectURL(blob);
@@ -202,7 +200,7 @@ document.addEventListener('DOMContentLoaded', () => {
         a.href = url;
         a.download = `${layoutName.replace(/ /g, '_')}_VTS_Chart.json`;
         document.body.appendChild(a);
-a.click();
+        a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
     }
