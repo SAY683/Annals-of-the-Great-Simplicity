@@ -1,4 +1,4 @@
-// START OF FILE JS/daopan-data.js (FINAL CORRECTED VERSION V6)
+// START OF FILE JS/daopan-data.js (FINAL VERSION V7 - ALL DATA ADDED)
 
 const daopanData = {
     layout: [
@@ -17,47 +17,74 @@ const daopanData = {
         zhong: "重宫", ju: "局宫", yi: "义宫", ben: "本宫", tai: "太宫", hole: "仪宫"
     },
     paths: {
-        gates: [ // 八门 (太宫) - 8 cells, 逆时针
-            [1, 2], [1, 3], [2, 4], [3, 4], [4, 3], [4, 2], [3, 1], [2, 1]
-        ],
-        generals: [ // 神将令 (仪宫 + 局宫) - 12 cells, 严格遵循【律令】图顺序
-            [2, 2], [1, 0], [0, 1], [2, 3], [0, 4], [1, 5],
-            [3, 3], [4, 5], [5, 4], [3, 2], [5, 1], [4, 0]
-        ],
-        divisions: [ // 十二神部 (重宫 + 义宫) - 12 cells, 【修正为逆时针】
-            [0, 0], [2, 0], [3, 0], [5, 0], [5, 2], [5, 3], 
-            [5, 5], [3, 5], [2, 5], [0, 5], [0, 3], [0, 2]
-        ]
+        gates: [ [1, 2], [1, 3], [2, 4], [3, 4], [4, 3], [4, 2], [3, 1], [2, 1] ],
+        generals: [ [2, 2], [1, 0], [0, 1], [2, 3], [0, 4], [1, 5], [3, 3], [4, 5], [5, 4], [3, 2], [5, 1], [4, 0] ],
+        divisions: [ [0, 0], [2, 0], [3, 0], [5, 0], [5, 2], [5, 3], [5, 5], [3, 5], [2, 5], [0, 5], [0, 3], [0, 2] ]
     },
-    // --- 【恢复完整数据】为悬停提示提供信息 ---
+    
+    // 跳盘规则
+    jumpRules: {
+        moon: { // 月奇跳局
+            '日月仪': { // 太宫跳盘
+                '火日': '风月', '风日': '水月', '水日': '土月', '土日': '火月'
+            },
+            '本相宫': 'A-B/B-A'
+        },
+        sun: { // 日偶跳局
+            '日月仪': { // 太宫跳盘
+                '风日': '土月', '风月': '土日', '水日': '火月', '水月': '火日'
+            },
+            '本相宫': 'A-A/B-B'
+        }
+    },
+
+    // 二相八态数据 (穴位详情)
+    acupointDetails: {
+        '风日': { name: '风日', type: '凝聚态 (Instance)', detail: '谐子团' },
+        '火日': { name: '火日', type: '凝聚态 (Instance)', detail: '振子团' },
+        '土日': { name: '土日', type: '凝聚态 (Instance)', detail: '振子簇' },
+        '水日': { name: '水日', type: '凝聚态 (Instance)', detail: '谐子簇' },
+        '风月': { name: '风月', type: '全息态 (Field)', detail: '引子簇' },
+        '火月': { name: '火月', type: '全息态 (Field)', detail: '交子簇' },
+        '土月': { name: '土月', type: '全息态 (Field)', detail: '交子团' },
+        '水月': { name: '水月', type: '全息态 (Field)', detail: '引子团' },
+        'info': {
+            '振子': '交子(引子 + 谐子) + 引子 + 谐子',
+            '交子': '谐子(引子 + 振子) + 引子 + 振子',
+            '引子': '振子(交子 + 谐子) + 交子 + 谐子',
+            '谐子': '引子(交子 + 振子) + 交子 + 振子'
+        }
+    },
+    
+    // 神将完整数据
     divineGenerals: {
-        moon: [ // 月家奇将
-            { id: 'm1', order: 1, type: '阴', name: '探索者', subName: '越垠', star: '破界星' },
-            { id: 'm2', order: 2, type: '阳', name: '革新者', subName: '破曜', star: '裂曜煞' },
-            { id: 'm3', order: 3, type: '阴', name: '小丑', subName: '谑枢', star: '谑机星' },
-            { id: 'm4', order: 4, type: '阳', name: '天真者', subName: '守昭', star: '众昭煞' },
-            { id: 'm5', order: 5, type: '阴', name: '照顾者', subName: '润荄', star: '滋荄星' },
-            { id: 'm6', order: 6, type: '阳', name: '英雄', subName: '振锋', star: '振锋煞' },
-            { id: 'm7', order: 7, type: '阴', name: '创造者', subName: '形曦', star: '塑曦星' },
-            { id: 'm8', order: 8, type: '阳', name: '智者', subName: '鉴渊', star: '鉴渊煞' },
-            { id: 'm9', order: 9, type: '阴', name: '情人', subName: '合漪', star: '合漪星' },
-            { id: 'm10', order: 10, type: '阳', name: '魔法师', subName: '玄圜', star: '玄圜煞' },
-            { id: 'm11', order: 11, type: '阴', name: '统治者', subName: '纲曜', star: '纲曜星' },
-            { id: 'm12', order: 12, type: '阳', name: '孤儿', subName: '孤曜', star: '孤曜煞' }
+        moon: [
+            { id: 'm1', name: '探索者', subName: '越垠', type: '阴', star: '破界星', desire: "自由、发现新世界、寻找真理与自我定义。", fear: "被困、平庸、失去自主；生活陷入重复与束缚。", behavior: "旅行或精神漫游、质疑常规、突破边界、追求独特体验、保持独立。", shadow: "逃避责任、永不满足、孤独成瘾、拒绝承诺、将自由等同于疏离。" },
+            { id: 'm2', name: '革新者', subName: '破曜', type: '阳', star: '裂曜煞', desire: "颠覆压迫性结构，创造真实与自由的新秩序。", fear: "无力、被压迫、平庸；变革无法发生。", behavior: "挑战权威、揭露虚伪、制造颠覆性改变、坚持真实、反抗不公。", shadow: "无目的破坏、愤世嫉俗、自我毁灭、以反叛为身份、拒绝建设。" },
+            { id: 'm3', name: '小丑', subName: '谑枢', type: '阴', star: '谑机星', desire: "享受当下、带来欢乐、解构严肃与权威。", fear: "无聊、被忽视、生活无趣或沉重。", behavior: "幽默讽刺、游戏精神、打破僵局、揭示真相、活在当下。", shadow: "轻浮逃避、拒绝深度、用笑掩盖痛苦、破坏而不建设、情感疏离。" },
+            { id: 'm4', name: '天真者', subName: '守昭', type: '阳', star: '众昭煞', desire: "获得幸福、安全与归属；保持纯真，相信善终胜恶。", fear: "惩罚、失败、被抛弃；世界充满危险与背叛。", behavior: "信任他人、保持乐观、寻求保护、避免冲突、向往简单生活。", shadow: "否认现实、幼稚逃避、依赖权威、压抑负面情绪、拒绝成长。" },
+            { id: 'm5', name: '照顾者', subName: '润荄', type: '阴', star: '滋荄星', desire: "帮助与滋养他人，创造安全与温暖的环境。", fear: "自私、无能为力、所爱之人受伤或受苦。", behavior: "给予支持、倾听共情、牺牲自我、提供资源、维护关系。", shadow: "情感勒索、过度干预、控制欲伪装成关爱、自我耗竭、怨恨未被感激。" },
+            { id: 'm6', name: '英雄', subName: '振锋', type: '阳', star: '振锋煞', desire: "证明自身价值，战胜障碍，带来积极改变。", fear: "软弱、失败、无助；被看作无能或懦弱。", behavior: "勇敢行动、承担责任、保护弱者、设定目标、坚持到底。", shadow: "好斗逞强、救世主情结、忽视合作、将他人工具化、无法示弱。" },
+            { id: 'm7', name: '创造者', subName: '形曦', type: '阴', star: '塑曦星', desire: "创造独特而持久的作品，实现内在愿景。", fear: "平庸、创意枯竭、作品被忽视或误解。", behavior: "想象与设计、艺术或技术创新、表达个性、追求完美、赋予形式。", shadow: "完美主义瘫痪、自我怀疑、为创作牺牲生活、贬低他人作品、脱离现实。" },
+            { id: 'm8', name: '智者', subName: '鉴渊', type: '阳', star: '鉴渊煞', desire: "理解世界真相，获得智慧并传授他人。", fear: "无知、被欺骗、浅薄；真理不可知。", behavior: "学习与研究、分析问题、传授知识、追求客观、反思内省。", shadow: "冷漠疏离、知识傲慢、脱离实践、用理性压抑情感、故步自封。" },
+            { id: 'm9', name: '情人', subName: '合漪', type: '阴', star: '合漪星', desire: "亲密、融合、体验美与爱；与他人或世界深度连接。", fear: "孤独、不被爱、关系破裂；爱被拒绝或背叛。", behavior: "吸引与融合、创造美感、表达热情、培养亲密、重视感官体验。", shadow: "情感依赖、嫉妒控制、为爱迷失自我、物化他人、沉溺激情。" },
+            { id: 'm10', name: '魔法师', subName: '玄圜', type: '阳', star: '玄圜煞', desire: "转化现实，掌握深层法则，疗愈与整合对立。", fear: "无力、魔法失效、被表象迷惑；转化失败。", behavior: "疗愈创伤、连接灵性与物质、促成质变、运用象征、整合矛盾。", shadow: "操控他人、神秘主义逃避、滥用影响力、制造幻觉、拒绝平凡。" },
+            { id: 'm11', name: '统治者', subName: '纲曜', type: '阴', star: '纲曜星', desire: "建立并维持秩序、安全与繁荣；承担责任，引领集体成功。", fear: "混乱、失控、无政府状态；被推翻或失去合法性。", behavior: "领导团队、制定规则与制度、分配资源、维护公平、建立可持续结构。", shadow: "专制独裁、滥用权力、控制欲过强、压抑异见、僵化守旧。" },
+            { id: 'm12', name: '孤儿', subName: '孤曜', type: '阳', star: '孤曜煞', desire: "归属、真实、平等；摆脱幻想、脚踏实地。", fear: "被排斥、孤立无援、沦为受害者；虚假的希望破灭。", behavior: "务实处事、共情他人苦难、寻求社群支持、质疑权威、强调公平。", shadow: "怨恨不平、受害者心态、随波逐流、压抑个性、愤世嫉俗。" }
         ],
-        sun: [ // 日家偶将
-            { id: 's1', order: 1, type: '阳', name: '智者', subName: '鉴渊', star: '明渊星' },
-            { id: 's2', order: 2, type: '阴', name: '照顾者', subName: '润荄', star: '荫荄煞' },
-            { id: 's3', order: 3, type: '阳', name: '英雄', subName: '振锋', star: '显锋星' },
-            { id: 's4', order: 4, type: '阴', name: '天真者', subName: '守昭', star: '立基煞' },
-            { id: 's5', order: 5, type: '阳', name: '统治者', subName: '纲曜', star: '纲曜星' },
-            { id: 's6', order: 6, type: '阴', name: '革新者', subName: '破曜', star: '裂曜煞' },
-            { id: 's7', order: 7, type: '阳', name: '情人', subName: '合漪', star: '合漪星' },
-            { id: 's8', order: 8, type: '阴', name: '魔法师', subName: '玄圜', star: '玄圜煞' },
-            { id: 's9', order: 9, type: '阳', name: '小丑', subName: '谑枢', star: '谑枢星' },
-            { id: 's10', order: 10, type: '阴', name: '创造者', subName: '形曦', star: '藏曦煞' },
-            { id: 's11', order: 11, type: '阳', name: '孤儿', subName: '孤曜', star: '孤曜星' },
-            { id: 's12', order: 12, type: '阴', name: '探索者', subName: '越垠', star: '越垠煞' }
+        sun: [
+            { id: 's1', name: '智者', subName: '鉴渊', type: '阳', star: '明渊星', desire: "理解世界真相，获得智慧并传授他人。", fear: "无知、被欺骗、浅薄；真理不可知。", behavior: "学习与研究、分析问题、传授知识、追求客观、反思内省。", shadow: "冷漠疏离、知识傲慢、脱离实践、用理性压抑情感、故步自封。" },
+            { id: 's2', name: '照顾者', subName: '润荄', type: '阴', star: '荫荄煞', desire: "帮助与滋养他人，创造安全与温暖的环境。", fear: "自私、无能为力、所爱之人受伤或受苦。", behavior: "给予支持、倾听共情、牺牲自我、提供资源、维护关系。", shadow: "情感勒索、过度干预、控制欲伪装成关爱、自我耗竭、怨恨未被感激。" },
+            { id: 's3', name: '英雄', subName: '振锋', type: '阳', star: '显锋星', desire: "证明自身价值，战胜障碍，带来积极改变。", fear: "软弱、失败、无助；被看作无能或懦弱。", behavior: "勇敢行动、承担责任、保护弱者、设定目标、坚持到底。", shadow: "好斗逞强、救世主情结、忽视合作、将他人工具化、无法示弱。" },
+            { id: 's4', name: '天真者', subName: '守昭', type: '阴', star: '立基煞', desire: "获得幸福、安全与归属；保持纯真，相信善终胜恶。", fear: "惩罚、失败、被抛弃；世界充满危险与背叛。", behavior: "信任他人、保持乐观、寻求保护、避免冲突、向往简单生活。", shadow: "否认现实、幼稚逃避、依赖权威、压抑负面情绪、拒绝成长。" },
+            { id: 's5', name: '统治者', subName: '纲曜', type: '阳', star: '纲曜星', desire: "建立并维持秩序、安全与繁荣；承担责任，引领集体成功。", fear: "混乱、失控、无政府状态；被推翻或失去合法性。", behavior: "领导团队、制定规则与制度、分配资源、维护公平、建立可持续结构。", shadow: "专制独裁、滥用权力、控制欲过强、压抑异见、僵化守旧。" },
+            { id: 's6', name: '革新者', subName: '破曜', type: '阴', star: '裂曜煞', desire: "颠覆压迫性结构，创造真实与自由的新秩序。", fear: "无力、被压迫、平庸；变革无法发生。", behavior: "挑战权威、揭露虚伪、制造颠覆性改变、坚持真实、反抗不公。", shadow: "无目的破坏、愤世嫉俗、自我毁灭、以反叛为身份、拒绝建设。" },
+            { id: 's7', name: '情人', subName: '合漪', type: '阳', star: '合漪星', desire: "亲密、融合、体验美与爱；与他人或世界深度连接。", fear: "孤独、不被爱、关系破裂；爱被拒绝或背叛。", behavior: "吸引与融合、创造美感、表达热情、培养亲密、重视感官体验。", shadow: "情感依赖、嫉妒控制、为爱迷失自我、物化他人、沉溺激情。" },
+            { id: 's8', name: '魔法师', subName: '玄圜', type: '阴', star: '玄圜煞', desire: "转化现实，掌握深层法则，疗愈与整合对立。", fear: "无力、魔法失效、被表象迷惑；转化失败。", behavior: "疗愈创伤、连接灵性与物质、促成质变、运用象征、整合矛盾。", shadow: "操控他人、神秘主义逃避、滥用影响力、制造幻觉、拒绝平凡。" },
+            { id: 's9', name: '小丑', subName: '谑枢', type: '阳', star: '谑枢星', desire: "享受当下、带来欢乐、解构严肃与权威。", fear: "无聊、被忽视、生活无趣或沉重。", behavior: "幽默讽刺、游戏精神、打破僵局、揭示真相、活在当下。", shadow: "轻浮逃避、拒绝深度、用笑掩盖痛苦、破坏而不建设、情感疏离。" },
+            { id: 's10', name: '创造者', subName: '形曦', type: '阴', star: '藏曦煞', desire: "创造独特而持久的作品，实现内在愿景。", fear: "平庸、创意枯竭、作品被忽视或误解。", behavior: "想象与设计、艺术或技术创新、表达个性、追求完美、赋予形式。", shadow: "完美主义瘫痪、自我怀疑、为创作牺牲生活、贬低他人作品、脱离现实。" },
+            { id: 's11', name: '孤儿', subName: '孤曜', type: '阳', star: '孤曜星', desire: "归属、真实、平等；摆脱幻想、脚踏实地。", fear: "被排斥、孤立无援、沦为受害者；虚假的希望破灭。", behavior: "务实处事、共情他人苦难、寻求社群支持、质疑权威、强调公平。", shadow: "怨恨不平、受害者心态、随波逐流、压抑个性、愤世嫉俗。" },
+            { id: 's12', name: '探索者', subName: '越垠', type: '阴', star: '越垠煞', desire: "自由、发现新世界、寻找真理与自我定义。", fear: "被困、平庸、失去自主；生活陷入重复与束缚。", behavior: "旅行或精神漫游、质疑常规、突破边界、追求独特体验、保持独立。", shadow: "逃避责任、永不满足、孤独成瘾、拒绝承诺、将自由等同于疏离。" }
         ]
     },
     divineDivisions: [
@@ -69,12 +96,12 @@ const daopanData = {
         { id: 'd11', name: '妖精键', scripture: '默示录.始' }, { id: 'd12', name: '铭纹键', scripture: '默示录.导' }
     ],
     fourEdicts: [
-        { id: 'e1', name: '御风令', description: 'A[地(L) > 风(R)] @ B[火(R) > 水(L)]' },
-        { id: 'e2', name: '踏影令', description: 'A[风(R) > 地(L)] @ B[水(L) > 火(R)]' },
-        { id: 'e3', name: '流光令', description: 'B[水(L) > 火(R)] @ A[风(R) > 地(L)]' },
-        { id: 'e4', name: '灵魄令', description: 'B[火(R) > 水(L)] @ A[地(L) > 风(R)]' }
+        { id: 'e1', name: '御风令', type: 'A', description: 'A[地(L) > 风(R)] @ B[火(R) > 水(L)]' },
+        { id: 'e2', name: '踏影令', type: 'A', description: 'A[风(R) > 地(L)] @ B[水(L) > 火(R)]' },
+        { id: 'e3', name: '流光令', type: 'B', description: 'B[水(L) > 火(R)] @ A[风(R) > 地(L)]' },
+        { id: 'e4', name: '灵魄令', type: 'B', description: 'B[火(R) > 水(L)] @ A[地(L) > 风(R)]' }
     ],
     eightGates: [ "休门", "生门", "伤门", "杜门", "景门", "死门", "惊门", "开门" ]
 };
 
-// END OF FILE JS/daopan-data.js (FINAL CORRECTED VERSION V6)
+// END OF FILE JS/daopan-data.js (FINAL VERSION V7)

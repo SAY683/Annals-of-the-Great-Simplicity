@@ -1,4 +1,4 @@
-<!-- START OF FILE daopan.html (FINAL VERSION) -->
+<!-- START OF FILE daopan.html (FINAL VERSION WITH GODS-EYE) -->
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -44,10 +44,50 @@
             <div class="daopan-grid"></div>
         </div>
     </div>
+
+    <!-- 高阶玩法区域 -->
+    <div id="advanced-play-area" class="hidden">
+        <hr>
+        <h2>高阶推演</h2>
+        <div id="jump-pan-controls">
+            <h3>跳盘 · 交宫穴极</h3>
+            <p>推演已完成。现在可根据遁局规则进行“跳盘”操作。请点击盘面上高亮的单元格以选择交换对象。</p>
+            <div id="jump-pan-info"></div>
+        </div>
+        
+        <!-- 神之眼区域 -->
+        <div id="gods-eye-area">
+            <h3>神之眼 · 四象之刻</h3>
+            <div id="gods-eye-toggle-buttons">
+                <button class="link-card-button secondary active" data-view="before">观 · 未跳之象</button>
+                <button class="link-card-button secondary" data-view="after">察 · 已跳之局</button>
+            </div>
+            <div id="gods-eye-container">
+                <div class="quadrant" id="quadrant-ne">
+                    <h4 class="quadrant-title"></h4>
+                    <pre class="gods-eye-display"></pre>
+                </div>
+                <div class="quadrant" id="quadrant-se">
+                    <h4 class="quadrant-title"></h4>
+                    <pre class="gods-eye-display"></pre>
+                </div>
+                <div class="quadrant" id="quadrant-sw">
+                    <h4 class="quadrant-title"></h4>
+                    <pre class="gods-eye-display"></pre>
+                </div>
+                <div class="quadrant" id="quadrant-nw">
+                    <h4 class="quadrant-title"></h4>
+                    <pre class="gods-eye-display"></pre>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <footer class="footer">
         <p><a href="glossary.html">返回词典</a> | <a href="index.html">返回主页</a></p>
     </footer>
 </div>
+
 <div id="selection-modal" class="modal-overlay">
     <div class="modal-content">
         <h3 id="modal-title">选择</h3>
@@ -56,7 +96,6 @@
     </div>
 </div>
 
-<!-- 【新增功能】悬停信息提示框 -->
 <div id="daopan-tooltip"></div>
 
 <a href="#" id="back-to-top" title="返回顶部">↑</a>
@@ -65,4 +104,4 @@
 <script src="JS/main.js"></script> 
 </body>
 </html>
-<!-- END OF FILE daopan.html (FINAL VERSION) -->
+<!-- END OF FILE daopan.html (FINAL VERSION WITH GODS-EYE) -->
