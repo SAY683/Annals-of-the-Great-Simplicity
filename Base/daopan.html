@@ -1,0 +1,68 @@
+<!-- START OF FILE daopan.html (FINAL VERSION) -->
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>道盘推演 - Annals of the Great Simplicity</title>
+    <link rel="stylesheet" href="CSS/style.css">
+    <link rel="stylesheet" href="CSS/daopan.css">
+</head>
+<body>
+<div class="container">
+    <div class="totem-container">
+        <img src="IMAGE/totem_icon.png" alt="" class="totem-image">
+    </div>
+    <h1>道盘推演</h1>
+    <p class="intro-text">
+        此乃心象之沙盘，映照内在之阵列。请依序布列四令，以定基盘；而后开启八门，运转神将，观其流转生克，洞悉当下之时局。
+    </p>
+    <div id="daopan-interactive-area">
+        <div id="daopan-side-panel">
+            <div id="daopan-controls">
+                <div class="control-group">
+                    <label for="ruling-selector">全局遁局</label>
+                    <select id="ruling-selector">
+                        <option value="moon">月家奇将</option>
+                        <option value="sun">日家偶将</option>
+                    </select>
+                </div>
+                <button id="toggle-acupoints-btn" class="link-card-button secondary">查看穴位</button>
+                <button id="reset-daopan-btn" class="link-card-button secondary">重置道盘</button>
+            </div>
+            <div id="edict-bank-container">
+                <h4>四令备选</h4>
+                <div id="edict-bank"></div>
+            </div>
+            <div id="current-phase-display">
+                <small>当前阶段</small>
+                <p>请拖拽“四令”至“本宫”</p>
+            </div>
+        </div>
+        <div id="daopan-container">
+            <div class="daopan-title">道盘</div>
+            <div class="daopan-grid"></div>
+        </div>
+    </div>
+    <footer class="footer">
+        <p><a href="glossary.html">返回词典</a> | <a href="index.html">返回主页</a></p>
+    </footer>
+</div>
+<div id="selection-modal" class="modal-overlay">
+    <div class="modal-content">
+        <h3 id="modal-title">选择</h3>
+        <div id="modal-options-container"></div>
+        <button id="modal-close-btn" class="link-card-button secondary">关闭</button>
+    </div>
+</div>
+
+<!-- 【新增功能】悬停信息提示框 -->
+<div id="daopan-tooltip"></div>
+
+<a href="#" id="back-to-top" title="返回顶部">↑</a>
+<script src="JS/daopan-data.js"></script>
+<script src="JS/daopan.js"></script>
+<script src="JS/main.js"></script> 
+</body>
+</html>
+<!-- END OF FILE daopan.html (FINAL VERSION) -->

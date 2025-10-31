@@ -1,0 +1,348 @@
+/* START OF FILE CSS/daopan.css (FINAL VERSION) */
+
+#daopan-interactive-area {
+    margin: 3em 0;
+    display: flex;
+    gap: 30px;
+    align-items: flex-start;
+}
+
+#daopan-side-panel {
+    flex: 0 0 220px;
+    display: flex;
+    flex-direction: column;
+    gap: 25px;
+}
+
+#daopan-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.control-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.control-group label {
+    font-family: 'Songti SC', serif;
+    color: #555;
+    font-size: 0.9em;
+}
+
+#ruling-selector {
+    width: 100%;
+    padding: 8px 12px;
+    font-family: 'Songti SC', serif;
+    font-size: 1em;
+    color: #3a3a3a;
+    background-color: #fff;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    appearance: none;
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23333' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: right 1rem center;
+    background-size: 1em;
+    cursor: pointer;
+}
+
+#edict-bank-container h4 {
+    font-family: 'Songti SC', serif;
+    text-align: center;
+    color: #888;
+    margin-bottom: 1em;
+    font-weight: normal;
+}
+
+#edict-bank {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-height: 100px;
+}
+
+#current-phase-display {
+    text-align: center;
+    padding: 15px;
+    background-color: #fbfaf7;
+    border: 1px solid #eaeaea;
+    border-radius: 6px;
+}
+
+#current-phase-display small {
+    color: #888;
+}
+
+#current-phase-display p {
+    font-size: 1.1em;
+    color: #3a3a3a;
+    font-weight: bold;
+    margin: 0.5em 0 0 0;
+}
+
+.edict-card {
+    padding: 12px 15px;
+    background-color: #fdfcf9;
+    border: 1px solid #ddd;
+    border-left: 4px solid #a74141;
+    border-radius: 6px;
+    cursor: grab;
+    text-align: center;
+    font-family: 'Songti SC', serif;
+    font-size: 1.1em;
+    user-select: none;
+    transition: all 0.3s ease;
+    box-sizing: border-box;
+}
+
+.edict-card.dragging {
+    opacity: 0.4;
+    transform: scale(1.05);
+}
+
+.daopan-grid .edict-card {
+    width: 100%;
+    height: 100%;
+    font-size: 1.1em;
+    cursor: default;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: transparent;
+    border: none;
+    color: #e0d6c7;
+}
+
+#daopan-container {
+    flex-grow: 1;
+    background-color: #1a1a1e;
+    border: 1px solid #4a3a3a;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3), inset 0 0 10px rgba(0, 0, 0, 0.5);
+}
+
+.daopan-title {
+    font-family: 'Songti SC', serif;
+    font-size: 1.8em;
+    color: #d4c4b0;
+    text-align: center;
+    padding-bottom: 20px;
+    margin-bottom: 20px;
+    border-bottom: 1px solid #4a3a3a;
+    letter-spacing: 4px;
+}
+
+.daopan-grid {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    grid-template-rows: repeat(6, 1fr);
+    gap: 5px;
+    position: relative;
+}
+
+.cell {
+    aspect-ratio: 1 / 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Songti SC', serif;
+    font-size: clamp(0.7em, 2.5vw, 1.2em);
+    color: #e0d6c7;
+    border-radius: 4px;
+    border: 1px solid rgba(224, 160, 111, 0.2);
+    transition: all 0.3s ease;
+    user-select: none;
+    position: relative;
+    text-align: center;
+    word-break: break-all;
+}
+
+.cell > span,
+.cell > .edict-card {
+    transition: opacity 0.3s ease;
+}
+
+.cell-zhong { background-color: #5c3c3c; }
+.cell-ju { background-color: #2c3e50; }
+.cell-yi { background-color: #463d5c; }
+.cell-ben { background-color: #6e4a4a; }
+.cell-tai { background-color: #2c5042; }
+.cell-hole { background-color: #333; }
+
+.cell.droppable {
+    background-color: #8e6a6a;
+    border-color: #ffcda5;
+}
+
+.cell.clickable {
+    cursor: pointer;
+    border-color: #ffcda5;
+}
+
+.cell.clickable:hover {
+    transform: scale(1.05);
+    background-color: rgba(255, 255, 255, 0.1);
+    z-index: 10;
+}
+
+.daopan-grid.show-acupoints .cell > span,
+.daopan-grid.show-acupoints .cell > .edict-card {
+    opacity: 0;
+}
+
+.daopan-grid.show-acupoints .cell::before {
+    content: attr(data-acupoint-name);
+    position: absolute;
+    opacity: 0;
+    transition: opacity 0.3s;
+    color: #ffcda5;
+    font-size: 0.9em;
+}
+
+.daopan-grid.show-acupoints .cell[data-acupoint-name]::before {
+    opacity: 1;
+}
+
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(5px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.3s ease;
+    z-index: 2000;
+}
+
+.modal-overlay.visible {
+    opacity: 1;
+    visibility: visible;
+}
+
+.modal-content {
+    background-color: #1a1a1e;
+    border: 1px solid #4a3a3a;
+    border-radius: 8px;
+    padding: 25px 35px;
+    min-width: 300px;
+    max-width: 500px;
+    text-align: center;
+    color: #d4c4b0;
+    transform: scale(0.95);
+    transition: all 0.3s ease;
+}
+
+.modal-overlay.visible .modal-content {
+    transform: scale(1);
+}
+
+#modal-title {
+    font-family: 'Songti SC', serif;
+    margin-top: 0;
+}
+
+#modal-options-container {
+    margin: 2em 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    justify-content: center;
+}
+
+.modal-option {
+    padding: 8px 15px;
+    background-color: #2c3e50;
+    border: 1px solid rgba(224, 160, 111, 0.2);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.modal-option:hover {
+    background-color: #3e5670;
+    border-color: #ffcda5;
+}
+
+#daopan-tooltip {
+    position: fixed;
+    background-color: rgba(26, 26, 30, 0.9);
+    backdrop-filter: blur(4px);
+    color: #d4c4b0;
+    border: 1px solid #4a3a3a;
+    border-radius: 6px;
+    padding: 12px 15px;
+    font-size: 0.9em;
+    line-height: 1.6;
+    max-width: 250px;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.2s ease, visibility 0.2s ease;
+    pointer-events: none;
+    z-index: 3000;
+}
+
+#daopan-tooltip.visible {
+    opacity: 1;
+    visibility: visible;
+}
+
+#daopan-tooltip strong {
+    color: #ffcda5;
+    font-weight: normal;
+}
+
+#daopan-tooltip small {
+    color: #888;
+    display: block;
+    margin-top: 5px;
+}
+
+@media (max-width: 900px) {
+    #daopan-interactive-area {
+        flex-direction: column;
+    }
+    #daopan-side-panel {
+        flex-direction: row;
+        flex-wrap: wrap;
+        flex: 1 1 auto;
+        justify-content: center;
+    }
+    #daopan-controls {
+        flex: 1 1 100%;
+        flex-direction: row;
+        justify-content: space-around;
+        align-items: center;
+    }
+    #edict-bank-container,
+    #current-phase-display {
+        flex: 1 1 250px;
+    }
+    #edict-bank {
+        flex-direction: row;
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+    .edict-card {
+        flex-grow: 1;
+    }
+    #daopan-container {
+        padding: 10px;
+    }
+    .daopan-title {
+        font-size: 1.5em;
+        padding-bottom: 15px;
+        margin-bottom: 15px;
+    }
+}
+/* END OF FILE CSS/daopan.css (FINAL VERSION) */
