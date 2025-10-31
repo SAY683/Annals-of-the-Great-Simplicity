@@ -34,7 +34,7 @@ document.addEventListener('DOMContentLoaded', () => {
         PLACE_GENERALS: '请点击“局宫”或“仪宫”以布列神将',
         PLACE_DIVISIONS: '请点击“重宫”或“义宫”以布列神部',
         COMPLETE: '推演完成，可进行高阶操作',
-        JUMP_PAN: '请点击任意高亮“本宫”确认联动跳盘'
+        JUMP_PAN: '请点击任意高亮“本宫”进行跳盘'
     };
 
     const godsEyeMap = {
@@ -49,11 +49,11 @@ document.addEventListener('DOMContentLoaded', () => {
             grid: [
                 { s: 'VV', r: 1, c: 3 }, { s: '/', r: 2, c: 2 }, { s: '\\', r: 2, c: 4 },
                 { s: 'TT', r: 3, c: 2 }, { s: 'TS', r: 3, c: 4 }, 
-                { s: '/', r: 4, c: 1 }, { s: '\\', r: 4, c: 3 }, { s: '/', r: 4, c: 3 }, { s: '\\', r: 4, c: 5 },
+                { s: '/', r: 4, c: 1 }, { s: '\\', r: 4, c: 2 }, { s: '/', r: 4, c: 4 }, { s: '\\', r: 4, c: 5 },
                 { s: 'ST', r: 5, c: 1 }, { s: 'SV', r: 5, c: 3 }, { s: 'SS', r: 5, c: 5 }, 
                 { s: '\\', r: 6, c: 2 }, { s: '/', r: 6, c: 4 },
                 { s: 'VT', r: 7, c: 2 }, { s: 'VS', r: 7, c: 4 }, 
-                { s: '\\', r: 8, c: 3 }, { s: '/', r: 8, c: 3 }, // Special case for combined slash
+                { s: '\\', r: 8, c: 3 }, { s: '/', r: 8, c: 3 },
                 { s: 'TV', r: 9, c: 3 }
             ]
         },
@@ -65,10 +65,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 { symbol: 'VT', type: 'ju' }, { symbol: 'VS', type: 'ju' }, 
                 { symbol: 'TV', type: 'zhong' }
             ],
-            grid: [ // The visual grid layout is the same for both
+            grid: [
                 { s: 'VV', r: 1, c: 3 }, { s: '/', r: 2, c: 2 }, { s: '\\', r: 2, c: 4 },
                 { s: 'TT', r: 3, c: 2 }, { s: 'TS', r: 3, c: 4 }, 
-                { s: '/', r: 4, c: 1 }, { s: '\\', r: 4, c: 3 }, { s: '/', r: 4, c: 3 }, { s: '\\', r: 4, c: 5 },
+                { s: '/', r: 4, c: 1 }, { s: '\\', r: 4, c: 2 }, { s: '/', r: 4, c: 4 }, { s: '\\', r: 4, c: 5 },
                 { s: 'ST', r: 5, c: 1 }, { s: 'SV', r: 5, c: 3 }, { s: 'SS', r: 5, c: 5 }, 
                 { s: '\\', r: 6, c: 2 }, { s: '/', r: 6, c: 4 },
                 { s: 'VT', r: 7, c: 2 }, { s: 'VS', r: 7, c: 4 }, 
@@ -232,10 +232,10 @@ document.addEventListener('DOMContentLoaded', () => {
              cell.classList.add('jumpable');
         });
     }
-
-    function findBenGongJumpPartner(cellA) {
+    
+    function findBenGongJumpPartners(cellA) {
         const typeA = cellA.dataset.cellType;
-        if (typeA !== 'ben' || !cellA._placedData) return null;
+        if (typeA !== 'ben' || !cellA._placedData) return [];
         
         const edictTypeA = cellA._placedData.type;
         const ruling = gameState.ruling;
@@ -244,7 +244,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (ruling === 'sun') targetEdictType = edictTypeA;
         
         const allBenGong = Array.from(document.querySelectorAll('.cell[data-cell-type="ben"]'));
-        return allBenGong.find(cellB => cellB !== cellA && cellB._placedData && cellB._placedData.type === targetEdictType);
+        return allBenGong.filter(cellB => cellB !== cellA && cellB._placedData && cellB._placedData.type === targetEdictType);
     }
     
     function performAllJumps(cellA, cellB) {
@@ -252,7 +252,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const allBenGong = Array.from(document.querySelectorAll('.cell[data-cell-type="ben"]'));
         const remainingBenGong = allBenGong.filter(c => c !== cellA && c !== cellB);
         const pairs = [[cellA, cellB]];
-        if(remainingBenGong.length === 2 && findBenGongJumpPartner(remainingBenGong[0]) === remainingBenGong[1]) {
+        if(remainingBenGong.length === 2 && findBenGongJumpPartners(remainingBenGong[0]).includes(remainingBenGong[1])) {
             pairs.push(remainingBenGong);
         }
 
@@ -393,24 +393,27 @@ document.addEventListener('DOMContentLoaded', () => {
                 display.appendChild(el);
             };
 
-            const symbols = ['VV','TT','TS','ST','SV','SS','VT','VS','TV'];
-            const gridPositions = {
-                'VV': '1 / 3', 'TT': '3 / 2', 'TS': '3 / 4', 'ST': '5 / 1', 'SV': '5 / 3',
-                'SS': '5 / 5', 'VT': '7 / 2', 'VS': '7 / 4', 'TV': '9 / 3'
+            const connections = {
+                'VV': ['TT', 'TS'], 'TT': ['SV'], 'TS': ['SV'],
+                'ST': ['VT'], 'SV': ['VT', 'VS'], 'SS': ['VS'],
+                'VT': ['TV'], 'VS': ['TV']
             };
-            const slashes = [
-                {p: '2 / 2', c: '/'}, {p: '2 / 4', c: '\\'}, {p: '4 / 1', c: '/'}, 
-                {p: '4 / 2', c: '\\'}, {p: '4 / 4', c: '/'}, {p: '4 / 5', c: '\\'},
-                {p: '6 / 2', c: '\\'}, {p: '6 / 4', c: '/'}, {p: '8 / 3', c: '\\ /'}
-            ];
-            
-            symbols.forEach(s => {
-                const content = qData[s] || '----';
-                createSpan(`[${content}]`, `symbol-${s.toLowerCase()}`, gridPositions[s]);
-            });
 
-            slashes.forEach(slash => {
-                 createSpan(slash.c, 'slash', slash.p);
+            gridLayout.forEach(item => {
+                if (item.s.includes('/')) { // It's a slash
+                    const [from, to] = {
+                        '2/2':'VV-TT', '2/4':'VV-TS', '4/1':'TT-ST', '4/2':'TT-SV', 
+                        '4/4':'TS-SV', '4/5':'TS-SS', '6/2':'ST-VT', '6/4':'SV-VT',
+                        '6/4':'SV-VS', '6/6':'SS-VS', '8/3':'VT-TV', '8/3':'VS-TV'
+                    }['' + item.r + '/' + item.c] || [];
+                    
+                    if (from && to && qData[from] !== '----' && qData[to] !== '----') {
+                         createSpan(item.s, 'slash', `${item.r} / ${item.c}`);
+                    }
+                } else { // It's a symbol
+                    const content = qData[item.s] || '----';
+                    createSpan(`[${content}]`, `symbol-${item.s.toLowerCase()}`, `${item.r} / ${item.c}`);
+                }
             });
         });
     }
@@ -457,36 +460,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function handleJumpSelection(cell) {
         if (gameState.hasJumped) return;
-        const partner = findBenGongJumpPartner(cell);
-        if (partner) {
-            document.querySelectorAll('.selected-for-jump').forEach(c => c.classList.remove('selected-for-jump'));
-            elements.jumpPanInfo.textContent = `确认将“${cell.textContent}”与“${partner.textContent}”联动交换？点击任一高亮处确认。`;
-            cell.classList.add('selected-for-jump');
-            partner.classList.add('selected-for-jump');
-            
-            const confirmationHandler = (e) => {
-                const confirmCell = e.target.closest('.selected-for-jump');
-                document.querySelectorAll('.selected-for-jump').forEach(c => c.classList.remove('selected-for-jump'));
-                elements.jumpPanInfo.textContent = '';
-                if (confirmCell) {
-                    performAllJumps(cell, partner);
-                }
-                document.body.removeEventListener('click', bodyClickHandler, { capture: true });
-            };
-            const bodyClickHandler = (e) => {
-                if (!e.target.closest('.selected-for-jump')) {
-                    confirmationHandler({}); // Simulate a cancel click
-                }
-            };
-            
-            setTimeout(() => {
-                elements.gridContainer.addEventListener('click', confirmationHandler, { once: true });
-                document.body.addEventListener('click', bodyClickHandler, { capture: true, once: true });
-            }, 0);
-
+        if (!gameState.jumpSelection) {
+            const partners = findBenGongJumpPartners(cell);
+            if (partners.length > 0) {
+                gameState.jumpSelection = cell;
+                cell.classList.add('selected-for-jump');
+                partners.forEach(p => p.classList.add('selected-for-jump'));
+                elements.jumpPanInfo.textContent = `已选择“${cell.textContent}”，请在其他高亮单元格中选择交换对象。`;
+            } else {
+                elements.jumpPanInfo.textContent = '此令无合法交换对象。';
+                setTimeout(() => { elements.jumpPanInfo.textContent = ''; }, 2000);
+            }
         } else {
-            elements.jumpPanInfo.textContent = '此令无合法交换对象。';
-            setTimeout(() => { elements.jumpPanInfo.textContent = ''; }, 2000);
+            if (cell.classList.contains('selected-for-jump') && cell !== gameState.jumpSelection) {
+                performAllJumps(gameState.jumpSelection, cell);
+            } else {
+                document.querySelectorAll('.selected-for-jump').forEach(c => c.classList.remove('selected-for-jump'));
+                gameState.jumpSelection = null;
+                elements.jumpPanInfo.textContent = '';
+            }
         }
     }
 
