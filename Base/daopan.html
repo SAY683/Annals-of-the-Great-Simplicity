@@ -1,4 +1,4 @@
-<!-- START OF FILE daopan.html (FINAL VERSION WITH GODS-EYE) -->
+<!-- START OF FILE daopan.html (FINAL AND TRULY COMPLETE VERSION) -->
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -7,6 +7,7 @@
     <title>道盘推演 - Annals of the Great Simplicity</title>
     <link rel="stylesheet" href="CSS/style.css">
     <link rel="stylesheet" href="CSS/daopan.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 </head>
 <body>
 <div class="container">
@@ -23,12 +24,13 @@
                 <div class="control-group">
                     <label for="ruling-selector">全局遁局</label>
                     <select id="ruling-selector">
-                        <option value="moon">月家奇将</option>
-                        <option value="sun">日家偶将</option>
+                        <option value="moon">月家奇将 (奇遁)</option>
+                        <option value="sun">日家偶将 (偶遁)</option>
                     </select>
                 </div>
                 <button id="toggle-acupoints-btn" class="link-card-button secondary">查看穴位</button>
                 <button id="reset-daopan-btn" class="link-card-button secondary">重置道盘</button>
+                <button id="download-image-btn" class="link-card-button" disabled>下载推演结果 (PNG)</button>
             </div>
             <div id="edict-bank-container">
                 <h4>四令备选</h4>
@@ -45,39 +47,49 @@
         </div>
     </div>
 
-    <!-- 高阶玩法区域 -->
     <div id="advanced-play-area" class="hidden">
         <hr>
         <h2>高阶推演</h2>
         <div id="jump-pan-controls">
             <h3>跳盘 · 交宫穴极</h3>
-            <p>推演已完成。现在可根据遁局规则进行“跳盘”操作。请点击盘面上高亮的单元格以选择交换对象。</p>
+            <p>推演已完成。现在可根据遁局规则进行“跳盘”操作。请点击盘面上高亮的“本宫”以确认联动跳盘。</p>
             <div id="jump-pan-info"></div>
         </div>
         
-        <!-- 神之眼区域 -->
         <div id="gods-eye-area">
             <h3>神之眼 · 四象之刻</h3>
             <div id="gods-eye-toggle-buttons">
                 <button class="link-card-button secondary active" data-view="before">观 · 未跳之象</button>
-                <button class="link-card-button secondary" data-view="after">察 · 已跳之局</button>
+                <button class="link-card-button secondary hidden" data-view="after">察 · 已跳之局</button>
             </div>
             <div id="gods-eye-container">
                 <div class="quadrant" id="quadrant-ne">
-                    <h4 class="quadrant-title"></h4>
-                    <pre class="gods-eye-display"></pre>
+                    <div class="quadrant-header">
+                        <h4 class="quadrant-title"></h4>
+                        <button class="flip-btn" title="左右翻转象内数据">⇄</button>
+                    </div>
+                    <div class="gods-eye-display"></div>
                 </div>
                 <div class="quadrant" id="quadrant-se">
-                    <h4 class="quadrant-title"></h4>
-                    <pre class="gods-eye-display"></pre>
+                     <div class="quadrant-header">
+                        <h4 class="quadrant-title"></h4>
+                        <button class="flip-btn" title="左右翻转象内数据">⇄</button>
+                    </div>
+                    <div class="gods-eye-display"></div>
                 </div>
                 <div class="quadrant" id="quadrant-sw">
-                    <h4 class="quadrant-title"></h4>
-                    <pre class="gods-eye-display"></pre>
+                     <div class="quadrant-header">
+                        <h4 class="quadrant-title"></h4>
+                        <button class="flip-btn" title="左右翻转象内数据">⇄</button>
+                    </div>
+                    <div class="gods-eye-display"></div>
                 </div>
                 <div class="quadrant" id="quadrant-nw">
-                    <h4 class="quadrant-title"></h4>
-                    <pre class="gods-eye-display"></pre>
+                     <div class="quadrant-header">
+                        <h4 class="quadrant-title"></h4>
+                        <button class="flip-btn" title="左右翻转象内数据">⇄</button>
+                    </div>
+                    <div class="gods-eye-display"></div>
                 </div>
             </div>
         </div>
@@ -104,4 +116,4 @@
 <script src="JS/main.js"></script> 
 </body>
 </html>
-<!-- END OF FILE daopan.html (FINAL VERSION WITH GODS-EYE) -->
+<!-- END OF FILE daopan.html (FINAL AND TRULY COMPLETE VERSION) -->

@@ -16,8 +16,8 @@ document.addEventListener('DOMContentLoaded', () => {
         advancedPlayArea: document.getElementById('advanced-play-area'),
         jumpPanInfo: document.getElementById('jump-pan-info'),
         godsEyeToggleButtons: document.getElementById('gods-eye-toggle-buttons'),
-        quadrantTitles: document.querySelectorAll('.quadrant-title'),
-        quadrantDisplays: document.querySelectorAll('.gods-eye-display'),
+        godsEyeContainer: document.getElementById('gods-eye-container'),
+        downloadImageBtn: document.getElementById('download-image-btn'),
         modal: {
             overlay: document.getElementById('selection-modal'),
             title: document.getElementById('modal-title'),
@@ -34,55 +34,33 @@ document.addEventListener('DOMContentLoaded', () => {
         PLACE_GENERALS: '请点击“局宫”或“仪宫”以布列神将',
         PLACE_DIVISIONS: '请点击“重宫”或“义宫”以布列神部',
         COMPLETE: '推演完成，可进行高阶操作',
-        JUMP_PAN: '请点击任意高亮“本宫”进行跳盘'
+        JUMP_PAN: '请点击任意高亮“本宫”确认联动跳盘'
     };
 
     const godsEyeMap = {
         sun: {
-            layout: [
-                { symbol: 'VV', type: 'zhong' }, { symbol: 'TT', type: 'ju' }, 
-                { symbol: 'TS', type: 'ju' }, { symbol: 'ST', type: 'yi' }, 
-                { symbol: 'SV', type: 'ben' }, { symbol: 'SS', type: 'yi' }, 
-                { symbol: 'VT', type: 'tai' }, { symbol: 'VS', type: 'tai' }, 
-                { symbol: 'TV', type: 'hole' }
-            ],
-            grid: [
-                { s: 'VV', r: 1, c: 3 }, { s: '/', r: 2, c: 2 }, { s: '\\', r: 2, c: 4 },
-                { s: 'TT', r: 3, c: 2 }, { s: 'TS', r: 3, c: 4 }, 
-                { s: '/', r: 4, c: 1 }, { s: '\\', r: 4, c: 2 }, { s: '/', r: 4, c: 4 }, { s: '\\', r: 4, c: 5 },
-                { s: 'ST', r: 5, c: 1 }, { s: 'SV', r: 5, c: 3 }, { s: 'SS', r: 5, c: 5 }, 
-                { s: '\\', r: 6, c: 2 }, { s: '/', r: 6, c: 4 },
-                { s: 'VT', r: 7, c: 2 }, { s: 'VS', r: 7, c: 4 }, 
-                { s: '\\', r: 8, c: 3 }, { s: '/', r: 8, c: 3 },
-                { s: 'TV', r: 9, c: 3 }
-            ]
+            layout: [ { symbol: 'VV', type: 'zhong' }, { symbol: 'TT', type: 'ju' }, { symbol: 'TS', type: 'ju' }, { symbol: 'ST', type: 'yi' }, { symbol: 'SV', type: 'ben' }, { symbol: 'SS', type: 'yi' }, { symbol: 'VT', type: 'tai' }, { symbol: 'VS', type: 'tai' }, { symbol: 'TV', type: 'hole' } ]
         },
         moon: {
-             layout: [
-                { symbol: 'VV', type: 'hole' }, { symbol: 'TT', type: 'tai' }, 
-                { symbol: 'TS', type: 'tai' }, { symbol: 'ST', type: 'yi' }, 
-                { symbol: 'SV', type: 'ben' }, { symbol: 'SS', type: 'yi' }, 
-                { symbol: 'VT', type: 'ju' }, { symbol: 'VS', type: 'ju' }, 
-                { symbol: 'TV', type: 'zhong' }
-            ],
-            grid: [
-                { s: 'VV', r: 1, c: 3 }, { s: '/', r: 2, c: 2 }, { s: '\\', r: 2, c: 4 },
-                { s: 'TT', r: 3, c: 2 }, { s: 'TS', r: 3, c: 4 }, 
-                { s: '/', r: 4, c: 1 }, { s: '\\', r: 4, c: 2 }, { s: '/', r: 4, c: 4 }, { s: '\\', r: 4, c: 5 },
-                { s: 'ST', r: 5, c: 1 }, { s: 'SV', r: 5, c: 3 }, { s: 'SS', r: 5, c: 5 }, 
-                { s: '\\', r: 6, c: 2 }, { s: '/', r: 6, c: 4 },
-                { s: 'VT', r: 7, c: 2 }, { s: 'VS', r: 7, c: 4 }, 
-                { s: '\\', r: 8, c: 3 }, { s: '/', r: 8, c: 3 },
-                { s: 'TV', r: 9, c: 3 }
-            ]
+             layout: [ { symbol: 'VV', type: 'hole' }, { symbol: 'TT', type: 'tai' }, { symbol: 'TS', type: 'tai' }, { symbol: 'ST', type: 'yi' }, { symbol: 'SV', type: 'ben' }, { symbol: 'SS', type: 'yi' }, { symbol: 'VT', type: 'ju' }, { symbol: 'VS', type: 'ju' }, { symbol: 'TV', type: 'zhong' } ]
         }
     };
+    
+    const nodePositions = {
+        'VV': {x: 50, y: 10}, 'TT': {x: 25, y: 30}, 'TS': {x: 75, y: 30},
+        'ST': {x: 10, y: 50}, 'SV': {x: 50, y: 50}, 'SS': {x: 90, y: 50},
+        'VT': {x: 25, y: 70}, 'VS': {x: 75, y: 70}, 'TV': {x: 50, y: 90}
+    };
+    const nodeConnections = [
+        ['VV','TT'], ['VV','TS'], ['TT','ST'], ['TT','SV'], ['TS','SV'], ['TS','SS'],
+        ['ST','VT'], ['SV','VT'], ['SV','VS'], ['SS','VS'], ['VT','TV'], ['VS','TV']
+    ];
 
     const quadrantConfig = {
-        ne: { start: [0, 5], r_inc: 1, c_inc: -1, titleAcupoint: '土穴' },
-        se: { start: [5, 5], r_inc: -1, c_inc: -1, titleAcupoint: '水穴' },
-        sw: { start: [5, 0], r_inc: -1, c_inc: 1, titleAcupoint: '风穴' },
-        nw: { start: [0, 0], r_inc: 1, c_inc: 1, titleAcupoint: '火穴' }
+        ne: { start: [0, 5], r_inc: 1, c_inc: -1, titleAcupoint: '土穴', rotation: 0 },
+        se: { start: [5, 5], r_inc: -1, c_inc: -1, titleAcupoint: '水穴', rotation: 1 },
+        sw: { start: [5, 0], r_inc: -1, c_inc: 1, titleAcupoint: '风穴', rotation: 2 },
+        nw: { start: [0, 0], r_inc: 1, c_inc: 1, titleAcupoint: '火穴', rotation: 3 }
     };
 
     // =========================================================================
@@ -95,8 +73,10 @@ document.addEventListener('DOMContentLoaded', () => {
             ruling: elements.rulingSelector.value, jumpSelection: null,
             panStateBeforeJump: null, panStateAfterJump: null,
             currentGodsEyeView: 'before',
-            hasJumped: false
+            hasJumped: false,
+            quadrantData: {}
         };
+        elements.downloadImageBtn.disabled = true;
     }
 
     function renderDaopanGrid() {
@@ -159,6 +139,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (currentIndex === phaseOrder.length - 1) {
             gameState.phase = 'COMPLETE';
             updateInteractivity();
+            elements.downloadImageBtn.disabled = false;
             const afterJumpButton = elements.godsEyeToggleButtons.querySelector('[data-view="after"]');
             afterJumpButton.classList.add('hidden');
             const beforeJumpButton = elements.godsEyeToggleButtons.querySelector('[data-view="before"]');
@@ -166,7 +147,8 @@ document.addEventListener('DOMContentLoaded', () => {
             beforeJumpButton.classList.add('active');
             elements.advancedPlayArea.classList.remove('hidden');
             gameState.panStateBeforeJump = capturePanState();
-            renderGodsEyeView('before');
+            generateAndStoreGodsEyeData('before');
+            renderAllQuadrants();
             gameState.phase = 'JUMP_PAN';
             elements.phaseDisplay.textContent = phaseInstructions[gameState.phase];
             activateJumpPan();
@@ -236,13 +218,11 @@ document.addEventListener('DOMContentLoaded', () => {
     function findBenGongJumpPartners(cellA) {
         const typeA = cellA.dataset.cellType;
         if (typeA !== 'ben' || !cellA._placedData) return [];
-        
         const edictTypeA = cellA._placedData.type;
         const ruling = gameState.ruling;
         let targetEdictType;
         if (ruling === 'moon') targetEdictType = (edictTypeA === 'A') ? 'B' : 'A';
         if (ruling === 'sun') targetEdictType = edictTypeA;
-        
         const allBenGong = Array.from(document.querySelectorAll('.cell[data-cell-type="ben"]'));
         return allBenGong.filter(cellB => cellB !== cellA && cellB._placedData && cellB._placedData.type === targetEdictType);
     }
@@ -292,12 +272,15 @@ document.addEventListener('DOMContentLoaded', () => {
         clearAllInteractivity();
         elements.phaseDisplay.textContent = "跳盘完成！";
         setTimeout(() => { elements.jumpPanInfo.textContent = ''; }, 2000);
+        
+        generateAndStoreGodsEyeData('after');
+        
         const afterJumpButton = elements.godsEyeToggleButtons.querySelector('[data-view="after"]');
         afterJumpButton.classList.remove('hidden');
         elements.godsEyeToggleButtons.querySelectorAll('button').forEach(btn => btn.classList.remove('active'));
         afterJumpButton.classList.add('active');
         gameState.currentGodsEyeView = 'after';
-        renderGodsEyeView('after');
+        renderAllQuadrants();
     }
     
     function getAcupointNameForCell(cell) {
@@ -337,84 +320,137 @@ document.addEventListener('DOMContentLoaded', () => {
         return panState;
     }
 
-    function generateGodsEyeData(panState) {
-        const symbolLayout = godsEyeMap[gameState.ruling].layout;
-        const quadrants = {};
+    function generateAndStoreGodsEyeData(viewType) {
+        const panState = viewType === 'before' ? gameState.panStateBeforeJump : gameState.panStateAfterJump;
+        if (!panState) return;
         
+        gameState.quadrantData[viewType] = {};
+        const symbolLayout = godsEyeMap[gameState.ruling].layout;
+
         for (const [qKey, config] of Object.entries(quadrantConfig)) {
-            quadrants[qKey] = {};
-            const qCells = [];
+            let quadrantMatrix = [[], [], []];
             for (let i = 0; i < 3; i++) { for (let j = 0; j < 3; j++) {
                 const r = config.start[0] + (i * config.r_inc);
                 const c = config.start[1] + (j * config.c_inc);
-                if (r >= 0 && r <= 5 && c >= 0 && c <= 5) qCells.push({r, c});
+                quadrantMatrix[i][j] = { key: `${r}-${c}`, type: daopanData.layout[r][c] };
             }}
+
+            for (let i = 0; i < config.rotation; i++) {
+                quadrantMatrix = quadrantMatrix[0].map((_, colIndex) => quadrantMatrix.map(row => row[colIndex]).reverse());
+            }
+
+            const temp = quadrantMatrix[0][0]; quadrantMatrix[0][0] = quadrantMatrix[0][2]; quadrantMatrix[0][2] = temp;
+            const temp2 = quadrantMatrix[1][0]; quadrantMatrix[1][0] = quadrantMatrix[1][2]; quadrantMatrix[1][2] = temp2;
+            const temp3 = quadrantMatrix[2][0]; quadrantMatrix[2][0] = quadrantMatrix[2][2]; quadrantMatrix[2][2] = temp3;
             
+            gameState.quadrantData[viewType][qKey] = {};
             const filledPositions = new Set();
             symbolLayout.forEach(({ symbol, type }) => {
-                const foundCell = qCells.find(cell => {
-                    const key = `${cell.r}-${cell.c}`;
-                    return daopanData.layout[cell.r][cell.c] === type && !filledPositions.has(key);
-                });
-
+                const foundCell = quadrantMatrix.flat().find(cell => cell.type === type && !filledPositions.has(cell.key));
                 if (foundCell) {
-                    const key = `${foundCell.r}-${foundCell.c}`;
-                    const cellData = panState[key];
-                    quadrants[qKey][symbol] = cellData ? (cellData.subName || cellData.name || cellData) : '----';
-                    filledPositions.add(key);
+                    const cellData = panState[foundCell.key];
+                    gameState.quadrantData[viewType][qKey][symbol] = cellData ? (cellData.subName || cellData.name || cellData) : '----';
+                    filledPositions.add(foundCell.key);
                 } else {
-                    quadrants[qKey][symbol] = '----';
+                    gameState.quadrantData[viewType][qKey][symbol] = '----';
                 }
             });
         }
-        return quadrants;
     }
 
-    function renderGodsEyeView(viewType) {
-        const panState = viewType === 'before' ? gameState.panStateBeforeJump : gameState.panStateAfterJump;
-        if (!panState) return;
+    function renderQuadrant(quadrantEl, qData) {
+        const display = quadrantEl.querySelector('.gods-eye-display');
+        display.innerHTML = '';
+        const svgNS = "http://www.w3.org/2000/svg";
+        const svg = document.createElementNS(svgNS, 'svg');
 
-        const godsEyeData = generateGodsEyeData(panState);
-        const gridLayout = godsEyeMap[gameState.ruling].grid;
+        Object.entries(qData).forEach(([symbol, value]) => {
+            if (value !== '----') {
+                const pos = nodePositions[symbol];
+                const nodeEl = document.createElement('div');
+                nodeEl.className = `gods-eye-node symbol-${symbol.toLowerCase()}`;
+                nodeEl.textContent = `[${value}]`;
+                nodeEl.style.left = `${pos.x}%`;
+                nodeEl.style.top = `${pos.y}%`;
+                display.appendChild(nodeEl);
+            }
+        });
 
-        elements.quadrantDisplays.forEach((display, index) => {
-            const qKey = Object.keys(quadrantConfig)[index];
-            const qData = godsEyeData[qKey];
+        nodeConnections.forEach(([from, to]) => {
+            if (qData[from] !== '----' && qData[to] !== '----') {
+                const pos1 = nodePositions[from];
+                const pos2 = nodePositions[to];
+                const line = document.createElementNS(svgNS, 'line');
+                line.setAttribute('x1', `${pos1.x}%`);
+                line.setAttribute('y1', `${pos1.y}%`);
+                line.setAttribute('x2', `${pos2.x}%`);
+                line.setAttribute('y2', `${pos2.y}%`);
+                svg.appendChild(line);
+            }
+        });
+        display.appendChild(svg);
+    }
+    
+    function renderAllQuadrants() {
+        const viewType = gameState.currentGodsEyeView;
+        const allQuadrantsData = gameState.quadrantData[viewType];
+        if (!allQuadrantsData) return;
+
+        elements.godsEyeContainer.querySelectorAll('.quadrant').forEach(quadrantEl => {
+            const qKey = quadrantEl.id.split('-')[1];
+            const qData = allQuadrantsData[qKey];
+            const titleEl = quadrantEl.querySelector('.quadrant-title');
             const titleAcupoint = quadrantConfig[qKey].titleAcupoint;
-            elements.quadrantTitles[index].textContent = `${gameState.ruling === 'sun' ? '遁局 (偶遁-' : '遁局 (奇遁-'}${titleAcupoint})`;
-            
-            display.innerHTML = '';
-            
-            const createSpan = (text, className, gridArea) => {
-                const el = document.createElement('span');
-                if (className) el.className = className;
-                el.textContent = text;
-                el.style.gridArea = gridArea;
-                display.appendChild(el);
-            };
+            titleEl.textContent = `${gameState.ruling === 'sun' ? '遁局 (偶遁-' : '遁局 (奇遁-'}${titleAcupoint})`;
+            renderQuadrant(quadrantEl, qData);
+        });
+    }
 
-            const connections = {
-                'VV': ['TT', 'TS'], 'TT': ['SV'], 'TS': ['SV'],
-                'ST': ['VT'], 'SV': ['VT', 'VS'], 'SS': ['VS'],
-                'VT': ['TV'], 'VS': ['TV']
-            };
+    function downloadPanAsImage() {
+        if (!gameState.panStateBeforeJump) { return; }
+        const btn = elements.downloadImageBtn;
+        const originalText = btn.textContent;
+        btn.textContent = '正在生成...';
+        btn.disabled = true;
 
-            gridLayout.forEach(item => {
-                if (item.s.includes('/')) { // It's a slash
-                    const [from, to] = {
-                        '2/2':'VV-TT', '2/4':'VV-TS', '4/1':'TT-ST', '4/2':'TT-SV', 
-                        '4/4':'TS-SV', '4/5':'TS-SS', '6/2':'ST-VT', '6/4':'SV-VT',
-                        '6/4':'SV-VS', '6/6':'SS-VS', '8/3':'VT-TV', '8/3':'VS-TV'
-                    }['' + item.r + '/' + item.c] || [];
-                    
-                    if (from && to && qData[from] !== '----' && qData[to] !== '----') {
-                         createSpan(item.s, 'slash', `${item.r} / ${item.c}`);
-                    }
-                } else { // It's a symbol
-                    const content = qData[item.s] || '----';
-                    createSpan(`[${content}]`, `symbol-${item.s.toLowerCase()}`, `${item.r} / ${item.c}`);
-                }
-            });
+        const container = document.createElement('div');
+        container.style.position = 'absolute';
+        container.style.left = '-9999px';
+        container.style.backgroundColor = getComputedStyle(document.body).backgroundColor;
+        container.style.padding = '20px';
+        container.style.display = 'grid';
+        container.style.gridTemplateColumns = '1fr 1fr';
+        container.style.gap = '20px';
+        container.style.width = '800px';
+
+        const beforeContainer = document.getElementById('gods-eye-container').cloneNode(true);
+        if(gameState.hasJumped) {
+             const afterContainer = beforeContainer.cloneNode(true);
+             container.appendChild(beforeContainer);
+             container.appendChild(afterContainer);
+             document.body.appendChild(container);
+             renderGodsEyeView('before', beforeContainer);
+             renderGodsEyeView('after', afterContainer);
+        } else {
+             container.style.gridTemplateColumns = '1fr';
+             container.appendChild(beforeContainer);
+             document.body.appendChild(container);
+             renderGodsEyeView('before', beforeContainer);
+        }
+
+        html2canvas(container, { scale: 2 }).then(canvas => {
+            const link = document.createElement('a');
+            link.download = `daopan_result_${gameState.ruling}_${Date.now()}.png`;
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+            btn.textContent = originalText;
+            btn.disabled = false;
+            document.body.removeChild(container);
+        }).catch(err => {
+            console.error('图片生成失败:', err);
+            btn.textContent = originalText;
+            btn.disabled = false;
+            document.body.removeChild(container);
         });
     }
 
@@ -460,7 +496,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function handleJumpSelection(cell) {
         if (gameState.hasJumped) return;
-        if (!gameState.jumpSelection) {
+        
+        if (gameState.jumpSelection) {
+            if (cell.classList.contains('selected-for-jump') && cell !== gameState.jumpSelection) {
+                 performAllJumps(gameState.jumpSelection, cell);
+            } else {
+                 document.querySelectorAll('.selected-for-jump').forEach(c => c.classList.remove('selected-for-jump'));
+                 gameState.jumpSelection = null;
+                 elements.jumpPanInfo.textContent = '';
+            }
+        } else {
             const partners = findBenGongJumpPartners(cell);
             if (partners.length > 0) {
                 gameState.jumpSelection = cell;
@@ -470,14 +515,6 @@ document.addEventListener('DOMContentLoaded', () => {
             } else {
                 elements.jumpPanInfo.textContent = '此令无合法交换对象。';
                 setTimeout(() => { elements.jumpPanInfo.textContent = ''; }, 2000);
-            }
-        } else {
-            if (cell.classList.contains('selected-for-jump') && cell !== gameState.jumpSelection) {
-                performAllJumps(gameState.jumpSelection, cell);
-            } else {
-                document.querySelectorAll('.selected-for-jump').forEach(c => c.classList.remove('selected-for-jump'));
-                gameState.jumpSelection = null;
-                elements.jumpPanInfo.textContent = '';
             }
         }
     }
@@ -525,10 +562,29 @@ document.addEventListener('DOMContentLoaded', () => {
         elements.rulingSelector.addEventListener('change', (e) => { 
             gameState.ruling = e.target.value;
             if (gameState.phase === 'COMPLETE' || gameState.phase === 'JUMP_PAN' || gameState.hasJumped) {
-                renderGodsEyeView(gameState.currentGodsEyeView);
+                generateAndStoreGodsEyeData('before');
+                if(gameState.hasJumped) generateAndStoreGodsEyeData('after');
+                renderAllQuadrants();
             }
         });
+        elements.downloadImageBtn.addEventListener('click', downloadPanAsImage);
         
+        elements.godsEyeContainer.addEventListener('click', (e) => {
+            const flipBtn = e.target.closest('.flip-btn');
+            if(flipBtn && (gameState.phase === 'JUMP_PAN' || gameState.hasJumped)) {
+                const quadrantEl = flipBtn.closest('.quadrant');
+                const qKey = quadrantEl.id.split('-')[1];
+                const viewType = gameState.currentGodsEyeView;
+                const qData = gameState.quadrantData[viewType][qKey];
+                
+                const tempTT = qData['TT']; qData['TT'] = qData['TS']; qData['TS'] = tempTT;
+                const tempST = qData['ST']; qData['ST'] = qData['SS']; qData['SS'] = tempST;
+                const tempVT = qData['VT']; qData['VT'] = qData['VS']; qData['VS'] = tempVT;
+
+                renderQuadrant(quadrantEl, qData);
+            }
+        });
+
         const interactiveArea = document.getElementById('daopan-interactive-area');
         interactiveArea.addEventListener('dragstart', handleDragStart);
         interactiveArea.addEventListener('dragend', handleDragEnd);
@@ -549,7 +605,7 @@ document.addEventListener('DOMContentLoaded', () => {
             elements.godsEyeToggleButtons.querySelectorAll('button').forEach(btn => btn.classList.remove('active'));
             button.classList.add('active');
             gameState.currentGodsEyeView = button.dataset.view;
-            renderGodsEyeView(gameState.currentGodsEyeView);
+            renderAllQuadrants();
         });
     }
 

@@ -1,4 +1,4 @@
-/* START OF FILE CSS/daopan.css (FINAL RESPONSIVE VERSION) */
+/* START OF FILE CSS/daopan.css (FINAL AND TRULY COMPLETE VERSION) */
 
 #daopan-interactive-area {
     margin: 3em 0;
@@ -275,42 +275,73 @@
     padding: 15px;
 }
 
-.quadrant-title {
-    font-family: 'Songti SC', serif;
-    font-size: 1.4em;
-    color: #d4c4b0;
-    text-align: center;
+.quadrant-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
     margin: 0 0 1em 0;
     padding-bottom: 0.8em;
     border-bottom: 1px solid #4a3a3a;
 }
 
-.gods-eye-display {
-    font-family: 'Courier New', Courier, monospace;
+.quadrant-title {
+    font-family: 'Songti SC', serif;
+    font-size: 1.4em;
     color: #d4c4b0;
-    display: grid;
-    grid-template-columns: repeat(5, 1fr);
-    grid-template-rows: repeat(7, auto);
-    justify-items: center;
-    align-items: center;
-    font-size: 0.9em;
-    line-height: 1.4;
-    min-height: 160px;
-}
-.gods-eye-display > span {
     text-align: center;
-    white-space: nowrap;
+    flex-grow: 1;
+    margin: 0;
+    padding: 0;
+    border: none;
 }
 
-.gods-eye-display .symbol-vv, .gods-eye-display .symbol-tv { color: #b0bec5; }
-.gods-eye-display .symbol-tt, .gods-eye-display .symbol-ts { color: #e57373; }
-.gods-eye-display .symbol-st, .gods-eye-display .symbol-sv, .gods-eye-display .symbol-ss { color: #81c784; }
-.gods-eye-display .symbol-vt, .gods-eye-display .symbol-vs { color: #64b5f6; }
-.gods-eye-display .slash {
-    color: #666;
-    user-select: none;
+.flip-btn {
+    background: none;
+    border: 1px solid #4a3a3a;
+    color: #888;
+    cursor: pointer;
+    border-radius: 4px;
     font-size: 1.2em;
-    transform: scaleY(0.8);
+    line-height: 1;
+    padding: 4px 6px;
+    transition: all 0.2s ease;
+}
+
+.flip-btn:hover {
+    color: #d4c4b0;
+    border-color: #d4c4b0;
+}
+
+.gods-eye-display {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 1 / 1.2;
+    min-height: 220px;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 0.9em;
+    color: #d4c4b0;
+}
+.gods-eye-node {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    white-space: nowrap;
+    z-index: 1;
+    font-size: 1.1em;
+}
+.gods-eye-node.symbol-vv, .gods-eye-node.symbol-tv { color: #b0bec5; }
+.gods-eye-node.symbol-tt, .gods-eye-node.symbol-ts { color: #e57373; }
+.gods-eye-node.symbol-st, .gods-eye-node.symbol-sv, .gods-eye-node.symbol-ss { color: #81c784; }
+.gods-eye-node.symbol-vt, .gods-eye-node.symbol-vs { color: #64b5f6; }
+.gods-eye-display svg {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    overflow: visible;
+    z-index: 0;
+}
+.gods-eye-display svg line {
+    stroke: #444;
+    stroke-width: 1;
 }
 
 .modal-overlay {
@@ -332,11 +363,12 @@
 #daopan-tooltip small { color: #888; display: block; margin-top: 5px; }
 
 @media (max-width: 960px) {
-    #daopan-interactive-area { flex-direction: column; }
+    #daopan-interactive-area { flex-direction: column; align-items: center; }
     #daopan-side-panel {
         flex-direction: row;
         flex-wrap: wrap;
         width: 100%;
+        max-width: 600px;
         flex-basis: auto;
     }
     #daopan-controls {
@@ -348,10 +380,12 @@
     #edict-bank-container, #current-phase-display { flex: 1 1 250px; }
     #edict-bank { flex-direction: row; flex-wrap: wrap; justify-content: center; }
     .edict-card { flex-grow: 1; }
-    #daopan-container { padding: 10px; width: 100%; box-sizing: border-box; }
+    #daopan-container { padding: 10px; width: 100%; max-width: 600px; box-sizing: border-box; }
 }
 
 @media (max-width: 768px) {
     #gods-eye-toggle-buttons { flex-direction: column; }
+    .quadrant { padding: 10px; }
+    .gods-eye-display { font-size: 0.8em; }
 }
-/* END OF FILE CSS/daopan.css (FINAL RESPONSIVE VERSION) */
+/* END OF FILE CSS/daopan.css (FINAL AND TRULY COMPLETE VERSION) */
