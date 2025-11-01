@@ -419,23 +419,23 @@ document.addEventListener('DOMContentLoaded', () => {
         container.style.backgroundColor = getComputedStyle(document.body).backgroundColor;
         container.style.padding = '20px';
         container.style.display = 'grid';
-        container.style.gridTemplateColumns = '1fr 1fr';
         container.style.gap = '20px';
         container.style.width = '800px';
 
-        const beforeContainer = document.getElementById('gods-eye-container').cloneNode(true);
+        const beforeNode = document.getElementById('gods-eye-container').cloneNode(true);
         if(gameState.hasJumped) {
-             const afterContainer = beforeContainer.cloneNode(true);
-             container.appendChild(beforeContainer);
-             container.appendChild(afterContainer);
-             document.body.appendChild(container);
-             renderGodsEyeView('before', beforeContainer);
-             renderGodsEyeView('after', afterContainer);
+            container.style.gridTemplateColumns = '1fr 1fr';
+            const afterNode = beforeNode.cloneNode(true);
+            container.appendChild(beforeNode);
+            container.appendChild(afterNode);
+            document.body.appendChild(container);
+            renderAllQuadrantsInContainer(beforeNode, 'before');
+            renderAllQuadrantsInContainer(afterNode, 'after');
         } else {
-             container.style.gridTemplateColumns = '1fr';
-             container.appendChild(beforeContainer);
-             document.body.appendChild(container);
-             renderGodsEyeView('before', beforeContainer);
+            container.style.gridTemplateColumns = '1fr';
+            container.appendChild(beforeNode);
+            document.body.appendChild(container);
+            renderAllQuadrantsInContainer(beforeNode, 'before');
         }
 
         html2canvas(container, { scale: 2 }).then(canvas => {
@@ -451,6 +451,15 @@ document.addEventListener('DOMContentLoaded', () => {
             btn.textContent = originalText;
             btn.disabled = false;
             document.body.removeChild(container);
+        });
+    }
+    
+    function renderAllQuadrantsInContainer(container, viewType) {
+        const allQuadrantsData = gameState.quadrantData[viewType];
+        if(!allQuadrantsData) return;
+        container.querySelectorAll('.quadrant').forEach(quadrantEl => {
+            const qKey = quadrantEl.id.split('-')[1];
+            renderQuadrant(quadrantEl, allQuadrantsData[qKey]);
         });
     }
 
@@ -496,7 +505,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function handleJumpSelection(cell) {
         if (gameState.hasJumped) return;
-        
         if (gameState.jumpSelection) {
             if (cell.classList.contains('selected-for-jump') && cell !== gameState.jumpSelection) {
                  performAllJumps(gameState.jumpSelection, cell);
