@@ -1,4 +1,45 @@
-/* START OF FILE CSS/daopan.css (FINAL AND TRULY COMPLETE VERSION) */
+/* START OF FILE CSS/daopan.css (FINAL OPTIMIZED VERSION) */
+
+:root {
+    /* 主题颜色 */
+    --c-primary: #a74141;
+    --c-secondary: #0B6A7A;
+    --c-accent: #ffcda5;
+    
+    /* 文本颜色 */
+    --c-text-light: #e0d6c7;
+    --c-text-dark: #3a3a3a;
+    --c-text-muted: #888;
+    --c-text-inverted: #1a1a1e;
+
+    /* 背景颜色 */
+    --c-bg-light: #fdfcf9;
+    --c-bg-dark: #1a1a1e;
+    --c-bg-panel: #fbfaf7;
+
+    /* 边框与分隔线 */
+    --c-border-light: #ddd;
+    --c-border-dark: #4a3a3a;
+    --c-border-interactive: rgba(224, 160, 111, 0.2);
+
+    /* 宫位背景色 */
+    --c-cell-zhong: #5c3c3c;
+    --c-cell-ju: #2c3e50;
+    --c-cell-yi: #463d5c;
+    --c-cell-ben: #6e4a4a;
+    --c-cell-tai: #2c5042;
+    --c-cell-hole: #333;
+
+    /* 神之眼符号颜色 */
+    --c-symbol-gray: #b0bec5;
+    --c-symbol-red: #e57373;
+    --c-symbol-green: #81c784;
+    --c-symbol-blue: #64b5f6;
+
+    /* 字体 */
+    --font-serif: 'Songti SC', 'STSong', 'SimSun', serif;
+    --font-mono: 'Courier New', Courier, monospace;
+}
 
 #daopan-interactive-area {
     margin: 3em 0;
@@ -27,19 +68,19 @@
 }
 
 .control-group label {
-    font-family: 'Songti SC', serif;
-    color: #555;
+    font-family: var(--font-serif);
+    color: var(--c-text-muted);
     font-size: 0.9em;
 }
 
 #ruling-selector {
     width: 100%;
     padding: 8px 12px;
-    font-family: 'Songti SC', serif;
+    font-family: var(--font-serif);
     font-size: 1em;
-    color: #3a3a3a;
+    color: var(--c-text-dark);
     background-color: #fff;
-    border: 1px solid #ccc;
+    border: 1px solid var(--c-border-light);
     border-radius: 4px;
     appearance: none;
     -webkit-appearance: none;
@@ -51,9 +92,9 @@
 }
 
 #edict-bank-container h4 {
-    font-family: 'Songti SC', serif;
+    font-family: var(--font-serif);
     text-align: center;
-    color: #888;
+    color: var(--c-text-muted);
     margin-bottom: 1em;
     font-weight: normal;
 }
@@ -68,315 +109,110 @@
 #current-phase-display {
     text-align: center;
     padding: 15px;
-    background-color: #fbfaf7;
+    background-color: var(--c-bg-panel);
     border: 1px solid #eaeaea;
     border-radius: 6px;
 }
 
-#current-phase-display small {
-    color: #888;
-}
-
-#current-phase-display p {
-    font-size: 1.1em;
-    color: #3a3a3a;
-    font-weight: bold;
-    margin: 0.5em 0 0 0;
-}
+#current-phase-display small { color: var(--c-text-muted); }
+#current-phase-display p { font-size: 1.1em; color: var(--c-text-dark); font-weight: bold; margin: 0.5em 0 0 0; }
 
 .edict-card {
     padding: 12px 15px;
-    background-color: #fdfcf9;
-    border: 1px solid #ddd;
-    border-left: 4px solid #a74141;
+    background-color: var(--c-bg-light);
+    border: 1px solid var(--c-border-light);
+    border-left: 4px solid var(--c-primary);
     border-radius: 6px;
     cursor: grab;
     text-align: center;
-    font-family: 'Songti SC', serif;
+    font-family: var(--font-serif);
     font-size: 1.1em;
     user-select: none;
     transition: all 0.3s ease;
     box-sizing: border-box;
 }
 
-.edict-card.dragging {
-    opacity: 0.4;
-    transform: scale(1.05);
-}
-
-.daopan-grid .edict-card {
-    width: 100%;
-    height: 100%;
-    font-size: 1.1em;
-    cursor: default;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background-color: transparent;
-    border: none;
-    color: #e0d6c7;
-}
+.edict-card.dragging { opacity: 0.4; transform: scale(1.05); }
+.daopan-grid .edict-card { width: 100%; height: 100%; font-size: 1.1em; cursor: default; display: flex; align-items: center; justify-content: center; background-color: transparent; border: none; color: var(--c-text-light); }
 
 #daopan-container {
     flex-grow: 1;
-    background-color: #1a1a1e;
-    border: 1px solid #4a3a3a;
+    background-color: var(--c-bg-dark);
+    border: 1px solid var(--c-border-dark);
     padding: 20px;
     border-radius: 8px;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3), inset 0 0 10px rgba(0, 0, 0, 0.5);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3), inset 0 0 10px rgba(0,0,0,0.5);
 }
 
-.daopan-title {
-    font-family: 'Songti SC', serif;
-    font-size: 1.8em;
-    color: #d4c4b0;
-    text-align: center;
-    padding-bottom: 20px;
-    margin-bottom: 20px;
-    border-bottom: 1px solid #4a3a3a;
-    letter-spacing: 4px;
-}
+.daopan-title { font-family: var(--font-serif); font-size: 1.8em; color: var(--c-text-light); text-align: center; padding-bottom: 20px; margin-bottom: 20px; border-bottom: 1px solid var(--c-border-dark); letter-spacing: 4px; }
+.daopan-grid { display: grid; grid-template-columns: repeat(6, 1fr); grid-template-rows: repeat(6, 1fr); gap: 5px; position: relative; }
+.cell { aspect-ratio: 1 / 1; display: flex; align-items: center; justify-content: center; font-family: var(--font-serif); font-size: clamp(0.7em, 2.5vw, 1.2em); color: var(--c-text-light); border-radius: 4px; border: 1px solid var(--c-border-interactive); transition: all 0.3s ease, transform 0.15s ease-in-out; user-select: none; position: relative; text-align: center; word-break: break-all; overflow: hidden; }
+.cell > span, .cell > .edict-card { transition: opacity 0.3s ease; }
 
-.daopan-grid {
-    display: grid;
-    grid-template-columns: repeat(6, 1fr);
-    grid-template-rows: repeat(6, 1fr);
-    gap: 5px;
-    position: relative;
-}
+.cell-zhong { background-color: var(--c-cell-zhong); }
+.cell-ju { background-color: var(--c-cell-ju); }
+.cell-yi { background-color: var(--c-cell-yi); }
+.cell-ben { background-color: var(--c-cell-ben); }
+.cell-tai { background-color: var(--c-cell-tai); }
+.cell-hole { background-color: var(--c-cell-hole); }
 
-.cell {
-    aspect-ratio: 1 / 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-family: 'Songti SC', serif;
-    font-size: clamp(0.7em, 2.5vw, 1.2em);
-    color: #e0d6c7;
-    border-radius: 4px;
-    border: 1px solid rgba(224, 160, 111, 0.2);
-    transition: all 0.3s ease;
-    user-select: none;
-    position: relative;
-    text-align: center;
-    word-break: break-all;
-    overflow: hidden;
-}
-
-.cell > span,
-.cell > .edict-card {
-    transition: opacity 0.3s ease;
-}
-
-.cell-zhong { background-color: #5c3c3c; }
-.cell-ju { background-color: #2c3e50; }
-.cell-yi { background-color: #463d5c; }
-.cell-ben { background-color: #6e4a4a; }
-.cell-tai { background-color: #2c5042; }
-.cell-hole { background-color: #333; }
-
-.cell.droppable { background-color: #8e6a6a; border-color: #ffcda5; }
-.cell.clickable { cursor: pointer; border-color: #ffcda5; }
+.cell.droppable { background-color: #8e6a6a; border-color: var(--c-accent); }
+.cell.clickable { cursor: pointer; border-color: var(--c-accent); }
 .cell.clickable:hover { transform: scale(1.05); background-color: rgba(255, 255, 255, 0.1); z-index: 10; }
+.cell.jumpable { cursor: pointer; box-shadow: 0 0 15px rgba(255, 205, 165, 0.5); border-color: var(--c-accent); }
+.cell.selected-for-jump { transform: scale(1.1); background-color: var(--c-text-light); color: var(--c-text-inverted); border-color: #fff; box-shadow: 0 0 20px #fff; z-index: 20; }
 
-.cell.jumpable {
-    cursor: pointer;
-    box-shadow: 0 0 15px rgba(255, 205, 165, 0.5);
-    border-color: #ffcda5;
-}
-.cell.selected-for-jump {
-    transform: scale(1.1);
-    background-color: #d4c4b0;
-    color: #1a1a1e;
-    border-color: #fff;
-    box-shadow: 0 0 20px #fff;
-    z-index: 20;
-}
+.daopan-grid.show-acupoints .cell > span, .daopan-grid.show-acupoints .cell > .edict-card { opacity: 0; }
+.daopan-grid.show-acupoints .cell::before { content: attr(data-acupoint-name); position: absolute; opacity: 0; transition: opacity 0.3s; color: var(--c-accent); font-size: 0.9em; }
+.daopan-grid.show-acupoints .cell[data-acupoint-name]::before { opacity: 1; }
 
-.daopan-grid.show-acupoints .cell > span,
-.daopan-grid.show-acupoints .cell > .edict-card {
-    opacity: 0;
-}
+#advanced-play-area { margin-top: 4em; transition: opacity 0.5s ease; animation: fadeIn 0.5s ease-in-out; }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
-.daopan-grid.show-acupoints .cell::before {
-    content: attr(data-acupoint-name);
-    position: absolute;
-    opacity: 0;
-    transition: opacity 0.3s;
-    color: #ffcda5;
-    font-size: 0.9em;
-}
+#advanced-play-area.hidden { display: none; }
+#jump-pan-controls h3 { text-align: center; border-bottom: none; }
+#jump-pan-controls p { text-align: center; max-width: 600px; margin: 1em auto; font-size: 0.9em; color: #666; }
+#jump-pan-info { text-align: center; margin-top: 1em; font-family: 'KaiTi', serif; color: var(--c-primary); min-height: 1.5em; }
+#gods-eye-area { margin-top: 3em; padding-top: 2em; border-top: 1px solid #eaeaea; }
+#gods-eye-area h3 { text-align: center; border-bottom: none; }
+#gods-eye-toggle-buttons { display: flex; justify-content: center; gap: 15px; margin: 1.5em 0; }
+#gods-eye-toggle-buttons .link-card-button.active { background-color: var(--c-text-dark); color: #fbfaf7; border-color: var(--c-text-dark); }
+#gods-eye-toggle-buttons .link-card-button.hidden { display: none; }
+#gods-eye-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 25px; margin-top: 2em; }
 
-.daopan-grid.show-acupoints .cell[data-acupoint-name]::before {
-    opacity: 1;
-}
+.quadrant { background-color: var(--c-bg-dark); border: 1px solid var(--c-border-dark); border-radius: 8px; padding: 15px; }
+.quadrant-header { display: flex; justify-content: space-between; align-items: center; margin: 0 0 1em 0; padding-bottom: 0.8em; border-bottom: 1px solid var(--c-border-dark); }
+.quadrant-title { font-family: var(--font-serif); font-size: 1.4em; color: var(--c-text-light); text-align: center; flex-grow: 1; margin: 0; padding: 0; border: none; }
+.flip-btn { background: none; border: 1px solid var(--c-border-dark); color: var(--c-text-muted); cursor: pointer; border-radius: 4px; font-size: 1.2em; line-height: 1; padding: 4px 6px; transition: all 0.2s ease; }
+.flip-btn:hover { color: var(--c-text-light); border-color: var(--c-text-light); transform: scale(1.1); }
 
-#advanced-play-area {
-    margin-top: 4em;
-    transition: opacity 0.5s ease;
-}
-#advanced-play-area.hidden {
-    display: none;
-}
-#jump-pan-controls h3 {
-    text-align: center;
-    border-bottom: none;
-}
-#jump-pan-controls p {
-    text-align: center;
-    max-width: 600px;
-    margin: 1em auto;
-    font-size: 0.9em;
-    color: #666;
-}
-#jump-pan-info {
-    text-align: center;
-    margin-top: 1em;
-    font-family: 'KaiTi', serif;
-    color: #a74141;
-    min-height: 1.5em;
-}
+.gods-eye-display { position: relative; width: 100%; aspect-ratio: 1 / 1.2; min-height: 220px; font-family: var(--font-mono); font-size: 0.9em; color: var(--c-text-light); }
+.gods-eye-node { position: absolute; transform: translate(-50%, -50%); white-space: nowrap; z-index: 1; font-size: 1.1em; }
+.gods-eye-node.symbol-vv, .gods-eye-node.symbol-tv { color: var(--c-symbol-gray); }
+.gods-eye-node.symbol-tt, .gods-eye-node.symbol-ts { color: var(--c-symbol-red); }
+.gods-eye-node.symbol-st, .gods-eye-node.symbol-sv, .gods-eye-node.symbol-ss { color: var(--c-symbol-green); }
+.gods-eye-node.symbol-vt, .gods-eye-node.symbol-vs { color: var(--c-symbol-blue); }
+.gods-eye-display svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; overflow: visible; z-index: 0; }
+.gods-eye-display svg line { stroke: #444; stroke-width: 1; }
 
-#gods-eye-area {
-    margin-top: 3em;
-    padding-top: 2em;
-    border-top: 1px solid #eaeaea;
-}
-#gods-eye-area h3 {
-    text-align: center;
-    border-bottom: none;
-}
-#gods-eye-toggle-buttons {
-    display: flex;
-    justify-content: center;
-    gap: 15px;
-    margin: 1.5em 0;
-}
-#gods-eye-toggle-buttons .link-card-button.active {
-    background-color: #3a3a3a;
-    color: #fbfaf7;
-    border-color: #3a3a3a;
-}
-#gods-eye-toggle-buttons .link-card-button.hidden {
-    display: none;
-}
-
-#gods-eye-container {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-    gap: 25px;
-    margin-top: 2em;
-}
-
-.quadrant {
-    background-color: #1a1a1e;
-    border: 1px solid #4a3a3a;
-    border-radius: 8px;
-    padding: 15px;
-}
-
-.quadrant-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin: 0 0 1em 0;
-    padding-bottom: 0.8em;
-    border-bottom: 1px solid #4a3a3a;
-}
-
-.quadrant-title {
-    font-family: 'Songti SC', serif;
-    font-size: 1.4em;
-    color: #d4c4b0;
-    text-align: center;
-    flex-grow: 1;
-    margin: 0;
-    padding: 0;
-    border: none;
-}
-
-.flip-btn {
-    background: none;
-    border: 1px solid #4a3a3a;
-    color: #888;
-    cursor: pointer;
-    border-radius: 4px;
-    font-size: 1.2em;
-    line-height: 1;
-    padding: 4px 6px;
-    transition: all 0.2s ease;
-}
-
-.flip-btn:hover {
-    color: #d4c4b0;
-    border-color: #d4c4b0;
-}
-
-.gods-eye-display {
-    position: relative;
-    width: 100%;
-    aspect-ratio: 1 / 1.2;
-    min-height: 220px;
-    font-family: 'Courier New', Courier, monospace;
-    font-size: 0.9em;
-    color: #d4c4b0;
-}
-.gods-eye-node {
-    position: absolute;
-    transform: translate(-50%, -50%);
-    white-space: nowrap;
-    z-index: 1;
-    font-size: 1.1em;
-}
-.gods-eye-node.symbol-vv, .gods-eye-node.symbol-tv { color: #b0bec5; }
-.gods-eye-node.symbol-tt, .gods-eye-node.symbol-ts { color: #e57373; }
-.gods-eye-node.symbol-st, .gods-eye-node.symbol-sv, .gods-eye-node.symbol-ss { color: #81c784; }
-.gods-eye-node.symbol-vt, .gods-eye-node.symbol-vs { color: #64b5f6; }
-.gods-eye-display svg {
-    position: absolute;
-    top: 0; left: 0;
-    width: 100%; height: 100%;
-    overflow: visible;
-    z-index: 0;
-}
-.gods-eye-display svg line {
-    stroke: #444;
-    stroke-width: 1;
-}
-
-.modal-overlay {
-    position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.7); backdrop-filter: blur(5px); display: flex; align-items: center; justify-content: center; opacity: 0; visibility: hidden; transition: all 0.3s ease; z-index: 2000;
-}
+.modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.7); backdrop-filter: blur(5px); display: flex; align-items: center; justify-content: center; opacity: 0; visibility: hidden; transition: all 0.3s ease; z-index: 2000; }
 .modal-overlay.visible { opacity: 1; visibility: visible; }
-.modal-content { background-color: #1a1a1e; border: 1px solid #4a3a3a; border-radius: 8px; padding: 25px 35px; min-width: 300px; max-width: 500px; text-align: center; color: #d4c4b0; transform: scale(0.95); transition: all 0.3s ease; }
+.modal-content { background-color: var(--c-bg-dark); border: 1px solid var(--c-border-dark); border-radius: 8px; padding: 25px 35px; min-width: 300px; max-width: 500px; text-align: center; color: var(--c-text-light); transform: scale(0.95); transition: all 0.3s ease; }
 .modal-overlay.visible .modal-content { transform: scale(1); }
-#modal-title { font-family: 'Songti SC', serif; margin-top: 0; }
+#modal-title { font-family: var(--font-serif); margin-top: 0; }
 #modal-options-container { margin: 2em 0; display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
-.modal-option { padding: 8px 15px; background-color: #2c3e50; border: 1px solid rgba(224, 160, 111, 0.2); border-radius: 4px; cursor: pointer; transition: all 0.2s ease; }
-.modal-option:hover { background-color: #3e5670; border-color: #ffcda5; }
+.modal-option { padding: 8px 15px; background-color: var(--c-cell-ju); border: 1px solid var(--c-border-interactive); border-radius: 4px; cursor: pointer; transition: all 0.2s ease; }
+.modal-option:hover { background-color: #3e5670; border-color: var(--c-accent); }
 
-#daopan-tooltip {
-    position: fixed; background-color: rgba(26, 26, 30, 0.9); backdrop-filter: blur(4px); color: #d4c4b0; border: 1px solid #4a3a3a; border-radius: 6px; padding: 12px 15px; font-size: 0.9em; line-height: 1.6; max-width: 250px; opacity: 0; visibility: hidden; transition: opacity 0.2s ease, visibility 0.2s ease; pointer-events: none; z-index: 3000;
-}
+#daopan-tooltip { position: fixed; background-color: rgba(26, 26, 30, 0.9); backdrop-filter: blur(4px); color: var(--c-text-light); border: 1px solid var(--c-border-dark); border-radius: 6px; padding: 12px 15px; font-size: 0.9em; line-height: 1.6; max-width: 250px; opacity: 0; visibility: hidden; transition: opacity 0.2s ease, visibility 0.2s ease; pointer-events: none; z-index: 3000; }
 #daopan-tooltip.visible { opacity: 1; visibility: visible; }
-#daopan-tooltip strong { color: #ffcda5; font-weight: normal; }
-#daopan-tooltip small { color: #888; display: block; margin-top: 5px; }
+#daopan-tooltip strong { color: var(--c-accent); font-weight: normal; }
+#daopan-tooltip small { color: var(--c-text-muted); display: block; margin-top: 5px; }
 
 @media (max-width: 960px) {
     #daopan-interactive-area { flex-direction: column; align-items: center; }
-    #daopan-side-panel {
-        flex-direction: row;
-        flex-wrap: wrap;
-        width: 100%;
-        max-width: 600px;
-        flex-basis: auto;
-    }
-    #daopan-controls {
-        flex: 1 1 100%;
-        flex-direction: row;
-        justify-content: space-around;
-        align-items: center;
-    }
+    #daopan-side-panel { flex-direction: row; flex-wrap: wrap; width: 100%; max-width: 600px; flex-basis: auto; }
+    #daopan-controls { flex: 1 1 100%; flex-direction: row; justify-content: space-around; align-items: center; }
     #edict-bank-container, #current-phase-display { flex: 1 1 250px; }
     #edict-bank { flex-direction: row; flex-wrap: wrap; justify-content: center; }
     .edict-card { flex-grow: 1; }
@@ -386,6 +222,5 @@
 @media (max-width: 768px) {
     #gods-eye-toggle-buttons { flex-direction: column; }
     .quadrant { padding: 10px; }
-    .gods-eye-display { font-size: 0.8em; }
 }
-/* END OF FILE CSS/daopan.css (FINAL AND TRULY COMPLETE VERSION) */
+/* END OF FILE CSS/daopan.css (FINAL OPTIMIZED VERSION) */

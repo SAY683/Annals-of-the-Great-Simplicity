@@ -1,40 +1,53 @@
-// START OF FILE JS/daopan.js (FINAL AND TRULY COMPLETE VERSION)
+// START OF FILE JS/daopan.js (FINAL OPTIMIZED VERSION)
 
 document.addEventListener('DOMContentLoaded', () => {
 
     // =========================================================================
-    // 1. DOM & STATE VARIABLES
+    // 1. CONSTANTS & CONFIGURATION
     // =========================================================================
-    const elements = {
-        gridContainer: document.querySelector('.daopan-grid'),
-        edictBank: document.getElementById('edict-bank'),
-        toggleAcupointsBtn: document.getElementById('toggle-acupoints-btn'),
-        resetBtn: document.getElementById('reset-daopan-btn'),
-        phaseDisplay: document.querySelector('#current-phase-display p'),
-        rulingSelector: document.getElementById('ruling-selector'),
-        tooltip: document.getElementById('daopan-tooltip'),
-        advancedPlayArea: document.getElementById('advanced-play-area'),
-        jumpPanInfo: document.getElementById('jump-pan-info'),
-        godsEyeToggleButtons: document.getElementById('gods-eye-toggle-buttons'),
-        godsEyeContainer: document.getElementById('gods-eye-container'),
-        downloadImageBtn: document.getElementById('download-image-btn'),
+    const SELECTORS = {
+        gridContainer: '.daopan-grid',
+        edictBank: '#edict-bank',
+        toggleAcupointsBtn: '#toggle-acupoints-btn',
+        resetBtn: '#reset-daopan-btn',
+        phaseDisplay: '#current-phase-display p',
+        rulingSelector: '#ruling-selector',
+        tooltip: '#daopan-tooltip',
+        advancedPlayArea: '#advanced-play-area',
+        jumpPanInfo: '#jump-pan-info',
+        godsEyeToggleButtons: '#gods-eye-toggle-buttons',
+        godsEyeContainer: '#gods-eye-container',
+        downloadImageBtn: '#download-image-btn',
         modal: {
-            overlay: document.getElementById('selection-modal'),
-            title: document.getElementById('modal-title'),
-            optionsContainer: document.getElementById('modal-options-container'),
-            closeBtn: document.getElementById('modal-close-btn')
-        }
+            overlay: '#selection-modal',
+            title: '#modal-title',
+            optionsContainer: '#modal-options-container',
+            closeBtn: '#modal-close-btn'
+        },
+        cell: '.cell',
+        edictCard: '.edict-card',
+        quadrant: '.quadrant',
+        quadrantTitle: '.quadrant-title',
+        godsEyeDisplay: '.gods-eye-display',
+        flipBtn: '.flip-btn',
     };
 
-    let gameState = {};
+    const PHASES = {
+        PLACE_EDICTS: 'PLACE_EDICTS',
+        PLACE_GATES: 'PLACE_GATES',
+        PLACE_GENERALS: 'PLACE_GENERALS',
+        PLACE_DIVISIONS: 'PLACE_DIVISIONS',
+        COMPLETE: 'COMPLETE',
+        JUMP_PAN: 'JUMP_PAN'
+    };
 
     const phaseInstructions = {
-        PLACE_EDICTS: '请拖拽“四令”至“本宫”',
-        PLACE_GATES: '请点击“太宫”以布列八门',
-        PLACE_GENERALS: '请点击“局宫”或“仪宫”以布列神将',
-        PLACE_DIVISIONS: '请点击“重宫”或“义宫”以布列神部',
-        COMPLETE: '推演完成，可进行高阶操作',
-        JUMP_PAN: '请点击任意高亮“本宫”确认联动跳盘'
+        [PHASES.PLACE_EDICTS]: '请拖拽“四令”至“本宫”',
+        [PHASES.PLACE_GATES]: '请点击“太宫”以布列八门',
+        [PHASES.PLACE_GENERALS]: '请点击“局宫”或“仪宫”以布列神将',
+        [PHASES.PLACE_DIVISIONS]: '请点击“重宫”或“义宫”以布列神部',
+        [PHASES.COMPLETE]: '推演完成，可进行高阶操作',
+        [PHASES.JUMP_PAN]: '请点击任意高亮“本宫”确认联动跳盘'
     };
 
     const godsEyeMap = {
@@ -64,14 +77,38 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     // =========================================================================
-    // 2. CORE FUNCTIONS
+    // 2. DOM & STATE INITIALIZATION
+    // =========================================================================
+    const elements = {};
+    for (const key in SELECTORS) {
+        if (typeof SELECTORS[key] === 'string') {
+            elements[key] = document.querySelector(SELECTORS[key]);
+        } else {
+            elements[key] = {};
+            for (const subKey in SELECTORS[key]) {
+                elements[key][subKey] = document.querySelector(SELECTORS[key][subKey]);
+            }
+        }
+    }
+
+    let gameState = {};
+
+    // =========================================================================
+    // 3. CORE FUNCTIONS
     // =========================================================================
     
+    /**
+     * 初始化或重置游戏状态对象
+     */
     function initializeGameState() {
         gameState = {
-            phase: 'PLACE_EDICTS', draggedElement: null, placedEdicts: 0,
-            ruling: elements.rulingSelector.value, jumpSelection: null,
-            panStateBeforeJump: null, panStateAfterJump: null,
+            phase: PHASES.PLACE_EDICTS,
+            draggedElement: null,
+            placedEdicts: 0,
+            ruling: elements.rulingSelector.value,
+            jumpSelection: null,
+            panStateBeforeJump: null,
+            panStateAfterJump: null,
             currentGodsEyeView: 'before',
             hasJumped: false,
             quadrantData: {}
@@ -79,6 +116,9 @@ document.addEventListener('DOMContentLoaded', () => {
         elements.downloadImageBtn.disabled = true;
     }
 
+    /**
+     * 根据 daopanData 渲染 6x6 道盘网格
+     */
     function renderDaopanGrid() {
         elements.gridContainer.innerHTML = '';
         daopanData.layout.forEach((row, r) => {
@@ -97,6 +137,9 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    /**
+     * 渲染四令备选卡牌
+     */
     function renderEdictBank() {
         elements.edictBank.innerHTML = '';
         daopanData.fourEdicts.forEach(edict => {
@@ -107,24 +150,30 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    /**
+     * 清除所有单元格的交互状态 CSS 类
+     */
     function clearAllInteractivity() {
-        document.querySelectorAll('.cell').forEach(cell => {
+        document.querySelectorAll(SELECTORS.cell).forEach(cell => {
             cell.classList.remove('clickable', 'droppable', 'jumpable', 'selected-for-jump');
         });
     }
 
+    /**
+     * 根据当前游戏阶段，更新UI和单元格的交互状态
+     */
     function updateInteractivity() {
         elements.phaseDisplay.textContent = phaseInstructions[gameState.phase];
         clearAllInteractivity();
         const config = {
-            PLACE_EDICTS: { types: ['ben'], class: 'droppable', condition: (cell) => !cell.querySelector('.edict-card') },
-            PLACE_GATES: { types: ['tai'], class: 'clickable' },
-            PLACE_GENERALS: { types: ['ju', 'hole'], class: 'clickable' },
-            PLACE_DIVISIONS: { types: ['zhong', 'yi'], class: 'clickable' }
+            [PHASES.PLACE_EDICTS]: { types: ['ben'], class: 'droppable', condition: (cell) => !cell.querySelector(SELECTORS.edictCard) },
+            [PHASES.PLACE_GATES]: { types: ['tai'], class: 'clickable' },
+            [PHASES.PLACE_GENERALS]: { types: ['ju', 'hole'], class: 'clickable' },
+            [PHASES.PLACE_DIVISIONS]: { types: ['zhong', 'yi'], class: 'clickable' }
         }[gameState.phase];
 
         if (config) {
-            document.querySelectorAll('.cell').forEach(cell => {
+            document.querySelectorAll(SELECTORS.cell).forEach(cell => {
                 const type = cell.dataset.cellType;
                 if (config.types.includes(type) && (config.condition ? config.condition(cell) : true)) {
                     cell.classList.add(config.class);
@@ -133,11 +182,14 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     
+    /**
+     * 推进游戏到下一个阶段
+     */
     function advancePhase() {
-        const phaseOrder = ['PLACE_EDICTS', 'PLACE_GATES', 'PLACE_GENERALS', 'PLACE_DIVISIONS'];
+        const phaseOrder = [PHASES.PLACE_EDICTS, PHASES.PLACE_GATES, PHASES.PLACE_GENERALS, PHASES.PLACE_DIVISIONS];
         const currentIndex = phaseOrder.indexOf(gameState.phase);
         if (currentIndex === phaseOrder.length - 1) {
-            gameState.phase = 'COMPLETE';
+            gameState.phase = PHASES.COMPLETE;
             updateInteractivity();
             elements.downloadImageBtn.disabled = false;
             const afterJumpButton = elements.godsEyeToggleButtons.querySelector('[data-view="after"]');
@@ -149,7 +201,7 @@ document.addEventListener('DOMContentLoaded', () => {
             gameState.panStateBeforeJump = capturePanState();
             generateAndStoreGodsEyeData('before');
             renderAllQuadrants();
-            gameState.phase = 'JUMP_PAN';
+            gameState.phase = PHASES.JUMP_PAN;
             elements.phaseDisplay.textContent = phaseInstructions[gameState.phase];
             activateJumpPan();
         } else if (currentIndex < phaseOrder.length - 1) {
@@ -158,6 +210,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    /**
+     * 重置整个道盘和游戏状态
+     */
     function resetBoard() {
         elements.gridContainer.classList.remove('show-acupoints');
         elements.toggleAcupointsBtn.textContent = '查看穴位';
@@ -169,6 +224,9 @@ document.addEventListener('DOMContentLoaded', () => {
         updateInteractivity();
     }
 
+    /**
+     * 打开通用选择模态框
+     */
     function openSelectionModal(title, options, callback) {
         elements.modal.title.textContent = title;
         elements.modal.optionsContainer.innerHTML = '';
@@ -182,13 +240,19 @@ document.addEventListener('DOMContentLoaded', () => {
         elements.modal.overlay.classList.add('visible');
     }
 
+    /**
+     * 关闭模态框
+     */
     function closeModal() { elements.modal.overlay.classList.remove('visible'); }
 
+    /**
+     * 执行自动排盘逻辑
+     */
     function performAutoPlacement(clickedCell, pathKey, dataArray) {
         const path = daopanData.paths[pathKey];
-        if (!path) { return; }
+        if (!path) return;
         const startCellIndex = path.findIndex(([r, c]) => r == clickedCell.dataset.row && c == clickedCell.dataset.col);
-        if (startCellIndex === -1) { return; }
+        if (startCellIndex === -1) return;
         openSelectionModal(`为起始宫选择`, dataArray, (startDataIndex) => {
             path.forEach((coords, i) => {
                 const [r, c] = coords;
@@ -208,28 +272,36 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    /**
+     * 激活跳盘阶段，高亮可点击的本宫
+     */
     function activateJumpPan() {
         clearAllInteractivity();
-        document.querySelectorAll('.cell[data-cell-type="ben"]').forEach(cell => {
+        document.querySelectorAll(SELECTORS.cell + '[data-cell-type="ben"]').forEach(cell => {
              cell.classList.add('jumpable');
         });
     }
     
+    /**
+     * 查找一个本宫所有合法的交换伙伴
+     * @returns {HTMLElement[]} - 包含伙伴单元格的数组
+     */
     function findBenGongJumpPartners(cellA) {
         const typeA = cellA.dataset.cellType;
         if (typeA !== 'ben' || !cellA._placedData) return [];
         const edictTypeA = cellA._placedData.type;
         const ruling = gameState.ruling;
-        let targetEdictType;
-        if (ruling === 'moon') targetEdictType = (edictTypeA === 'A') ? 'B' : 'A';
-        if (ruling === 'sun') targetEdictType = edictTypeA;
-        const allBenGong = Array.from(document.querySelectorAll('.cell[data-cell-type="ben"]'));
+        let targetEdictType = (ruling === 'moon') ? (edictTypeA === 'A' ? 'B' : 'A') : edictTypeA;
+        const allBenGong = Array.from(document.querySelectorAll(SELECTORS.cell + '[data-cell-type="ben"]'));
         return allBenGong.filter(cellB => cellB !== cellA && cellB._placedData && cellB._placedData.type === targetEdictType);
     }
     
+    /**
+     * 执行所有联动跳盘操作（本宫和八门）
+     */
     function performAllJumps(cellA, cellB) {
         let tempPanState = capturePanState();
-        const allBenGong = Array.from(document.querySelectorAll('.cell[data-cell-type="ben"]'));
+        const allBenGong = Array.from(document.querySelectorAll(SELECTORS.cell + '[data-cell-type="ben"]'));
         const remainingBenGong = allBenGong.filter(c => c !== cellA && c !== cellB);
         const pairs = [[cellA, cellB]];
         if(remainingBenGong.length === 2 && findBenGongJumpPartners(remainingBenGong[0]).includes(remainingBenGong[1])) {
@@ -267,7 +339,7 @@ document.addEventListener('DOMContentLoaded', () => {
         gameState.panStateAfterJump = tempPanState;
         redrawPanFromState(gameState.panStateAfterJump);
 
-        gameState.phase = 'COMPLETE';
+        gameState.phase = PHASES.COMPLETE;
         gameState.hasJumped = true;
         clearAllInteractivity();
         elements.phaseDisplay.textContent = "跳盘完成！";
@@ -283,23 +355,32 @@ document.addEventListener('DOMContentLoaded', () => {
         renderAllQuadrants();
     }
     
+    /**
+     * 辅助函数：通过单元格获取其穴位名
+     */
     function getAcupointNameForCell(cell) {
         const r = parseInt(cell.dataset.row), c = parseInt(cell.dataset.col);
         return (r >= 1 && r <= 4 && c >= 1 && c <= 4) ? daopanData.acupointLayout[r-1][c-1] : null;
     }
 
+    /**
+     * 辅助函数：通过穴位名找到单元格
+     */
     function findCellByAcupoint(acupointName) {
         return document.querySelector(`.cell[data-acupoint-name="${acupointName}"]`);
     }
 
+    /**
+     * 根据数据快照重绘整个道盘的显示内容
+     */
     function redrawPanFromState(panState) {
-        document.querySelectorAll('.cell').forEach(cell => {
+        document.querySelectorAll(SELECTORS.cell).forEach(cell => {
             const key = `${cell.dataset.row}-${cell.dataset.col}`;
             const data = panState[key];
             cell._placedData = data;
             if (data) {
-                if (cell.querySelector('.edict-card')) {
-                    const card = cell.querySelector('.edict-card');
+                if (cell.querySelector(SELECTORS.edictCard)) {
+                    const card = cell.querySelector(SELECTORS.edictCard);
                     card.dataset.id = data.id;
                     card.textContent = data.name;
                 } else {
@@ -312,14 +393,21 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    /**
+     * 捕获当前道盘所有单元格的数据快照
+     * @returns {object} - 盘面数据快照
+     */
     function capturePanState() {
         const panState = {};
-        document.querySelectorAll('.cell').forEach(cell => {
+        document.querySelectorAll(SELECTORS.cell).forEach(cell => {
             panState[`${cell.dataset.row}-${cell.dataset.col}`] = cell._placedData;
         });
         return panState;
     }
 
+    /**
+     * 生成并存储神之眼数据，包含旋转和镜像逻辑
+     */
     function generateAndStoreGodsEyeData(viewType) {
         const panState = viewType === 'before' ? gameState.panStateBeforeJump : gameState.panStateAfterJump;
         if (!panState) return;
@@ -358,8 +446,11 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    /**
+     * 渲染单个神之眼象限
+     */
     function renderQuadrant(quadrantEl, qData) {
-        const display = quadrantEl.querySelector('.gods-eye-display');
+        const display = quadrantEl.querySelector(SELECTORS.godsEyeDisplay);
         display.innerHTML = '';
         const svgNS = "http://www.w3.org/2000/svg";
         const svg = document.createElementNS(svgNS, 'svg');
@@ -391,21 +482,27 @@ document.addEventListener('DOMContentLoaded', () => {
         display.appendChild(svg);
     }
     
+    /**
+     * 渲染所有四个神之眼象限
+     */
     function renderAllQuadrants() {
         const viewType = gameState.currentGodsEyeView;
         const allQuadrantsData = gameState.quadrantData[viewType];
         if (!allQuadrantsData) return;
 
-        elements.godsEyeContainer.querySelectorAll('.quadrant').forEach(quadrantEl => {
+        elements.godsEyeContainer.querySelectorAll(SELECTORS.quadrant).forEach(quadrantEl => {
             const qKey = quadrantEl.id.split('-')[1];
             const qData = allQuadrantsData[qKey];
-            const titleEl = quadrantEl.querySelector('.quadrant-title');
+            const titleEl = quadrantEl.querySelector(SELECTORS.quadrantTitle);
             const titleAcupoint = quadrantConfig[qKey].titleAcupoint;
             titleEl.textContent = `${gameState.ruling === 'sun' ? '遁局 (偶遁-' : '遁局 (奇遁-'}${titleAcupoint})`;
             renderQuadrant(quadrantEl, qData);
         });
     }
 
+    /**
+     * 将神之眼视图下载为PNG图片
+     */
     function downloadPanAsImage() {
         if (!gameState.panStateBeforeJump) { return; }
         const btn = elements.downloadImageBtn;
@@ -426,6 +523,17 @@ document.addEventListener('DOMContentLoaded', () => {
         if(gameState.hasJumped) {
             container.style.gridTemplateColumns = '1fr 1fr';
             const afterNode = beforeNode.cloneNode(true);
+            const beforeTitle = document.createElement('h3');
+            beforeTitle.textContent = '跳盘前';
+            beforeTitle.style.textAlign = 'center';
+            beforeTitle.style.gridColumn = '1 / 2';
+            const afterTitle = document.createElement('h3');
+            afterTitle.textContent = '跳盘后';
+            afterTitle.style.textAlign = 'center';
+            afterTitle.style.gridColumn = '2 / 3';
+            
+            container.appendChild(beforeTitle);
+            container.appendChild(afterTitle);
             container.appendChild(beforeNode);
             container.appendChild(afterNode);
             document.body.appendChild(container);
@@ -454,10 +562,13 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
     
+    /**
+     * 在指定的容器内渲染所有象限 (用于图片导出)
+     */
     function renderAllQuadrantsInContainer(container, viewType) {
         const allQuadrantsData = gameState.quadrantData[viewType];
         if(!allQuadrantsData) return;
-        container.querySelectorAll('.quadrant').forEach(quadrantEl => {
+        container.querySelectorAll(SELECTORS.quadrant).forEach(quadrantEl => {
             const qKey = quadrantEl.id.split('-')[1];
             renderQuadrant(quadrantEl, allQuadrantsData[qKey]);
         });
@@ -493,9 +604,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!cell) return;
         if (cell.classList.contains('clickable')) {
             const actions = {
-                'PLACE_GATES': () => performAutoPlacement(cell, 'gates', daopanData.eightGates),
-                'PLACE_GENERALS': () => { const generalsData = daopanData.divineGenerals[gameState.ruling]; performAutoPlacement(cell, 'generals', generalsData); },
-                'PLACE_DIVISIONS': () => performAutoPlacement(cell, 'divisions', daopanData.divineDivisions)
+                [PHASES.PLACE_GATES]: () => performAutoPlacement(cell, 'gates', daopanData.eightGates),
+                [PHASES.PLACE_GENERALS]: () => { const generalsData = daopanData.divineGenerals[gameState.ruling]; performAutoPlacement(cell, 'generals', generalsData); },
+                [PHASES.PLACE_DIVISIONS]: () => performAutoPlacement(cell, 'divisions', daopanData.divineDivisions)
             };
             if (actions[gameState.phase]) { actions[gameState.phase](); }
         } else if (cell.classList.contains('jumpable')) {
@@ -619,5 +730,4 @@ document.addEventListener('DOMContentLoaded', () => {
 
     initialize();
 });
-
 // END OF FILE JS/daopan.js (FINAL AND TRULY COMPLETE VERSION)
