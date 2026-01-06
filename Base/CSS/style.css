@@ -109,15 +109,23 @@ a:hover {
     border-bottom: 1px solid #a74141;
 }
 
-/* --- 讨论区入口 --- */
-.discussion-link-section {
+/* --- 讨论区与订阅入口 --- */
+.discussion-link-section,
+.substack-link-section {
     margin-top: 4rem;
     padding-top: 2rem;
     border-top: 1px solid #eaeaea;
     text-align: center;
 }
 
-.discussion-link-section p {
+/* 让两个板块如果紧邻时，中间的间距稍微紧凑一点，并使用虚线区分 */
+.discussion-link-section + .substack-link-section {
+    margin-top: 2rem;       /* 减少间距 */
+    border-top: 1px dotted #ccc; /* 使用虚线，表示层级较轻 */
+}
+
+.discussion-link-section p,
+.substack-link-section p {
     text-align: center;
     font-size: 1.1em;
     color: #444;
