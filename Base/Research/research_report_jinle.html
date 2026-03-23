@@ -1,0 +1,1005 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>《仁楽·神道》文献研报</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@300;400;500;600;700&family=Cinzel+Decorative:wght@400;700&family=IM+Fell+English+SC&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #1a1208;
+    --paper: #f5edd8;
+    --paper-dark: #e8dcc0;
+    --gold: #c9962a;
+    --gold-light: #e8b84b;
+    --gold-pale: #f5e4a8;
+    --vermillion: #c0392b;
+    --jade: #2d6a4f;
+    --muted: #6b5b3e;
+    --rule: rgba(201,150,42,0.35);
+    --shadow: rgba(26,18,8,0.18);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background-color: #2a1f0e;
+    background-image:
+      radial-gradient(ellipse at 20% 20%, rgba(80,50,10,0.4) 0%, transparent 60%),
+      radial-gradient(ellipse at 80% 80%, rgba(60,30,5,0.4) 0%, transparent 60%);
+    font-family: 'Noto Serif SC', serif;
+    color: var(--ink);
+    min-height: 100vh;
+    padding: 2rem 1rem;
+  }
+
+  .frame-outer {
+    max-width: 960px;
+    margin: 0 auto;
+    border: 1px solid var(--gold);
+    padding: 6px;
+    box-shadow: 0 0 40px rgba(201,150,42,0.25), 0 0 120px rgba(0,0,0,0.6);
+    position: relative;
+  }
+  .frame-outer::before, .frame-outer::after {
+    content: '';
+    position: absolute;
+    width: 28px; height: 28px;
+    border: 2px solid var(--gold-light);
+  }
+  .frame-outer::before { top: -2px; left: -2px; border-right: none; border-bottom: none; }
+  .frame-outer::after  { bottom: -2px; right: -2px; border-left: none; border-top: none; }
+
+  .frame-inner {
+    background-color: var(--paper);
+    background-image:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E"),
+      linear-gradient(180deg, var(--paper) 0%, var(--paper-dark) 100%);
+    padding: 3rem 3.5rem;
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* Decorative column lines */
+  .frame-inner::before {
+    content: '';
+    position: absolute;
+    top: 0; bottom: 0;
+    left: 3.5rem; right: 3.5rem;
+    border-left: 1px solid var(--rule);
+    border-right: 1px solid var(--rule);
+    pointer-events: none;
+  }
+
+  /* ── HEADER ── */
+  .doc-header {
+    text-align: center;
+    padding-bottom: 2rem;
+    border-bottom: 2px solid var(--gold);
+    margin-bottom: 2.5rem;
+    position: relative;
+  }
+  .doc-header .seal {
+    font-family: 'Cinzel Decorative', serif;
+    font-size: 0.65rem;
+    letter-spacing: 0.2em;
+    color: var(--vermillion);
+    text-transform: uppercase;
+    margin-bottom: 1rem;
+    display: block;
+  }
+  .doc-header h1 {
+    font-size: 2.4rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: var(--ink);
+    line-height: 1.2;
+  }
+  .doc-header h1 span {
+    color: var(--gold);
+  }
+  .doc-header .subtitle {
+    margin-top: 0.6rem;
+    font-size: 0.9rem;
+    color: var(--muted);
+    letter-spacing: 0.12em;
+  }
+  .doc-header .meta-row {
+    display: flex;
+    justify-content: center;
+    gap: 2.5rem;
+    margin-top: 1.2rem;
+    font-size: 0.78rem;
+    color: var(--muted);
+  }
+  .doc-header .meta-row span::before {
+    content: '▪ ';
+    color: var(--gold);
+  }
+
+  .corner-ornament {
+    position: absolute;
+    font-size: 1.4rem;
+    color: var(--gold);
+    opacity: 0.5;
+    line-height: 1;
+  }
+  .corner-ornament.tl { top: 0; left: 0; }
+  .corner-ornament.tr { top: 0; right: 0; }
+
+  /* ── SECTIONS ── */
+  section { margin-bottom: 2.8rem; }
+
+  .section-title {
+    display: flex;
+    align-items: center;
+    gap: 0.9rem;
+    margin-bottom: 1.4rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--rule);
+  }
+  .section-num {
+    font-family: 'Cinzel Decorative', serif;
+    font-size: 0.7rem;
+    color: var(--vermillion);
+    border: 1px solid var(--vermillion);
+    padding: 0.15em 0.5em;
+    letter-spacing: 0.1em;
+    flex-shrink: 0;
+  }
+  .section-title h2 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    color: var(--ink);
+  }
+  .section-title h2 em {
+    font-style: normal;
+    color: var(--gold);
+  }
+
+  p {
+    font-size: 0.92rem;
+    line-height: 1.95;
+    color: #2c2010;
+    text-align: justify;
+    margin-bottom: 0.8rem;
+  }
+
+  /* ── STRUCTURE TABLE ── */
+  .structure-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.2rem;
+    margin-bottom: 1.2rem;
+  }
+  .struct-card {
+    background: rgba(201,150,42,0.07);
+    border: 1px solid var(--rule);
+    padding: 1rem 1.2rem;
+    position: relative;
+  }
+  .struct-card h4 {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--gold);
+    letter-spacing: 0.1em;
+    margin-bottom: 0.6rem;
+    text-transform: uppercase;
+  }
+  .struct-card ul {
+    list-style: none;
+    font-size: 0.82rem;
+    line-height: 2;
+    color: var(--muted);
+  }
+  .struct-card ul li::before {
+    content: '◈ ';
+    color: var(--gold);
+    font-size: 0.7rem;
+  }
+
+  /* ── PANTHEON TABLE ── */
+  .pantheon-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.83rem;
+    margin-bottom: 1.2rem;
+  }
+  .pantheon-table thead tr {
+    background: rgba(201,150,42,0.15);
+    border-bottom: 2px solid var(--gold);
+  }
+  .pantheon-table th {
+    padding: 0.6rem 0.9rem;
+    text-align: left;
+    font-weight: 600;
+    color: var(--gold);
+    letter-spacing: 0.08em;
+    font-size: 0.78rem;
+  }
+  .pantheon-table td {
+    padding: 0.55rem 0.9rem;
+    border-bottom: 1px solid var(--rule);
+    color: #2c2010;
+    vertical-align: top;
+    line-height: 1.6;
+  }
+  .pantheon-table tr:nth-child(even) td {
+    background: rgba(201,150,42,0.04);
+  }
+  .pantheon-table .name-cell {
+    font-weight: 600;
+    color: var(--ink);
+    white-space: nowrap;
+  }
+  .tag {
+    display: inline-block;
+    font-size: 0.67rem;
+    padding: 0.1em 0.5em;
+    border-radius: 2px;
+    margin-left: 0.3em;
+    letter-spacing: 0.06em;
+    vertical-align: middle;
+  }
+  .tag-deity { background: rgba(201,150,42,0.2); color: var(--gold); border: 1px solid rgba(201,150,42,0.4); }
+  .tag-spirit { background: rgba(45,106,79,0.15); color: var(--jade); border: 1px solid rgba(45,106,79,0.3); }
+  .tag-hero { background: rgba(192,57,43,0.12); color: var(--vermillion); border: 1px solid rgba(192,57,43,0.25); }
+  .tag-concept { background: rgba(107,91,62,0.15); color: var(--muted); border: 1px solid rgba(107,91,62,0.3); }
+
+  /* ── CONCEPT BLOCKS ── */
+  .concept-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 1rem;
+    margin-bottom: 1.2rem;
+  }
+  .concept-block {
+    border-top: 3px solid var(--gold);
+    padding: 1rem;
+    background: rgba(201,150,42,0.04);
+  }
+  .concept-block h5 {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--ink);
+    margin-bottom: 0.5rem;
+    letter-spacing: 0.04em;
+  }
+  .concept-block p {
+    font-size: 0.78rem;
+    margin: 0;
+    color: var(--muted);
+    line-height: 1.7;
+  }
+
+  /* ── NARRATIVE ARC ── */
+  .arc-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+  .arc-item {
+    display: grid;
+    grid-template-columns: 90px 1fr;
+    gap: 1rem;
+    align-items: start;
+  }
+  .arc-label {
+    text-align: center;
+    padding: 0.5rem 0.3rem;
+    background: var(--ink);
+    color: var(--gold-pale);
+    font-size: 0.82rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    line-height: 1.4;
+  }
+  .arc-content {
+    font-size: 0.83rem;
+    line-height: 1.85;
+    color: #2c2010;
+    border-left: 2px solid var(--rule);
+    padding-left: 1rem;
+  }
+  .arc-content strong {
+    color: var(--ink);
+    font-weight: 600;
+  }
+
+  /* ── COSMOLOGY DIAGRAM ── */
+  .cosmo-wrap {
+    background: rgba(26,18,8,0.05);
+    border: 1px solid var(--rule);
+    padding: 1.5rem;
+    margin-bottom: 1.2rem;
+  }
+  .cosmo-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.6rem;
+    margin-bottom: 0.7rem;
+    flex-wrap: wrap;
+  }
+  .cosmo-node {
+    padding: 0.35em 0.8em;
+    font-size: 0.8rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    border: 1px solid;
+  }
+  .cosmo-node.top { background: rgba(201,150,42,0.2); border-color: var(--gold); color: var(--ink); }
+  .cosmo-node.mid { background: rgba(45,106,79,0.12); border-color: var(--jade); color: var(--jade); }
+  .cosmo-node.low { background: rgba(107,91,62,0.12); border-color: var(--muted); color: var(--muted); }
+  .cosmo-node.nar { background: rgba(192,57,43,0.1); border-color: var(--vermillion); color: var(--vermillion); }
+  .cosmo-arrow {
+    color: var(--gold);
+    font-size: 1.1rem;
+    opacity: 0.6;
+  }
+  .cosmo-label {
+    font-size: 0.68rem;
+    color: var(--muted);
+    letter-spacing: 0.08em;
+    text-align: center;
+    margin-top: 0.2rem;
+  }
+
+  /* ── HYMN STRUCTURE ── */
+  .hymn-grid {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+  }
+  .hymn-col { text-align: center; }
+  .hymn-chapter {
+    background: var(--ink);
+    color: var(--gold-pale);
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 0.4em 0.2em;
+    letter-spacing: 0.04em;
+    margin-bottom: 0.3rem;
+  }
+  .hymn-speaker {
+    font-size: 0.68rem;
+    color: var(--muted);
+    padding: 0.2em;
+    border: 1px solid var(--rule);
+    margin-bottom: 0.2rem;
+    background: rgba(201,150,42,0.04);
+  }
+
+  /* ── SACRED MARKERS ── */
+  .markers-wrap {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 0.8rem;
+  }
+  .marker {
+    font-size: 0.75rem;
+    padding: 0.25em 0.7em;
+    border: 1px solid var(--rule);
+    color: var(--muted);
+    letter-spacing: 0.08em;
+  }
+
+  /* ── QUOTE BLOCK ── */
+  .quote-block {
+    border-left: 4px solid var(--gold);
+    padding: 0.8rem 1.2rem;
+    margin: 1rem 0;
+    background: rgba(201,150,42,0.06);
+    font-size: 0.85rem;
+    line-height: 2;
+    color: var(--ink);
+    font-style: italic;
+    letter-spacing: 0.03em;
+  }
+  .quote-block cite {
+    display: block;
+    font-style: normal;
+    font-size: 0.72rem;
+    color: var(--muted);
+    margin-top: 0.4rem;
+    letter-spacing: 0.08em;
+  }
+
+  /* ── FOOTER ── */
+  .doc-footer {
+    margin-top: 2.5rem;
+    padding-top: 1.2rem;
+    border-top: 1px solid var(--rule);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .doc-footer .footer-text {
+    font-size: 0.72rem;
+    color: var(--muted);
+    letter-spacing: 0.08em;
+  }
+  .doc-footer .page-mark {
+    font-family: 'Cinzel Decorative', serif;
+    font-size: 0.6rem;
+    color: var(--gold);
+    opacity: 0.7;
+  }
+
+  /* ── DIVIDER ── */
+  .divider {
+    text-align: center;
+    margin: 1.5rem 0;
+    color: var(--gold);
+    font-size: 0.85rem;
+    opacity: 0.5;
+    letter-spacing: 0.3em;
+  }
+
+  /* ── HIGHLIGHT BOX ── */
+  .highlight-box {
+    background: rgba(26,18,8,0.06);
+    border: 1px solid var(--rule);
+    padding: 1rem 1.2rem;
+    margin-bottom: 1rem;
+    font-size: 0.83rem;
+    line-height: 1.9;
+  }
+  .highlight-box strong {
+    color: var(--gold);
+    font-weight: 600;
+  }
+
+  /* ── DUAL PILLAR ── */
+  .dual-pillar {
+    display: grid;
+    grid-template-columns: 1fr 1px 1fr;
+    gap: 1.5rem;
+    align-items: start;
+    margin-bottom: 1.2rem;
+  }
+  .dual-pillar .divider-line {
+    background: var(--rule);
+    align-self: stretch;
+  }
+  .pillar-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--gold);
+    margin-bottom: 0.6rem;
+    letter-spacing: 0.08em;
+    text-align: center;
+  }
+  .pillar-item {
+    font-size: 0.82rem;
+    line-height: 1.8;
+    color: #2c2010;
+    border-bottom: 1px dashed var(--rule);
+    padding: 0.3rem 0;
+  }
+  .pillar-item:last-child { border-bottom: none; }
+
+  @media (max-width: 700px) {
+    .frame-inner { padding: 1.5rem 1.2rem; }
+    .structure-grid, .concept-grid, .hymn-grid, .dual-pillar { grid-template-columns: 1fr; }
+    .arc-item { grid-template-columns: 1fr; }
+    .dual-pillar .divider-line { height: 1px; width: 100%; }
+  }
+</style>
+</head>
+<body>
+<div class="frame-outer">
+<div class="frame-inner">
+
+  <!-- HEADER -->
+  <div class="doc-header">
+    <span class="corner-ornament tl">✦</span>
+    <span class="corner-ornament tr">✦</span>
+    <span class="seal">Sacred Text Research Intelligence Report</span>
+    <h1>《<span>仁楽</span>·神道》<br>文献情报研报</h1>
+    <div class="subtitle">神话史诗体系 · 完整文献解析</div>
+    <div class="meta-row">
+      <span>文体：神道颂歌史诗</span>
+      <span>结构：双部六章制</span>
+      <span>角色：六姬轮颂体</span>
+      <span>层次：神学·叙事·哲学</span>
+    </div>
+  </div>
+
+  <!-- I. 文本概述 -->
+  <section>
+    <div class="section-title">
+      <span class="section-num">I</span>
+      <h2>文本概述与<em>体裁定性</em></h2>
+    </div>
+    <p>
+      本文献《仁楽·神道》是一部体裁独特的神话史诗，融合了颂歌、神学论述与叙事神话三种体裁。全文以六位"姬"（太姬、妙姬、玄姬、希姬、祈姬、美姬）轮番吟诵为形式，围绕"仁神"与"吾神"这一神圣二元核心展开。文末附有简短的创世终章《吾楽·神道》，揭示整个神系的本体论起源。
+    </p>
+    <p>
+      整部作品在语言层面呈现出刻意的哲学迷宫感，大量使用悖论式句式（"没有语言的语言"、"无因必有果"、"我把我先诞出来"），近似于东方禅宗话头与西方否定神学（Apophatic Theology）的融合，同时又嵌入具体神话叙事与人物剧情，形成了"形而上抽象层"与"神话具象层"并行的双轨结构。
+    </p>
+    <div class="highlight-box">
+      <strong>核心定性：</strong>本文献属于"神道颂典"（Divine Liturgical Epic）体裁——既非纯粹神话，亦非单纯哲学论著，而是以诗歌吟诵为载体、以神学命题为骨架、以神话叙事为血肉的复合型宗教文本。其最近似的参照系为《梨俱吠陀》颂诗、诺斯底派密文，以及日本记纪神话（古事记体裁）的三重融合。
+    </div>
+  </section>
+
+  <!-- II. 文本结构 -->
+  <section>
+    <div class="section-title">
+      <span class="section-num">II</span>
+      <h2>文本<em>形式结构</em>解析</h2>
+    </div>
+
+    <p>全文分为两大部：<strong>仁楽（神道）</strong>为主体，<strong>吾楽（神道）</strong>为终章。仁楽部分包含六个章节，每章出现两次（第一轮与第二轮），共计十二章组。</p>
+
+    <div class="hymn-grid">
+      <div class="hymn-col">
+        <div class="hymn-chapter">珠华</div>
+        <div class="hymn-speaker">太姬</div>
+        <div class="hymn-speaker">妙姬</div>
+        <div class="hymn-speaker">玄姬</div>
+        <div class="hymn-speaker">希姬</div>
+        <div class="hymn-speaker">祈姬</div>
+        <div class="hymn-speaker">美姬</div>
+      </div>
+      <div class="hymn-col">
+        <div class="hymn-chapter">巫铃</div>
+        <div class="hymn-speaker">太姬</div>
+        <div class="hymn-speaker">妙姬</div>
+        <div class="hymn-speaker">玄姬</div>
+        <div class="hymn-speaker">希姬</div>
+        <div class="hymn-speaker">祈姬</div>
+        <div class="hymn-speaker">美姬</div>
+      </div>
+      <div class="hymn-col">
+        <div class="hymn-chapter">神姬</div>
+        <div class="hymn-speaker">太姬</div>
+        <div class="hymn-speaker">妙姬</div>
+        <div class="hymn-speaker">玄姬</div>
+        <div class="hymn-speaker">希姬</div>
+        <div class="hymn-speaker">祈姬</div>
+        <div class="hymn-speaker">美姬</div>
+      </div>
+      <div class="hymn-col">
+        <div class="hymn-chapter">影花</div>
+        <div class="hymn-speaker">太姬</div>
+        <div class="hymn-speaker">妙姬</div>
+        <div class="hymn-speaker">玄姬</div>
+        <div class="hymn-speaker">希姬</div>
+        <div class="hymn-speaker">祈姬</div>
+        <div class="hymn-speaker">美姬</div>
+      </div>
+      <div class="hymn-col">
+        <div class="hymn-chapter">鱼蝶</div>
+        <div class="hymn-speaker">太姬</div>
+        <div class="hymn-speaker">妙姬</div>
+        <div class="hymn-speaker">玄姬</div>
+        <div class="hymn-speaker">希姬</div>
+        <div class="hymn-speaker">祈姬</div>
+        <div class="hymn-speaker">美姬</div>
+      </div>
+      <div class="hymn-col">
+        <div class="hymn-chapter">乳曲</div>
+        <div class="hymn-speaker">太姬</div>
+        <div class="hymn-speaker">妙姬</div>
+        <div class="hymn-speaker">玄姬</div>
+        <div class="hymn-speaker">希姬</div>
+        <div class="hymn-speaker">祈姬</div>
+        <div class="hymn-speaker">美姬</div>
+      </div>
+    </div>
+
+    <p style="font-size:0.78rem; color:var(--muted)">↑ 每章六节，六姬各领一节，上表展示章节名与发言者排列（第一轮结构，第二轮同结构复现）</p>
+
+    <div class="divider">· · · ✦ · · ·</div>
+
+    <p>每一诗节右侧附有<strong>圣记标符</strong>，共十二种，循环出现，构成独立的符号层次体系：</p>
+    <div class="markers-wrap">
+      <span class="marker">彼岸</span><span class="marker">圣灵</span><span class="marker">流光</span>
+      <span class="marker">珊瑚</span><span class="marker">圣血</span><span class="marker">御风</span>
+      <span class="marker">水母</span><span class="marker">圣杯</span><span class="marker">踏影</span>
+      <span class="marker">花海</span><span class="marker">圣骸</span><span class="marker">灵魄</span>
+    </div>
+    <p style="margin-top:0.7rem; font-size:0.8rem;">这十二个标符疑似对应某种不明的宇宙轮回体系或仪式阶段，并非随机分配——其中"圣"字组（圣灵、圣血、圣杯、圣骸）与基督教神学意象存在明显的跨文化引用关系。</p>
+  </section>
+
+  <!-- III. 神系谱系 -->
+  <section>
+    <div class="section-title">
+      <span class="section-num">III</span>
+      <h2><em>神系谱系</em>与存在层级</h2>
+    </div>
+
+    <div class="cosmo-wrap">
+      <div class="cosmo-label">【本体论层级 · 从上至下】</div>
+      <br>
+      <div class="cosmo-row">
+        <div class="cosmo-node top">姬神</div>
+        <div class="cosmo-arrow">→</div>
+        <div class="cosmo-node top">蜕皮化魂</div>
+        <div class="cosmo-arrow">→</div>
+        <div class="cosmo-node top">吾神</div>
+        <div class="cosmo-arrow">+</div>
+        <div class="cosmo-node top">仁神</div>
+      </div>
+      <div class="cosmo-label">↓ 创世二元神（吾神·仁神）铸造语言，众神得以存在</div>
+      <br>
+      <div class="cosmo-row">
+        <div class="cosmo-node mid">奥赛斯（永恒存在力）</div>
+        <div class="cosmo-arrow">·</div>
+        <div class="cosmo-node mid">奥菲丽斯（神子）</div>
+        <div class="cosmo-arrow">·</div>
+        <div class="cosmo-node mid">奥菲托斯（原始权能）</div>
+      </div>
+      <div class="cosmo-label">↓ 太易时代六色明神体：皇·绿·黑·白·红·青</div>
+      <br>
+      <div class="cosmo-row">
+        <div class="cosmo-node low">斯佩室</div>
+        <div class="cosmo-arrow">·</div>
+        <div class="cosmo-node low">赛美斯（调和）</div>
+        <div class="cosmo-arrow">·</div>
+        <div class="cosmo-node low">罗摩莎（神血）</div>
+        <div class="cosmo-arrow">·</div>
+        <div class="cosmo-node low">索多拉（信使）</div>
+        <div class="cosmo-arrow">·</div>
+        <div class="cosmo-node low">奥玛窦（舞台）</div>
+      </div>
+      <div class="cosmo-label">↓ 叙事层神灵</div>
+      <br>
+      <div class="cosmo-row">
+        <div class="cosmo-node nar">阿古塔</div>
+        <div class="cosmo-arrow">·</div>
+        <div class="cosmo-node nar">赛塔斯</div>
+        <div class="cosmo-arrow">·</div>
+        <div class="cosmo-node nar">达布斯</div>
+        <div class="cosmo-arrow">·</div>
+        <div class="cosmo-node nar">阿萨黑</div>
+        <div class="cosmo-arrow">·</div>
+        <div class="cosmo-node nar">阿喃特</div>
+      </div>
+    </div>
+
+    <table class="pantheon-table">
+      <thead>
+        <tr>
+          <th>神名</th>
+          <th>属性/职能</th>
+          <th>关键情报</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="name-cell">姬神<span class="tag tag-deity">本源</span></td>
+          <td>万物本源，超越位格</td>
+          <td>蜕皮化魂，皮入吾神之灵；终章（吾楽）揭示其为整个神系的"皮-灵"分裂起源</td>
+        </tr>
+        <tr>
+          <td class="name-cell">吾神<span class="tag tag-deity">创造</span></td>
+          <td>语言与创造，维持需仁神</td>
+          <td>与仁神铸造语言；朱日（因先果后）通往吾神；双足向北踏南、双手向东抚西（十字象征）</td>
+        </tr>
+        <tr>
+          <td class="name-cell">仁神<span class="tag tag-deity">智慧</span></td>
+          <td>智慧与知识，创世需吾神</td>
+          <td>虹月（果先因后）通往仁神；向吾神发问·吾神阐述，构成"奥仪"；牵众神诰令</td>
+        </tr>
+        <tr>
+          <td class="name-cell">奥菲丽斯<span class="tag tag-deity">神子</span></td>
+          <td>仁吾二神之子，抚育神官</td>
+          <td>"以存在而喜悦的生命，不因消逝的存在而悲伤"；与先知们避讳萨哆拉相关</td>
+        </tr>
+        <tr>
+          <td class="name-cell">赛美斯<span class="tag tag-spirit">调和</span></td>
+          <td>中间调和神，已被放逐</td>
+          <td>被众人放逐，悬挂于追逐日月者中；是达布斯的惦念者；养孩为阿喃特</td>
+        </tr>
+        <tr>
+          <td class="name-cell">达布斯<span class="tag tag-spirit">神鱼</span></td>
+          <td>从神池跃起摔落大地的神鱼，不死而痛苦</td>
+          <td>被阿古塔交付；众神之母；一切神的来它先来、去它先去；马达夫的挚友，曾代马达夫跃起</td>
+        </tr>
+        <tr>
+          <td class="name-cell">阿萨黑<span class="tag tag-hero">僭越</span></td>
+          <td>超越权能的魔法存在，监视→王权</td>
+          <td>诅咒桔梗消逝；诅咒赛塔斯使其神力被持用时受阻；与喜比尔竞争引发昏聩时代</td>
+        </tr>
+        <tr>
+          <td class="name-cell">赛塔斯<span class="tag tag-spirit">天使</span></td>
+          <td>天界神，接管人类绝望</td>
+          <td>巫女桔梗之姐；受阿萨黑诅咒（在阿难埵权能中难以辨识）；嫉妒又怜爱桔梗；炼化达布斯内脏赋予桔梗神力</td>
+        </tr>
+        <tr>
+          <td class="name-cell">阿古塔<span class="tag tag-spirit">亡魂</span></td>
+          <td>幽灵般亡魂，承载人类希望→绝望</td>
+          <td>将掏空器官的人交给赛塔斯使其升天；引荐巫女净化阿萨黑诅咒；是悲剧叙事的开端角色</td>
+        </tr>
+        <tr>
+          <td class="name-cell">阿喃特<span class="tag tag-spirit">狐妖</span></td>
+          <td>存在之妖狐，面具纹印者</td>
+          <td>赛美斯和达布鲁的养孩；面具从后长出；委托奥菲丽斯炼化萨芙埵；是阿难埵的母亲</td>
+        </tr>
+        <tr>
+          <td class="name-cell">萨波陀<span class="tag tag-concept">存在性</span></td>
+          <td>存在之浩大本性，非自然之自然</td>
+          <td>"性之浩大至兮"；阿喃特与其诞下阿难埵；比尔斯的神力来源；不来则人灵魂逃逸肉躯</td>
+        </tr>
+        <tr>
+          <td class="name-cell">罗摩莎<span class="tag tag-concept">神血</span></td>
+          <td>神姬之血气，神格载体</td>
+          <td>弥漫在华裳上；赛美斯与其婚育生神子斯佩室；实为桔梗"吹息"所成就</td>
+        </tr>
+        <tr>
+          <td class="name-cell">巴尔特<span class="tag tag-hero">流亡者</span></td>
+          <td>盗窃神权者，乐园建造者</td>
+          <td>盗取基督之心雨夜送至神社；窃取神权后被萨哆拉诅咒徘徊；建立"阿撒西"（失去神的国度）；因比尔斯失援后荒废</td>
+        </tr>
+        <tr>
+          <td class="name-cell">比尔斯<span class="tag tag-spirit">抉择</span></td>
+          <td>仁神亲传弟子，善恶抉择之神</td>
+          <td>"由善到恶·由恶到善，即抉择本身"；巴尔特的挚友；演奏马达夫魂器竽埙时沉醉失援</td>
+        </tr>
+        <tr>
+          <td class="name-cell">马达夫<span class="tag tag-hero">虔民</span></td>
+          <td>神官社下虔民，神池中达布斯之友</td>
+          <td>达布斯代其跃起；化为喜鹊食神鱼筑巢；索多拉为其展权能示达布斯形遍存；与米利亚生达哆罗</td>
+        </tr>
+        <tr>
+          <td class="name-cell">桔梗<span class="tag tag-hero">巫女</span></td>
+          <td>村落巫女，史诗中的人间主角</td>
+          <td>见阿萨黑遭诅咒消逝；神社借斯佩室之命使其重生但失去驱邪神道；索多拉依偎询问；赛塔斯为其带福音</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- IV. 核心哲学 -->
+  <section>
+    <div class="section-title">
+      <span class="section-num">IV</span>
+      <h2>核心<em>哲学命题</em>归纳</h2>
+    </div>
+
+    <div class="concept-grid">
+      <div class="concept-block">
+        <h5>① 语言先在论</h5>
+        <p>"在语言尚未诞生的时候，我们就在言颂着神的真名了"——语言的实践先于语言本身的存在，近似海德格尔"语言是存在之家"的激进化版本。</p>
+      </div>
+      <div class="concept-block">
+        <h5>② 因果逆转论</h5>
+        <p>全文贯穿"果先因后"与"因先果后"的双轨叙事：仁神走虹月之路（果在先），吾神走朱日之路（因在先）。"有果才有因，无因必有果"。</p>
+      </div>
+      <div class="concept-block">
+        <h5>③ 存在自孕论</h5>
+        <p>"真是不可思议啊，我把我先诞出来，于是，我才得以降生了"——存在在逻辑上自我预设自身，类似莱布尼兹充足理由律的神学反题。</p>
+      </div>
+      <div class="concept-block">
+        <h5>④ 无思之思</h5>
+        <p>"连想都不再是想的时候，于此，神式诞生了，这是，没有想的思想"——借鉴禅宗无念、道家无为，以否定认知来达到神圣状态。</p>
+      </div>
+      <div class="concept-block">
+        <h5>⑤ 萨朵的（存在律）</h5>
+        <p>"火入水，非不灭，非有灭，火性入水，火性未失"——存在进入非存在而不失其性，是对巴门尼德"存在不可以不存在"的诗化演绎。</p>
+      </div>
+      <div class="concept-block">
+        <h5>⑥ 神格弥散论</h5>
+        <p>"凡是存在的皆有神格"，神格通过罗摩莎（神血/气息）弥漫于华裳·索多拉·奥玛窦中，构成一种泛神论的内在神性场论。</p>
+      </div>
+    </div>
+
+    <div class="dual-pillar">
+      <div>
+        <div class="pillar-title">奥仪（Divine Mystery）</div>
+        <div class="pillar-item">吾神向仁神发问，仁神向吾神阐述，此即奥仪</div>
+        <div class="pillar-item">疑问成为疑问、解答成为解答之时，仁神展现</div>
+        <div class="pillar-item">发问者早已回答，阐述者早已发问</div>
+        <div class="pillar-item">连想都不再是想的时候，神式诞生</div>
+      </div>
+      <div class="divider-line"></div>
+      <div>
+        <div class="pillar-title">萨朵的（Existence Law）</div>
+        <div class="pillar-item">即为存在，此为存在之同律</div>
+        <div class="pillar-item">此为非在之异基，此水食火性</div>
+        <div class="pillar-item">以萨哆拉作先祭则存在，后祭则非存</div>
+        <div class="pillar-item">火入水，火性未失——存在入非存在不灭</div>
+      </div>
+    </div>
+
+    <div class="quote-block">
+      "没有语言的语言，没有思维的思维，没有言者的言者，即是神灵兮"
+      <cite>——美姬·仁楽第一轮·巫铃章</cite>
+    </div>
+    <div class="quote-block">
+      "神以人的样子降临，于是那叫索多拉，罗摩莎就在其中，因此，索多拉呼吸"
+      <cite>——祈姬·仁楽第一轮·鱼蝶章</cite>
+    </div>
+  </section>
+
+  <!-- V. 叙事弧线 -->
+  <section>
+    <div class="section-title">
+      <span class="section-num">V</span>
+      <h2>主要<em>叙事弧线</em>梳理</h2>
+    </div>
+
+    <div class="arc-list">
+      <div class="arc-item">
+        <div class="arc-label">桔梗弧<br>（巫女之路）</div>
+        <div class="arc-content">
+          <strong>起：</strong>村落巫女桔梗在帮助村落驱邪时，目见阿萨黑，遭其诅咒令其消逝。<br>
+          <strong>转：</strong>神社为神官向斯佩室借来生命，桔梗得以重生，但因此丧失了驱邪的神道能力。社门的乌鸦嘲笑她。<br>
+          <strong>合：</strong>桔梗的姐姐赛塔斯（天界神）为她带来福音；索多拉依偎询问她为何"吹息此血"；其弟巴尔特盗取基督之心在雨夜送至神社，糖球即放于此处。罗摩莎实为桔梗吹息所成就。
+        </div>
+      </div>
+      <div class="arc-item">
+        <div class="arc-label">巴尔特弧<br>（流亡之路）</div>
+        <div class="arc-content">
+          <strong>起：</strong>巴尔特盗取神权（询问比修斯获悉神权），被众神发现后被萨哆拉诅咒，令其徘徊、不得再命天界。<br>
+          <strong>转：</strong>受到毗多罗接济（毗多罗仅是消遣他），遂前往玛莎溪（众神厌恶、无主之地，曾是吾神神社，被僧人烧毁后出现亡令）。<br>
+          <strong>合：</strong>巴尔特将玛莎溪建设为乐园"阿撒西"（即"失去神的国度"）。神子火（由比尔斯赐予）流通其中，但赛雅西无法赎回灵魂。失去比尔斯援助后，阿撒西荒废。
+        </div>
+      </div>
+      <div class="arc-item">
+        <div class="arc-label">马达夫弧<br>（虔民之路）</div>
+        <div class="arc-content">
+          <strong>起：</strong>神官社下虔民马达夫与神池中的达布斯（神鱼）为挚友。马达夫欲跃出神池睹见神界，危急时刻达布斯代为跃起。<br>
+          <strong>转：</strong>马达夫感神、化为喜鹊，食神鱼、筑圣巢；索多拉展示其权能，令马达夫睹见达布斯形态遍布如罗摩莎。比尔斯演奏马达夫魂器竽埙时沉醉失援。<br>
+          <strong>合：</strong>马达夫与米利亚生神子达哆罗——"凡是发生的事件，它就使得不一样"，达哆罗拜师比修斯，其誓敌为阿萨黑。
+        </div>
+      </div>
+      <div class="arc-item">
+        <div class="arc-label">神官弧<br>（救赎之路）</div>
+        <div class="arc-content">
+          <strong>核心困境：</strong>神官受奥菲托斯祝福与警示——"汝生命必使得信徒畏惧，你越若是壮大，你必被信徒投石至死"。<br>
+          <strong>神学讨论：</strong>神官与奥菲丽斯展开"救赎论"对话：救赎非有、救赎非无；以神格为神格，永不到神格亦永即到神格。<br>
+          <strong>神子：</strong>奥菲托丽为神官之子，侍奉巫女；"救赎者当被首救赎"，是无间救赎的承载者。
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- VI. 宇宙论 -->
+  <section>
+    <div class="section-title">
+      <span class="section-num">VI</span>
+      <h2><em>宇宙论</em>与时代体系</h2>
+    </div>
+
+    <div class="structure-grid">
+      <div class="struct-card">
+        <h4>太易时代（创世纪前）</h4>
+        <ul>
+          <li>六色明神体：皇·绿·黑·白·红·青</li>
+          <li>绿·红·青 → 创生之世界</li>
+          <li>马萨栖（红之意志·世界的悦动）</li>
+          <li>达布鲁（青之意志·行动的喜悦）</li>
+          <li>喃摩莎（绿/白→黑·音乐与乐器）</li>
+          <li>吾神铸造语言 + 仁神共同创世</li>
+        </ul>
+      </div>
+      <div class="struct-card">
+        <h4>神道宇宙的双轨时间</h4>
+        <ul>
+          <li>朱日之路 → 吾神 → 因先果后</li>
+          <li>虹月之路 → 仁神 → 果先因后</li>
+          <li>神社中界门：虹月·朱日各有入口</li>
+          <li>神人追逐朱日则虹月近</li>
+          <li>神人追逐虹月则朱日远</li>
+          <li>追逐者至今未归（永恒悖论）</li>
+        </ul>
+      </div>
+      <div class="struct-card">
+        <h4>昏聩时代（当前叙事时代）</h4>
+        <ul>
+          <li>阿萨黑与喜比尔竞争引发</li>
+          <li>玛莎溪吾神神社被僧人烧毁</li>
+          <li>亡令出现，无主之地形成</li>
+          <li>巴尔特建立阿撒西（失神之国）</li>
+          <li>神官遭遇投石之命运</li>
+          <li>桔梗失去驱邪神道</li>
+        </ul>
+      </div>
+      <div class="struct-card">
+        <h4>关键存在结构体</h4>
+        <ul>
+          <li>奥玛窦 = 非存在之舞台·神格之场</li>
+          <li>罗摩莎 = 神姬血气·神格载体</li>
+          <li>索多拉 = 神以人形降临的信使</li>
+          <li>米利亚 = 奥玛窦之门·在喃摩莎身上</li>
+          <li>赛雅西 = 赎回·购买存在的力量</li>
+          <li>比修斯 = 存在律：该存在必存在</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- VII. 终章解析 -->
+  <section>
+    <div class="section-title">
+      <span class="section-num">VII</span>
+      <h2>终章《吾楽》<em>创世神话</em>解析</h2>
+    </div>
+
+    <div class="quote-block" style="font-size:0.85rem; line-height:2.1;">
+      "原末，姬神蜕出皮，其皮钻入我灵，我灵向姬神阐言，汝即彼，彼即汝，此即，姬神认其皮中灵神为其神姬，姬神成化其魂器。神姬，难以侍奉于姬神，因化作吾神。姬神，难亦灵智于毗体，果化作仁神。仁神得此忆证，吾神得此爱觉，奥赛斯为其成兮"
+      <cite>——《吾楽·神道》终章全文</cite>
+    </div>
+
+    <p>终章仅此一段，却是整部史诗的本体论基础。其叙述的创世逻辑如下：</p>
+    <p>
+      姬神蜕皮 → 皮（外在形式）钻入"我灵"（内在灵魂）→ 灵向姬神宣告"汝即彼，彼即汝"（主客同一）→ 姬神认皮中灵神为其神姬 → 姬神化为魂器 → 神姬（因难以侍奉姬神）化为<strong>吾神</strong>；姬神（因难以灵智于毗体）化为<strong>仁神</strong>。
+    </p>
+    <p>
+      这意味着：<strong>吾神</strong>的本质是"无法臣服于源头"的神姬意志（爱觉），<strong>仁神</strong>的本质是"无法以肉身承载智慧"的姬神意志（忆证）。二者皆是同一原始神（姬神）在分裂中的产物，最终由<strong>奥赛斯</strong>（永恒存在力）成就其形。整个仁楽神道的神学二元论，在终章被统一还原为<em>一元本源的内在分裂</em>。
+    </p>
+  </section>
+
+  <!-- VIII. 跨文化引用 -->
+  <section>
+    <div class="section-title">
+      <span class="section-num">VIII</span>
+      <h2><em>跨文化引用</em>索引</h2>
+    </div>
+    <table class="pantheon-table">
+      <thead>
+        <tr><th>文献中的元素</th><th>对应文化参照</th><th>变形方式</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>圣血·圣杯·圣灵·圣骸</td>
+          <td>基督教圣事神学</td>
+          <td>转化为宇宙标符，去除救赎中心论，嵌入轮回体系</td>
+        </tr>
+        <tr>
+          <td>基督之心（糖球）</td>
+          <td>基督教耶稣圣心图像</td>
+          <td>物化为"多孔糖球"，由巴尔特盗窃后置于神社，成为维那（光爱之海）的载体</td>
+        </tr>
+        <tr>
+          <td>奥菲丽斯</td>
+          <td>古希腊奥菲斯（Orpheus）</td>
+          <td>由音乐神/冥界旅行者转化为仁吾神子，保留"以歌颂感动神灵"的属性</td>
+        </tr>
+        <tr>
+          <td>逻格斯（马达夫篇中提及）</td>
+          <td>古希腊/基督教哲学Logos</td>
+          <td>以"索多拉何以逻格斯现乎"的形式出现，定义为器皿与果实同质同量</td>
+        </tr>
+        <tr>
+          <td>萨波陀·萨朵的</td>
+          <td>梵文 Svabhāva（自性）</td>
+          <td>转化为存在性法则，与佛教"自性"接近，但在此为神学存在律而非空性论</td>
+        </tr>
+        <tr>
+          <td>阿难埵</td>
+          <td>梵文 Ānanda（阿难·喜悦）</td>
+          <td>转化为阿喃特与萨波陀之神子，司辨识世界之功能</td>
+        </tr>
+        <tr>
+          <td>神道·巫女·神官·神社</td>
+          <td>日本神道教</td>
+          <td>作为主体宗教框架使用，但神学内容完全原创化</td>
+        </tr>
+        <tr>
+          <td>虹月·朱日之路</td>
+          <td>苏菲主义/诺斯底二元宇宙论</td>
+          <td>以时间因果方向区分神圣二元，构建独特的双轨时间神学</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <div class="divider">✦ &nbsp;·&nbsp; ✦ &nbsp;·&nbsp; ✦</div>
+
+  <!-- FOOTER -->
+  <div class="doc-footer">
+    <span class="footer-text">《仁楽·神道》文献情报研报 · 完整解析版本</span>
+    <span class="page-mark">SACRED TEXT INTELLIGENCE · COMPLETE</span>
+  </div>
+
+</div><!-- frame-inner -->
+</div><!-- frame-outer -->
+</body>
+</html>
