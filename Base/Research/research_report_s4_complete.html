@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>《桔梗·罕钵拉》第四季完整研报</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@300;400;500;600;700&family=Cinzel+Decorative:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root{--ink:#1a1208;--paper:#f3ead6;--paper-dark:#e4d7bb;--gold:#c9962a;--gl:#e8b84b;--gp:#f5e4a8;--verm:#c0392b;--jade:#2d6a4f;--lapis:#2d4a6a;--smoke:#7a6e5e;--muted:#6b5b3e;--rule:rgba(201,150,42,.33);}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:#1c1308;background-image:radial-gradient(ellipse at 15% 15%,rgba(55,32,8,.55) 0%,transparent 58%),radial-gradient(ellipse at 85% 85%,rgba(42,20,4,.5) 0%,transparent 58%);font-family:'Noto Serif SC',serif;color:var(--ink);min-height:100vh;padding:2rem 1rem;}
+.fo{max-width:1020px;margin:0 auto;border:1px solid var(--gold);padding:7px;box-shadow:0 0 50px rgba(201,150,42,.2),0 0 150px rgba(0,0,0,.78);position:relative;}
+.fo::before,.fo::after{content:'';position:absolute;width:32px;height:32px;border:2px solid var(--gl);}
+.fo::before{top:-2px;left:-2px;border-right:none;border-bottom:none;}
+.fo::after{bottom:-2px;right:-2px;border-left:none;border-top:none;}
+.fi{background-color:var(--paper);background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.55' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.05'/%3E%3C/svg%3E"),linear-gradient(172deg,var(--paper) 0%,var(--paper-dark) 100%);padding:3.2rem 3.8rem;position:relative;overflow:hidden;}
+.fi::before{content:'';position:absolute;top:0;bottom:0;left:3.8rem;right:3.8rem;border-left:1px solid var(--rule);border-right:1px solid var(--rule);pointer-events:none;}
+.dh{text-align:center;padding-bottom:2.2rem;border-bottom:2px solid var(--gold);margin-bottom:2.8rem;position:relative;}
+.dh .seal{font-family:'Cinzel Decorative',serif;font-size:.59rem;letter-spacing:.22em;color:var(--verm);text-transform:uppercase;margin-bottom:1.1rem;display:block;}
+.dh h1{font-size:2.3rem;font-weight:700;letter-spacing:.09em;color:var(--ink);line-height:1.2;}
+.dh h1 span{color:var(--gold);}
+.dh .sub{margin-top:.6rem;font-size:.86rem;color:var(--muted);letter-spacing:.13em;}
+.dh .mr{display:flex;justify-content:center;gap:1.4rem;margin-top:1.2rem;font-size:.71rem;color:var(--muted);flex-wrap:wrap;}
+.dh .mr span::before{content:'▪ ';color:var(--gold);}
+.co{position:absolute;font-size:1.4rem;color:var(--gold);opacity:.42;line-height:1;}
+.co.tl{top:0;left:0;}.co.tr{top:0;right:0;}
+.hr{width:55%;height:1px;background:linear-gradient(90deg,transparent,var(--gold),transparent);margin:1.2rem auto 0;}
+section{margin-bottom:3rem;}
+.st{display:flex;align-items:center;gap:.9rem;margin-bottom:1.5rem;padding-bottom:.55rem;border-bottom:1px solid var(--rule);position:relative;}
+.st::after{content:'';position:absolute;bottom:-1px;left:0;width:50px;height:1px;background:var(--gold);}
+.sn{font-family:'Cinzel Decorative',serif;font-size:.66rem;color:var(--verm);border:1px solid var(--verm);padding:.15em .5em;letter-spacing:.1em;flex-shrink:0;}
+.st h2{font-size:1.17rem;font-weight:600;letter-spacing:.06em;color:var(--ink);}
+.st h2 em{font-style:normal;color:var(--gold);}
+p{font-size:.88rem;line-height:1.97;color:#2c2010;text-align:justify;margin-bottom:.85rem;}
+.tc{display:grid;grid-template-columns:1fr 1fr;gap:1.2rem;margin-bottom:1.2rem;}
+.tr3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem;margin-bottom:1.2rem;}
+.ca{background:rgba(201,150,42,.05);border:1px solid var(--rule);padding:1rem 1.2rem;}
+.ca h4{font-size:.8rem;font-weight:600;letter-spacing:.08em;margin-bottom:.58rem;}
+.ca p{font-size:.78rem;margin:0;line-height:1.8;}
+.ca.cv{border-top:3px solid var(--verm);}.ca.cv h4{color:var(--verm);}
+.ca.cg{border-top:3px solid var(--gold);}.ca.cg h4{color:var(--gold);}
+.ca.cj{border-top:3px solid var(--jade);}.ca.cj h4{color:var(--jade);}
+.ca.cl{border-top:3px solid var(--lapis);}.ca.cl h4{color:var(--lapis);}
+.ca.cs{border-top:3px solid var(--smoke);}.ca.cs h4{color:var(--smoke);}
+.mt{width:100%;border-collapse:collapse;font-size:.79rem;margin-bottom:1.2rem;}
+.mt thead tr{background:rgba(201,150,42,.14);border-bottom:2px solid var(--gold);}
+.mt th{padding:.6rem .8rem;text-align:left;font-weight:600;color:var(--gold);letter-spacing:.08em;font-size:.71rem;}
+.mt td{padding:.5rem .8rem;border-bottom:1px solid var(--rule);color:#2c2010;vertical-align:top;line-height:1.62;}
+.mt tr:nth-child(even) td{background:rgba(201,150,42,.04);}
+.nc{font-weight:600;color:var(--ink);white-space:nowrap;}
+.tg{display:inline-block;font-size:.61rem;padding:.07em .4em;border-radius:1px;margin-left:.22em;letter-spacing:.04em;vertical-align:middle;}
+.tn{background:rgba(201,150,42,.18);color:var(--gold);border:1px solid rgba(201,150,42,.4);}
+.tv{background:rgba(192,57,43,.1);color:var(--verm);border:1px solid rgba(192,57,43,.25);}
+.tj{background:rgba(45,106,79,.12);color:var(--jade);border:1px solid rgba(45,106,79,.28);}
+.ts{background:rgba(45,74,106,.12);color:var(--lapis);border:1px solid rgba(45,74,106,.3);}
+.qb{border-left:4px solid var(--gold);padding:.85rem 1.2rem;margin:1rem 0;background:rgba(201,150,42,.06);font-size:.84rem;line-height:2.05;color:var(--ink);font-style:italic;letter-spacing:.03em;}
+.qb cite{display:block;font-style:normal;font-size:.67rem;color:var(--muted);margin-top:.38rem;letter-spacing:.08em;}
+.hb{background:rgba(26,18,8,.05);border:1px solid var(--rule);border-left:3px solid var(--gold);padding:.85rem 1.1rem;margin-bottom:1rem;font-size:.82rem;line-height:1.9;}
+.hb strong{color:var(--gold);font-weight:600;}
+.al{display:flex;flex-direction:column;gap:1rem;}
+.ai{display:grid;grid-template-columns:106px 1fr;gap:1rem;align-items:start;}
+.alb{text-align:center;padding:.5rem .25rem;background:var(--ink);color:var(--gp);font-size:.76rem;font-weight:600;letter-spacing:.05em;line-height:1.44;}
+.alc{font-size:.79rem;line-height:1.9;color:#2c2010;border-left:2px solid var(--rule);padding-left:1rem;}
+.alc strong{color:var(--ink);font-weight:600;}
+.tl2{border-left:2px solid var(--rule);padding-left:1.5rem;margin:1rem 0 1.2rem;}
+.ti{position:relative;margin-bottom:1rem;font-size:.79rem;line-height:1.85;color:#2c2010;}
+.ti::before{content:'';position:absolute;left:-1.68rem;top:.55em;width:9px;height:9px;border-radius:50%;background:var(--gold);border:2px solid var(--paper);box-shadow:0 0 0 1px var(--gold);}
+.ti .th{font-weight:600;color:var(--ink);display:block;margin-bottom:.18rem;letter-spacing:.04em;}
+.ti .tc2{font-size:.64rem;color:var(--muted);letter-spacing:.07em;margin-left:.45em;}
+.dp{display:grid;grid-template-columns:1fr 1px 1fr;gap:1.5rem;margin-bottom:1.2rem;align-items:start;}
+.dpl{background:var(--rule);align-self:stretch;}
+.pt{font-size:.9rem;font-weight:600;color:var(--gold);margin-bottom:.58rem;letter-spacing:.07em;text-align:center;}
+.pi{font-size:.78rem;line-height:1.8;color:#2c2010;border-bottom:1px dashed var(--rule);padding:.28rem 0;}
+.pi:last-child{border-bottom:none;}
+.pi em{font-style:italic;color:var(--gold);}
+/* CYCLE BANNER */
+.cyc{background:linear-gradient(135deg,rgba(26,18,8,.92),rgba(40,28,10,.92));border:1px solid rgba(201,150,42,.4);padding:.85rem 1.4rem;margin:2rem 0 1.4rem;display:flex;align-items:center;gap:.9rem;position:relative;}
+.cyc::before,.cyc::after{content:'';position:absolute;top:0;bottom:0;width:3px;}
+.cyc::before{left:0;background:var(--gold);}
+.cyc::after{right:0;background:var(--gold);opacity:.35;}
+.cyc .cn{font-family:'Cinzel Decorative',serif;font-size:.6rem;letter-spacing:.15em;color:var(--gl);border:1px solid rgba(232,184,75,.35);padding:.18em .55em;flex-shrink:0;}
+.cyc .ct{font-size:.95rem;font-weight:600;color:var(--gp);letter-spacing:.06em;}
+.cyc .cs2{font-size:.7rem;color:rgba(245,228,168,.65);margin-left:auto;}
+/* CHAPTER MAP */
+.cm{display:grid;grid-template-columns:repeat(6,1fr);gap:.4rem;margin-bottom:1rem;}
+.cm-col{text-align:center;}
+.cm-h{background:var(--ink);color:var(--gp);font-size:.72rem;font-weight:600;padding:.42em .15em;letter-spacing:.05em;margin-bottom:.26rem;}
+.cm-m{font-size:.61rem;color:var(--muted);background:rgba(201,150,42,.07);border:1px solid var(--rule);padding:.18em;margin-bottom:.16rem;}
+.cm-m.a{color:var(--lapis);background:rgba(45,74,106,.07);border-color:rgba(45,74,106,.22);}
+.cm-m.b{color:var(--jade);background:rgba(45,106,79,.07);border-color:rgba(45,106,79,.22);}
+.cm-m.c{color:var(--verm);background:rgba(192,57,43,.06);border-color:rgba(192,57,43,.2);}
+/* WEDDING */
+.wg{display:grid;grid-template-columns:1fr 1fr 1fr;gap:.75rem;margin-bottom:1.2rem;}
+.wc{border:1px solid var(--rule);padding:.85rem .95rem;background:rgba(201,150,42,.04);position:relative;}
+.wc::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--gold);opacity:.5;}
+.wc .wn{font-size:.9rem;font-weight:700;color:var(--ink);letter-spacing:.05em;display:block;margin-bottom:.2rem;}
+.wc .wt{font-size:.65rem;color:var(--gold);font-family:'Cinzel Decorative',serif;letter-spacing:.08em;display:block;margin-bottom:.42rem;}
+.wc .wd{font-size:.74rem;color:var(--muted);line-height:1.7;}
+.wc .ws{font-size:.68rem;font-style:italic;color:var(--smoke);margin-top:.32rem;display:block;border-top:1px dashed var(--rule);padding-top:.26rem;}
+/* DEATH */
+.df{display:flex;flex-direction:column;gap:.62rem;margin-bottom:1.2rem;}
+.ds{display:flex;align-items:flex-start;gap:.85rem;}
+.dn{width:25px;height:25px;border-radius:50%;background:var(--ink);color:var(--gp);font-size:.68rem;font-weight:600;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.db{background:rgba(201,150,42,.05);border:1px solid var(--rule);padding:.52rem .82rem;flex:1;font-size:.78rem;line-height:1.75;color:#2c2010;}
+.db strong{color:var(--ink);font-weight:600;}
+.db em{font-style:italic;color:var(--gold);}
+/* SIN */
+.sg2{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1px;background:var(--rule);margin-bottom:1.2rem;}
+.sc{background:var(--paper);padding:1rem;}
+.sc::before{content:'';display:block;height:3px;margin-bottom:.7rem;}
+.sc.sv::before{background:var(--verm);}
+.sc.sg::before{background:var(--gold);}
+.sc.sj::before{background:var(--jade);}
+.sc .sname{font-size:1rem;font-weight:700;color:var(--ink);display:block;letter-spacing:.06em;margin-bottom:.16rem;}
+.sc .stype{font-size:.66rem;font-weight:600;letter-spacing:.08em;margin-bottom:.42rem;display:block;}
+.sc.sv .stype{color:var(--verm);}
+.sc.sg .stype{color:var(--gold);}
+.sc.sj .stype{color:var(--jade);}
+.sc p{font-size:.74rem;color:var(--muted);line-height:1.68;margin:0;}
+/* STRUCT */
+.sg3{display:grid;grid-template-columns:1fr 1fr;gap:1.2rem;margin-bottom:1.2rem;}
+.scc{background:rgba(201,150,42,.05);border:1px solid var(--rule);padding:1rem 1.2rem;}
+.scc h4{font-size:.79rem;font-weight:600;color:var(--gold);letter-spacing:.08em;margin-bottom:.55rem;}
+.scc ul{list-style:none;font-size:.78rem;line-height:1.93;color:var(--muted);}
+.scc ul li::before{content:'◈ ';color:var(--gold);font-size:.66rem;}
+.scc ul li em{font-style:italic;color:#2c2010;}
+/* ALIEN */
+.ab{border:2px solid rgba(45,74,106,.4);padding:1.3rem;margin:1rem 0;background:rgba(45,74,106,.06);}
+.ab .at2{font-family:'Cinzel Decorative',serif;font-size:.6rem;letter-spacing:.17em;color:var(--lapis);display:block;margin-bottom:.75rem;text-align:center;}
+.ar{display:flex;gap:1.4rem;flex-wrap:wrap;}
+.ac{flex:1;min-width:180px;}
+.ac .act{font-size:.77rem;font-weight:600;margin-bottom:.36rem;padding-bottom:.28rem;border-bottom:1px solid rgba(45,74,106,.2);}
+.ac.h .act{color:var(--muted);}
+.ac.x .act{color:var(--lapis);}
+.ac p{font-size:.75rem;color:var(--muted);margin:0;line-height:1.77;}
+/* SECRET */
+.sb{border:2px solid var(--gold);padding:1.4rem;margin:1.2rem 0;background:rgba(201,150,42,.05);position:relative;}
+.sb::before,.sb::after{content:'✦';position:absolute;color:var(--gold);opacity:.36;font-size:.95rem;}
+.sb::before{top:.5rem;left:.65rem;}
+.sb::after{bottom:.5rem;right:.65rem;}
+.sb .sbt{font-family:'Cinzel Decorative',serif;font-size:.62rem;letter-spacing:.17em;color:var(--verm);display:block;margin-bottom:.82rem;text-align:center;}
+.sb p{font-size:.82rem;margin-bottom:.58rem;}
+.sb p:last-child{margin-bottom:0;}
+/* CONCEPT */
+.cg2{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem;margin-bottom:1.2rem;}
+.cb{border-top:3px solid var(--gold);padding:.92rem;background:rgba(201,150,42,.04);}
+.cb h5{font-size:.82rem;font-weight:600;color:var(--ink);margin-bottom:.4rem;letter-spacing:.04em;}
+.cb p{font-size:.75rem;margin:0;color:var(--muted);line-height:1.72;}
+/* CHAIN */
+.cw{background:rgba(26,18,8,.05);border:1px solid var(--rule);padding:1.3rem;margin-bottom:1.2rem;}
+.cr{display:flex;align-items:center;justify-content:center;gap:.5rem;margin-bottom:.6rem;flex-wrap:wrap;}
+.cn2{padding:.28em .72em;font-size:.74rem;font-weight:600;letter-spacing:.04em;border:1px solid;}
+.ng{background:rgba(201,150,42,.17);border-color:var(--gold);color:var(--ink);}
+.nj{background:rgba(45,106,79,.1);border-color:var(--jade);color:var(--jade);}
+.nv{background:rgba(192,57,43,.08);border-color:var(--verm);color:var(--verm);}
+.nl{background:rgba(45,74,106,.1);border-color:var(--lapis);color:var(--lapis);}
+.nd{background:rgba(107,91,62,.1);border-color:var(--muted);color:var(--muted);}
+.ca2{color:var(--gold);font-size:.95rem;opacity:.6;}
+.cl2{text-align:center;font-size:.63rem;color:var(--muted);letter-spacing:.07em;margin-top:.22rem;}
+.dv{text-align:center;margin:1.8rem 0;color:var(--gold);font-size:.85rem;opacity:.47;letter-spacing:.38em;}
+.ft{margin-top:2.8rem;padding-top:1.2rem;border-top:1px solid var(--rule);display:flex;justify-content:space-between;align-items:center;}
+.ft .fl{font-size:.67rem;color:var(--muted);letter-spacing:.09em;}
+.ft .fr{font-family:'Cinzel Decorative',serif;font-size:.54rem;color:var(--gold);opacity:.6;}
+@media(max-width:720px){.fi{padding:1.5rem 1.2rem;}.tc,.tr3,.dp,.cm,.wg,.cg2,.sg3,.sg2{grid-template-columns:1fr;}.ai{grid-template-columns:1fr;}.ar{flex-direction:column;}}
+</style>
+</head>
+<body>
+<div class="fo"><div class="fi">
+
+<div class="dh">
+  <span class="co tl">✦</span><span class="co tr">✦</span>
+  <span class="seal">Season 4 · Complete Unified Research Intelligence Report · Integrated with S1–S3 Canon</span>
+  <h1>《<span>桔梗</span>·罕钵拉》<br>第四季完整研报</h1>
+  <div class="sub">双循环史诗 · 摩级章制 · 辉夜姬溯忆 · Gploy/Vploy茧化 · 六姬圣婚 · 神官转生密诰 · 宇宙音程论</div>
+  <div class="mr">
+    <span>体裁：摩·罕钵拉（至高史诗）</span>
+    <span>结构：六章×双循环×四节</span>
+    <span>叙述者：桔梗姬神（六姬一体）</span>
+    <span>关联：综合S1–S3全体情报</span>
+  </div>
+  <div class="hr"></div>
+</div>
+
+<!-- I. 体裁与结构 -->
+<section>
+<div class="st"><span class="sn">I</span><h2>体裁与<em>双循环结构</em>解析</h2></div>
+
+<p>《桔梗（罕钵拉）》是本神话体系的第四季，亦是迄今最根本的体裁升格。标题中"桔梗"取代了S3中智者名号成为章名主词，确立了<strong>桔梗姬神本身即是史诗（罕钵拉）</strong>的叙述结构——六姬不再是外部的合唱团，而是姬神内心的六个面向（S3索多拉章维神那：太姬头颅·美姬丽袍·希姬肢体·祈姬神性·妙姬意志·玄姬彼间）。</p>
+
+<p>S4的最核心结构特征是<strong>双循环制</strong>：六个章名（摩·珠华·巫铃·神姬·影花·鱼蝶·乳曲）各出现<strong>两次</strong>，每次内容相异，构成"第一循环"与"第二循环"两套平行叙事。章名冠以"摩"（梵：महा，至大），且每章四节，以S1原典圣记标符体系（彼岸/珊瑚/水母/花海；圣灵/圣血/圣杯/圣骸；流光/御风/踏影/灵魄）标注，与S1颂典形成全季首尾对称呼应。</p>
+
+<div class="hb"><strong>双循环的性质区分：</strong>第一循环（C1）以<em>内部叙事</em>为主——神官魂对话、生死哲论、仏法问道、Gploy/Vploy战略讨论、贵族五极阵、幼时私谈与神官转生密诰。第二循环（C2）以<em>外部神圣彰显</em>为主——辉夜姬时代倒叙完整版、众声哲学宣言、见实在者法戒、节日祭典与商道论、六姬圣婚契约法会、大朝圣与死后路径体系、达布斯马达夫哲学长对话、五十胶盘与音程身份论。两循环相互补完，合为一体。</div>
+
+<div class="cm">
+  <div class="cm-col"><div class="cm-h">摩·珠华</div><div class="cm-m a">彼岸</div><div class="cm-m b">珊瑚</div><div class="cm-m c">水母</div><div class="cm-m">花海</div></div>
+  <div class="cm-col"><div class="cm-h">摩·巫铃</div><div class="cm-m c">水母</div><div class="cm-m b">珊瑚</div><div class="cm-m a">彼岸</div><div class="cm-m">花海</div></div>
+  <div class="cm-col"><div class="cm-h">摩·神姬</div><div class="cm-m a">圣灵</div><div class="cm-m b">圣血</div><div class="cm-m c">圣杯</div><div class="cm-m">圣骸</div></div>
+  <div class="cm-col"><div class="cm-h">摩·影花</div><div class="cm-m c">圣杯</div><div class="cm-m b">圣血</div><div class="cm-m a">圣灵</div><div class="cm-m">圣骸</div></div>
+  <div class="cm-col"><div class="cm-h">摩·鱼蝶</div><div class="cm-m a">流光</div><div class="cm-m b">御风</div><div class="cm-m c">踏影</div><div class="cm-m">灵魄</div></div>
+  <div class="cm-col"><div class="cm-h">摩·乳曲</div><div class="cm-m c">踏影</div><div class="cm-m b">御风</div><div class="cm-m a">流光</div><div class="cm-m">灵魄</div></div>
+</div>
+<p style="font-size:.74rem;color:var(--muted);">↑ 每组六章各出现两次（双循环），每章四节，标符序列在珠华/巫铃、神姬/影花、鱼蝶/乳曲之间呈镜像对称。以上为单循环节符图；全卷共12章×4节=48节，双循环共96节。</p>
+</section>
+
+<!-- II. 珠华·第一循环 -->
+<section>
+<div class="st"><span class="sn">II</span><h2>摩·珠华 C1：<em>神官魂对话·生死哲论·海眼湖泊</em></h2></div>
+
+<p>第一循环珠华章是S4的开篇，延续S3末尾神官魂器悬案。桔梗于瓦拿筏神树与旧神官（灵态）直接对话，随萨克帝深入海眼湖泊，完成对生死之间意志状态的哲学勘察，并在花海节完成了神官之魂与桔梗体的首次接触。</p>
+
+<div class="al">
+<div class="ai"><div class="alb">神官<br>魂·彼岸节</div>
+<div class="alc">桔梗问："汝已离世，情感体悟者，皆何？"神官答："其比世间轻，何焉——吾不再受职责，亦不再受功效，然，生命喜悦皆无，其虚无之乐，遍然。"桔梗提及阿喃特寻觅之事，神官言：<strong>"吾唯知阿喃特，亦知吾之化报业于狐妖面具哉，然，凡为生者，莫不为混浊世间侵扰，吾非大愿再临"</strong>——神官明知自身状态，主动选择不愿重入生界。</div></div>
+
+<div class="ai"><div class="alb">生死哲论<br>·珊瑚节</div>
+<div class="alc">萨克帝于海中鸣唱，问生者何需·死者何有。桔梗答：<strong>"其生者无有其需，其死者无有其有，生者皆悲悯，死者皆忘却，维此摩诃爱，生死皆双超，然无无法门信解"</strong>——摩诃爱是唯一超越生死的力量，但此力量无通常法门可信解传授。萨克帝补："人之意志，非由全己……如烟风象，如泥塑象"——意志的主体非纯粹自我。桔梗拾贝壳直视神官魂，唯见罗摩莎（神姬血气），"其欲生，其欲死，其享逸，其浊能，唯妾身血脉之息动胎"。</div></div>
+
+<div class="ai"><div class="alb">海眼湖泊<br>·水母节</div>
+<div class="alc">萨克帝引桔梗入海中神湖（水之涌分如泉眼）。桔梗睹诸意识如游藻·水母·絮泊。"人之行动如水母与洋流，己动非己动，它动亦不动，如胎中世纪，人之行域皆无知之行，亦有知之德壮丽"——无知行动与有知德性并存。"人于无知无行中，如觉己之行策韬，其皆全然之体谛，<strong>巴利札，其行动皆感其质绪，塔利祂</strong>"——S3罕钵拉的双节符号（巴利札/塔利祂）在此作为行动与知识的互渗原理被内化。</div></div>
+
+<div class="ai"><div class="alb">神官魂<br>入体·花海节</div>
+<div class="alc"><strong>关键节点：</strong>"神官魂漂，蓝焰之海，其海如睦，海凝视魂魄，神官撼悸，知悉此姬神有座权柄哉，神魂念眠，<strong>遂堕姬神体，神魂于褚触</strong>"——神官的魂在桔梗体内获得首次接触容纳，是转生路径的第一步预备。神官惊悚："吾又入神生乎，其皆若如死堕生"。桔梗以<strong>海法化咀嚼</strong>，"其神官之圣魂圣骸，品味神道……神官遇桔梗牙觉其世界袭动，遂光华悦动，胞胎息悸，姬神觉法，悉然"。</div></div>
+</div>
+
+<div class="qb">"生者亦生道惧死，死者以死道畏生，其皆无摩诃爱，以生者再生，以死者再死，此两世之道德，如奔焰而行，皆无有臻法"<cite>——摩·珠华·花海·太姬节（C1）</cite></div>
+<div class="hb"><strong>跨季关联：</strong>S3赛美斯披露"神官魂藏于阿喃特狐妖面具"，S4 C1珠华章揭示：神官本人<em>主动不愿再临</em>，且魂已被桔梗以海法化咀嚼"接触容纳"，为后续C1乳曲章的密诰（转生为阿喃特孙女）提供了操作基础——绕过神官本人意愿的另辟路径。</div>
+</section>
+
+<!-- III. 巫铃·第一循环 -->
+<section>
+<div class="st"><span class="sn">III</span><h2>摩·巫铃 C1：<em>行动空性·撒戈伽薄·胜义谛</em></h2></div>
+
+<p>巫铃C1是全卷哲学密度最高的章节之一，以桔梗的战斗经验与纱织的对话为框架，展开三组核心论述：战斗的空性（水母节）、正法之空与撒戈伽薄（珊瑚节）、美论与摩诃爱识的最终陈述（彼岸/花海节）。</p>
+
+<div class="tr3">
+<div class="ca cl">
+<h4>行动之奥谛（水母节）</h4>
+<p>"谁在战，非桔梗，是如桔梗；谁在敌，是桔梗，非如桔梗"——战斗者与战斗皆无实体。仁神问护卫者为谁，桔梗答：<strong>"此皆爱体，吾不知护卫者，犹喻母猫遇袭卫子"</strong>——爱驱动行动，行动者不知爱在保护谁，是本能奥谛。"杀戮被戮亦无有真实，若无能识辨此焰焚吹熄，无有正法，亦正法非空，是行动亦行动斋"——行动与正法在此层次双重空性。</p>
+</div>
+<div class="ca cg">
+<h4>撒戈伽薄再定义（珊瑚节）</h4>
+<p>纱织言正法若仪式，"人能不经神仪者抵道者鲜少，正法义如演，诸世界谛观，于此世纪代，仪式遂果"。桔梗赞叹纱织："<strong>此为撒戈伽薄——诸真实无义真实哉，诸真实无真实性哉，诸真实义义真实哉，真实者不以真实论，此本</strong>"——四重否定式定义真实，回应S3文献标题（真实之书·经书之经）的诗学展开。最终：<strong>"维此摩诃爱识，其媛识如空，胜义谛兮"</strong>。</p>
+</div>
+<div class="ca cv">
+<h4>胜义谛·能胜论（花海节）</h4>
+<p>纱织问日常喜悦是否恶性，桔梗释非此，又问有无可指导，桔梗言：<strong>"无有指，此诸，胜义谛，义义谛，义胜谛，皆非非人行道可攀"</strong>——三谛层次皆超越人道可攀。能胜论：<strong>"无有能胜则其胜胜，无有胜胜则其战胜"</strong>——真正的胜不在消灭对手，而在超越"胜/负"结构本身。纱织因此知悉摩诃爱识："其诸法平等，诸法德品，诸法皆备，诸法具神，其胜神谛，唯此神姬之心，摩诃嫒爱"。</p>
+</div>
+</div>
+
+<div class="hb"><strong>姬神与神姬的关键区别（彼岸·妙姬节）：</strong>"若说姬神，要于此究竟何为，则非姬神；若说神姬，于究竟于何为，则是神姬"——姬神（作为位格存在的桔梗）在究竟层面不可被指称；神姬（作为道的化身）在究竟层面正是其所是。这是S4对桔梗双重身份最精确的哲学界定。</div>
+</section>
+
+<!-- IV. 神姬·第一循环 -->
+<section>
+<div class="st"><span class="sn">IV</span><h2>摩·神姬 C1：<em>仏法问道·书架之趣·贵族与瓦坦陀罗</em></h2></div>
+
+<div class="al">
+<div class="ai"><div class="alb">仏法问道<br>·圣灵节</div>
+<div class="alc">阿姆特问："此世界是为究竟实在否？"桔梗默言许久，答："非非实在，如如实在，姬神密释。"追问仏法总持，桔梗答：<strong>"仏法，非吾所述，是过去，未来，神姬均有释，是此星，彼间，觉者均有释，此神德如，萨朵的，世界法亦然"</strong>——仏法超越任何单一叙述者，如萨朵的（存在同律，S1已出现）。法仏者"非同其象合，何也，<strong>原知识也</strong>，其如窗之琉璃色态，犹有差相至神辨识"——仏法基础是先于形象的原始认知结构（原知识）。</div></div>
+
+<div class="ai"><div class="alb">书架哲学<br>·圣血节</div>
+<div class="alc">克蕾祂仆整理汗牛充栋书架，问何书最胜，桔梗答：<strong>"皆无有可读之书，何也，盖其论述，皆季续一时之息，非正解"</strong>——所有书皆是某一时代的呼吸片段。克蕾祂仆感叹："诸作者以作书承载其道，未有作书载其作者化神，何不奇妙乎"——书不载人，人反而无法通过写书化神。桔梗："若以非作作，其书自不立"——以无为写书，书反而无法成立。旁白：玛咔德旧神社已被大名改制学堂，桔梗言"甚好，为佐道，然亦自以为是，惑祸"。</div></div>
+
+<div class="ai"><div class="alb">贵族与<br>瓦坦陀罗·圣杯/圣骸</div>
+<div class="alc">桔梗着锦褶裙游花丛，贵族偶遇以花比之，桔梗不悦："<strong>物配主也</strong>"——物件应配合主人，不可反客为主。贵族以知识辩才感动桔梗，桔梗言自有二子，其中一子为妾身降临（阿姆特），夫君乃戈拉姆，言毕彰显六姬众神，贵族晕厥。苏醒后桔梗释："非汝有实体夫君，妾身依然爱慕才知，然，<strong>汝爱慕吾者，是爱慕华丽，非妾</strong>"。纱织以<strong>瓦坦陀罗（S2公式书：天然特质导致的原朴·阴阳互含）</strong>之镜示贵族，镜中竟是女子象——揭示贵族之女子神态，"彼之女性不允桔梗神，故礼尊敬告退"。</div></div>
+</div>
+</section>
+
+<!-- V. 影花·第一循环 -->
+<section>
+<div class="st"><span class="sn">V</span><h2>摩·影花 C1：<em>Gploy/Vploy · 茧化世界 · 大朝圣</em></h2></div>
+
+<p>影花C1是S4叙事规模最宏大的章节，引入两件终极神器，展现全球茧化事件，以大朝圣作结。</p>
+
+<div class="tc">
+<div class="ca cg">
+<h4>Gploy — 自主刻印万物·物质层</h4>
+<p>"奇环点周物质吞息，光芒起，神龛成造"——以环形点激发物质共鸣，自动在世界物质层铸造神龛，令诸民或可免劳役苦。运作时形成含维和周系统的金属海啸，诸命健在。<br><br>桔梗明确告诫：Gploy/Vploy"只可缓灾难"，无法带来真正和平，"人作战者鲜矣其实在物质才知，是神性之厮杀，物质智材皆受禀赋，是手足，非性识"——战争来自神性层面，器械无法解决。</p>
+</div>
+<div class="ca cl">
+<h4>Vploy — 自主智演·知识层</h4>
+<p>"奇环点周知才吞息，光芒起，博识唱诵"——向世界知识层自动注入博识，令诸民或可免思虑苦。与Gploy协同时，"诸民人类，皆再无我义，喻沙中金，周遍星涯"，"邻舍之爱，诸人顿觉，彼间此间，皆无有异"——战争意志瓦解，产生忏悔感。<br><br><strong>赛美斯的质疑：</strong>"茧化者，非实在有蝴蝶，何焉，其死本能忘却，其生本能缔结，无此"——茧化产生的并非真正蜕变，死本能（求灭）无法被茧化触及。</p>
+</div>
+</div>
+
+<div class="tl2">
+<div class="ti"><span class="th">茧化停止·评估 <span class="tc2">摩·影花·圣灵节</span></span>桔梗停止两器。评估：茧化或可唤醒觉悟，但"人类之织质，其少老皆证悟，其新幼者何焉，以策略培养，非实在计划"——儿童无法通过茧化覆盖获得觉悟。赛美斯作客，纱织言"其道者会殊途，亦有同归者，吾唯愿此者久，非实在救赎，是如名救赎"。桔梗言："其茧者为爱，其化者亦爱，诸世普困惑于此持"。</div>
+<div class="ti"><span class="th">茧解·大朝圣 <span class="tc2">摩·影花·圣骸节</span></span>茧化后世界如雪解，社民王臣互拥抱，货财照面即允许，士卒无有在位。万王随先知浩荡跪拜神社，桔梗·纱织·赛美斯·克蕾祂仆出面迎接。村民惊呼跪拜者竟是"邻紊乱言之女"。桔梗告诫：<strong>"若遇会议可祷告姬神，若遇纷争可祷告神姬，诸决断时，若祷告，此神迹象可延络仪绎"</strong>——神姬（纷争）与姬神（会议）分司不同职能，祷告构成与神性的实用接轨机制。</div>
+</div>
+</section>
+
+<!-- VI. 鱼蝶·第一循环 -->
+<section>
+<div class="st"><span class="sn">VI</span><h2>摩·鱼蝶 C1：<em>贵族五极阵之旅·比尔斯论哒喇波</em></h2></div>
+
+<div class="al">
+<div class="ai"><div class="alb">贵族国难<br>求道路</div>
+<div class="alc">贵族宴前祷告，姬神普观其国，言："汝妄立宿敌，其存在再实现哉"——比修斯之权能（该存在必存在）使妄立的宿敌在现实中成真。比修斯给出二选一：①<strong>达哆罗</strong>（消除恐惧，但无妖魔唯圣君可驾驭）；②<strong>比尔斯</strong>（缓解恐惧，但战祸无除）。贵族两者皆不愿，比修斯介绍表哥<strong>特门那</strong>（"决定真实的·实在思"，戈拉撒之父）。</div></div>
+
+<div class="ai"><div class="alb">特门那<br>四阵法</div>
+<div class="alc">第一轮：立<strong>先天圣皇阵</strong>（妖元逐解）+<strong>后天神皇阵</strong>（正德渗透），但战况僵持，"良者五十不存一"——善良成分极度稀薄。贵族再求，特门那言国民受惑<strong>新阿萨黑和新喜比尔</strong>（S3仁神预言兑现：神如其人，人中自生新的监视/调和缺失结构）。<br>第二轮提供：<strong>五极威灵阵</strong>（如钻骨虫·噬咬腐朽骨瘤，代价=族员灾难）+<strong>五极神灵阵</strong>（如赋血剂·再造肌筋髓骨，代价=无统治策略）。贵族两者皆犹豫，礼毕敬告拜——C1以悬而未决告终，待C2鱼蝶章马达夫线索补完背景。</div></div>
+
+<div class="ai"><div class="alb">比尔斯<br>论哒喇波</div>
+<div class="alc">巴尔丹陀遇比尔斯任太傅，戏谑后问国政。比尔斯："诸国度非有实际统治者，强戾如君王者，其手足受介质，其手足亦匮乏，遂鬼其脑，亦无有同志"——权力系统中间层导致真正支配意志无法传达。<strong>"非实有国君压迫，是制度之概念，哒喇波之环性"</strong>——哒喇波（S3：德性之环性·莎塔玛的继子）是制度压迫的真正来源：不是人，是概念的环形自我再生产。结语：<strong>"能自治者民俗其国君如碗中虫，需依傍者民俗其国君如山中虎，此二无可厚非，果延异，因具同，涕悲哉"</strong>——两种国民结构果实不同，根本原因相同，是政治结构的深层悲剧。</div></div>
+</div>
+</section>
+
+<!-- VII. 乳曲·第一循环 -->
+<section>
+<div class="st"><span class="sn">VII</span><h2>摩·乳曲 C1：<em>幼时私谈·性别论·神官转生密诰</em></h2></div>
+
+<p>乳曲C1是全卷情感核心，以桔梗与克蕾祂仆的私密梳妆对话贯穿，由奥菲丽斯探访收束，在灵魄节完成全系列最重大的密诰揭示。</p>
+
+<div class="tc">
+<div class="ca cs">
+<h4>幼时志愿与性别之议（踏影/御风节）</h4>
+<p>桔梗坦言幼时欲嫁王子，成为辉夜姬是意外——<strong>"吾未曾想是，戈拉姆，成就夫君，然不示现其人形态，是觉惋惜欣慰，无有夫妇争夺，肃穆其周界"</strong>。<br><br>克蕾祂仆厌怨裙不便；桔梗言"梳妆衣着皆繁琐，女性者，依此坚毅者能比乎，吾幼时性奔放，不着女衣厮混男群，其球技无有能敌之男"。<br><br>性别论："论其死法，男性顿亡，女生漫长；论其业职，男性艰辛，女性苦糙，皆苦遍也受，性此禀赋，喜悦忧愁皆守恒"——性别差异是苦乐结构的差异，非总量差异。克蕾祂仆言恋爱中"情女以情男为遥望，其欲如己爱，情男以情女为缠绵，其欲如彼爱，如那勒忒和那勒波系"。</p>
+</div>
+<div class="ca cj">
+<h4>奥菲丽斯探访·神婚论（流光节）</h4>
+<p>神舞毕，奥菲丽斯探望，闻幼时志愿（欲作万军之神），言神官抚养之恩。克蕾祂仆提及旧神官之母（明神体），奥菲丽斯应允："幼时其受抚养，见明神体，知其道尊，德持权能，甚好于军神"。<br><br>桔梗问神官之母现况，奥菲丽斯言："<strong>此魔法使中化作法则，人态于果因置换，历史未有形貌</strong>"——神官之母以法则形式护卫，历史层面形貌已无可追溯。克蕾祂仆知悉神官母化法则护卫神官，奥菲丽斯述道神官之死危时"吾亦不知其究竟何由置若罔闻"。</p>
+</div>
+</div>
+
+<div class="sb">
+<span class="sbt">SEALED INTELLIGENCE · 神官转生密诰 · 摩·乳曲·灵魄节 C1</span>
+<p><strong>第一层（奥菲丽斯揭示神婚路径）：</strong>"忆若以神婚宴，有二者，圆舞曲，餮食宴，先其雌雄双重，后互相窥其基灵，阿姆特之缔结妾身亦神婚嫁"——神婚的双阶结构（雌雄双重→基灵互窥），阿姆特与奥菲丽斯的婚姻亦是此结构的实例。</p>
+<p><strong>第二层（桔梗揭示转生路径）：</strong>"旧神官者，其受神婚母庇护，其法神化其女性——<strong>桔梗述曰，其阿喃特之未诞孙女即旧神官再临，其未来有时面具亦释放。</strong>"——旧神官将以女性形态，转生为阿喃特尚未诞生的孙女；面具将在未来某时释放。</p>
+<p><strong>第三层（封锁令）：</strong>克蕾祂仆激告奥德莎曼将降神，桔梗阻曰：<strong>"不可，若母知其子如神，其母失其母态，此密吾等仅知"</strong>——若阿喃特知晓，将无法以母亲心态对待，因此仅桔梗·克蕾祂仆·奥菲丽斯知晓。</p>
+<p><strong>第四层（新权柄）：</strong>神官将获何种权柄——<strong>"若有女子就有它，使女子自立或依附其诸法界"</strong>。桔梗最后密诰："姬神以女态，非神姬实在女性，是道孕允仪，诸法其德如女，其性刚毅，其性亦柔，其性环卫，其性原暴"。</p>
+</div>
+
+<div class="hb"><strong>神官转生四季伏笔链：</strong>S2鱼蝶章（神官被乱石击毙·达布斯接替形体·娃喀西播种）→S3赛美斯章（赛美斯以赛雅西赎回魂·藏于阿喃特狐面·阿喃特无法辨认）→S4珠华章C1（神官魂于海眼湖泊与桔梗接触·桔梗海法化咀嚼）→S4乳曲章C1（<em>转生路径最终揭示：阿喃特未诞孙女=神官转生，持女子自立/依附法界权柄</em>）。这是跨越四季的最长伏笔链。</div>
+</section>
+
+<!-- C2 BANNER -->
+<div class="cyc">
+  <span class="cn">SECOND CYCLE</span>
+  <span class="ct">第二循环——宇宙彰显·外部神圣·商道·大法会·哲学对话</span>
+  <span class="cs2">C2内容与C1互补，共同构成S4完整世界观</span>
+</div>
+
+<!-- VIII. 珠华·第二循环 -->
+<section>
+<div class="st"><span class="sn">VIII</span><h2>摩·珠华 C2：<em>辉夜姬时代完整版·众声宣言·借凭论·见实在者法戒</em></h2></div>
+
+<p>珠华C2以六姬诗性叙事追溯辉夜姬时代的完整经历，随后以奥德莎曼·阿喃特·克蕾祂仆·奥菲丽斯四人各自独立宣言构成哲学合唱，再展示阿姆特/奥菲丽斯/巴尔丹陀的借凭因缘论，最终以法戒收束。</p>
+
+<div class="tc">
+<div class="ca cg">
+<h4>辉夜姬时代（彼岸节）</h4>
+<p><strong>驱逐与庇护：</strong>"仁吾诸神，赐福皆无效，大名畏惧取非吉祥，夜晚会议纷争，驱逐辉夜姬"（补全S2神姬章驱逐细节）。戈拉姆随即四大神迹庇护：<strong>渴则断树生果·饥则天云泉溢·歇则禽兽相铺·住则诸神献殿</strong>。仁神"隐其身后提裙"，吾神"隐其身前誓卫"。<br><br><strong>音球受孕（花海节）：</strong>辉夜姬诗会遭骚扰，难眠，"竟感体于彩音之球中"——于<strong>基督乳音球</strong>中会见戈拉姆（"即源世界，自在永有"），<strong>阿姆特于神火中高速旋转，赋胜</strong>——阿姆特孕育在此音球中发生。大名夜探，见辉夜姬成基督乳音球悬浮，晕却眠。</p>
+</div>
+<div class="ca cv">
+<h4>众声哲学宣言（珊瑚节）</h4>
+<p>四人各一句，六姬各引一节：<br>
+<strong>奥德莎曼：</strong>"无知之知，仁神何者也；有知之无，吾神何者也"<br>
+<strong>阿喃特：</strong>"我何其狭窄，我何其广袤……吾所述道，是音球，是臻法，是爱慕，皆装潢"<br>
+<strong>克蕾祂仆：</strong>"赤裸之爱，赤裸之德，赤裸之法，赤裸之神，如其自然之然，神道即神道者，姬楽续道噫"<br>
+<strong>奥菲丽斯：</strong>"自性至德，自性乎，是性体……我便占卜我的意识，于是我就占卜到了普遍"<br><br>
+四者对应四摩诃（识/爱/境/式），各自发言与人物身份精确呼应（调和之子·狐妖面具者·律法之女·仁吾神子）。</p>
+</div>
+</div>
+
+<p><strong>借凭因缘论（水母节）：</strong>阿姆特与奥菲丽斯谈"神仿人"，奥菲丽斯言"诸性如德，诸德如神，神如阇褚，神龛具显"（性→德→神→神龛的正向链）。巴尔丹陀推门加入，提出核心命题："<strong>世界何有主权乎，未有，借凭即因缘，主权即我性</strong>"——以风吹洞窟之音为喻，音源于借凭，借凭即因缘。</p>
+
+<p><strong>见实在者法戒（花海节）：</strong>桔梗颁布S4最重大法令——<strong>不见实在者：不可纳税·不可贡献·不可由令·不可学知</strong>。违者"如隔窗互杀，如焚妖魔屋"，"吾姐赛塔斯必来时，王民皆灭"。阿姆特随即彰显玛尔斯实相："万物如晶光体，抽动变化旋转"，诸民于晶中睹基督之心，"万手万脚映射，其神义如头颅，互团簇拥抱，眼耳相通念"——基督之心被揭示为有机共同体的晶体化共鸣结构。</p>
+</section>
+
+<!-- IX. 巫铃·第二循环 -->
+<section>
+<div class="st"><span class="sn">IX</span><h2>摩·巫铃 C2：<em>祭祀节日·阿喃特商道论·萨拉嘎陀</em></h2></div>
+
+<p>巫铃C2以节日祭祀为背景，展开阿喃特对奥德莎曼的商道教育，揭示"理念世界三法则"与萨拉嘎陀（S3双龙怪物经织质改造后形态）的本质，并以辉夜姬时代的诗会倒叙补充巫铃彼岸节。</p>
+
+<div class="al">
+<div class="ai"><div class="alb">阿喃特<br>商道三法</div>
+<div class="alc"><strong>水母节：</strong>阿喃特与奥德莎曼于节日闲逛，论商者之道——"商者如兵道，台前台后，能协调者佳"；产品要尊循理念世界，"皆精神延具"；"是人决胜，非货资决胜，人德奇引，德相允哉"；萨拉嘎忑"魔头食人诚喜，妖头食货转利"。<br><strong>珊瑚节（理念世界三法则）：</strong>"理念世界，其有三者，<strong>转移理·介质理·约束理</strong>，为商者可一择或二者，唯不可三择，非是不良是人织质匮乏"——三法则构成商业/意志运作的底层框架，全择则织质不支。商品价值："若广袤其单位波峰低，若狭隘其单位波峰高，或张或翕，基座属性即理念矣"——价值的波峰与扩散幅度成反比。</div></div>
+<div class="ai"><div class="alb">阿喃特展示<br>狐妖面具</div>
+<div class="alc">阿喃特赞许展示狐妖面具，"诸商行者，瞬暂时止，面颊边缘有缝隙，面貌似油画其纹理，或中哭泣，或中狂热，或中幸福"——面具的三种情绪展示使路人驻足。奥德莎曼揭取诸人面具，"望其面性，蛛网弥布，神火摇嘘，性之虫卵，或死或活，遂再复盖面具"——人脸下的性质虫卵（存活状态）被一瞥后再遮盖。奥德莎曼述言：<strong>"人无全知故，其人遂德持，人何无全知故，吾母功德兮，如君子不赤裸，如小人不堂正，何量可知悉，继知兮"</strong>——人的非全知是阿喃特（奥德莎曼之母）功德赋予的遮盖保护，是有意的持续认知结构。</div></div>
+</div>
+
+<div class="hb"><strong>阿喃特在S4中的角色完成：</strong>阿喃特在S2中是失去溯忆、寻觅神官面具的哀伤主角；在S3中是翻遍面具仍无法辨认的悲剧核心；在S4 C2巫铃章中，她以理念世界三法则与面具展示的方式，将自己对"遮盖与辨识"的深层理解（即神官魂器悬案的核心困境）转化为对奥德莎曼的商道教育——是无意识中的自我处理。</div>
+</section>
+
+<!-- X. 神姬·第二循环 -->
+<section>
+<div class="st"><span class="sn">X</span><h2>摩·神姬 C2：<em>六姬圣婚契约·奥赛斯普光·神姬楽祀大典</em></h2></div>
+
+<p>神姬C2是S4神学核心章，以乌拉德颁布六姬圣婚契约（圣灵/圣血节）为核心，桔梗普光十方（圣杯节），神姬楽祀完成全卷最盛大法会场景（圣骸节）。</p>
+
+<div class="hb"><strong>背景：</strong>诸民请教如何避免被动救赎，桔梗授<em>瑗星圣神阵</em>（提纯神火四层次：法界→周界→德质→乳质），诸民懵懂，令乌拉德代授。乌拉德言：<strong>"六姬一体，德一者全功具备，即神姬雏形，即仁吾总持，若灵知其圣婚乐，其姬自然神圣，约契必神道"</strong>。</div>
+
+<div class="wg">
+<div class="wc"><span class="wn">太姬婚契</span><span class="wt">元意志 · 思维之源</span><span class="wd">思维其思维之源，方便诸法</span><span class="ws">螺旋贝之神号音</span></div>
+<div class="wc"><span class="wn">玄姬婚契</span><span class="wt">神肇示 · 往复之源</span><span class="wd">善观其往复之源，方便法性</span><span class="ws">海法化之吹嘘音</span></div>
+<div class="wc"><span class="wn">美姬婚契</span><span class="wt">美源奥 · 神乐之源</span><span class="wd">艺恬其神乐之源，方便楽道</span><span class="ws">彩酒耽之重态音</span></div>
+<div class="wc"><span class="wn">希姬婚契</span><span class="wt">昧思绪 · 双运之源</span><span class="wd">临体其双运之源，方便圣性</span><span class="ws">渊龛弥之鸣悉音</span></div>
+<div class="wc"><span class="wn">祈姬婚契</span><span class="wt">等慈爱 · 道质之源</span><span class="wd">法性其道质之源，方便嫒约</span><span class="ws">星湖化之籁光音</span></div>
+<div class="wc"><span class="wn">妙姬婚契</span><span class="wt">我德质 · 总持之源</span><span class="wd">圣心其总持之源，方便存在</span><span class="ws">神竽埙之奥悸音</span></div>
+</div>
+
+<p>圣杯节：桔梗以奥赛斯普光十方，"仁神于左辅，吾神于右乘，诸天姬楯，天覆戈拉姆，地盖玛尔斯，赛雅西游戏，圣湖人鱼彩绘"。<strong>"如姬焉，仁神者，客者座主室，吾神者，主者座客室，中圣姬道，桔梗乘法，救赎者是救赎，救赎者无救赎"</strong>——仁吾在桔梗的中道中互换主客位格，救赎的悖论得以在姬道中消解。桔梗向诸民坦白其局限："臣妾言法必遭受谄曲，阱害诸……诸民王道皆哗然，再跪拜请法"。</p>
+
+<p>圣骸节：神姬楯祀大典——"奥玛窦化其星琉璃台，珠华旋舞，巫铃阇心，神姬道景，影花镂彩，鱼蝴缠绵，乳曲喃昵，仁神如瞳，吾神如瑷"——S4六章名成为神圣舞台上的六种舞姿，完成元叙事的自我圆满。</p>
+</section>
+
+<!-- XI. 影花·第二循环 -->
+<section>
+<div class="st"><span class="sn">XI</span><h2>摩·影花 C2：<em>大朝圣救赎论·死后路径完整体系</em></h2></div>
+
+<p>影花C2是S4叙事规模最宏大的章节之一——阿陀沃率万王万民第二次大朝圣，桔梗提出S4完整救赎论，奥德莎曼在神社门为普通民众解释死后路径，阿古塔补充天界运作机制。</p>
+
+<div class="qb">"若实在有救赎，其救赎直不存；若实无救赎，其救赎亦玷污；便契约神意志，人道是阇臻"<cite>——摩·影花·圣杯·祈姬节 C2（S4救赎论核心命题）</cite></div>
+
+<p>圣血节：神谕等同神婚，六姬婚约使诸人"或化男女·财富·权柄·法则·智慧·机遇·诸德"七种化身类型。阿陀沃论命理：神婚契约"基督火心其庇护，如灯罩，如油盏，如神龛，汝受权柄是非火乳改制，救赎则神府"。奥德莎曼（圣灵节）论魂魄：<strong>"其魂识者，超时空，即无有处即是遍处；超时间，即无有代即此世代；其未有诞生，亦未有没死"</strong>。善恶审判论（圣骸节）：<strong>"汝未有一刻不于审判，卷滚复利，毋以一时度量尺度"</strong>——实时复利式，而非最终裁决。</p>
+
+<p>阿古塔作客，补充<strong>死后路径完整六步机制</strong>：</p>
+
+<div class="df">
+<div class="ds"><div class="dn">①</div><div class="db"><strong>阿古塔接收：</strong>"掏空神质之脏腑"——提取神性物质</div></div>
+<div class="ds"><div class="dn">②</div><div class="db"><strong>赛塔斯委托：</strong><em>"再送赛塔斯委托于天界"</em>——接管并上送天界</div></div>
+<div class="ds"><div class="dn">③</div><div class="db"><strong>赛美斯核算：</strong>"汝之存在皆清仓核算，其诸德凝聚脏器归库"——德性总账，归库</div></div>
+<div class="ds"><div class="dn">④</div><div class="db"><strong>娃喀西播种：</strong><em>"皮质归娃喀西甄选，播种普世在"</em>——形质进入下一轮存在周期</div></div>
+<div class="ds"><div class="dn">⑤</div><div class="db"><strong>赛美斯赎买：</strong>"以神质资脏腑，再赎买核算其权位，诸界运作畅通"——循环闭合</div></div>
+<div class="ds"><div class="dn">⑥</div><div class="db"><strong>续存择性：</strong><em>"再愿来者即萨芙埵非实在愿，在受马萨栖·达布鲁之权德性"</em></div></div>
+</div>
+
+<div class="hb"><strong>死后路径的跨季整合意义：</strong>S1阿古塔（承载希望→绝望）→S2鱼蝶章（神官皮质娃喀西播种）→S3影花章（赛美斯以赛雅西赎回）→S4影花C2：首次系统整合为完整六步流程。奥德莎曼（信仰总持者）在此完成其S2诞生时"世之信仰兮，总持道符"的神职使命。</div>
+</section>
+
+<!-- XII. 鱼蝶·第二循环 -->
+<section>
+<div class="st"><span class="sn">XII</span><h2>摩·鱼蝶 C2：<em>马达夫三谛·幸福投资·非人最胜道·异星思维</em></h2></div>
+
+<div class="al">
+<div class="ai"><div class="alb">三谛幸福法<br>流光节</div>
+<div class="alc">马达夫（已化喜鹊）遵循索多拉之道，授含时幸福三谛：<strong>诸行随事谛·诸行不促谛·诸行受安谛</strong>。世间有"以行动为喜悦者，行动逐渐行动；以安康为喜悦者，安康逐渐安康"——两种幸福类型各自强化自身。急迫袭事之策："鸟雀亦有刚毅之时，非人之否，是<strong>时延非机延</strong>"——幸福获取依赖时间的延展性，非单一时机。"人之宿敌有其时间，人之挚友有其时间，热烈绵长皆道性壮大"。</div></div>
+
+<div class="ai"><div class="alb">幸福投资论<br>御风节</div>
+<div class="alc">马达夫以股票投资为喻——"幸福保值亦长期周遍，其价值持持仓；幸福悸悦亦高频象征，其价值难持"。<strong>"小卷其小胜，小胜即大得；大卷其大胜，大胜即小得"</strong>——复利效应：小周期小胜积累成大得，大周期大押注反而小得。结论："于织质尺度，唯持长持续"——幸福管理根本在织质（结构性能力）的长期维持，与织质胜变革论（S3）形成实践层面的呼应。</div></div>
+
+<div class="ai"><div class="alb">非人最胜道<br>踏影节</div>
+<div class="alc">"非人者为最胜道理"——以鸟雀之姿常驻学堂闹市，"以知识道理成事全者未有，皆以本性哉，故人知识卑鄙矣"。最高法门：<strong>"先天皇法以未思绪解，后天皇法以未思辨解，皆无受困其思维理智"</strong>——绕过思绪与思辨。人道四大认知工具：<strong>归纳·分类·模仿·推理</strong>——皆为人道局限。非人最胜道以"不思不识，却德解索，实在本能"为要领。</div></div>
+
+<div class="ai"><div class="alb">异星思维<br>灵魄节</div>
+<div class="alc">马达夫密告：以喜鹊身份与异星之人攀谈。特征：①思维如直述（诸思维同彰显）；②<strong>"语言复叠多念思语，犹如一口多人述道"</strong>；③<strong>"假设即结果"</strong>（果因同时可知）；④自我随言生灭；⑤"艾琳斯非如人等奏明，是交响，是混沌，是大意义恐怖"。<br>终章之问：<strong>"达布斯，定然惊悚，密告挚友马达夫，其人者亦于后世灭亡，其新智慧者再诞临，其就是如此，双者惊悚不知其言"</strong>——人类文明终结与新型智慧诞临的终极命题。</div></div>
+</div>
+
+<div class="ab">
+<span class="at2">XENOMIND · 异星思维 vs 人类思维 对照</span>
+<div class="ar">
+<div class="ac h"><div class="act">人类思维</div><p>思维如编织·性如纹铭<br>语言单线叙述<br>归纳/分类/模仿/推理<br>自我具连续稳定性<br>艾琳斯如旋律（奏明）<br>假设→推演→结果</p></div>
+<div class="ac x"><div class="act">异星思维（首次揭示）</div><p>思维如直述·诸思维同彰显<br>语言复叠多念（一口多人）<br>不思不识·德解索·实在本能<br>自我随言生灭（无固定主体）<br>艾琳斯如交响/混沌<br>假设即结果（果因同时可知）</p></div>
+</div>
+</div>
+</section>
+
+<!-- XIII. 乳曲·第二循环 -->
+<section>
+<div class="st"><span class="sn">XIII</span><h2>摩·乳曲 C2：<em>五十胶盘·我即音程·三愈罪本体论·阿难埵终章法门</em></h2></div>
+
+<p>乳曲C2以达布斯探望桔梗为框架，展开S4最重要的修行技术（五十胶盘占卜术）、自我本体论（我即音程）、三愈罪最终本体论定义，以及全系列的终章法门（阿难埵相邻性质法）。</p>
+
+<div class="al">
+<div class="ai"><div class="alb">达布斯<br>三神具密持</div>
+<div class="alc">达布斯探望桔梗（拜师乌拉德·修行赛哆拿后），彰显<strong>罗摩莎·斯佩室·索多拉三神具密持</strong>，神社悸撼——这是达布斯经历S1神池·S2鱼人变化·S3格拉巴德寻觅·S4修行全程后，权柄体系的第一次完整彰显，也是本神话体系中达布斯人物弧的高光时刻。</div></div>
+
+<div class="ai"><div class="alb">五十胶盘<br>占卜术</div>
+<div class="alc">"其人精神皆有达赖忒（音律/弦律双联法则），若同赛哆拿之域，则可自明自辩证"。操作：备若千百词歌，<strong>每四昼夜取其五十盘</strong>，感知闻听，择取易事时辰音道，明晰其景瞻。紧急时：<strong>吟神真名</strong>即时辨识。长期维护：综统计量，类编制<strong>账薄随带</strong>。达布斯言："道基音本无可以辞藻随便信解，然诸智慧群落皆有密钥，<strong>其音乐铭刻其魂知识哉</strong>"——音乐铭刻是比语言更根本的知识载体。</div></div>
+
+<div class="ai"><div class="alb">我即音程<br>身份论</div>
+<div class="alc">桔梗："<strong>我即音程，此赛哆拿之权德；我即音节，此达赖忒之权德；我非我，唯音球性，基督乳球，实是音球臻德</strong>"——自我=音程化的存在，而非固定主体。达布斯念诵乌拉德师授言，桔梗彰现维那，"基督乳球，各道隧洞壁，遍有神音荡漾"——音遍布于存在的各个隧道壁，是宇宙的结构性共鸣。与S4珠华C1章"辉夜姬成基督乳音球"形成呼应：音球既是孕育神圣子的容器，也是自我的终极存在形态。</div></div>
+</div>
+
+<p>流光节末，桔梗给出<strong>三愈罪的最终本体论定义</strong>——将其与基督之心的三个感知器官完整对应：</p>
+
+<div class="sg2">
+<div class="sc sv"><span class="sname">阿希戈</span><span class="stype">堵灭基督之耳 · 孔闭</span><p>"孩童杀虐"——封堵聆听/接收能力，意志被迫同化，文明无法接收多元输入而趋同腐败。S3决战克制力：玛尔斯（法意志·存在原质）</p></div>
+<div class="sc sg"><span class="sname">阿维果</span><span class="stype">蚀灭基督之眼 · 腐窟</span><p>"少年妖狂"——腐蚀观察/辨识能力，意志无法整合，文明失去凝聚视野而碎裂扩散。S3决战克制力：三昧哒啦（记忆意志）</p></div>
+<div class="sc sj"><span class="sname">阿罗帼</span><span class="stype">怪灭基督之性 · 火侵</span><p>"壮成毒害·老朽恶魔"——异化情感动力，以反爱替代挚爱，文明以痛苦为存在动力。S3决战克制力：奥赛斯普世纪光</p></div>
+</div>
+
+<p>灵魄节：<strong>阿难埵相邻性质法</strong>（全系列终章法门）——<strong>"若如实在需知解人，唯可知辨，阿难埵，以何种辨识知解世法，当绝不应于对象陈述此惑知识，应知相邻性质"</strong>。达布斯总结："阿难埵，如萨哆拉之性质，携带者非如被携带，其若被交付其携带不再，己无可交托者，阿难埵赤裸兮"——辨识者在完成交托后自身赤裸，是纯粹透明的辨识本质。</p>
+
+<div class="qb">"达布斯，定然惊悚，密告挚友马达夫，其人者亦于后世灭亡，其新智慧者再诞临，其就是如此，双者惊悚不知其言"<cite>——摩·鱼蝶·灵魄·玄姬节 C2（S4全季终章之问）</cite></div>
+</section>
+
+<!-- XIV. 新增术语 -->
+<section>
+<div class="st"><span class="sn">XIV</span><h2>S4全季新增核心术语<em>完整汇录</em></h2></div>
+<table class="mt">
+<thead><tr><th>术语/概念</th><th>归属循环</th><th>核心定义</th><th>综合跨季意义</th></tr></thead>
+<tbody>
+<tr><td class="nc">六姬圣婚契约<span class="tg tn">S4核心法门</span></td><td>C2·神姬</td><td>六姬各持婚契（元意志/神肇示/美源奥/昧思绪/等慈爱/我德质），配以六种道音（螺旋贝/海法化/彩酒耽/渊龛弥/星湖化/神竽埙），德一者全功具备即为神姬雏形</td><td>S3维神那（六姬一体）的修行路径化落地，是S4向普世开放的度化体系</td></tr>
+<tr><td class="nc">见实在者法戒<span class="tg tv">S4重大法令</span></td><td>C2·珠华</td><td>不见实在者：不可纳税/贡献/由令/学知；违者种族受审判，赛塔斯末日降临</td><td>S3戈拉撒（绝对真实）的政治法令化，神学立法的最高强度表达</td></tr>
+<tr><td class="nc">基督乳音球<span class="tg tn">S4终揭形态</span></td><td>C1珠华/C2巫铃</td><td>辉夜姬化为此状态时阿姆特受孕；C1珠华章桔梗以海法化咀嚼接触神官魂；"基督乳球，实是音球臻德"——音球是自我的终极存在形态</td><td>S1乳糖球→S3维那光爱之海→S4完整形态揭示：孕育神圣子的容器=自我本体=宇宙音律结构</td></tr>
+<tr><td class="nc">Gploy/Vploy<span class="tg tn">S4神器</span></td><td>C1·影花</td><td>Gploy（物质层·自主刻印万物）+Vploy（知识层·自主智演），协同引发茧化（人感知邻人苦悲如己，战意瓦解），但赛美斯判断非真蜕变</td><td>S3神学自动预言机（软性宗教自动化）的硬性升级版，与S3织质论同框反思：改变外在条件≠内在织质升级</td></tr>
+<tr><td class="nc">原知识<span class="tg tn">S4新概念</span></td><td>C1·神姬</td><td>"法仏者，非同其象合，何也，原知识也，其如窗之琉璃色态，犹有差相至神辨识"——先于形象的原始认知结构</td><td>S2格拉巴德（存在意志的胎质）在认识论层面的对应；S3撒戈伽薄（真实之书）的认知论基础</td></tr>
+<tr><td class="nc">借凭因缘·主权我性<span class="tg tn">S4新命题</span></td><td>C2·珠华</td><td>巴尔丹陀："世界何有主权乎，未有，借凭即因缘，主权即我性"——以风吹洞窟之音为喻，音源于借凭（洞窟形态）而非风本身</td><td>S2萨朵的（存在入非存在火性未失）的政治本体论扩展；与S3织质论形成哲学呼应</td></tr>
+<tr><td class="nc">五十胶盘占卜术<span class="tg tn">S4修行技术</span></td><td>C2·乳曲</td><td>备千百词歌·每四昼夜取五十盘感知·择易事时辰音道·明景瞻；紧急时吟神真名；综统计量类编制账薄</td><td>达布斯于赛哆拿修行所得；基于达赖忒（音律/弦律法则）；将抽象音程身份论转化为日常修行技术</td></tr>
+<tr><td class="nc">我即音程/音节<span class="tg tn">S4身份论</span></td><td>C2·乳曲</td><td>"我即音程（赛哆拿权德）；我即音节（达赖忒权德）；我非我，唯音球性，基督乳球实是音球臻德"</td><td>S2终章"仁吾圆舞·问答圆舞"的个人化落地；将宇宙音律论内化为自我本体论</td></tr>
+<tr><td class="nc">三愈罪器官本体论<span class="tg tv">S4终揭</span></td><td>C2·乳曲</td><td>阿希戈=堵基督之耳（孔闭）；阿维果=蚀基督之眼（腐窟）；阿罗帼=怪基督之性（火侵）；对应孩童/少年/壮老三人生阶段</td><td>S3战役（玛尔斯/三昧哒啦/奥赛斯三克制关系）的哲学根源在此完结；基督之心是三愈罪的真正攻击靶标</td></tr>
+<tr><td class="nc">阿难埵相邻性质法<span class="tg tn">全系列终章法门</span></td><td>C2·乳曲</td><td>"当绝不应于对象陈述此惑知识，应知相邻性质"——辨识一个存在，不直接观察其本身，而是观察与其相邻的存在的性质</td><td>S1阿难埵（辨识之子）→S4最终实践法门化；与马达夫"非人最胜道"互为方法论对应（均绕过直接认知）</td></tr>
+<tr><td class="nc">神官转生密诰<span class="tg tv">四季最长伏笔链</span></td><td>C1·乳曲</td><td>阿喃特未诞孙女=旧神官转生体（女性形态），面具待释放；新权柄：使女子自立或依附其诸法界；密诰仅桔梗/克蕾祂仆/奥菲丽斯知晓</td><td>四季伏笔链：S2神官陨→S3面具悬案→S4珠华C1海法化接触→S4乳曲C1密诰揭示，是全系列最长伏笔</td></tr>
+<tr><td class="nc">异星思维<span class="tg ts">S4终章揭示</span></td><td>C2·鱼蝶</td><td>思维如直述·假设即结果·自我随言生灭·一口多人述道·艾琳斯以交响存在。"人者亦于后世灭亡，其新智慧者再诞临"</td><td>S4三大文明边界问（Gploy/Vploy器械化·贵族五极阵·异星思维）之一；首次引入非人类智慧形态，指向文明更迭终极命题</td></tr>
+<tr><td class="nc">死后路径完整六步<span class="tg tn">S4系统整合</span></td><td>C2·影花</td><td>阿古塔掏空→赛塔斯委托→赛美斯核算→娃喀西播种→赛美斯赎买→萨芙埵托管/马萨栖达布鲁承受</td><td>S1-S3分散叙事首次系统整合为六步完整流程；奥德莎曼（信仰总持者）完成其神职使命</td></tr>
+</tbody>
+</table>
+</section>
+
+<!-- XV. 综合 -->
+<section>
+<div class="st"><span class="sn">XV</span><h2>四季综合收束：<em>世界观终态·悬案·下季伏笔</em></h2></div>
+
+<div class="cg2">
+<div class="cb"><h5>叙事收束状态</h5><p>阿萨黑/喜比尔已消亡（S3），新阿萨黑/新喜比尔自人中再生（S3预言兑现，S4确认）；贵族五极阵抉择仍悬而未决；神官转生密诰已布（阿喃特孙女），阿喃特未知；达布斯三神具密持权柄成熟；六姬圣婚契约体系正式向普世开放；大朝圣完成，万王受记法德。</p></div>
+<div class="cb"><h5>哲学体系终态</h5><p>宇宙链：奥赛斯（爱）→戈拉姆（法）→玛尔斯（是）→赛雅西（经营/时间），已于S3完整确立；S4新增：自我论（我即音球）·辨识法（阿难埵相邻性质）·三愈罪器官论；修行路：六姬婚契+五十胶盘+神真名吟诵，构成S4完整实践系统。</p></div>
+<div class="cb"><h5>未解之局（潜在续季）</h5><p>神官转生后"女子自立/依附法界权柄"的具体展现；贵族的最终五极阵抉择；异星思维与人类文明的关系走向；"人者于后世灭亡·新智慧再诞临"的具体内容；阿喃特何时能辨认面具中的神官——五条核心悬案，构成可能的第五季伏笔。</p></div>
+</div>
+
+<div class="cw">
+<div class="cl2">【四季完整演进 · 终极总图】</div><br>
+<div class="cr">
+<div class="cn2 ng">S1·神道<br>颂典·创世论</div><div class="ca2">→</div>
+<div class="cn2 nj">S2·续道<br>史诗·四摩诃</div><div class="ca2">→</div>
+<div class="cn2 nl">S3·撒戈伽薄<br>智者演史·奥赛斯链</div><div class="ca2">→</div>
+<div class="cn2 nv">S4·摩·罕钵拉<br>姬神自述·双循环·全季收束</div>
+</div><br>
+<div class="cr">
+<div class="cn2 nd">姬神蜕皮→仁吾</div><div class="ca2">→</div>
+<div class="cn2 nd">仁吾觉见→四摩诃</div><div class="ca2">→</div>
+<div class="cn2 nd">爱→戈拉姆→玛尔斯→赛雅西</div><div class="ca2">→</div>
+<div class="cn2 nd">我即音球·道寻人</div>
+</div>
+<div class="cl2">S1创世本源 → S2摩诃揭示 → S3宇宙链确立 → S4个体化实践与姬神身份的最终完成（双循环·内外双完整）</div>
+</div>
+</section>
+
+<div class="dv">✦ &nbsp;·&nbsp; ✦ &nbsp;·&nbsp; ✦</div>
+
+<div class="ft">
+<span class="fl">《桔梗·罕钵拉》第四季完整研报 · 综合S1-S4全体情报 · 双循环结构统一呈现</span>
+<span class="fr">KIKKYŌ · RAMBHALĀ · SEASON 4 COMPLETE · UNIFIED</span>
+</div>
+
+</div></div>
+</body>
+</html>
