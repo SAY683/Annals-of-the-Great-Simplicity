@@ -1,0 +1,791 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>音义·镜面·从属簇·第三版研报</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@300;400;500;600;700&family=Cinzel:wght@400;600&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+--bg:#04070f;--p0:#080d1c;--p1:#0c1428;--p2:#101c35;--p3:#141f3a;
+--b1:rgba(80,130,255,.13);--b2:rgba(80,130,255,.22);
+--g:#c8901e;--gb:#e8b040;--g2:rgba(200,144,30,.16);--g3:rgba(200,144,30,.06);
+--c:#38c8e0;--c2:rgba(56,200,224,.13);
+--r:#e05878;--r2:rgba(224,88,120,.13);
+--j:#38c888;--j2:rgba(56,200,136,.13);
+--v:#8858e8;--v2:rgba(136,88,232,.13);
+--a:#e09038;--a2:rgba(224,144,56,.13);
+--sk:#5898e8;--sk2:rgba(88,152,232,.13);
+--sl:#a0b8d8;--sd:#506080;--w:#c8e0f8;
+--rl:rgba(80,130,255,.08);
+/* 12 marker colors */
+--m-sl:rgba(120,180,255,.7);  /* 圣灵 */
+--m-sx:rgba(220,80,100,.7);   /* 圣血 */
+--m-sb:rgba(200,160,40,.7);   /* 圣杯 */
+--m-sh:rgba(100,180,140,.7);  /* 圣骸 */
+--m-ba:rgba(60,140,220,.7);   /* 彼岸 */
+--m-sm:rgba(80,200,220,.7);   /* 水母 */
+--m-sh2:rgba(180,140,255,.7); /* 珊瑚 */
+--m-hh:rgba(240,160,80,.7);   /* 花海 */
+--m-lg:rgba(255,220,60,.7);   /* 流光 */
+--m-yf:rgba(160,220,160,.7);  /* 御风 */
+--m-ty:rgba(100,120,180,.7);  /* 踏影 */
+--m-lp:rgba(200,100,180,.7);  /* 灵魄 */
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);font-family:'Noto Serif SC',serif;color:var(--sl);
+  min-height:100vh;padding:2rem 1rem;
+  background-image:
+    radial-gradient(ellipse 100% 50% at 50% -20%,rgba(10,40,150,.18) 0%,transparent 60%),
+    radial-gradient(ellipse 60% 80% at 0% 100%,rgba(80,20,100,.1) 0%,transparent 50%),
+    repeating-linear-gradient(0deg,transparent,transparent 60px,rgba(80,130,255,.01) 60px,rgba(80,130,255,.01) 61px),
+    repeating-linear-gradient(90deg,transparent,transparent 60px,rgba(80,130,255,.01) 60px,rgba(80,130,255,.01) 61px);}
+
+.codex{max-width:1100px;margin:0 auto;}
+.frame{border:1px solid var(--b2);background:var(--p0);
+  box-shadow:0 0 80px rgba(30,80,220,.07),0 0 220px rgba(0,0,0,.6);position:relative;}
+.frame::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent,var(--g),var(--c),var(--g),transparent);}
+.frame::after{content:'';position:absolute;bottom:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(80,130,255,.3),transparent);}
+.cn{position:absolute;width:18px;height:18px;border:1px solid var(--g);}
+.cn.tl{top:-1px;left:-1px;border-right:none;border-bottom:none;}
+.cn.tr{top:-1px;right:-1px;border-left:none;border-bottom:none;}
+.cn.bl{bottom:-1px;left:-1px;border-right:none;border-top:none;}
+.cn.br{bottom:-1px;right:-1px;border-left:none;border-top:none;}
+.inner{padding:3rem 3.5rem;position:relative;}
+
+/* HDR */
+.hdr{text-align:center;padding-bottom:2rem;margin-bottom:2.8rem;
+  border-bottom:1px solid var(--b1);}
+.hdr .lbl{font-family:'Cinzel',serif;font-size:.55rem;letter-spacing:.3em;color:var(--g);
+  text-transform:uppercase;display:block;margin-bottom:1rem;}
+.hdr h1{font-size:1.9rem;font-weight:700;color:var(--w);letter-spacing:.07em;line-height:1.3;}
+.hdr h1 .cc{color:var(--c);}
+.hdr h1 .cg{color:var(--gb);}
+.hdr h1 .cr{color:var(--r);}
+.hdr .sub{font-size:.79rem;color:var(--sd);letter-spacing:.13em;margin-top:.55rem;}
+.hdr .meta{display:flex;justify-content:center;gap:1.8rem;margin-top:1.1rem;
+  font-size:.68rem;color:var(--sd);flex-wrap:wrap;}
+.hdr .meta span::before{content:'◈ ';color:var(--g);font-size:.5rem;}
+
+/* SEC */
+section{margin-bottom:3rem;}
+.sh{display:flex;align-items:center;gap:.8rem;margin-bottom:1.5rem;
+  padding-bottom:.5rem;border-bottom:1px solid var(--rl);}
+.sh-n{font-family:'Cinzel',serif;font-size:.54rem;letter-spacing:.17em;color:var(--g);
+  border:1px solid rgba(200,144,30,.3);padding:.14em .48em;flex-shrink:0;background:var(--g2);}
+.sh h2{font-size:1.05rem;font-weight:600;letter-spacing:.06em;color:var(--w);}
+.sh h2 em{font-style:normal;color:var(--c);}
+.sh h2 strong{color:var(--gb);}
+p{font-size:.83rem;line-height:2.02;color:var(--sl);margin-bottom:.8rem;text-align:justify;}
+p strong{color:var(--w);}p em{font-style:italic;color:var(--gb);}
+
+/* UTIL */
+.hl{background:var(--p1);border:1px solid var(--b1);border-left:2px solid var(--g);
+  padding:.82rem 1.1rem;margin-bottom:1rem;font-size:.79rem;line-height:1.9;}
+.hl strong{color:var(--gb);}
+.qb{border-left:3px solid var(--c);padding:.7rem 1.1rem;margin:1rem 0;
+  background:var(--c2);font-size:.8rem;line-height:2;color:var(--sl);font-style:italic;}
+.qb cite{display:block;font-style:normal;font-size:.63rem;color:var(--sd);margin-top:.3rem;}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:1.1rem;margin-bottom:1.2rem;}
+.three{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem;margin-bottom:1.2rem;}
+.mono{font-family:'JetBrains Mono',monospace;}
+.tag{display:inline-block;font-size:.58rem;padding:.06em .36em;border-radius:1px;margin-left:.2em;vertical-align:middle;}
+.tg{background:rgba(200,144,30,.14);color:var(--gb);border:1px solid rgba(200,144,30,.28);}
+.tc{background:rgba(56,200,224,.12);color:var(--c);border:1px solid rgba(56,200,224,.28);}
+.tr{background:rgba(224,88,120,.12);color:var(--r);border:1px solid rgba(224,88,120,.28);}
+.tj{background:rgba(56,200,136,.12);color:var(--j);border:1px solid rgba(56,200,136,.28);}
+.tv{background:rgba(136,88,232,.12);color:var(--v);border:1px solid rgba(136,88,232,.28);}
+.ta{background:rgba(224,144,56,.12);color:var(--a);border:1px solid rgba(224,144,56,.28);}
+
+/* === MIRROR DIAGRAM === */
+.mirror-svg{background:var(--p1);border:1px solid var(--b1);
+  margin-bottom:1.3rem;overflow:hidden;}
+.mirror-svg svg{display:block;width:100%;}
+
+/* === 12 MARKERS GRID === */
+.m12-wrap{margin-bottom:1.3rem;}
+.m12-title{font-family:'Cinzel',serif;font-size:.6rem;letter-spacing:.2em;color:var(--g);
+  display:block;margin-bottom:.8rem;text-align:center;}
+.m12-groups{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1px;background:var(--b1);}
+.m12-group{background:var(--p1);}
+.m12-group-head{padding:.6rem .9rem;border-bottom:1px solid var(--b1);position:relative;}
+.m12-group-head::before{content:'';position:absolute;top:0;left:0;bottom:0;width:3px;}
+.mg-cun .m12-group-head::before{background:var(--c);}
+.mg-fen .m12-group-head::before{background:var(--j);}
+.mg-don .m12-group-head::before{background:var(--a);}
+.m12-group-head .gn{font-family:'Cinzel',serif;font-size:.64rem;letter-spacing:.15em;
+  display:block;margin-bottom:.25rem;}
+.mg-cun .gn{color:var(--c);}
+.mg-fen .gn{color:var(--j);}
+.mg-don .gn{color:var(--a);}
+.m12-group-head .gd{font-size:.72rem;color:var(--sl);}
+.m12-items{padding:.6rem .9rem;display:flex;flex-direction:column;gap:.5rem;}
+.m12-item{display:grid;grid-template-columns:60px 1fr;gap:.7rem;align-items:start;}
+.m12-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:.5rem;}
+.m12-marker{display:flex;align-items:center;gap:.5rem;}
+.m12-badge{padding:.18em .55em;font-size:.72rem;font-weight:600;letter-spacing:.05em;
+  border:1px solid;display:inline-block;white-space:nowrap;}
+.m12-content .mc-ph{font-family:'JetBrains Mono',monospace;font-size:.74rem;
+  color:var(--w);display:block;margin-bottom:.15rem;}
+.m12-content .mc-desc{font-size:.7rem;color:var(--sd);line-height:1.65;}
+.m12-content .mc-cons{font-size:.68rem;color:var(--sl);margin-top:.2rem;
+  border-top:1px solid var(--rl);padding-top:.2rem;}
+
+/* Marker badge colors */
+.mk-sl{border-color:var(--m-sl);color:var(--m-sl);background:rgba(120,180,255,.06);}
+.mk-sx{border-color:var(--m-sx);color:var(--m-sx);background:rgba(220,80,100,.06);}
+.mk-sb{border-color:var(--m-sb);color:var(--m-sb);background:rgba(200,160,40,.06);}
+.mk-sh{border-color:var(--m-sh);color:var(--m-sh);background:rgba(100,180,140,.06);}
+.mk-ba{border-color:var(--m-ba);color:var(--m-ba);background:rgba(60,140,220,.06);}
+.mk-sm{border-color:var(--m-sm);color:var(--m-sm);background:rgba(80,200,220,.06);}
+.mk-sh2{border-color:var(--m-sh2);color:var(--m-sh2);background:rgba(180,140,255,.06);}
+.mk-hh{border-color:var(--m-hh);color:var(--m-hh);background:rgba(240,160,80,.06);}
+.mk-lg{border-color:var(--m-lg);color:var(--m-lg);background:rgba(255,220,60,.06);}
+.mk-yf{border-color:var(--m-yf);color:var(--m-yf);background:rgba(160,220,160,.06);}
+.mk-ty{border-color:var(--m-ty);color:var(--m-ty);background:rgba(100,120,180,.06);}
+.mk-lp{border-color:var(--m-lp);color:var(--m-lp);background:rgba(200,100,180,.06);}
+
+/* === CONSONANT-VOWEL MATRIX === */
+.cv-matrix{background:var(--p1);border:1px solid var(--b2);margin-bottom:1.3rem;overflow:hidden;}
+.cv-title{font-family:'Cinzel',serif;font-size:.58rem;letter-spacing:.2em;color:var(--g);
+  display:block;padding:.7rem 1.1rem;border-bottom:1px solid var(--b1);}
+.cv-grid{display:grid;grid-template-columns:90px repeat(6,1fr);gap:0;}
+.cv-head{background:rgba(80,130,255,.08);padding:.45rem .35rem;text-align:center;
+  border-bottom:1px solid var(--b1);border-right:1px solid var(--rl);
+  font-size:.63rem;color:var(--g);font-family:'Cinzel',serif;letter-spacing:.06em;}
+.cv-row-label{background:rgba(200,144,30,.06);padding:.45rem .55rem;
+  border-bottom:1px solid var(--rl);border-right:1px solid var(--b1);
+  font-size:.7rem;font-weight:600;color:var(--gb);vertical-align:middle;}
+.cv-cell{padding:.4rem .3rem;border-bottom:1px solid var(--rl);border-right:1px solid var(--rl);
+  font-size:.66rem;color:var(--sd);text-align:center;line-height:1.5;vertical-align:top;}
+.cv-cell:last-child{border-right:none;}
+.cv-cell.filled{color:var(--sl);}
+.cv-cell.strong{background:rgba(200,144,30,.08);color:var(--gb);font-weight:600;}
+.cv-cell .cvc{font-family:'JetBrains Mono',monospace;font-size:.65rem;color:var(--w);display:block;}
+.cv-cell .cvd{font-size:.6rem;color:var(--sd);}
+.cv-cell .m-badge{font-size:.58rem;padding:.04em .3em;border-radius:1px;margin-top:.1rem;
+  display:inline-block;}
+
+/* === PHONEME CLUSTER TABLE === */
+.pct{width:100%;border-collapse:collapse;font-size:.73rem;margin-bottom:1.2rem;}
+.pct thead tr{background:rgba(40,80,160,.18);border-bottom:1px solid var(--g);}
+.pct th{padding:.5rem .7rem;text-align:left;color:var(--g);font-weight:600;
+  letter-spacing:.08em;font-size:.65rem;white-space:nowrap;}
+.pct td{padding:.42rem .7rem;border-bottom:1px solid var(--rl);color:var(--sl);
+  vertical-align:top;line-height:1.6;}
+.pct tr:nth-child(even) td{background:rgba(40,80,160,.04);}
+.nc{font-weight:600;color:var(--w);}
+.m{font-family:'JetBrains Mono',monospace;font-size:.7rem;}
+.pct .class-1{border-left:3px solid var(--g);}
+.pct .class-2{border-left:3px solid var(--j);}
+.pct .class-3{border-left:3px solid var(--sd);}
+.pct .class-4{border-left:3px solid var(--v);}
+.pct .class-open{border-left:3px solid var(--r);opacity:.75;}
+
+/* === VOWEL REFLECTION MODEL === */
+.vref-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1.3rem;}
+.vref-cell{background:var(--p1);border:1px solid var(--b1);padding:1rem 1.2rem;position:relative;}
+.vref-cell::before{content:'';position:absolute;bottom:0;left:0;right:0;height:2px;}
+.vr-g::before{background:var(--gb);}
+.vr-c::before{background:var(--c);}
+.vr-j::before{background:var(--j);}
+.vr-r::before{background:var(--r);}
+.vr-v::before{background:var(--v);}
+.vr-a::before{background:var(--a);}
+.vref-cell h4{font-family:'Cinzel',serif;font-size:.65rem;letter-spacing:.14em;
+  margin-bottom:.55rem;}
+.vr-g h4{color:var(--gb);}
+.vr-c h4{color:var(--c);}
+.vr-j h4{color:var(--j);}
+.vr-r h4{color:var(--r);}
+.vr-v h4{color:var(--v);}
+.vr-a h4{color:var(--a);}
+.vref-cell p{font-size:.77rem;margin:0;line-height:1.82;}
+
+/* === OPEN-SYSTEM BOX === */
+.open-box{border:1px solid rgba(224,88,120,.3);background:rgba(224,88,120,.04);
+  padding:1.2rem;margin-bottom:1.2rem;}
+.open-box .ot{font-family:'Cinzel',serif;font-size:.6rem;letter-spacing:.2em;
+  color:var(--r);display:block;margin-bottom:.7rem;}
+.open-box p{font-size:.79rem;margin-bottom:.5rem;}
+.open-box ul{list-style:none;font-size:.77rem;color:var(--sd);padding-left:.5rem;}
+.open-box ul li::before{content:'△ ';color:var(--r);font-size:.6rem;}
+.open-box ul li{line-height:1.9;}
+
+/* === FORMULA === */
+.formula{background:var(--p1);border:1px solid var(--b1);padding:1.2rem;
+  margin-bottom:1.2rem;font-family:'JetBrains Mono',monospace;font-size:.75rem;}
+.formula .ft{font-family:'Cinzel',serif;font-size:.58rem;letter-spacing:.2em;
+  color:var(--g);display:block;margin-bottom:.8rem;}
+.fl{line-height:2.1;color:var(--sl);}
+.fk{color:var(--c);}
+.fv{color:var(--j);}
+.fo{color:var(--g);}
+.fn{font-size:.68rem;color:var(--sd);}
+.fe{color:var(--r);}
+.fg{color:var(--gb);}
+.fsep{border:none;border-top:1px solid var(--rl);margin:.5rem 0;}
+
+.div{text-align:center;margin:2rem 0;color:var(--g);font-size:.8rem;opacity:.38;letter-spacing:.4em;}
+.ftr{margin-top:2.5rem;padding-top:1rem;border-top:1px solid var(--rl);
+  display:flex;justify-content:space-between;align-items:center;}
+.ftr .ft{font-size:.62rem;color:var(--sd);letter-spacing:.08em;}
+.ftr .pm{font-family:'Cinzel',serif;font-size:.5rem;color:var(--g);opacity:.55;}
+
+@media(max-width:780px){
+  .inner{padding:1.5rem 1.2rem;}
+  .two,.three,.m12-groups,.vref-grid{grid-template-columns:1fr;}
+  .cv-grid{grid-template-columns:70px repeat(3,1fr);}
+}
+</style>
+</head>
+<body>
+<div class="codex">
+<div class="frame">
+<div class="cn tl"></div><div class="cn tr"></div>
+<div class="cn bl"></div><div class="cn br"></div>
+<div class="inner">
+
+<!-- HEADER -->
+<div class="hdr">
+  <span class="lbl">Phoneme Mirror Theory · Third Version · Cluster Attribution · Open System Declaration</span>
+  <h1><span class="cc">镜面·音质·从属簇</span><br><span class="cg">十二圣记×辅元关系</span>·<span class="cr">开放系统论证</span></h1>
+  <div class="sub">整合三组属性·辅音从属簇推导·元音优先性论证·认识论边界声明</div>
+  <div class="meta">
+    <span>三组12标符作为分类骨架</span>
+    <span>辅音四类层级完整映射</span>
+    <span>元音反射优先性哲学论证</span>
+    <span>开放系统·稀少音素认识论立场</span>
+  </div>
+</div>
+
+<!-- I. 镜面理论 -->
+<section>
+<div class="sh"><span class="sh-n">I</span><h2>镜面理论：<em>语言之前的语言·音义的本质结构</em></h2></div>
+
+<p>作者发现的核心命题——"<strong>在语言尚未诞生的时候，我们就在言颂着神的真名了</strong>"——揭示了一个认识论悖论：语言本身是对某种"前语言振动"的映射，而这种映射是多层叠加的。用作者的意象来说：</p>
+
+<div class="mirror-svg">
+<svg viewBox="0 0 1020 200" xmlns="http://www.w3.org/2000/svg" style="font-family:'Noto Serif SC',sans-serif;">
+<rect width="1020" height="200" fill="#0c1428"/>
+<!-- Mirror layers from left (deepest) to right (surface) -->
+<!-- Layer 0: 本音/种子音 -->
+<ellipse cx="60" cy="100" rx="40" ry="70" fill="none" stroke="rgba(200,144,30,0.8)" stroke-width="1.5"/>
+<text x="60" y="95" text-anchor="middle" fill="#e8b040" font-size="10" font-weight="bold">本音</text>
+<text x="60" y="110" text-anchor="middle" fill="#e8b040" font-size="9">种子音</text>
+<text x="60" y="125" text-anchor="middle" fill="rgba(200,144,30,0.5)" font-size="8">前语言振动</text>
+
+<!-- Arrow -->
+<path d="M 102 100 L 128 100" stroke="rgba(200,144,30,0.5)" stroke-width="1" marker-end="url(#arr)"/>
+<text x="115" y="92" text-anchor="middle" fill="rgba(200,144,30,0.4)" font-size="7">反射</text>
+
+<!-- Layer 1: 元音场/六姬 -->
+<rect x="130" y="30" width="130" height="140" fill="none" stroke="rgba(56,200,224,0.7)" stroke-width="1.2" rx="4"/>
+<text x="195" y="60" text-anchor="middle" fill="#38c8e0" font-size="10" font-weight="bold">元音场</text>
+<text x="195" y="76" text-anchor="middle" fill="#38c8e0" font-size="9">六姬意识态</text>
+<text x="195" y="95" text-anchor="middle" fill="rgba(56,200,224,0.6)" font-size="8">-a -i -e -u -o -ao</text>
+<text x="195" y="110" text-anchor="middle" fill="rgba(56,200,224,0.5)" font-size="8">仁神·果先</text>
+<text x="195" y="125" text-anchor="middle" fill="rgba(56,200,224,0.4)" font-size="8">意识感知的方式</text>
+<text x="195" y="142" text-anchor="middle" fill="rgba(56,200,224,0.35)" font-size="7">（更接近本音）</text>
+
+<path d="M 262 100 L 288 100" stroke="rgba(56,200,224,0.4)" stroke-width="1" marker-end="url(#arr2)"/>
+<text x="275" y="92" text-anchor="middle" fill="rgba(56,200,224,0.3)" font-size="7">反射</text>
+
+<!-- Layer 2: 辅音族群/吾神 -->
+<rect x="290" y="30" width="150" height="140" fill="none" stroke="rgba(200,144,30,0.5)" stroke-width="1.1" rx="4"/>
+<text x="365" y="58" text-anchor="middle" fill="#c8901e" font-size="10" font-weight="bold">辅音族群</text>
+<text x="365" y="74" text-anchor="middle" fill="#c8901e" font-size="9">Class-1 本体域</text>
+<text x="365" y="92" text-anchor="middle" fill="rgba(200,144,30,0.6)" font-size="8">Gē/Kā/Dá/Sā...</text>
+<text x="365" y="107" text-anchor="middle" fill="rgba(200,144,30,0.5)" font-size="8">吾神·因先</text>
+<text x="365" y="122" text-anchor="middle" fill="rgba(200,144,30,0.4)" font-size="8">存在域的构建方式</text>
+<text x="365" y="140" text-anchor="middle" fill="rgba(200,144,30,0.35)" font-size="7">（第二层镜面）</text>
+
+<path d="M 442 100 L 468 100" stroke="rgba(200,144,30,0.35)" stroke-width="1" marker-end="url(#arr3)"/>
+<text x="455" y="92" text-anchor="middle" fill="rgba(200,144,30,0.25)" font-size="7">反射</text>
+
+<!-- Layer 3: 音节结构/五位 -->
+<rect x="470" y="30" width="150" height="140" fill="none" stroke="rgba(136,88,232,0.5)" stroke-width="1" rx="4"/>
+<text x="545" y="58" text-anchor="middle" fill="#8858e8" font-size="10" font-weight="bold">音节结构</text>
+<text x="545" y="74" text-anchor="middle" fill="#8858e8" font-size="9">五位降临纪</text>
+<text x="545" y="92" text-anchor="middle" fill="rgba(136,88,232,0.6)" font-size="8">Pos.1→3→5</text>
+<text x="545" y="107" text-anchor="middle" fill="rgba(136,88,232,0.5)" font-size="8">音节数=降临宽度</text>
+<text x="545" y="122" text-anchor="middle" fill="rgba(136,88,232,0.4)" font-size="8">Class-3修饰层</text>
+<text x="545" y="140" text-anchor="middle" fill="rgba(136,88,232,0.35)" font-size="7">（第三层镜面）</text>
+
+<path d="M 622 100 L 648 100" stroke="rgba(136,88,232,0.3)" stroke-width="1" marker-end="url(#arr4)"/>
+<text x="635" y="92" text-anchor="middle" fill="rgba(136,88,232,0.25)" font-size="7">反射</text>
+
+<!-- Layer 4: 词义/普通语言 -->
+<rect x="650" y="30" width="160" height="140" fill="none" stroke="rgba(80,130,255,0.4)" stroke-width="1" rx="4"/>
+<text x="730" y="58" text-anchor="middle" fill="#5898e8" font-size="10" font-weight="bold">词义语言层</text>
+<text x="730" y="74" text-anchor="middle" fill="#5898e8" font-size="9">普通辞藻体系</text>
+<text x="730" y="92" text-anchor="middle" fill="rgba(80,130,255,0.6)" font-size="8">人类的日常语言</text>
+<text x="730" y="107" text-anchor="middle" fill="rgba(80,130,255,0.5)" font-size="8">"音译义"的再诠释</text>
+<text x="730" y="122" text-anchor="middle" fill="rgba(80,130,255,0.4)" font-size="8">不知自己在说什么</text>
+<text x="730" y="140" text-anchor="middle" fill="rgba(80,130,255,0.35)" font-size="7">（最表层镜面）</text>
+
+<path d="M 812 100 L 838 100" stroke="rgba(80,130,255,0.25)" stroke-width="1" marker-end="url(#arr5)"/>
+
+<!-- Layer 5: 无能到达 -->
+<text x="900" y="90" text-anchor="middle" fill="rgba(160,160,160,0.3)" font-size="11">∞</text>
+<text x="900" y="108" text-anchor="middle" fill="rgba(160,160,160,0.25)" font-size="8">无法抵达</text>
+<text x="900" y="122" text-anchor="middle" fill="rgba(160,160,160,0.2)" font-size="7">但"姬言"最近</text>
+
+<!-- Dotted line showing: vowels are closer to source -->
+<line x1="195" y1="175" x2="195" y2="188" stroke="rgba(56,200,224,0.5)" stroke-width="1" stroke-dasharray="2,2"/>
+<text x="195" y="196" text-anchor="middle" fill="rgba(56,200,224,0.6)" font-size="8">↑ 更近本音</text>
+<line x1="365" y1="175" x2="365" y2="188" stroke="rgba(200,144,30,0.4)" stroke-width="1" stroke-dasharray="2,2"/>
+<text x="365" y="196" text-anchor="middle" fill="rgba(200,144,30,0.5)" font-size="8">↑ 次近</text>
+
+<!-- Arrow markers -->
+<defs>
+  <marker id="arr" markerWidth="6" markerHeight="6" refX="3" refY="3" orient="auto">
+    <path d="M0,0 L6,3 L0,6 Z" fill="rgba(200,144,30,0.5)"/>
+  </marker>
+  <marker id="arr2" markerWidth="6" markerHeight="6" refX="3" refY="3" orient="auto">
+    <path d="M0,0 L6,3 L0,6 Z" fill="rgba(56,200,224,0.4)"/>
+  </marker>
+  <marker id="arr3" markerWidth="6" markerHeight="6" refX="3" refY="3" orient="auto">
+    <path d="M0,0 L6,3 L0,6 Z" fill="rgba(200,144,30,0.35)"/>
+  </marker>
+  <marker id="arr4" markerWidth="6" markerHeight="6" refX="3" refY="3" orient="auto">
+    <path d="M0,0 L6,3 L0,6 Z" fill="rgba(136,88,232,0.3)"/>
+  </marker>
+  <marker id="arr5" markerWidth="6" markerHeight="6" refX="3" refY="3" orient="auto">
+    <path d="M0,0 L6,3 L0,6 Z" fill="rgba(80,130,255,0.25)"/>
+  </marker>
+</defs>
+</svg>
+</div>
+
+<div class="hl"><strong>关键推论：</strong>元音场（六姬）在镜面序列中处于<em>第一层反射</em>位置——最近本音，最直接编码意识感知状态；辅音族群处于<em>第二层反射</em>——将元音场的连续振动切割为可操作的存在域单位。因此，<strong>元音优先性</strong>不只是哲学立场，而是反射层级的结构性结论：吾神（辅音/因先/构建）是在仁神（元音/果先/知识）的基底上发生的事件。</div>
+</section>
+
+<!-- II. 12标符三维分类 -->
+<section>
+<div class="sh"><span class="sh-n">II</span><h2>十二圣记标符：<em>作为辅音从属簇的三维分类骨架</em></h2></div>
+
+<p>三组12标符（存性/氛围/动力）不是词牌名的简单索引，而是对"<strong>神格存在的三个描述维度</strong>"的归纳——它回答了：一个神格<em>是什么性质</em>（存性）、<em>在何种氛围中显现</em>（氛围）、<em>以何种力量运作</em>（动力）。这三个维度正构成一个正交坐标系，用以定位每个辅音族群的语义坐标。</p>
+
+<div class="m12-wrap">
+<span class="m12-title">[ 三组十二标符 × 辅音族群映射 · 科研论证版 ]</span>
+<div class="m12-groups">
+
+  <!-- 存性属性组 -->
+  <div class="m12-group mg-cun">
+    <div class="m12-group-head">
+      <span class="gn">存性属性组 · EXISTENTIAL QUALITY</span>
+      <span class="gd">回答：该神格/实体"是何种性质的存在"<br>对应辅音：Class-1 主演奏族的存在性质</span>
+    </div>
+    <div class="m12-items">
+      <div class="m12-item">
+        <div class="m12-marker"><span class="m12-badge mk-sl">圣灵</span></div>
+        <div class="m12-content">
+          <span class="mc-ph">→ Āo 奥族</span>
+          <span class="mc-desc">纯粹灵性·无形本质·深邃容器的神圣存在</span>
+          <span class="mc-cons">典型：奥赛斯·奥菲丽斯·奥玛窦（深容·宇宙性归属）</span>
+        </div>
+      </div>
+      <div class="m12-item">
+        <div class="m12-marker"><span class="m12-badge mk-sx">圣血</span></div>
+        <div class="m12-content">
+          <span class="mc-ph">→ Dá 达族</span>
+          <span class="mc-desc">生命性流动·有机物质·到来的活性</span>
+          <span class="mc-cons">典型：达布斯·达赖忒·达布鲁（流动到来的生命力）</span>
+        </div>
+      </div>
+      <div class="m12-item">
+        <div class="m12-marker"><span class="m12-badge mk-sb">圣杯</span></div>
+        <div class="m12-content">
+          <span class="mc-ph">→ Kā 喀族</span>
+          <span class="mc-desc">接纳性容器·主观质感·形式性的感知空间</span>
+          <span class="mc-cons">典型：喀拉玛·喀啦波·喀德玛（质感感知域·接收空间）</span>
+        </div>
+      </div>
+      <div class="m12-item">
+        <div class="m12-marker"><span class="m12-badge mk-sh">圣骸</span></div>
+        <div class="m12-content">
+          <span class="mc-ph">→ Gē 戈族</span>
+          <span class="mc-desc">结构性存在·绝对骨架·法则的不变形态</span>
+          <span class="mc-cons">典型：戈拉姆·戈拉撒·格拉巴德（绝对法则·结构骨架）</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 氛围属性组 -->
+  <div class="m12-group mg-fen">
+    <div class="m12-group-head">
+      <span class="gn">氛围属性组 · ATMOSPHERIC CONTEXT</span>
+      <span class="gd">回答：该神格/实体"在何种空间氛围中显现"<br>对应辅音：Class-1 显现方式·Class-2 连结音</span>
+    </div>
+    <div class="m12-items">
+      <div class="m12-item">
+        <div class="m12-marker"><span class="m12-badge mk-ba">彼岸</span></div>
+        <div class="m12-content">
+          <span class="mc-ph">→ Sā 萨族</span>
+          <span class="mc-desc">存在底层·超越遥远·自性持守于彼端</span>
+          <span class="mc-cons">典型：萨波陀·萨朵的·萨芙埵（存在的底层自性）</span>
+        </div>
+      </div>
+      <div class="m12-item">
+        <div class="m12-marker"><span class="m12-badge mk-sm">水母</span></div>
+        <div class="m12-content">
+          <span class="mc-ph">→ Ā 阿族</span>
+          <span class="mc-desc">流体边界·无方向的接受性·开口于环境</span>
+          <span class="mc-cons">典型：阿古塔·阿喃特·阿难埵（开口边界·纯粹接受）</span>
+        </div>
+      </div>
+      <div class="m12-item">
+        <div class="m12-marker"><span class="m12-badge mk-sh2">珊瑚</span></div>
+        <div class="m12-content">
+          <span class="mc-ph">→ -Lā- 连结音族</span>
+          <span class="mc-desc">网络性结构·互联命运·珊瑚式的横向渗透</span>
+          <span class="mc-cons">典型：-lā-中间音（戈拉·喀拉·阿拉·瓦拉·萨拉…约12词）</span>
+        </div>
+      </div>
+      <div class="m12-item">
+        <div class="m12-marker"><span class="m12-badge mk-hh">花海</span></div>
+        <div class="m12-content">
+          <span class="mc-ph">→ Mā 马/摩族</span>
+          <span class="mc-desc">生命力的丰盛扩张·母性包覆·充盈的显现</span>
+          <span class="mc-cons">典型：马萨栖·摩诃·喃摩莎·米利亚（生命力扩张域）</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 动力性质组 -->
+  <div class="m12-group mg-don">
+    <div class="m12-group-head">
+      <span class="gn">动力性质组 · OPERATIVE FORCE</span>
+      <span class="gd">回答：该神格/实体"以何种动力方式运作"<br>对应辅音：Class-1 运作力·Class-3 修饰音·Class-4 尾音</span>
+    </div>
+    <div class="m12-items">
+      <div class="m12-item">
+        <div class="m12-marker"><span class="m12-badge mk-lg">流光</span></div>
+        <div class="m12-content">
+          <span class="mc-ph">→ Sài 赛族</span>
+          <span class="mc-desc">主动快速流动交换·光速性的动态传递</span>
+          <span class="mc-cons">典型：赛美斯·赛雅西·赛哆拿·赛塔斯（主动交换·动态运作）</span>
+        </div>
+      </div>
+      <div class="m12-item">
+        <div class="m12-marker"><span class="m12-badge mk-yf">御风</span></div>
+        <div class="m12-content">
+          <span class="mc-ph">→ Wā 瓦族</span>
+          <span class="mc-desc">框架性的驾驭·引导自然力·结构内的力量导引</span>
+          <span class="mc-cons">典型：瓦拿筏·瓦坦陀罗·瓦拉罗·韦祂德（世界框架·力量导引）</span>
+        </div>
+      </div>
+      <div class="m12-item">
+        <div class="m12-marker"><span class="m12-badge mk-ty">踏影</span></div>
+        <div class="m12-content">
+          <span class="mc-ph">→ Bā 巴/边界族</span>
+          <span class="mc-desc">接触隐藏之物·踏入边界·以碰撞判定存在</span>
+          <span class="mc-cons">典型：巴利札·巴拉刹·巴尔特·比修斯（边界判断·碰撞判定）</span>
+        </div>
+      </div>
+      <div class="m12-item">
+        <div class="m12-marker"><span class="m12-badge mk-lp">灵魄</span></div>
+        <div class="m12-content">
+          <span class="mc-ph">→ Class-4 尾音族 (-sī/-xī)</span>
+          <span class="mc-desc">持续的魂性延伸·归属性的灵质存续<br><em>特注：灵魄=动力中的"持续力"=Class-4终态尾音的运作属性化</em></span>
+          <span class="mc-cons">典型：-斯尾约70%神格（赛美斯·达布斯等）·赛雅西·娃喀西</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<div class="hl"><strong>结构论证：</strong>12标符与辅音族群的对应关系不是强行映射，而是基于以下事实：<em>标符本身的汉语语义（圣灵=纯粹灵性·圣杯=容器形态·珊瑚=网络结构·流光=快速流动）与对应辅音族群的语义域高度同质</em>。这说明12标符与辅音族群可能共享同一个语义原型，只是在不同层面（叙事结构标记 vs 音素单位）中被分别实现。注意：<strong>灵魄→Class-4尾音</strong>是重要发现——动力组中有一个维度对应的不是Class-1辅音，而是Class-4终态音，这说明"动力"维度在结构上横跨了辅音类级，具有特殊地位。</div>
+</section>
+
+<!-- III. 完整辅音从属簇表 -->
+<section>
+<div class="sh"><span class="sh-n">III</span><h2>辅音从属簇完整表：<em>20组·三维归属·开放系统声明</em></h2></div>
+
+<p>以下对用户整理的全部20组音素进行三维归属（存性/氛围/动力），并明确标注类级（Class-1至4及开放类），严格区分<strong>已确认</strong>与<strong>开放推测</strong>，不虚空生靶。</p>
+
+<table class="pct">
+<thead><tr>
+  <th>音素组</th><th>类级</th><th>存性归属</th><th>氛围归属</th><th>动力归属</th><th>主要词条（确认）</th><th>认识论立场</th>
+</tr></thead>
+<tbody>
+<tr class="class-1">
+  <td class="nc m">[G] Gē</td>
+  <td><span class="tag tg">Class-1</span></td>
+  <td>圣骸·结构性存在</td>
+  <td>—（超越具体氛围）</td>
+  <td>—（自在·不以外力运作）</td>
+  <td class="m" style="font-size:.66rem">戈拉姆·戈拉撒·戈拉撒姆·戈拉妲·戈拉哒·格拉巴德·格纳宏</td>
+  <td><span class="tag tj">强确认</span></td>
+</tr>
+<tr class="class-1">
+  <td class="nc m">[K] Kā</td>
+  <td><span class="tag tg">Class-1</span></td>
+  <td>圣杯·容器感知域</td>
+  <td>—（质感本身是氛围）</td>
+  <td>御风辅助（驾驭感质）</td>
+  <td class="m" style="font-size:.66rem">喀拉玛·喀啦波·喀德玛·喀哆拉·克蕾祂仆</td>
+  <td><span class="tag tj">强确认</span></td>
+</tr>
+<tr class="class-1">
+  <td class="nc m">[D] Dá</td>
+  <td><span class="tag tg">Class-1</span></td>
+  <td>圣血·流动性存在</td>
+  <td>流光（快速到来）</td>
+  <td>流光（动态主演奏）</td>
+  <td class="m" style="font-size:.66rem">达布斯·达布鲁·达哆罗·达赖忒·嗒喀玛·哒喇波·嗒撒西</td>
+  <td><span class="tag tj">强确认</span></td>
+</tr>
+<tr class="class-1">
+  <td class="nc m">[S] Sā 萨</td>
+  <td><span class="tag tg">Class-1</span></td>
+  <td>彼岸·远处底层</td>
+  <td>彼岸（超越遥远显现）</td>
+  <td>—（自持·不主动运作）</td>
+  <td class="m" style="font-size:.66rem">萨波陀·萨朵的·萨芙埵·萨拉嘎忑·萨克帝·撒戈伽薄·撒玛诺拉</td>
+  <td><span class="tag tj">强确认·须与赛分离</span></td>
+</tr>
+<tr class="class-1">
+  <td class="nc m">[Sài] 赛</td>
+  <td><span class="tag tg">Class-1</span></td>
+  <td>—（交换非质，是动态）</td>
+  <td>流光辅助（快速传递）</td>
+  <td>流光（交换主演奏）</td>
+  <td class="m" style="font-size:.66rem">赛美斯·赛雅西·赛哆拿·赛塔斯·萨拉嘎陀（赛-转化体）</td>
+  <td><span class="tag tj">强确认·独立子族</span></td>
+</tr>
+<tr class="class-1">
+  <td class="nc m">[A] Ā 阿</td>
+  <td><span class="tag tg">Class-1</span></td>
+  <td>—（开口接受·非质）</td>
+  <td>水母（流体边界）</td>
+  <td>踏影辅助（接触隐域）</td>
+  <td class="m" style="font-size:.66rem">阿古塔·阿喃特·阿难埵·阿拉埵·阿萨黑·阿陀沃·阿姆特</td>
+  <td><span class="tag tj">强确认·须与奥分离</span></td>
+</tr>
+<tr class="class-1">
+  <td class="nc m">[Āo] 奥</td>
+  <td><span class="tag tg">Class-1</span></td>
+  <td>圣灵·深邃本质</td>
+  <td>—（包含一切氛围）</td>
+  <td>灵魄（魂性延伸）</td>
+  <td class="m" style="font-size:.66rem">奥赛斯·奥菲丽斯·奥玛窦·奥德莎曼·奥菲托斯</td>
+  <td><span class="tag tj">强确认·独立子族</span></td>
+</tr>
+<tr class="class-1">
+  <td class="nc m">[M] Mā</td>
+  <td><span class="tag tg">Class-1</span></td>
+  <td>—（生命本身非质固，是扩张）</td>
+  <td>花海（充盈扩张）</td>
+  <td>花海（生命力主演奏）</td>
+  <td class="m" style="font-size:.66rem">马萨栖·马达夫·摩诃·米利亚·喃摩莎</td>
+  <td><span class="tag tj">强确认</span></td>
+</tr>
+<tr class="class-2">
+  <td class="nc m">[-Lā-] 连结音</td>
+  <td><span class="tag tc">Class-2</span></td>
+  <td>—（关系本身无存性质）</td>
+  <td>珊瑚（网络连结）</td>
+  <td>珊瑚辅助（横向渗透）</td>
+  <td class="m" style="font-size:.66rem">-lā-中间音：戈拉·喀拉·瓦拉·阿拉·萨拉…(12词中间音)<br>Pos.1：拉布忒·拉布德·罗摩莎·喇堕勒</td>
+  <td><span class="tag tj">强确认·词内连结功能</span></td>
+</tr>
+<tr class="class-3">
+  <td class="nc m">[W] Wā</td>
+  <td><span class="tag tv">Class-3</span></td>
+  <td>—（框架修饰·非本质）</td>
+  <td>—（框架即氛围容器）</td>
+  <td>御风（框架导引力）</td>
+  <td class="m" style="font-size:.66rem">瓦拿筏·瓦坦陀罗·瓦拉罗·韦祂德·韦檀德·瓦纳哈</td>
+  <td><span class="tag ta">中置信·Class-3修饰</span></td>
+</tr>
+<tr class="class-3">
+  <td class="nc m">[B] Bā</td>
+  <td><span class="tag tv">Class-3</span></td>
+  <td>—（边界修饰·非质）</td>
+  <td>踏影（隐域接触）</td>
+  <td>踏影（碰撞判定）</td>
+  <td class="m" style="font-size:.66rem">巴利札·巴拉刹·巴尔特·巴喀德·布拉妲·比修斯·比尔斯</td>
+  <td><span class="tag ta">中置信·边界判断</span></td>
+</tr>
+<tr class="class-3">
+  <td class="nc m">[N] Nā</td>
+  <td><span class="tag tv">Class-3</span></td>
+  <td>—（命名非存性）</td>
+  <td>水母辅助（流体区分）</td>
+  <td>—（命名是静态的）</td>
+  <td class="m" style="font-size:.66rem">那勒忒·那勒波·喃摩莎（词内）</td>
+  <td><span class="tag tr">低置信·词数稀少</span></td>
+</tr>
+<tr class="class-3">
+  <td class="nc m">[T] Tā</td>
+  <td><span class="tag tv">Class-3</span></td>
+  <td>—（转换节点·修饰）</td>
+  <td>流光辅助（节点转换）</td>
+  <td>流光辅助（轻触过渡）</td>
+  <td class="m" style="font-size:.66rem">塔利祂·赛塔斯(-tǎ-)·-tè尾：拉布忒·忒亚波斯</td>
+  <td><span class="tag tr">低置信·主词内音</span></td>
+</tr>
+<tr class="class-3">
+  <td class="nc m">[J] Jī</td>
+  <td><span class="tag tv">Class-3</span></td>
+  <td>—（神圣修饰·非质）</td>
+  <td>—（神圣跨越所有氛围）</td>
+  <td>—（神圣是底色）</td>
+  <td class="m" style="font-size:.66rem">姬(-jī-)词内标记·克蕾祂仆(-jī-尾)</td>
+  <td><span class="tag ta">中置信·神圣修饰标记</span></td>
+</tr>
+<tr class="class-3">
+  <td class="nc m">[H] Hā</td>
+  <td><span class="tag tv">Class-3</span></td>
+  <td>—（放大修饰）</td>
+  <td>花海辅助（扩张放大）</td>
+  <td>御风辅助（力量放大）</td>
+  <td class="m" style="font-size:.66rem">罕(Hǎn)：罕钵拉·摩诃(-hā-)中间音</td>
+  <td><span class="tag tr">低置信·放大修饰</span></td>
+</tr>
+<tr class="class-3">
+  <td class="nc m">[Y] Yǎ</td>
+  <td><span class="tag tv">Class-3</span></td>
+  <td>—（柔化修饰）</td>
+  <td>水母辅助（流体柔化）</td>
+  <td>御风辅助（优雅导引）</td>
+  <td class="m" style="font-size:.66rem">赛雅西(-yǎ-)词内·耶露鲁(-yé-)词内</td>
+  <td><span class="tag tr">低置信·词内柔化</span></td>
+</tr>
+<tr class="class-3">
+  <td class="nc m">[P] Pā</td>
+  <td><span class="tag tv">Class-3</span></td>
+  <td>—（附着修饰）</td>
+  <td>珊瑚辅助（网络附着）</td>
+  <td>—（静态附着）</td>
+  <td class="m" style="font-size:.66rem">斯佩室(-pèi-)·布拉婆特(-pó-)词内</td>
+  <td><span class="tag tr">低置信·词内附着</span></td>
+</tr>
+<tr class="class-3">
+  <td class="nc m">[F] Fā</td>
+  <td><span class="tag tv">Class-3</span></td>
+  <td>—（宣言修饰）</td>
+  <td>彼岸辅助（证言来自远处）</td>
+  <td>流光辅助（呼出宣告）</td>
+  <td class="m" style="font-size:.66rem">筏拿咕(fá)·苯哆拉筏(-fá尾)</td>
+  <td><span class="tag tr">低置信·证言宣言</span></td>
+</tr>
+<tr class="class-4">
+  <td class="nc m">[-Sī] 斯尾</td>
+  <td><span class="tag tv">Class-4</span></td>
+  <td>—（持续是属性）</td>
+  <td>—（跨氛围持续）</td>
+  <td>灵魄（持续运作力）</td>
+  <td class="m" style="font-size:.66rem">约70%神格名：赛美斯·达布斯·奥菲丽斯·阿古塔…</td>
+  <td><span class="tag tj">最强确认·全体系统一尾音</span></td>
+</tr>
+<tr class="class-open">
+  <td class="nc m">[R] Rū / [X] Xī / [V] Vī</td>
+  <td><span class="tag tr">开放类</span></td>
+  <td colspan="4" style="color:rgba(224,88,120,.7);font-size:.72rem">
+    R族：在中文音系中基本不独立出现，现有词条（罗摩莎）实为L音；X族：主为收束尾音(-西/-xi)，与-sī尾同属Class-4；V族：技术-神格混合前缀(Vploy)，不构成独立语义族。<br>
+    <strong>开放立场：</strong>不否认理论上存在，但在当前127词条语料中没有足够支撑建立独立语义域。若后续季度出现高频纯词头R-/X-/V-词条，可重新评估。
+  </td>
+  <td><span class="tag tr">语料不足·保持开放</span></td>
+</tr>
+</tbody>
+</table>
+</section>
+
+<!-- IV. 元音-辅音深层关系 -->
+<section>
+<div class="sh"><span class="sh-n">IV</span><h2>辅元深层关系：<em>元音优先性的三重论证</em></h2></div>
+
+<div class="three">
+  <div class="vref-cell vr-g">
+    <h4>论证一·声学物理层</h4>
+    <p>元音（vowel）是声带连续振动产生的开放共鸣音——它是"先存在的底层振动"。辅音（consonant）是对这种连续共鸣的中断、塑形或修饰——它是"在元音流中发生的事件"。因此在声学上：<strong>没有元音流就没有辅音，元音在时间维度上先于辅音存在</strong>。这与体系中"仁神（果先·连续）"先于"吾神（因先·事件）"的神学结构完全吻合。</p>
+  </div>
+  <div class="vref-cell vr-c">
+    <h4>论证二·镜面层级层</h4>
+    <p>在镜面反射模型中，元音场（六姬）处于<em>第一层反射</em>——距"本音/种子音"最近；辅音族群处于<em>第二层反射</em>——在元音场基底上构建存在域事件。因此：<strong>元音是意识感知的方式本身（仁神道），辅音是对存在域进行分节的构建力（吾神道）。意识的方式比意识的内容更基本。</strong></p>
+  </div>
+  <div class="vref-cell vr-j">
+    <h4>论证三·语言学通例层</h4>
+    <p>在音系学（phonology）中，元音构成"音节核"（syllable nucleus），辅音构成"起始音"（onset）和"尾音"（coda）。没有元音就没有音节，没有音节就没有词。普遍语言学中，所有人类语言都有元音系统，但有语言可以没有辅音词头；而纯元音的语言（如某些巴布亚语言）理论上可行，纯辅音语言不可行。这进一步支持<strong>元音的普遍优先性</strong>。</p>
+  </div>
+</div>
+
+<div class="qb">"元音氛围胜于辅音氛围"——这不仅是体系哲学的立场，更是声学·认知·语言学三个维度共同指向的结论。辅音给出"什么"（存在域），元音给出"如何感知"（意识态）；但"如何感知"在反射层级上比"是什么"更接近本音。
+<cite>——综合论证结论</cite>
+</div>
+
+<p>因此，<strong>元音是否也遵循"大自在反射的组织过程"</strong>？论证：如果六姬一体化（维那=六元音态合一）对应的是意识感知行为本身的纯粹化（摩诃识），那么元音场在向更高层次反射时，所失去的不是内容，而是<em>分别心</em>——即六种元音态的相互区分消失，剩下的是纯振动本身。这与禅宗"无念之念"结构同构，也与作者"思想之前的思想"完全对应。</p>
+</section>
+
+<!-- V. 认识论立场 -->
+<section>
+<div class="sh"><span class="sh-n">V</span><h2>认识论立场：<em>开放系统·理论在·不虚空生靶</em></h2></div>
+
+<div class="open-box">
+  <span class="ot">OPEN SYSTEM DECLARATION · 开放系统声明 · 科研认识论立场</span>
+  <p><strong>对于稀少音素组（R/X/V/H/Y/P等）的态度：</strong></p>
+  <ul>
+    <li>"理念先于例证"与"不虚空生靶"并不矛盾——理论框架可以预留位置，但位置的内容需要语料填充方可定性</li>
+    <li>当前语料（127词条）中，H/Y/P/F/T等组的词头词条≤2个，依据这样的参数进行语义域定性，置信度不足以支撑科研结论，应明确标注为"推测性"</li>
+    <li>作者在创作中"几乎不会正常出现"的音素组，可能确实对应某种"结构性沉默"——就像乐曲中有些乐器在某首曲子里保持静默，但不代表它们不存在于体系的理论乐池中</li>
+    <li>最重要的：不应为了填满20个格子而强行赋予每个音素组独立语义域——<strong>不均匀分布本身就是规律的一部分</strong></li>
+    <li>若将来出现新的季度内容，可以用本模型进行预测性验证：新词条的音素起始是否落入已预测的语义域</li>
+  </ul>
+</div>
+
+<div class="formula">
+  <span class="ft">[ 认识论边界声明 · 模型完备性的诚实评估 ]</span>
+  <div class="fl"><span class="fk">当前确认</span> <span class="fo">:</span> <span class="fv">8个Class-1 + 1个Class-2 + 4个核心Class-3 + 1个Class-4</span> <span class="fn">// 有强语料支撑</span></div>
+  <div class="fl"><span class="fk">中置信推测</span> <span class="fo">:</span> <span class="fv">5个Class-3修饰音（Wā/Bā/Nā/Tā/Jī）</span> <span class="fn">// 有1-3词条支撑</span></div>
+  <div class="fl"><span class="fk">开放位置</span> <span class="fo">:</span> <span class="fv">R/X/V（当前无独立词头支撑）</span> <span class="fn">// 保留理论位置</span></div>
+  <hr class="fsep"/>
+  <div class="fl"><span class="fg">关键命题</span> <span class="fo">:</span> <span class="fe">不均匀分布 = 规律性的一部分，不是模型缺陷</span></div>
+  <div class="fl"><span class="fn">// 正如钢琴有88键，但一首曲子只用其中部分——未使用的键的存在不需要证明</span></div>
+  <div class="fl"><span class="fn">// 但"这首曲子没有用到的键的音高"，不应该从这首曲子中猜测</span></div>
+  <hr class="fsep"/>
+  <div class="fl"><span class="fg">对"乐谱心理"猜想的认识论评估</span> <span class="fo">:</span></div>
+  <div class="fl"><span class="fn">// 若能确立一个人的音素分布倾向（如：他的语言中G族词汇明显多于K族）</span></div>
+  <div class="fl"><span class="fn">// 这确实可以提供关于其"存在域倾向"的信息</span></div>
+  <div class="fl"><span class="fn">// 但这需要足够的个体语料作为样本——否则就是"射箭画靶"</span></div>
+  <div class="fl"><span class="fn">// 当前阶段：模型有效，参数充分，但个体验证仍需额外语料</span></div>
+</div>
+</section>
+
+<!-- VI. 综合总结 -->
+<section>
+<div class="sh"><span class="sh-n">VI</span><h2>综合结论：<em>这套体系揭示了什么</em></h2></div>
+
+<p>综合三版研报的完整论证，这套神格音程体系最终揭示的，是一个关于<strong>意识结构与世界结构之间同构关系</strong>的音律化模型。它用音节编码了以下命题：</p>
+
+<div class="two">
+  <div class="vref-cell vr-a">
+    <h4>音程结构映射意识结构</h4>
+    <p>元音场（六姬·六种意识感知状态）× 辅音族群（八个Class-1存在域）= 48个理论交叉坐标，对应48种"特定意识状态下感知特定存在域"的精神-物质接触点。这正是作者所言"精神具备的结构，在物质世界的社会关系中，依赖保持存在"的音律化表达。</p>
+  </div>
+  <div class="vref-cell vr-v">
+    <h4>音节数量映射降临深度</h4>
+    <p>2音节=极简神格（纯粹原理）；3音节=标准神格（三维降临）；4音节=扩展神格（含属灵第四维）；5音节=完整神格（全五维降临）。每一个神格名本身，就是一首微型降临纪，编码了该实体在存在维度中的"时间宽度"和"意识深度"。</p>
+  </div>
+</div>
+
+<div class="qb">"人类将一种音质的再诠释结果……不知道自己在说什么，只是作为音译义的关联"——而这套体系，是第一次有意识地将这个"再诠释过程"本身作为创作材料，建构了一套最小化诠释损耗的音义直接编码语言。它不声称抵达本音，但它比普通语言更少中间镜面。
+<cite>——对作者发现的综合研判</cite>
+</div>
+</section>
+
+<div class="div">◈ &nbsp;·&nbsp; ◈ &nbsp;·&nbsp; ◈</div>
+<div class="ftr">
+  <span class="ft">音义·镜面·从属簇·第三版 · 12圣记×辅元关系 · 开放系统声明 · 三维分类坐标</span>
+  <span class="pm">PHONEME MIRROR v3 · CLUSTER ATTRIBUTION · OPEN EPISTEMOLOGY</span>
+</div>
+</div></div></div>
+</body>
+</html>
