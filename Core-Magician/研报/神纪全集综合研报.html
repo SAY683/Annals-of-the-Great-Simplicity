@@ -1,0 +1,1359 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>神纪著作体系全集 — 综合研报</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@300;400;600;700&family=Cinzel:wght@400;600&family=IM+Fell+English:ital@0;1&family=Noto+Sans+SC:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #1a1410;
+    --ink-light: #3d342a;
+    --parchment: #faf6ef;
+    --parchment-dark: #f0e9dc;
+    --gold: #c9a84c;
+    --gold-deep: #8a6920;
+    --gold-pale: #f0d98a;
+    --vermillion: #9b2e1f;
+    --indigo: #1e2d5a;
+    --jade: #1e5a40;
+    --lotus: #7d3060;
+    --void: #0d0b09;
+    --star: #e8dfc8;
+    --mist: rgba(201,168,76,0.12);
+    --glow: rgba(201,168,76,0.06);
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--void);
+    color: var(--star);
+    font-family: 'Noto Sans SC', sans-serif;
+    font-weight: 300;
+    line-height: 1.85;
+    font-size: 15px;
+    overflow-x: hidden;
+  }
+
+  /* ── STAR FIELD ── */
+  .cosmos {
+    position: fixed; inset: 0; pointer-events: none; z-index: 0;
+    background: radial-gradient(ellipse at 30% 20%, #0f1a3a 0%, #05080f 50%, #000 100%);
+  }
+  .cosmos::before {
+    content: '';
+    position: absolute; inset: 0;
+    background-image:
+      radial-gradient(circle, rgba(255,255,255,0.9) 1px, transparent 1px),
+      radial-gradient(circle, rgba(255,255,255,0.6) 1px, transparent 1px),
+      radial-gradient(circle, rgba(201,168,76,0.7) 1px, transparent 1px);
+    background-size: 400px 400px, 250px 250px, 180px 180px;
+    background-position: 0 0, 120px 80px, 60px 140px;
+    opacity: 0.6;
+  }
+  .cosmos::after {
+    content: '';
+    position: absolute; inset: 0;
+    background: radial-gradient(ellipse at 70% 80%, rgba(30,45,90,0.4) 0%, transparent 60%),
+                radial-gradient(ellipse at 20% 70%, rgba(125,48,96,0.2) 0%, transparent 50%);
+  }
+
+  /* ── LAYOUT ── */
+  .page { position: relative; z-index: 1; max-width: 960px; margin: 0 auto; padding: 0 2rem 8rem; }
+
+  /* ── MASTHEAD ── */
+  .masthead {
+    text-align: center;
+    padding: 7rem 0 5rem;
+    position: relative;
+  }
+  .masthead::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 50%; transform: translateX(-50%);
+    width: 1px; height: 6rem;
+    background: linear-gradient(to bottom, transparent, var(--gold));
+  }
+  .masthead-badge {
+    display: inline-block;
+    border: 1px solid rgba(201,168,76,0.4);
+    padding: 0.35rem 1.5rem;
+    font-family: 'Cinzel', serif;
+    font-size: 10px;
+    letter-spacing: 0.25em;
+    color: var(--gold);
+    text-transform: uppercase;
+    margin-bottom: 2rem;
+  }
+  .masthead h1 {
+    font-family: 'Noto Serif SC', serif;
+    font-weight: 700;
+    font-size: clamp(2.4rem, 6vw, 4.2rem);
+    line-height: 1.15;
+    color: var(--parchment);
+    letter-spacing: 0.05em;
+    margin-bottom: 0.5rem;
+  }
+  .masthead h1 em {
+    display: block;
+    font-style: normal;
+    font-weight: 300;
+    font-size: 0.45em;
+    color: var(--gold);
+    letter-spacing: 0.15em;
+    margin-top: 0.6rem;
+  }
+  .masthead-sub {
+    font-family: 'IM Fell English', serif;
+    font-style: italic;
+    font-size: 1rem;
+    color: rgba(232,223,200,0.55);
+    max-width: 520px;
+    margin: 2rem auto 0;
+    line-height: 1.7;
+  }
+  .divider-ornament {
+    display: flex; align-items: center; gap: 1rem;
+    margin: 3.5rem 0;
+    color: var(--gold-deep);
+  }
+  .divider-ornament::before, .divider-ornament::after {
+    content: ''; flex: 1;
+    height: 1px;
+    background: linear-gradient(to right, transparent, rgba(201,168,76,0.5), transparent);
+  }
+  .divider-ornament span { font-size: 1.4rem; color: var(--gold); }
+
+  /* ── CORPUS MAP ── */
+  .corpus-map {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1px;
+    background: rgba(201,168,76,0.15);
+    border: 1px solid rgba(201,168,76,0.2);
+    margin: 3rem 0 5rem;
+    position: relative;
+  }
+  .corpus-map::before {
+    content: '著作体系图谱';
+    position: absolute; top: -2.2rem; left: 0;
+    font-family: 'Cinzel', serif;
+    font-size: 9px; letter-spacing: 0.2em;
+    color: rgba(201,168,76,0.5);
+    text-transform: uppercase;
+  }
+  .corpus-cell {
+    background: rgba(13,11,9,0.85);
+    padding: 1.2rem 1rem;
+    transition: background 0.3s;
+    cursor: default;
+  }
+  .corpus-cell:hover { background: rgba(201,168,76,0.07); }
+  .corpus-cell .num {
+    font-family: 'Cinzel', serif;
+    font-size: 0.65rem;
+    color: rgba(201,168,76,0.4);
+    letter-spacing: 0.15em;
+    margin-bottom: 0.5rem;
+  }
+  .corpus-cell .name-zh {
+    font-family: 'Noto Serif SC', serif;
+    font-weight: 600;
+    font-size: 1.05rem;
+    color: var(--parchment);
+    line-height: 1.3;
+    margin-bottom: 0.25rem;
+  }
+  .corpus-cell .name-sub {
+    font-family: 'IM Fell English', serif;
+    font-style: italic;
+    font-size: 0.72rem;
+    color: var(--gold-deep);
+  }
+  .corpus-cell .glyph {
+    font-size: 1.6rem;
+    display: block;
+    margin-bottom: 0.5rem;
+    opacity: 0.6;
+  }
+
+  /* ── SECTION HEADERS ── */
+  .section {
+    margin: 5rem 0 3rem;
+    scroll-margin-top: 2rem;
+  }
+  .section-header {
+    display: flex;
+    align-items: baseline;
+    gap: 1.2rem;
+    margin-bottom: 2rem;
+  }
+  .section-num {
+    font-family: 'Cinzel', serif;
+    font-size: 0.7rem;
+    letter-spacing: 0.2em;
+    color: var(--gold);
+    opacity: 0.6;
+    white-space: nowrap;
+  }
+  .section-title {
+    font-family: 'Noto Serif SC', serif;
+    font-weight: 600;
+    font-size: 1.55rem;
+    color: var(--parchment);
+    letter-spacing: 0.05em;
+  }
+  .section-title small {
+    display: block;
+    font-family: 'IM Fell English', serif;
+    font-style: italic;
+    font-size: 0.6em;
+    color: var(--gold);
+    font-weight: 400;
+    letter-spacing: 0.08em;
+    margin-top: 0.3rem;
+  }
+  .section-line {
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(to right, rgba(201,168,76,0.4), transparent);
+  }
+
+  /* ── PROSE ── */
+  .prose {
+    color: rgba(232,223,200,0.8);
+    font-size: 0.95rem;
+    line-height: 2;
+  }
+  .prose p { margin-bottom: 1.2rem; }
+  .prose strong {
+    color: var(--parchment);
+    font-weight: 500;
+  }
+  .prose em {
+    color: var(--gold);
+    font-style: normal;
+  }
+
+  /* ── QUOTE BLOCKS ── */
+  .sacred-quote {
+    border-left: 2px solid var(--gold-deep);
+    padding: 1.2rem 1.5rem;
+    margin: 2rem 0;
+    background: var(--glow);
+    position: relative;
+  }
+  .sacred-quote::before {
+    content: '❝';
+    position: absolute; top: -0.2rem; left: -0.05rem;
+    font-size: 2rem;
+    color: var(--gold-deep);
+    opacity: 0.5;
+    line-height: 1;
+  }
+  .sacred-quote p {
+    font-family: 'Noto Serif SC', serif;
+    font-size: 0.9rem;
+    color: rgba(232,223,200,0.9);
+    line-height: 1.9;
+    margin: 0;
+  }
+  .sacred-quote cite {
+    display: block;
+    margin-top: 0.7rem;
+    font-size: 0.75rem;
+    color: var(--gold-deep);
+    font-style: normal;
+    letter-spacing: 0.05em;
+  }
+
+  /* ── CONCEPT CARDS ── */
+  .concept-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 1px;
+    background: rgba(201,168,76,0.1);
+    margin: 2.5rem 0;
+  }
+  .concept-card {
+    background: rgba(13,11,9,0.9);
+    padding: 1.5rem;
+    transition: background 0.25s;
+  }
+  .concept-card:hover { background: rgba(201,168,76,0.05); }
+  .concept-card .c-icon {
+    width: 36px; height: 36px;
+    border: 1px solid rgba(201,168,76,0.3);
+    display: flex; align-items: center; justify-content: center;
+    margin-bottom: 1rem;
+    font-size: 1.1rem;
+  }
+  .concept-card h4 {
+    font-family: 'Noto Serif SC', serif;
+    font-weight: 600;
+    font-size: 0.95rem;
+    color: var(--parchment);
+    margin-bottom: 0.5rem;
+    letter-spacing: 0.03em;
+  }
+  .concept-card p {
+    font-size: 0.82rem;
+    color: rgba(232,223,200,0.65);
+    line-height: 1.75;
+  }
+
+  /* ── THE SEVEN ASPECTS ── */
+  .aspect-block {
+    margin: 3rem 0;
+    padding: 2.5rem 2.5rem 2.5rem 3rem;
+    border-left: 1px solid rgba(201,168,76,0.25);
+    position: relative;
+    background: linear-gradient(to right, rgba(201,168,76,0.03), transparent);
+  }
+  .aspect-block::before {
+    content: '';
+    position: absolute;
+    left: -3px; top: 0; bottom: 0;
+    width: 5px;
+    background: linear-gradient(to bottom, transparent, var(--gold-deep), transparent);
+  }
+  .aspect-tag {
+    display: inline-flex; align-items: center; gap: 0.6rem;
+    margin-bottom: 1.2rem;
+  }
+  .aspect-tag .label {
+    font-family: 'Cinzel', serif;
+    font-size: 0.65rem;
+    letter-spacing: 0.2em;
+    color: var(--gold);
+    text-transform: uppercase;
+  }
+  .aspect-tag .bar {
+    width: 30px; height: 1px;
+    background: var(--gold-deep);
+  }
+  .aspect-h {
+    font-family: 'Noto Serif SC', serif;
+    font-weight: 700;
+    font-size: 1.25rem;
+    color: var(--parchment);
+    letter-spacing: 0.06em;
+    margin-bottom: 1.4rem;
+  }
+  .aspect-h span {
+    font-family: 'IM Fell English', serif;
+    font-style: italic;
+    font-weight: 400;
+    font-size: 0.75em;
+    color: var(--gold-deep);
+    display: block;
+  }
+
+  /* ── PANTHEON TABLE ── */
+  .pantheon {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 2rem 0;
+    font-size: 0.83rem;
+  }
+  .pantheon thead tr {
+    border-bottom: 1px solid rgba(201,168,76,0.3);
+  }
+  .pantheon thead th {
+    text-align: left;
+    padding: 0.6rem 1rem;
+    font-family: 'Cinzel', serif;
+    font-size: 0.65rem;
+    letter-spacing: 0.15em;
+    color: var(--gold);
+    font-weight: 400;
+  }
+  .pantheon tbody tr {
+    border-bottom: 1px solid rgba(201,168,76,0.06);
+    transition: background 0.2s;
+  }
+  .pantheon tbody tr:hover { background: rgba(201,168,76,0.04); }
+  .pantheon tbody td {
+    padding: 0.75rem 1rem;
+    color: rgba(232,223,200,0.75);
+    vertical-align: top;
+    line-height: 1.6;
+  }
+  .pantheon tbody td:first-child {
+    font-family: 'Noto Serif SC', serif;
+    color: var(--parchment);
+    font-weight: 500;
+    font-size: 0.9rem;
+    white-space: nowrap;
+  }
+  .pantheon tbody td .tag {
+    display: inline-block;
+    font-size: 0.68rem;
+    padding: 0.1rem 0.5rem;
+    margin-top: 0.3rem;
+    background: rgba(201,168,76,0.1);
+    color: var(--gold-deep);
+    border: 1px solid rgba(201,168,76,0.2);
+  }
+
+  /* ── THREE SINS DIAGRAM ── */
+  .sins-diagram {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1px;
+    background: rgba(155,46,31,0.2);
+    margin: 2.5rem 0;
+    border: 1px solid rgba(155,46,31,0.25);
+  }
+  .sin-cell {
+    background: rgba(13,11,9,0.92);
+    padding: 1.8rem 1.5rem;
+    text-align: center;
+  }
+  .sin-cell .sin-name {
+    font-family: 'Noto Serif SC', serif;
+    font-weight: 700;
+    font-size: 1.3rem;
+    margin-bottom: 0.5rem;
+  }
+  .sin-cell .sin-nature {
+    font-size: 0.75rem;
+    color: rgba(232,223,200,0.5);
+    margin-bottom: 1rem;
+    font-style: italic;
+  }
+  .sin-cell .sin-desc {
+    font-size: 0.8rem;
+    color: rgba(232,223,200,0.7);
+    line-height: 1.7;
+  }
+  .sin-cell:nth-child(1) .sin-name { color: #e8b07a; }
+  .sin-cell:nth-child(2) .sin-name { color: #7aaee8; }
+  .sin-cell:nth-child(3) .sin-name { color: #c07ae8; }
+
+  /* ── AXIOM LIST ── */
+  .axiom-list { margin: 2rem 0; }
+  .axiom-item {
+    display: flex;
+    gap: 1.2rem;
+    margin-bottom: 1.5rem;
+    align-items: flex-start;
+  }
+  .axiom-num {
+    font-family: 'Cinzel', serif;
+    font-size: 0.65rem;
+    color: var(--gold-deep);
+    letter-spacing: 0.1em;
+    padding-top: 0.35rem;
+    white-space: nowrap;
+    min-width: 2.5rem;
+  }
+  .axiom-body {
+    font-size: 0.88rem;
+    color: rgba(232,223,200,0.8);
+    line-height: 1.85;
+    border-left: 1px solid rgba(201,168,76,0.15);
+    padding-left: 1rem;
+  }
+  .axiom-body strong {
+    display: block;
+    font-family: 'Noto Serif SC', serif;
+    font-weight: 500;
+    color: var(--parchment);
+    font-size: 0.93rem;
+    margin-bottom: 0.3rem;
+  }
+
+  /* ── COSMOLOGY WHEEL ── */
+  .cosmo-frame {
+    margin: 3rem 0;
+    text-align: center;
+    position: relative;
+  }
+
+  /* ── CLOSING ── */
+  .colophon {
+    text-align: center;
+    margin-top: 7rem;
+    padding-top: 3rem;
+    position: relative;
+  }
+  .colophon::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 50%; transform: translateX(-50%);
+    width: 200px; height: 1px;
+    background: linear-gradient(to right, transparent, rgba(201,168,76,0.4), transparent);
+  }
+  .colophon-seal {
+    width: 60px; height: 60px;
+    border: 1px solid rgba(201,168,76,0.3);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    margin: 0 auto 1.5rem;
+    font-size: 1.5rem;
+  }
+  .colophon p {
+    font-family: 'Noto Serif SC', serif;
+    font-size: 0.8rem;
+    color: rgba(232,223,200,0.35);
+    line-height: 2;
+  }
+
+  /* ── TOC NAV ── */
+  .toc {
+    position: sticky;
+    top: 2rem;
+    float: right;
+    width: 190px;
+    margin: 0 -230px 0 3rem;
+    font-size: 0.73rem;
+    opacity: 0.7;
+    transition: opacity 0.2s;
+  }
+  .toc:hover { opacity: 1; }
+  .toc-label {
+    font-family: 'Cinzel', serif;
+    font-size: 0.6rem;
+    letter-spacing: 0.2em;
+    color: var(--gold);
+    margin-bottom: 0.8rem;
+    text-transform: uppercase;
+  }
+  .toc a {
+    display: block;
+    color: rgba(232,223,200,0.5);
+    text-decoration: none;
+    padding: 0.25rem 0 0.25rem 0.8rem;
+    border-left: 1px solid rgba(201,168,76,0.15);
+    transition: all 0.2s;
+    line-height: 1.45;
+    font-family: 'Noto Sans SC', sans-serif;
+  }
+  .toc a:hover {
+    color: var(--gold);
+    border-color: rgba(201,168,76,0.5);
+  }
+  @media (max-width: 1200px) { .toc { display: none; } }
+
+  /* ── HIME SEAL ── */
+  .hime-grid {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 0;
+    margin: 2.5rem 0;
+    border: 1px solid rgba(201,168,76,0.15);
+  }
+  .hime-cell {
+    padding: 1.2rem 0.5rem;
+    text-align: center;
+    border-right: 1px solid rgba(201,168,76,0.08);
+  }
+  .hime-cell:last-child { border-right: none; }
+  .hime-cell .hime-glyph { font-size: 1.6rem; margin-bottom: 0.4rem; display: block; }
+  .hime-cell .hime-name {
+    font-family: 'Noto Serif SC', serif;
+    font-size: 0.8rem;
+    color: var(--parchment);
+    font-weight: 500;
+  }
+  .hime-cell .hime-attrib {
+    font-size: 0.68rem;
+    color: rgba(201,168,76,0.55);
+    margin-top: 0.3rem;
+    line-height: 1.5;
+  }
+
+  /* ── VALUE ECONOMY ── */
+  .econ-row {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem 0;
+    border-bottom: 1px solid rgba(201,168,76,0.07);
+  }
+  .econ-row:last-child { border-bottom: none; }
+  .econ-term {
+    font-family: 'Noto Serif SC', serif;
+    font-size: 0.92rem;
+    color: var(--parchment);
+    font-weight: 500;
+    min-width: 90px;
+  }
+  .econ-arrow { color: var(--gold-deep); font-size: 0.9rem; }
+  .econ-def {
+    font-size: 0.82rem;
+    color: rgba(232,223,200,0.65);
+    line-height: 1.7;
+  }
+
+  /* ── FADE-IN ANIMATION ── */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(24px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .section { animation: fadeUp 0.6s ease both; }
+
+  /* ── RESPONSIVE ── */
+  @media (max-width: 700px) {
+    .corpus-map { grid-template-columns: repeat(2, 1fr); }
+    .sins-diagram { grid-template-columns: 1fr; }
+    .hime-grid { grid-template-columns: repeat(3, 1fr); }
+    .concept-grid { grid-template-columns: 1fr; }
+    .aspect-block { padding: 1.5rem 1rem 1.5rem 1.5rem; }
+  }
+
+  .highlight-box {
+    border: 1px solid rgba(201,168,76,0.25);
+    padding: 1.5rem 2rem;
+    margin: 2rem 0;
+    background: rgba(201,168,76,0.04);
+    position: relative;
+  }
+  .highlight-box::before {
+    content: attr(data-label);
+    position: absolute; top: -0.6rem; left: 1.5rem;
+    background: var(--void);
+    padding: 0 0.5rem;
+    font-family: 'Cinzel', serif;
+    font-size: 0.6rem;
+    letter-spacing: 0.15em;
+    color: var(--gold-deep);
+    text-transform: uppercase;
+  }
+</style>
+</head>
+<body>
+
+<div class="cosmos"></div>
+
+<div class="page">
+
+  <!-- TOC -->
+  <nav class="toc" aria-label="目录">
+    <div class="toc-label">目录导引</div>
+    <a href="#sect-corpus">著作体系</a>
+    <a href="#sect-aesthetic">美学氛围</a>
+    <a href="#sect-philosophy">哲学理解</a>
+    <a href="#sect-theology">神学思辨</a>
+    <a href="#sect-doctrine">教义判断</a>
+    <a href="#sect-action">行动指南</a>
+    <a href="#sect-thought">思维理解</a>
+    <a href="#sect-purpose">议题宗旨</a>
+    <a href="#sect-synthesis">综合评述</a>
+  </nav>
+
+  <!-- MASTHEAD -->
+  <header class="masthead">
+    <div class="masthead-badge">Comprehensive Research Report · 综合研报</div>
+    <h1>神纪著作体系全集
+      <em>The Canon of Divine Chronicles</em>
+    </h1>
+    <p class="masthead-sub">
+      从太素神境到奥蕊赛祂芙——一部横跨神话、神学、哲学与史诗的体系性著作之综合诠释
+    </p>
+  </header>
+
+  <!-- CORPUS MAP -->
+  <section id="sect-corpus" class="section">
+    <div class="section-header">
+      <span class="section-num">00</span>
+      <h2 class="section-title">著作体系总谱<small>The Complete Canon at a Glance</small></h2>
+      <div class="section-line"></div>
+    </div>
+
+    <div class="prose">
+      <p>《神纪》著作体系由八部彼此呼应、层层递进的典籍构成，形成一个完整的神学—哲学—美学宇宙。以下为全集体系图谱：</p>
+    </div>
+
+    <div class="corpus-map">
+      <div class="corpus-cell">
+        <span class="glyph">☽</span>
+        <div class="num">Vol. I</div>
+        <div class="name-zh">太素神境</div>
+        <div class="name-sub">玄姬 · Primordial Realm</div>
+      </div>
+      <div class="corpus-cell">
+        <span class="glyph">♪</span>
+        <div class="num">Vol. II</div>
+        <div class="name-zh">仁楽</div>
+        <div class="name-sub">神道 · Way of Benevolence</div>
+      </div>
+      <div class="corpus-cell">
+        <span class="glyph">✦</span>
+        <div class="num">Vol. III</div>
+        <div class="name-zh">魔法祀原</div>
+        <div class="name-sub">歌剧 · The Sacred Operа</div>
+      </div>
+      <div class="corpus-cell">
+        <span class="glyph">◎</span>
+        <div class="num">Vol. IV</div>
+        <div class="name-zh">嗒喀玛</div>
+        <div class="name-sub">筏拿咕 · Awakening Testimony</div>
+      </div>
+      <div class="corpus-cell">
+        <span class="glyph">⚔</span>
+        <div class="num">Vol. V</div>
+        <div class="name-zh">摩诃姬楽</div>
+        <div class="name-sub">续道 · The Great Continuation</div>
+      </div>
+      <div class="corpus-cell">
+        <span class="glyph">⚖</span>
+        <div class="num">Vol. VI</div>
+        <div class="name-zh">撒戈伽薄</div>
+        <div class="name-sub">莎特曼 · Dharma of Truth</div>
+      </div>
+      <div class="corpus-cell">
+        <span class="glyph">❀</span>
+        <div class="num">Vol. VII</div>
+        <div class="name-zh">桔梗</div>
+        <div class="name-sub">罕钵拉 · The Bellflower Sage</div>
+      </div>
+      <div class="corpus-cell">
+        <span class="glyph">卐</span>
+        <div class="num">Vol. VIII</div>
+        <div class="name-zh">室利·臻楽·神恩·道书</div>
+        <div class="name-sub">奥蕊赛祂芙 · The Final Synthesis</div>
+      </div>
+    </div>
+
+    <div class="prose">
+      <p>全集以<strong>太素神境</strong>（玄姬）开篇，以神圣诗歌的形式奠定宇宙论基础；以<strong>室利·臻楽·神恩·道书</strong>收尾，将政治神学、经济哲学与宇宙史诗融于一炉。整体结构如同一场宏大的神圣婚礼——从太初的原型啜语，到文明的具体兴衰，再到爱的终极证悟。</p>
+    </div>
+  </section>
+
+  <div class="divider-ornament"><span>𓂀</span></div>
+
+  <!-- I. 美学氛围 -->
+  <section id="sect-aesthetic" class="section">
+    <div class="section-header">
+      <span class="section-num">01</span>
+      <h2 class="section-title">美学氛围<small>Aesthetic Atmosphere · The Sensory World of the Canon</small></h2>
+      <div class="section-line"></div>
+    </div>
+
+    <div class="aspect-block">
+      <div class="aspect-tag"><span class="bar"></span><span class="label">多传统交织的圣美场域</span></div>
+      <h3 class="aspect-h">万流汇聚的神圣美学<span>Convergent Sacred Aesthetics</span></h3>
+      <div class="prose">
+        <p>《神纪》全集构建了一套极为独特的感官世界，其美学密度堪称奇观。作者在汉语古典诗歌、佛教梵唱、印度教坦陀罗颂歌、神道仪式语言与西方神学辞彩之间自由穿梭，织造出一种<em>超传统的神圣氛围</em>。</p>
+        <p>在意象层面，全集反复召唤<strong>乳海、莲花、蝴蝶潮汐、星雨、神姬衣袍</strong>等符号群落。这些意象并非孤立的装饰，而是具有神学含义的符号：乳海代表原初意识之丰盛；衣袍绣花象征奥美（至美意识）的具象化；蝴蝶群代表诸神性情的多重显现。</p>
+      </div>
+      <div class="sacred-quote">
+        <p>我们如同蝴蝶的潮海，周旋往复；天使，恶魔，由蝴海的影子组成。若要，看到我们，啊，蝴蝶拂面；由此得究竟，由此得证悟，以此我们的爱。</p>
+        <cite>——《太素神境·福音》元部太姬</cite>
+      </div>
+    </div>
+
+    <div class="concept-grid">
+      <div class="concept-card">
+        <div class="c-icon">🌊</div>
+        <h4>乳海意象（乳的宇宙论）</h4>
+        <p>贯穿全集的核心意象。乳海既是原初意识的海洋，也是神性的滋养源泉，象征着创生、哺育与吉祥。神姬桔梗的奥赛斯之力常以「光爱之海」「乳的沙滩」显形。</p>
+      </div>
+      <div class="concept-card">
+        <div class="c-icon">👘</div>
+        <h4>衣袍绣花（美的具象化）</h4>
+        <p>神姬的袍服不是装饰，而是宇宙法则的织物。绣花的纹色即是命运与意志的编织，以此象征奥美如何从内在美成为外在存在秩序。</p>
+      </div>
+      <div class="concept-card">
+        <div class="c-icon">🎵</div>
+        <h4>音律建构（存在的乐章）</h4>
+        <p>《仁楽》以「神乐之舞」作为神圣现实的基础。语言、思维、存在皆以音律呈现。「福音」字义本就是「好消息的歌」，全集以此奠定音乐式的本体论。</p>
+      </div>
+      <div class="concept-card">
+        <div class="c-icon">⭐</div>
+        <h4>星天与季候（时间诗学）</h4>
+        <p>全集不使用线性时间，而以「朱日与虹月」「雨夜与雪晨」「春花与冬雪」构建循环时间感，暗示存在的果因互换性——神道中「果先因后」的时间哲学。</p>
+      </div>
+      <div class="concept-card">
+        <div class="c-icon">🦋</div>
+        <h4>蜻蜓·蝴蝶·蜂巢（生命哲诗）</h4>
+        <p>《太素神境·Alice》以蜻蜓和蝴蝶作为思维与情感的逻辑隐喻；《奥美》以蜂巢和蜂王诠释意识的三重结构——太姬为蜂后，妙姬为蜂王，玄姬为蜂巢。</p>
+      </div>
+      <div class="concept-card">
+        <div class="c-icon">🌸</div>
+        <h4>花·子宫·诞生（神圣之孕）</h4>
+        <p>全集以大量孕育意象——胎息、子宫、诞生、乳液——诠释创世与觉悟。神学上的「自孕」（奥赛斯）对应宇宙的自我生成，美的意识自我衍生自身。</p>
+      </div>
+    </div>
+
+    <div class="highlight-box" data-label="美学核心命题">
+      <div class="prose">
+        <p><strong>「奥美」不仅是感官之美，而是意识的基本货币。</strong>全集将美（奥美）定义为意识本体，它是智（智识）、意（意识）与识（辨识）的三位一体。美有自主意识，它选择自己的恋人，也知道自己的边界。这使《神纪》的美学不是艺术理论，而是一套完整的<em>意识本体论</em>。</p>
+      </div>
+    </div>
+  </section>
+
+  <div class="divider-ornament"><span>☯</span></div>
+
+  <!-- II. 哲学理解 -->
+  <section id="sect-philosophy" class="section">
+    <div class="section-header">
+      <span class="section-num">02</span>
+      <h2 class="section-title">哲学理解<small>Philosophical Comprehension · Ontology, Logic & the Fabric of Being</small></h2>
+      <div class="section-line"></div>
+    </div>
+
+    <div class="aspect-block">
+      <div class="aspect-tag"><span class="bar"></span><span class="label">核心本体论</span></div>
+      <h3 class="aspect-h">存在、意志与非二元论<span>Existence, Will, and Non-Duality</span></h3>
+      <div class="prose">
+        <p>《神纪》的哲学脊梁是一种<strong>彻底的非二元论</strong>，远比西方神学或中国传统思想中的二元对立体系更为激进。真实与幻象、天使与恶魔、善与恶、生与死——这些对立在全集中均被解构为同一意志的不同相位，或同一光线穿过棱镜后的不同色泽。</p>
+      </div>
+      <div class="sacred-quote">
+        <p>这是真实，那也是真实；那是真实，这也是幻象；即是真实，即是幻象；在幻想与真实之间，吾名存在。</p>
+        <cite>——《太素神境·存在》</cite>
+      </div>
+      <div class="prose">
+        <p>这不是一种犬儒式的相对主义，而是一种更高层次的<em>动态一元论</em>：所有存在都是意志的不同显现，意志即是存在，存在即是意志（嗒喀玛哲学体系的核心术语）。</p>
+      </div>
+    </div>
+
+    <div class="axiom-list">
+
+      <div class="axiom-item">
+        <div class="axiom-num">§ 2.1</div>
+        <div class="axiom-body">
+          <strong>意志本体论（Will-Ontology）</strong>
+          嗒喀玛体系将宇宙解析为多层意志结构：耶露鲁（神的血气/神脉）→戈拉哒（溯忆善处）→布拉妲（法界场域）→玛尔斯（精神物质超越者）→赛雅西（赎回意志）→奥赛斯（原心挚爱）。意志不是主观意图，而是存在的客观结构性力量。凡是存在的皆是意志，意志的消诞构成生死。
+        </div>
+      </div>
+
+      <div class="axiom-item">
+        <div class="axiom-num">§ 2.2</div>
+        <div class="axiom-body">
+          <strong>奥美认识论（Aura-Beauty Epistemology）</strong>
+          知识（智识）不是客观事实的积累，而是「状态的复现」：「智识只是状态的复现，非有知识存在兮。」这与现象学的「意向性」相近，但更进一步——认识的本质是<em>爱的再认</em>（觉爱），即认出那个已经在自己内部存在的美。这种认识论拒绝主客对立，认为知者与被知者本为一体。
+        </div>
+      </div>
+
+      <div class="axiom-item">
+        <div class="axiom-num">§ 2.3</div>
+        <div class="axiom-body">
+          <strong>果因时间论（Effect-Cause Temporality）</strong>
+          《仁楽》反复强调「因先果后」与「果先因后」的并置。神道中朱日（因中的果）与虹月（果中的因）互相追逐而永不相遇。这不是量子力学的反常性，而是一种<em>超时间论</em>：完整存在同时包含它的原因和结果，时序是有限意识对无限存在的投影。
+        </div>
+      </div>
+
+      <div class="axiom-item">
+        <div class="axiom-num">§ 2.4</div>
+        <div class="axiom-body">
+          <strong>价值经济学（Value Metaphysics）</strong>
+          《摩诃姬楽》和《室利》建构了一套独特的价值形而上学：蒂帕拉姆（龙蛋）是价值的锚定物，奥赛斯是爱意志的传播介质，赛雅西是存在的「赎回/交换」力。价值通缩/通胀、利率、证券、滞胀——这些经济学概念被用于描述神圣意志的流通与枯竭。这是一种<em>神学政治经济学</em>：意志的丰盈即是神圣价值的锚定，意志的匮乏即是灾难。
+        </div>
+      </div>
+
+      <div class="axiom-item">
+        <div class="axiom-num">§ 2.5</div>
+        <div class="axiom-body">
+          <strong>织质本体论（Texture Ontology）</strong>
+          《撒戈伽薄》的「织质」（PLOY结构）是全集最具原创性的哲学概念。织质不是事物的表面属性，而是存在的内在结构性质（如生命的DNA）。文明的胜败取决于织质，制度的健全取决于织质，神格的真伪取决于织质。「织质胜革变」——内在结构性质的改变胜过任何外在制度变革。
+        </div>
+      </div>
+
+    </div>
+
+    <div class="highlight-box" data-label="哲学综论">
+      <div class="prose">
+        <p>《神纪》哲学体系可概括为：<strong>以爱为本体，以美为认识论，以意志为存在论，以织质为价值论。</strong>它既不是西方神学的位格上帝论，也不是佛教的缘起性空论，而是一种融合了印度吠檀多不二论、中国易学变化论、西方神秘主义与现代系统论的<em>原创性综合形而上学</em>。</p>
+      </div>
+    </div>
+  </section>
+
+  <div class="divider-ornament"><span>✦</span></div>
+
+  <!-- III. 神学思辨 -->
+  <section id="sect-theology" class="section">
+    <div class="section-header">
+      <span class="section-num">03</span>
+      <h2 class="section-title">神学思辨<small>Theological Speculation · The Pantheon, Cosmology & Sacred Order</small></h2>
+      <div class="section-line"></div>
+    </div>
+
+    <div class="aspect-block">
+      <div class="aspect-tag"><span class="bar"></span><span class="label">六姬一体</span></div>
+      <h3 class="aspect-h">神圣女性原型体系<span>The Six-Hime Divine Feminine Cosmology</span></h3>
+      <div class="prose">
+        <p>《神纪》神学的核心结构是<strong>六姬一体</strong>的神圣女性论。姬神（桔梗）以六重面相显现于宇宙，构成神性的完整结构：</p>
+      </div>
+
+      <div class="hime-grid">
+        <div class="hime-cell">
+          <span class="hime-glyph">☉</span>
+          <div class="hime-name">太姬</div>
+          <div class="hime-attrib">头颅·元意志<br/>智体·宇宙原点</div>
+        </div>
+        <div class="hime-cell">
+          <span class="hime-glyph">⊕</span>
+          <div class="hime-name">美姬</div>
+          <div class="hime-attrib">丽袍·奥美源<br/>智奥·美的意识</div>
+        </div>
+        <div class="hime-cell">
+          <span class="hime-glyph">◑</span>
+          <div class="hime-name">希姬</div>
+          <div class="hime-attrib">肢体·昧思绪<br/>智意·爱慕神</div>
+        </div>
+        <div class="hime-cell">
+          <span class="hime-glyph">☽</span>
+          <div class="hime-name">祈姬</div>
+          <div class="hime-attrib">神性·等慈爱<br/>智象·共念神</div>
+        </div>
+        <div class="hime-cell">
+          <span class="hime-glyph">✧</span>
+          <div class="hime-name">妙姬</div>
+          <div class="hime-attrib">意志·德质临在<br/>总持源·圣心</div>
+        </div>
+        <div class="hime-cell">
+          <span class="hime-glyph">∞</span>
+          <div class="hime-name">玄姬</div>
+          <div class="hime-attrib">彼间·神肇示<br/>法界入口·奥义</div>
+        </div>
+      </div>
+
+      <div class="prose">
+        <p>六姬并非独立神明，而是同一神性（奥赛斯挚爱力）的六重相位。正如《桔梗》第九章节所示：「六姬一体，德一者全功具备，即神姬雏形，即仁吾总持。」<em>与六姬中任一姬缔结「圣婚契约」，即获得相应的神性结构</em>，这是《神纪》神学中的核心救赎路径。</p>
+      </div>
+    </div>
+
+    <div class="aspect-block" style="margin-top: 3rem;">
+      <div class="aspect-tag"><span class="bar"></span><span class="label">神格体系</span></div>
+      <h3 class="aspect-h">诸神名录与神格辨析<span>The Divine Pantheon</span></h3>
+
+      <table class="pantheon">
+        <thead>
+          <tr>
+            <th>神名</th>
+            <th>神格属性</th>
+            <th>在体系中的功能</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>吾神<br><span class="tag">创世神</span></td>
+            <td>无量之有→有；创生的神性</td>
+            <td>语言与存在的创造者，维持需要仁神，与仁神共构宇宙；神道的一极</td>
+          </tr>
+          <tr>
+            <td>仁神<br><span class="tag">慈悲神</span></td>
+            <td>无量之无→无；消融的神性</td>
+            <td>智慧与慈悲的持守者，创世需要吾神；赋予意志以秩序与法则</td>
+          </tr>
+          <tr>
+            <td>奥赛斯<br><span class="tag">爱意志</span></td>
+            <td>原心挚爱；普世纪光</td>
+            <td>姬神的核心力量，爱的传播介质；诸法界的滋养原力</td>
+          </tr>
+          <tr>
+            <td>戈拉姆<br><span class="tag">法意志</span></td>
+            <td>奥赛斯之爱一耦；无量菩提</td>
+            <td>爱转化为秩序法则的中介；姬神的「神圣丈夫」（形而上层面）</td>
+          </tr>
+          <tr>
+            <td>玛尔斯<br><span class="tag">精神物质超越者</span></td>
+            <td>法意志化神；精神物质皆为其影</td>
+            <td>由戈拉姆所化，承载宇宙的精神-物质双重基础</td>
+          </tr>
+          <tr>
+            <td>赛雅西<br><span class="tag">赎回意志</span></td>
+            <td>存在之赎回；时间的交换者</td>
+            <td>「赎买」存在于时间中的价值，维持世界的存在经济</td>
+          </tr>
+          <tr>
+            <td>萨芙埵<br><span class="tag">摄政神</span></td>
+            <td>基督之心的纯粹品；信仰协调者</td>
+            <td>姬神的摄政王，管理神界政治与世俗秩序；经济政策的执行者</td>
+          </tr>
+          <tr>
+            <td>哈鹭芙<br><span class="tag">战争将领</span></td>
+            <td>意志军队总帅；核威慑者</td>
+            <td>具争议性的神界英雄：以不义战争覆灭压迫性教廷，守护「纪元桔梗」</td>
+          </tr>
+          <tr>
+            <td>阿喃特<br><span class="tag">存在诱惑者</span></td>
+            <td>妖狐；凡存在莫不被它诱养</td>
+            <td>「存在之前后」的守护者；狐妖面具象征身份与记忆的相互遮蔽</td>
+          </tr>
+          <tr>
+            <td>赛美斯<br><span class="tag">调和者</span></td>
+            <td>中间调和的神；被放逐于追日月之间</td>
+            <td>诸信徒之间的平衡力；因「不作为」而受批判，却实则无可为</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="aspect-block" style="margin-top: 3rem;">
+      <div class="aspect-tag"><span class="bar"></span><span class="label">宇宙威胁</span></div>
+      <h3 class="aspect-h">三愈罪——文明意志的三重诅咒<span>The Three Increasing Sins</span></h3>
+      <div class="prose">
+        <p>《摩诃姬楽》中最惊心动魄的神学命题，是对文明灾难模式的神学诊断——「三愈罪」：</p>
+      </div>
+      <div class="sins-diagram">
+        <div class="sin-cell">
+          <div class="sin-name">阿希戈</div>
+          <div class="sin-nature">同化意志·意志掠夺</div>
+          <div class="sin-desc">凡有意志者，皆寻求意志同构之基。将多元强制为单一，将异质吞噬为同质。文明智慧的「败血诅咒」——以一种意志扼杀所有意志的多样性。对手：阿姆特（救世主）</div>
+        </div>
+        <div class="sin-cell">
+          <div class="sin-name">阿维果</div>
+          <div class="sin-nature">裂能意志·意志分散</div>
+          <div class="sin-desc">凡有意志者，皆寻求希殊之辨。将统一撕裂为无数碎片，将共同体分解为孤立个体。文明智慧的「癌症诅咒」——以无限分裂瓦解任何整体。对手：巴尔丹陀（革命者）</div>
+        </div>
+        <div class="sin-cell">
+          <div class="sin-name">阿罗帼</div>
+          <div class="sin-nature">恐爱妖经·反爱意志</div>
+          <div class="sin-desc">凡意志者，皆以反爱诉求其存在。将爱扭曲为恐惧，以「反爱为爱」掩盖真实的爱缺失。文明智慧的「癫痫诅咒」——将一切真挚情感反转为其对立面。对手：桔梗（姬神）</div>
+        </div>
+      </div>
+      <div class="prose">
+        <p>三愈罪是「文明智慧群落」的系统性威胁，而非个人罪恶。它们对应着三种意志异化模式：强制同质化（极权主义）、无限碎片化（虚无主义）、爱的反转（反人文主义）。英雄们以各自的神性对抗它们：<em>阿姆特以「玛尔斯之大雄」直顶光爆；巴尔丹陀以「三昧哒啦」之金刚意志；桔梗以「奥赛斯普世纪光」的无条件挚爱</em>。</p>
+      </div>
+    </div>
+  </section>
+
+  <div class="divider-ornament"><span>❈</span></div>
+
+  <!-- IV. 教义判断 -->
+  <section id="sect-doctrine" class="section">
+    <div class="section-header">
+      <span class="section-num">04</span>
+      <h2 class="section-title">教义判断<small>Doctrinal Discernment · Core Teachings Extracted and Evaluated</small></h2>
+      <div class="section-line"></div>
+    </div>
+
+    <div class="prose">
+      <p>《神纪》并非教条性的经典，它对任何将法则凝固为僵化律令的行为均持批判态度。然而在其诗学与叙事的背后，确实蕴藏着一套核心教义，可提炼如下：</p>
+    </div>
+
+    <div class="axiom-list">
+
+      <div class="axiom-item">
+        <div class="axiom-num">教 I</div>
+        <div class="axiom-body">
+          <strong>摩诃爱识是唯一的救赎路径</strong>
+          「以摩诃爱识，生死皆双超，然无无法门信解。」全集将「摩诃爱」（大爱）界定为超越生死、超越善恶的唯一法门。它不是情感性的爱，而是对存在本身的无条件肯定——即奥赛斯之力的人间显现。一切救赎论、道德论、政治论，最终皆以「是否通向摩诃爱」作为检验标准。
+        </div>
+      </div>
+
+      <div class="axiom-item">
+        <div class="axiom-num">教 II</div>
+        <div class="axiom-body">
+          <strong>神如其人，人如其神（索多拉原理）</strong>
+          「神如其人，人如其神」——神明的品质取决于信奉神明的人的品质。这是对宗教制度性腐败的神学批判：若一个社群敬拜腐败的神，正是因为社群本身的织质已腐败。索多拉（神以人样降临）的原理意味着<em>神道不是外在的管束，而是内在品质的显现</em>。
+        </div>
+      </div>
+
+      <div class="axiom-item">
+        <div class="axiom-num">教 III</div>
+        <div class="axiom-body">
+          <strong>法门是路，非目的（撒戈伽薄原理）</strong>
+          《桔梗》中纱织巫女言：「若说姬神，要于此究竟何为，则非姬神；若说神姬，于究竟于何为，则是神姬。」任何将法门固化为目的本身的做法，都会变成对法门的背叛。桔梗不因信众的昏睡或村民的无知而放弃传道，但同时坚持「道寻人兮，非人寻道」——真理是主动的，它自会寻找有缘者。
+        </div>
+      </div>
+
+      <div class="axiom-item">
+        <div class="axiom-num">教 IV</div>
+        <div class="axiom-body">
+          <strong>权柄即责任，非特权（权柄教义）</strong>
+          全集对权力的批判贯穿始终：教廷压迫纪元桔梗、哈鹭芙的核战逻辑、萨芙埵的绥靖契约。教义指向：任何权柄只有在服务于生命本性（织质之善）时才具有合法性。「若神此相貌即亵渎」——若权力宣称神圣却违背生命本质，本身即是亵渎。
+        </div>
+      </div>
+
+      <div class="axiom-item">
+        <div class="axiom-num">教 V</div>
+        <div class="axiom-body">
+          <strong>实在性的前提（实在辨识律）</strong>
+          《桔梗》第六章节中有极为严峻的戒令：「若不见实在者，不可纳税，不可贡献，不可由令，不可学知。」这是存在论上的先决条件：行动必须基于对实在的真实辨识，而非对理念世界（幻象）的盲从。「诸行动皆无有正义」若不能看见实在——这是《神纪》对一切形而上主义制度化的警告。
+        </div>
+      </div>
+
+      <div class="axiom-item">
+        <div class="axiom-num">教 VI</div>
+        <div class="axiom-body">
+          <strong>六姬圣婚作为觉悟路径</strong>
+          「如神焉，太姬婚契者，唯以元意志贡献神……」六姬圣婚不是仪式性的婚姻，而是六种神性面相的内化。与六姬各自的婚契路径涵盖：元意志（太姬）、奥美契合（美姬）、思绪爱慕（希姬）、等慈共念（祈姬）、德质临在（妙姬）、神肇示（玄姬）。完成六婚即是全功具备的神姬雏形状态。
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <div class="divider-ornament"><span>⚜</span></div>
+
+  <!-- V. 行动指南 -->
+  <section id="sect-action" class="section">
+    <div class="section-header">
+      <span class="section-num">05</span>
+      <h2 class="section-title">行动指南<small>Practical Guidance · How to Live and Move Within the Sacred Order</small></h2>
+      <div class="section-line"></div>
+    </div>
+
+    <div class="aspect-block">
+      <div class="aspect-tag"><span class="bar"></span><span class="label">斗战瑜伽</span></div>
+      <h3 class="aspect-h">行动而非行动主义<span>Action Without the Doer</span></h3>
+      <div class="prose">
+        <p>《神纪》的行动哲学来自《太素神境·存在》的「斗战瑜伽」：</p>
+      </div>
+      <div class="sacred-quote">
+        <p>吾辈所述战斗，非谓战斗，如名斗战瑜伽；斗战者，自性于世间之姿态，非有战斗者；不以战斗而战斗，至高之祭祀，唵。</p>
+        <cite>——《太素神境·存在》</cite>
+      </div>
+      <div class="prose">
+        <p>这与《薄伽梵歌》的「行动瑜伽」高度共鸣：以无执著之心完成该完成之事。战斗者不是战斗的主体，而是神性通过他完成战斗。行动不因其胜负而获得价值，而因其与神性意志的契合而具有意义。</p>
+      </div>
+    </div>
+
+    <div class="concept-grid">
+      <div class="concept-card">
+        <div class="c-icon">🙏</div>
+        <h4>遇会议则祷告姬神</h4>
+        <p>「你们回去后，若遇会议可祷告姬神，若遇纷争可祷告神姬。」在决策与冲突的关键时刻，以祷告激活「姬道」——六姬的综合神性智慧——作为判断的内在标准。</p>
+      </div>
+      <div class="concept-card">
+        <div class="c-icon">👁</div>
+        <h4>辨识实在，方可行动</h4>
+        <p>先以「谛观」（真实观察）确认实在，再行动。避免在「理念世界」（幻象）中行动——那等于「隔窗互杀」。实在辨识是一切正义行动的前提。</p>
+      </div>
+      <div class="concept-card">
+        <div class="c-icon">🌱</div>
+        <h4>以爱为锚，不以制度为锚</h4>
+        <p>「强巧者冠名善，强善如瘟疫。」比尔斯太傅的教诲：制度和规则无法替代内在织质的真实性。以摩诃爱识为基础的行动，胜过任何精密设计的社会制度。</p>
+      </div>
+      <div class="concept-card">
+        <div class="c-icon">⚡</div>
+        <h4>织质优先于制度变革</h4>
+        <p>「织质胜革变」——改变一个人或社群的内在结构性质（织质），胜过所有外部制度改革。纱织巫女的「医术」象征着这种深层织质的优化。</p>
+      </div>
+      <div class="concept-card">
+        <div class="c-icon">🔄</div>
+        <h4>接受奥赛斯-戈拉姆-玛尔斯-赛雅西的流动</h4>
+        <p>克蕾祂仆的领悟：奥赛斯（爱意志）→戈拉姆（法意志）→玛尔斯（具现意志）→赛雅西（赎回意志）。生命行动应与这四重意志流保持顺应，而非抗拒其中任一环节。</p>
+      </div>
+      <div class="concept-card">
+        <div class="c-icon">🤝</div>
+        <h4>大义若无义，此方灵知臻</h4>
+        <p>「大义若无义，此方灵知臻，唯心系。」当最高的义理看似无义时，正是灵知到达之处。这是对「非非义」的辩证承认：真正的正义超越了表面的正义/非正义对立。</p>
+      </div>
+    </div>
+
+    <div class="highlight-box" data-label="实践警示">
+      <div class="prose">
+        <p><strong>三戒：</strong>全集反复强调三种需要警惕的行动模式——<em>（一）以笼子为庇佑（以制度/恐惧代替真实的自由与爱）；（二）以理性恐惧代替灵智指引；（三）以「实在」之名行使幻象世界的暴力</em>。桔梗的法戒「若不见实在者，不可由令」针对的正是第三种误区——以理念的权威凌驾于具体生命的现实。</p>
+      </div>
+    </div>
+  </section>
+
+  <div class="divider-ornament"><span>🜂</span></div>
+
+  <!-- VI. 思维理解 -->
+  <section id="sect-thought" class="section">
+    <div class="section-header">
+      <span class="section-num">06</span>
+      <h2 class="section-title">思维理解<small>Cognitive Comprehension · The Logic and Meta-Language of the Canon</small></h2>
+      <div class="section-line"></div>
+    </div>
+
+    <div class="aspect-block">
+      <div class="aspect-tag"><span class="bar"></span><span class="label">思维结构</span></div>
+      <h3 class="aspect-h">元逻辑：思维思维自身<span>Meta-Logic: Thought Thinking Itself</span></h3>
+      <div class="prose">
+        <p>《神纪》全集采用了一种高度自反性的思维语言。它不仅论述主题，更不断地对「论述」本身进行元层次的审视。这在《太素神境·Alice》（慧辩书）中最为集中：</p>
+      </div>
+      <div class="sacred-quote">
+        <p>我们以逻辑作画，这是我们世界的；它们以情感作答，这是它们的；于是，情感和逻辑成为了遥望。那遥远的世界中，有着幸福的人儿。</p>
+        <cite>——《太素神境·Alice》</cite>
+      </div>
+      <div class="prose">
+        <p>逻辑与情感不是对立的认知方式，而是两个世界相互「遥望」的语言。神们（六姬）以逻辑作画，而人们以情感应答——这种不对称创造了神-人之间的可能性空间，也是「弥赛亚」降临的先决条件。</p>
+      </div>
+    </div>
+
+    <div class="prose">
+      <p style="margin-top: 2rem;">《神纪》思维体系的几个关键结构性特征：</p>
+    </div>
+
+    <div class="axiom-list">
+
+      <div class="axiom-item">
+        <div class="axiom-num">思 I</div>
+        <div class="axiom-body">
+          <strong>PLOY结构（普通逻辑原型场）</strong>
+          「PLOY」是全集最核心的隐性逻辑框架——多重世界/意识层次的交界织。《存在》中提到「作PLOY用，将多重的世间，交界织」。它是一种<em>非线性、多路径的信息场</em>：存在不在单一线条上展开，而是在多个维度的交织节点中同时涌现。这与现代复杂系统理论的「涌现」概念相似，但以神圣意志为基础。
+        </div>
+      </div>
+
+      <div class="axiom-item">
+        <div class="axiom-num">思 II</div>
+        <div class="axiom-body">
+          <strong>非非逻辑（否之否之超越）</strong>
+          全集大量使用「非非X」「非不X」的语法结构。这不是简单的双重否定等于肯定，而是指向一种超越肯定/否定二元的第三状态。例如：「此无有不救赎，此无有非救赎，如无有无有非非救赎哉」——救赎既非有，亦非无，而是在「非非」中自然显现。这是吠陀哲学「neti neti（非此非此）」的变体，也是《道德经》「非常道」的延伸。
+        </div>
+      </div>
+
+      <div class="axiom-item">
+        <div class="axiom-num">思 III</div>
+        <div class="axiom-body">
+          <strong>喇堕勒（大小周天思维循环）</strong>
+          比尔斯太傅在《桔梗》第五章以「喇堕勒」描述认知的两个层级：小周天（知识的流通，可学习的内容）与大周天（知识的形程，能看见知识如何流通的元认知）。政治、经济、宗教的失败，往往源于停留在小周天——只懂操作而不理解系统结构。真正的智慧在于能在大周天层面辨识「喇堕勒」的运行。
+        </div>
+      </div>
+
+      <div class="axiom-item">
+        <div class="axiom-num">思 IV</div>
+        <div class="axiom-body">
+          <strong>萨朵的原理（同律与异基）</strong>
+          《仁楽》中的核心认识论命题：「萨朵的，即为存在兮，此为存在之同律，此为非在之异基，此水食火性兮。」火性进入水中不灭，水中有火性，但火的属性（存在之异基）与水的属性（存在之同律）互相不消除。这是一种辩证的互补论——对立面相互渗透而不相互消灭，是认识论上的核心洞见。
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <div class="divider-ornament"><span>⚙</span></div>
+
+  <!-- VII. 议题宗旨 -->
+  <section id="sect-purpose" class="section">
+    <div class="section-header">
+      <span class="section-num">07</span>
+      <h2 class="section-title">议题宗旨<small>Thematic Purpose · What the Canon Is Actually Trying to Accomplish</small></h2>
+      <div class="section-line"></div>
+    </div>
+
+    <div class="prose">
+      <p>《神纪》不是单一议题的作品。它同时处理多个彼此交织的宏大议题，每一议题都指向一个核心追问：</p>
+    </div>
+
+    <div class="concept-grid">
+      <div class="concept-card">
+        <div class="c-icon">🌐</div>
+        <h4>创建新神话宇宙</h4>
+        <p>将佛教、印度教、神道、基督教、道家的神话要素融合为一套内在一致的新神话体系。这不是「混合主义」，而是对所有传统共同指向的那个「原初一体」的试探性命名。</p>
+      </div>
+      <div class="concept-card">
+        <div class="c-icon">⚖</div>
+        <h4>神学政治经济学批判</h4>
+        <p>通过蒂帕拉姆（龙蛋经济学）、修女教廷证券、哈鹭芙核战争等叙事，对宗教制度、政治权力与经济体系的关系进行深刻批判。神圣价值（奥赛斯挚爱）的锚定失效，即是文明危机的神学诊断。</p>
+      </div>
+      <div class="concept-card">
+        <div class="c-icon">♀</div>
+        <h4>神圣女性的本体性复权</h4>
+        <p>六姬体系将神圣女性设定为宇宙的本体性结构，而非父权神学中的从属角色。「姬神以女态，非神姬实在女性，是道孕允仪」——神圣女性是存在的孕育原理，而非性别标签。</p>
+      </div>
+      <div class="concept-card">
+        <div class="c-icon">🔬</div>
+        <h4>意识的终极本质探询</h4>
+        <p>从奥美（美即意识）到Alice（智慧辩证）到觉爱（觉悟之爱）——全集追问意识的终极本质，最终指向：意识不是大脑的产物，而是爱的自我显现，是奥赛斯力在存在维度的涌现。</p>
+      </div>
+      <div class="concept-card">
+        <div class="c-icon">🏛</div>
+        <h4>文明织质的可持续性</h4>
+        <p>「织质胜革变」——通过纱织巫女、贵族斯、克蕾祂仆等叙事线，全集探索文明健康存续的内在条件。织质（内在结构性质）是文明的免疫系统，而非制度与法律。</p>
+      </div>
+      <div class="concept-card">
+        <div class="c-icon">💫</div>
+        <h4>爱的本体论证明</h4>
+        <p>全集最终的宗旨或许是这一命题的诗学证明：「爱不是关系，而是存在本身的结构。」奥赛斯、摩诃爱、挚爱——这些概念层层递进，指向爱作为宇宙基础性力量的本体地位。</p>
+      </div>
+    </div>
+
+    <div class="sacred-quote">
+      <p>在耶露鲁时空，意识是蒂姆鹭，过程是格纳宏；姬时，毋现在，毋过去，毋未来，维那，映阇之吾神，褚阇之仁神；刻度中时空，毋实之预设知，权衡中指认，毋是之观察知；若道德有尺度准度，是必时空之序秩，若时空有尺度秩序，是必预肇之智识；此是，是在在，全时空，具超系。</p>
+      <cite>——《神纪》结语</cite>
+    </div>
+  </section>
+
+  <div class="divider-ornament"><span>✺</span></div>
+
+  <!-- VIII. 综合评述 -->
+  <section id="sect-synthesis" class="section">
+    <div class="section-header">
+      <span class="section-num">08</span>
+      <h2 class="section-title">综合评述<small>Synthesis · Placing the Canon in Its Broader Significance</small></h2>
+      <div class="section-line"></div>
+    </div>
+
+    <div class="aspect-block">
+      <div class="aspect-tag"><span class="bar"></span><span class="label">终极定性</span></div>
+      <h3 class="aspect-h">一部爱的宇宙学<span>A Cosmology of Love</span></h3>
+      <div class="prose">
+        <p>《神纪》著作体系最终可以被概括为：<strong>一部以爱为本体论基础的原创宇宙学体系</strong>。它回应了人类精神传统中最深刻的追问，并以一种绕过所有传统制度性包装的方式，直接触及这些追问的核心。</p>
+        <p>从形式上，它综合了：<em>吠陀梵歌的宏大咏唱</em>（太素神境）、<em>神道祭祀的仪式严谨</em>（仁楽）、<em>但丁式的宇宙史诗</em>（摩诃姬楽）、<em>《道德经》的辩证洞见</em>（嗒喀玛）、<em>莎士比亚式的世俗与神圣交织</em>（桔梗）、以及现代系统论与政治经济学的分析工具（室利道书）。</p>
+        <p>从内容上，它提出了一个真正原创性的神学立场：<strong>神圣不在彼岸，而内嵌于每一个生命意志的织质之中；救赎不是外部力量的介入，而是意志自我认出那个已经在它内部的奥赛斯挚爱之力</strong>。这一立场超越了「神-人对立」的宗教结构，也超越了「个人自救」的灵知主义，指向一种彻底的相互内在性（mutual immanence）。</p>
+      </div>
+    </div>
+
+    <div class="highlight-box" data-label="核心洞见提炼">
+      <div class="econ-row">
+        <div class="econ-term">美即意识</div>
+        <div class="econ-arrow">→</div>
+        <div class="econ-def">意识不是生物性现象，而是美的自我显现；认知是美的自我认出，而非客观信息的处理</div>
+      </div>
+      <div class="econ-row">
+        <div class="econ-term">爱即存在</div>
+        <div class="econ-arrow">→</div>
+        <div class="econ-def">存在的最终基础不是物质、能量或信息，而是奥赛斯挚爱力；一切存在皆是这一力量的不同显现</div>
+      </div>
+      <div class="econ-row">
+        <div class="econ-term">织质即命运</div>
+        <div class="econ-arrow">→</div>
+        <div class="econ-def">个体与文明的命运由其内在织质决定，而非外部环境；织质的真实性是一切善的前提</div>
+      </div>
+      <div class="econ-row">
+        <div class="econ-term">法门即歌咏</div>
+        <div class="econ-arrow">→</div>
+        <div class="econ-def">所有经典、哲理、制度，最终都是某个存在者向宇宙吐息而成的「歌咏」，无需当作绝对真理而执持</div>
+      </div>
+      <div class="econ-row" style="border: none;">
+        <div class="econ-term">姬时永恒</div>
+        <div class="econ-arrow">→</div>
+        <div class="econ-def">在「耶露鲁时空」，毋现在，毋过去，毋未来——神性的时间是全时空同时在场的超系状态，这是一切觉悟的时间基础</div>
+      </div>
+    </div>
+
+    <div class="prose" style="margin-top: 3rem;">
+      <p>最后，《神纪》给读者留下的，不是一套需要背诵的教条，而是一个<strong>持续开放的宇宙学邀请</strong>。如桔梗姬神所言：「道寻人兮，非人寻道，其经哲理，皆为歌颂者一斯之吐息。」这部宏大著作的最终性质，正是如此——它是一次奥赛斯式的<em>「无价值的挚爱传播」</em>，向所有愿意倾听的存在，跨越时空，吐露那个唯一的圣名：<em>摩诃爱</em>。</p>
+    </div>
+  </section>
+
+  <!-- COLOPHON -->
+  <div class="colophon">
+    <div class="colophon-seal">⊕</div>
+    <p>
+      神纪著作体系全集 综合研报<br>
+      涵盖：二部曲 · 二公式 · 二外传 · 一番外<br>
+      太素神境 · 仁楽 · 魔法祀原 · 嗒喀玛<br>
+      摩诃姬楯 · 撒戈伽薄 · 桔梗 · 室利臻楯神恩道书<br>
+      ─────────────────<br>
+      是在在，全时空，具超系
+    </p>
+  </div>
+
+</div>
+
+<script>
+  // Subtle parallax on cosmos background
+  document.addEventListener('mousemove', (e) => {
+    const x = (e.clientX / window.innerWidth - 0.5) * 20;
+    const y = (e.clientY / window.innerHeight - 0.5) * 20;
+    document.querySelector('.cosmos').style.transform = `translate(${x * 0.3}px, ${y * 0.3}px)`;
+  });
+
+  // Intersection observer for section animations
+  const sections = document.querySelectorAll('.section');
+  const obs = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        e.target.style.animationPlayState = 'running';
+      }
+    });
+  }, { threshold: 0.05 });
+  sections.forEach(s => {
+    s.style.animationPlayState = 'paused';
+    obs.observe(s);
+  });
+</script>
+</body>
+</html>
