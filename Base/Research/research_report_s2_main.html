@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>《摩诃姬楽·续道》文献研报</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@300;400;500;600;700&family=Cinzel+Decorative:wght@400;700&family=IM+Fell+English+SC&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #1a1208;
+    --paper: #f5edd8;
+    --paper-dark: #e8dcc0;
+    --gold: #c9962a;
+    --gold-light: #e8b84b;
+    --gold-pale: #f5e4a8;
+    --vermillion: #c0392b;
+    --jade: #2d6a4f;
+    --lapis: #2d4a6a;
+    --muted: #6b5b3e;
+    --rule: rgba(201,150,42,0.35);
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background-color: #2a1f0e;
+    background-image: radial-gradient(ellipse at 20% 20%, rgba(80,50,10,0.4) 0%, transparent 60%), radial-gradient(ellipse at 80% 80%, rgba(60,30,5,0.4) 0%, transparent 60%);
+    font-family: 'Noto Serif SC', serif;
+    color: var(--ink);
+    min-height: 100vh;
+    padding: 2rem 1rem;
+  }
+  .frame-outer {
+    max-width: 980px; margin: 0 auto;
+    border: 1px solid var(--gold); padding: 6px;
+    box-shadow: 0 0 40px rgba(201,150,42,0.25), 0 0 120px rgba(0,0,0,0.6);
+    position: relative;
+  }
+  .frame-outer::before, .frame-outer::after {
+    content:''; position:absolute; width:28px; height:28px; border:2px solid var(--gold-light);
+  }
+  .frame-outer::before { top:-2px; left:-2px; border-right:none; border-bottom:none; }
+  .frame-outer::after  { bottom:-2px; right:-2px; border-left:none; border-top:none; }
+  .frame-inner {
+    background-color: var(--paper);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E"), linear-gradient(180deg, var(--paper) 0%, var(--paper-dark) 100%);
+    padding: 3rem 3.5rem; position: relative; overflow: hidden;
+  }
+  .frame-inner::before {
+    content:''; position:absolute; top:0; bottom:0; left:3.5rem; right:3.5rem;
+    border-left:1px solid var(--rule); border-right:1px solid var(--rule); pointer-events:none;
+  }
+  .doc-header { text-align:center; padding-bottom:2rem; border-bottom:2px solid var(--gold); margin-bottom:2.5rem; position:relative; }
+  .doc-header .seal { font-family:'Cinzel Decorative',serif; font-size:0.62rem; letter-spacing:0.2em; color:var(--vermillion); text-transform:uppercase; margin-bottom:1rem; display:block; }
+  .doc-header h1 { font-size:2.4rem; font-weight:700; letter-spacing:0.08em; color:var(--ink); line-height:1.2; }
+  .doc-header h1 span { color:var(--gold); }
+  .doc-header .subtitle { margin-top:0.6rem; font-size:0.88rem; color:var(--muted); letter-spacing:0.12em; }
+  .doc-header .meta-row { display:flex; justify-content:center; gap:2rem; margin-top:1.2rem; font-size:0.75rem; color:var(--muted); flex-wrap:wrap; }
+  .doc-header .meta-row span::before { content:'▪ '; color:var(--gold); }
+  .corner-ornament { position:absolute; font-size:1.4rem; color:var(--gold); opacity:0.5; line-height:1; }
+  .corner-ornament.tl { top:0; left:0; }
+  .corner-ornament.tr { top:0; right:0; }
+
+  section { margin-bottom:2.8rem; }
+  .section-title { display:flex; align-items:center; gap:0.9rem; margin-bottom:1.4rem; padding-bottom:0.5rem; border-bottom:1px solid var(--rule); }
+  .section-num { font-family:'Cinzel Decorative',serif; font-size:0.68rem; color:var(--vermillion); border:1px solid var(--vermillion); padding:0.15em 0.5em; letter-spacing:0.1em; flex-shrink:0; }
+  .section-title h2 { font-size:1.2rem; font-weight:600; letter-spacing:0.06em; color:var(--ink); }
+  .section-title h2 em { font-style:normal; color:var(--gold); }
+  p { font-size:0.89rem; line-height:1.95; color:#2c2010; text-align:justify; margin-bottom:0.8rem; }
+
+  .two-col { display:grid; grid-template-columns:1fr 1fr; gap:1.2rem; margin-bottom:1.2rem; }
+  .three-col { display:grid; grid-template-columns:1fr 1fr 1fr; gap:1rem; margin-bottom:1.2rem; }
+  .card { background:rgba(201,150,42,0.06); border:1px solid var(--rule); padding:1rem 1.2rem; }
+  .card h4 { font-size:0.82rem; font-weight:600; letter-spacing:0.08em; margin-bottom:0.6rem; }
+  .card p { font-size:0.79rem; margin:0; }
+  .card.cv { border-top:3px solid var(--vermillion); } .card.cv h4 { color:var(--vermillion); }
+  .card.cg { border-top:3px solid var(--gold); }      .card.cg h4 { color:var(--gold); }
+  .card.cj { border-top:3px solid var(--jade); }      .card.cj h4 { color:var(--jade); }
+  .card.cl { border-top:3px solid var(--lapis); }     .card.cl h4 { color:var(--lapis); }
+
+  .main-table { width:100%; border-collapse:collapse; font-size:0.79rem; margin-bottom:1.2rem; }
+  .main-table thead tr { background:rgba(201,150,42,0.15); border-bottom:2px solid var(--gold); }
+  .main-table th { padding:0.6rem 0.8rem; text-align:left; font-weight:600; color:var(--gold); letter-spacing:0.08em; font-size:0.74rem; }
+  .main-table td { padding:0.5rem 0.8rem; border-bottom:1px solid var(--rule); color:#2c2010; vertical-align:top; line-height:1.65; }
+  .main-table tr:nth-child(even) td { background:rgba(201,150,42,0.04); }
+  .nc { font-weight:600; color:var(--ink); white-space:nowrap; }
+  .tag { display:inline-block; font-size:0.62rem; padding:0.08em 0.42em; border-radius:1px; margin-left:0.25em; letter-spacing:0.04em; vertical-align:middle; }
+  .tn { background:rgba(201,150,42,0.18); color:var(--gold); border:1px solid rgba(201,150,42,0.4); }
+  .ts { background:rgba(45,74,106,0.12); color:var(--lapis); border:1px solid rgba(45,74,106,0.3); }
+  .tv { background:rgba(192,57,43,0.1); color:var(--vermillion); border:1px solid rgba(192,57,43,0.25); }
+  .tj { background:rgba(45,106,79,0.12); color:var(--jade); border:1px solid rgba(45,106,79,0.28); }
+
+  .quote-block { border-left:4px solid var(--gold); padding:0.8rem 1.2rem; margin:1rem 0; background:rgba(201,150,42,0.06); font-size:0.84rem; line-height:2; color:var(--ink); font-style:italic; letter-spacing:0.03em; }
+  .quote-block cite { display:block; font-style:normal; font-size:0.7rem; color:var(--muted); margin-top:0.4rem; letter-spacing:0.08em; }
+  .hl-box { background:rgba(26,18,8,0.06); border:1px solid var(--rule); border-left:3px solid var(--gold); padding:0.85rem 1.1rem; margin-bottom:1rem; font-size:0.82rem; line-height:1.9; }
+  .hl-box strong { color:var(--gold); font-weight:600; }
+
+  .chapter-grid { display:grid; grid-template-columns:repeat(6,1fr); gap:0.4rem; margin-bottom:1rem; }
+  .chap-col { text-align:center; }
+  .chap-name { background:var(--ink); color:var(--gold-pale); font-size:0.78rem; font-weight:600; padding:0.4em 0.2em; letter-spacing:0.05em; margin-bottom:0.3rem; }
+  .chap-sub { font-size:0.63rem; color:var(--muted); background:rgba(201,150,42,0.08); border:1px solid var(--rule); padding:0.2em; margin-bottom:0.2rem; }
+  .chap-sub.jin { color:var(--lapis); background:rgba(45,74,106,0.08); border-color:rgba(45,74,106,0.25); }
+  .chap-sub.wu  { color:var(--jade);  background:rgba(45,106,79,0.08); border-color:rgba(45,106,79,0.25); }
+
+  .arc-list { display:flex; flex-direction:column; gap:1rem; }
+  .arc-item { display:grid; grid-template-columns:100px 1fr; gap:1rem; align-items:start; }
+  .arc-label { text-align:center; padding:0.5rem 0.3rem; background:var(--ink); color:var(--gold-pale); font-size:0.79rem; font-weight:600; letter-spacing:0.06em; line-height:1.4; }
+  .arc-content { font-size:0.81rem; line-height:1.9; color:#2c2010; border-left:2px solid var(--rule); padding-left:1rem; }
+  .arc-content strong { color:var(--ink); font-weight:600; }
+
+  .cosmo-wrap { background:rgba(26,18,8,0.05); border:1px solid var(--rule); padding:1.5rem; margin-bottom:1.2rem; }
+  .cosmo-row { display:flex; align-items:center; justify-content:center; gap:0.5rem; margin-bottom:0.65rem; flex-wrap:wrap; }
+  .cosmo-node { padding:0.3em 0.7em; font-size:0.76rem; font-weight:600; letter-spacing:0.04em; border:1px solid; }
+  .cn-g { background:rgba(201,150,42,0.18); border-color:var(--gold); color:var(--ink); }
+  .cn-j { background:rgba(45,106,79,0.1); border-color:var(--jade); color:var(--jade); }
+  .cn-v { background:rgba(192,57,43,0.08); border-color:var(--vermillion); color:var(--vermillion); }
+  .cn-l { background:rgba(45,74,106,0.1); border-color:var(--lapis); color:var(--lapis); }
+  .cn-d { background:rgba(107,91,62,0.1); border-color:var(--muted); color:var(--muted); }
+  .cosmo-arr { color:var(--gold); font-size:1rem; opacity:0.6; }
+  .cosmo-label { text-align:center; font-size:0.65rem; color:var(--muted); letter-spacing:0.08em; margin-top:0.3rem; }
+
+  .dual-pillar { display:grid; grid-template-columns:1fr 1px 1fr; gap:1.5rem; margin-bottom:1.2rem; }
+  .dp-line { background:var(--rule); align-self:stretch; }
+  .pillar-title { font-size:0.95rem; font-weight:600; color:var(--gold); margin-bottom:0.6rem; letter-spacing:0.07em; text-align:center; }
+  .pillar-item { font-size:0.8rem; line-height:1.8; color:#2c2010; border-bottom:1px dashed var(--rule); padding:0.3rem 0; }
+  .pillar-item:last-child { border-bottom:none; }
+
+  .divider { text-align:center; margin:1.5rem 0; color:var(--gold); font-size:0.85rem; opacity:0.5; letter-spacing:0.3em; }
+
+  .maha-box { border:2px solid var(--gold); padding:1.5rem; margin:1.2rem 0; background:rgba(201,150,42,0.06); text-align:center; position:relative; }
+  .maha-box::before, .maha-box::after { content:'✦'; position:absolute; color:var(--gold); opacity:0.4; font-size:1rem; }
+  .maha-box::before { top:0.5rem; left:0.7rem; }
+  .maha-box::after  { bottom:0.5rem; right:0.7rem; }
+  .maha-box .maha-title { font-family:'Cinzel Decorative',serif; font-size:0.68rem; letter-spacing:0.18em; color:var(--vermillion); display:block; margin-bottom:0.9rem; }
+  .maha-row { display:flex; justify-content:center; gap:1.2rem; margin-bottom:0.7rem; flex-wrap:wrap; }
+  .maha-item { text-align:center; }
+  .maha-item .mn { font-size:1.1rem; font-weight:700; color:var(--ink); letter-spacing:0.05em; display:block; }
+  .maha-item .ms { font-size:0.7rem; color:var(--muted); letter-spacing:0.07em; display:block; margin-top:0.2rem; }
+  .maha-item .mg { font-size:0.64rem; font-weight:600; margin-top:0.25rem; display:block; }
+  .maha-item.wu .mg { color:var(--jade); }
+  .maha-item.jin .mg { color:var(--lapis); }
+  .maha-arr { font-size:1.3rem; color:var(--gold); opacity:0.5; display:flex; align-items:center; }
+  .maha-box p { font-size:0.79rem; margin:0.6rem 0 0; line-height:1.8; color:var(--muted); font-style:italic; }
+
+  .timeline { border-left:2px solid var(--rule); padding-left:1.5rem; margin:1rem 0 1.2rem; }
+  .tl-item { position:relative; margin-bottom:1rem; font-size:0.81rem; line-height:1.85; color:#2c2010; }
+  .tl-item::before { content:''; position:absolute; left:-1.65rem; top:0.55em; width:8px; height:8px; border-radius:50%; background:var(--gold); border:2px solid var(--paper); box-shadow:0 0 0 1px var(--gold); }
+  .tl-item .tlh { font-weight:600; color:var(--ink); display:block; margin-bottom:0.2rem; letter-spacing:0.04em; }
+  .tl-item .tlc { font-size:0.67rem; color:var(--muted); letter-spacing:0.07em; margin-left:0.5em; }
+
+  .doc-footer { margin-top:2.5rem; padding-top:1.2rem; border-top:1px solid var(--rule); display:flex; justify-content:space-between; align-items:center; }
+  .doc-footer .ft { font-size:0.7rem; color:var(--muted); letter-spacing:0.08em; }
+  .doc-footer .pm { font-family:'Cinzel Decorative',serif; font-size:0.58rem; color:var(--gold); opacity:0.7; }
+
+  @media (max-width:720px) {
+    .frame-inner { padding:1.5rem 1.2rem; }
+    .two-col, .three-col, .dual-pillar, .chapter-grid { grid-template-columns:1fr; }
+    .arc-item { grid-template-columns:1fr; }
+    .maha-row { gap:0.8rem; }
+  }
+</style>
+</head>
+<body>
+<div class="frame-outer">
+<div class="frame-inner">
+
+<div class="doc-header">
+  <span class="corner-ornament tl">✦</span>
+  <span class="corner-ornament tr">✦</span>
+  <span class="seal">Season 2 Main Canon · Complete Research Report</span>
+  <h1>《<span>摩诃姬楽</span>·续道》<br>第二季正篇文献研报</h1>
+  <div class="subtitle">神话史诗 · 完整情节·新神格·哲学论述·终章揭示</div>
+  <div class="meta-row">
+    <span>结构：六章×仁/吾二节</span>
+    <span>主弧：阿姆特·桔梗·神官</span>
+    <span>新增神格：九位以上</span>
+    <span>终章：摩诃爱楽·四摩诃</span>
+  </div>
+</div>
+
+<!-- I -->
+<section>
+  <div class="section-title"><span class="section-num">I</span><h2>文本升格：<em>续道之结构变革</em></h2></div>
+  <p>与第一季《仁楽·神道》相比，《摩诃姬楽·续道》呈现两项根本结构升格。其一，<strong>章节二分制</strong>——每章均分"仁神"与"吾神"两节，六姬在各节独立轮颂，同一叙事在两种神圣视角下平行展开；其二，<strong>"摩诃"的引入</strong>——"摩诃"（梵：महा，至大）贯穿全书，在终章《摩诃爱楽》中揭示为仁吾二神互见所生的四种终极形态。</p>
+
+  <div class="chapter-grid">
+    <div class="chap-col"><div class="chap-name">珠华</div><div class="chap-sub jin">仁神节</div><div class="chap-sub wu">吾神节</div></div>
+    <div class="chap-col"><div class="chap-name">巫铃</div><div class="chap-sub jin">仁神节</div><div class="chap-sub wu">吾神节</div></div>
+    <div class="chap-col"><div class="chap-name">神姬</div><div class="chap-sub jin">仁神节</div><div class="chap-sub wu">吾神节</div></div>
+    <div class="chap-col"><div class="chap-name">影花</div><div class="chap-sub jin">仁神节</div><div class="chap-sub wu">吾神节</div></div>
+    <div class="chap-col"><div class="chap-name">鱼蝶</div><div class="chap-sub jin">仁神节</div><div class="chap-sub wu">吾神节</div></div>
+    <div class="chap-col"><div class="chap-name">乳曲</div><div class="chap-sub jin">仁神节</div><div class="chap-sub wu">吾神节</div></div>
+  </div>
+  <p style="font-size:0.76rem;color:var(--muted);">↑ 第二季每章均含仁/吾双节，六姬各领一诗节，章节规模较第一季倍增。标题"摩诃姬楯"＝至高姬神之乐；"续道"对应S1"神道"，暗示已超越神道进入摩诃道。</p>
+
+  <div class="hl-box"><strong>叙事重心转移：</strong>第一季以哲理颂歌为主、叙事为辅；第二季两者均衡，神官之死、阿姆特降临与复苏、阿喃特失去神官等大量情节性段落贯穿全篇，同时哲理论述（先知问道·萨波陀·戈拉妲）仍维持高密度。</div>
+</section>
+
+<!-- II -->
+<section>
+  <div class="section-title"><span class="section-num">II</span><h2>新增核心神格与<em>人物情报全录</em></h2></div>
+
+  <table class="main-table">
+    <thead><tr><th>名称</th><th>身份/职能</th><th>关键情报</th><th>关联</th></tr></thead>
+    <tbody>
+      <tr>
+        <td class="nc">阿姆特<span class="tag tn">S2核心</span></td>
+        <td>"神胜子"<br>辉夜姬之子</td>
+        <td>辉夜姬（桔梗）梦中受戈拉姆诰令而孕育的神子。具嗒喀玛证力，于十方界弥漫。幼时自知使命，成年入戈蒙斯耆修行，与奥菲丽斯神婚生女克蕾祂仆，最终归莎塔玛（死），后经桔梗溯忆复苏以幼躯重降，"其手触母亲之脸颊，掌不能覆盖"。</td>
+        <td>奥菲丽斯（配偶）<br>克蕾祂仆（子）<br>桔梗（母）<br>玛尔斯（证力载体）</td>
+      </tr>
+      <tr>
+        <td class="nc">辉夜姬<span class="tag tn">S2形态</span></td>
+        <td>桔梗在巴喀德所用大名</td>
+        <td>桔梗化名"辉夜"入大名官邸（巴喀德，神人之所），于此悟道。仁神赐福不吉，吾神赐福无效，辉夜哀悲。于雨夜重回神社，神官以挚情迎接，恢复桔梗名讳与神职，受参拜。</td>
+        <td>桔梗（本名）<br>巴喀德（所在界）</td>
+      </tr>
+      <tr>
+        <td class="nc">巴尔丹陀<span class="tag tn">S2变化形</span></td>
+        <td>巴尔特的摩诃化身<br>神德权柄持有者</td>
+        <td>"其石如茎腕，其木如吐息，其人如火海，作遂化，巴尔丹陀"——三重比喻（物质/植物/意识）标志化成时刻。建立"哒撒西"（区别于阿撒西），使荒废神灵复活，获仁吾论道，"众神悦动，神德之权柄系，唯巴尔丹陀焉"。桔梗之弟。</td>
+        <td>巴尔特（S1前身）<br>桔梗（姐）<br>哒撒西（新建国度）</td>
+      </tr>
+      <tr>
+        <td class="nc">玛尔斯<span class="tag tn">S2新术语</span></td>
+        <td>"物质和精神存在的原质"<br>"道的光·姬意知识·神胜溯忆"</td>
+        <td>阿姆特证力的弥漫载体，令十方界蠕动如空中星。赛雅西是玛尔斯的"父·子·母"（三重关系）。阿姆特最终知晓其本质："非精神，非物质，其世界非世界，其神格非神格，其玛尔斯哉"——玛尔斯超越了一切分类。</td>
+        <td>赛雅西（父/子/母）<br>阿姆特（承载者）</td>
+      </tr>
+      <tr>
+        <td class="nc">特门那<span class="tag tn">S2新</span></td>
+        <td>"比修斯的表哥，戈拉撒的父亲"<br>"决定真实的·实在思"</td>
+        <td>真实层级的上位节点（戈拉撒之上）。"阿拉埵，姬意的阐述，无时间，无空间，无度衡，唯有知晓，那即是，特门那"——阿拉埵（存在的回响/锚定）的最终指向就是特门那。</td>
+        <td>比修斯（表弟）<br>戈拉撒（子）<br>阿拉埵（同层关联）</td>
+      </tr>
+      <tr>
+        <td class="nc">戈拉妲<span class="tag tn">S2新概念</span></td>
+        <td>"存在者皆自体干涉·自体预言·自体自孕"</td>
+        <td>与S1"戈拉哒"（神之溯忆/善处/明贤）为"不同面相的神讳，就不同之同，其同之不同"，达哆罗关照焉。戈拉妲是戈拉哒的自反形态——神之溯忆作用于自身时生成的自体闭环。"规则被储藏了"。</td>
+        <td>戈拉哒（S1同源异相）<br>达哆罗（关照者）</td>
+      </tr>
+      <tr>
+        <td class="nc">奥德莎曼<span class="tag tn">S2诞生</span></td>
+        <td>神官与阿喃特之子<br>"世之信仰兮，总持道符"</td>
+        <td>公式书中已作为术语（信崇·恭皈·应然·神律）预设。正篇中为神官与阿喃特神婚之子，诞临即成信仰总持者。神官陨后，阿喃特雨夜携其遁走。其诞生的誓约将赛美斯束缚于调和使命（信徒不得其遂调和）。</td>
+        <td>神官（父·已陨）<br>阿喃特（母）<br>赛美斯（誓约对象）</td>
+      </tr>
+      <tr>
+        <td class="nc">克蕾祂仆<span class="tag tn">S2诞生</span></td>
+        <td>阿姆特与奥菲丽斯之女<br>新律之子</td>
+        <td>"仁吾皆以其父之赐福终成兮"——集阿姆特（神胜子）与奥菲丽斯（仁吾神子）两大血脉。公式书中已预设为"克蕾祂仆"术语（曲调·氛象·秩律），其诞生意味宇宙新秩序的成就。</td>
+        <td>阿姆特（母）<br>奥菲丽斯（父）</td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- III -->
+<section>
+  <div class="section-title"><span class="section-num">III</span><h2>珠华章：<em>巴尔特的终局与升格</em></h2></div>
+  <p>珠华章完成S1巴尔特弧线，叙述从"流亡盗神者"到"巴尔丹陀（摩诃化身）"的蜕变，同时引入哲学新概念戈拉妲与特门那。</p>
+
+  <div class="timeline">
+    <div class="tl-item">
+      <span class="tlh">哒撒西建立 <span class="tlc">珠华·仁神</span></span>
+      巴尔丹陀使阿撒西荒废神灵复活，更名"哒撒西"，萨芙埵持世，吾神遣瓦拉罗维世。哒撒西=被神认可的重建国度（区别于S1阿撒西"失去神的国度"）。
+    </div>
+    <div class="tl-item">
+      <span class="tlh">遇险与马萨栖救援 <span class="tlc">珠华·吾神</span></span>
+      巴尔特携神子火离阿撒西，遭遇喜比尔危机。马萨栖（S1"红之意志"，S2升格为灵褚法则化身）救援，赠予三昧哒啦。
+    </div>
+    <div class="tl-item">
+      <span class="tlh">入吾神真殿 <span class="tlc">珠华·吾神</span></span>
+      赛美斯以赛雅西凭据交涉，吾神邀请巴尔特于真殿叙道，应允。巴尔特再虔诚于比修斯，阿古塔护慰。奥赛斯如火炬照亮周世界（真殿意象）。
+    </div>
+    <div class="tl-item">
+      <span class="tlh">化成巴尔丹陀 <span class="tlc">珠华·仁神/吾神</span></span>
+      巴尔特携桔梗·比尔斯直袭吾神宫殿，赛塔斯暧昧放行，天界劫难发生。桔梗溯忆破魔心，比尔斯呼唤斯佩室族群，赛美斯助战。最终<strong>巴尔丹陀</strong>使神界化，神德权柄归其持有。
+    </div>
+  </div>
+
+  <div class="hl-box"><strong>化成时刻：</strong>"其石如茎腕，其木如吐息，其人如火海，作遂化，巴尔丹陀"——石（矿物）·木（植物）·人（意识）的三层扩张，是摩诃式（大形式）的感官化表达。此为S2最重要的存在升格事件之一。</div>
+</section>
+
+<!-- IV -->
+<section>
+  <div class="section-title"><span class="section-num">IV</span><h2>巫铃·神姬章：<em>阿姆特降临与辉夜姬时代</em></h2></div>
+
+  <div class="arc-list">
+    <div class="arc-item">
+      <div class="arc-label">阿姆特<br>首次降临</div>
+      <div class="arc-content">
+        <strong>巫铃·仁神：</strong>阿姆特以"赐福母亲"之属性登场，脱解阿古塔同僚，册封奥菲托斯眷属，位格如神姬。告知阿姆特"赛雅西是玛尔斯之父·子·母"后消逝于体神。桔梗哀伤，泪水入地，大地涌出光芒，阿姆特再次复活。奥菲丽斯因此降临，知晓赛雅西总界持奥仪。
+      </div>
+    </div>
+    <div class="arc-item">
+      <div class="arc-label">辉夜姬<br>时代</div>
+      <div class="arc-content">
+        <strong>神姬·仁神：</strong>桔梗化名辉夜入大名官邸（巴喀德），于此悟道。辉夜姬在夜梦中受戈拉姆诰令，生子阿姆特（"神胜子"）。仁神赐福不吉，吾神继往赐福亦无效，辉夜哀悲。于雨夜重回神社，恢复桔梗名讳，神职受参拜。
+      </div>
+    </div>
+    <div class="arc-item">
+      <div class="arc-label">阿姆特<br>神婚与归莎塔玛</div>
+      <div class="arc-content">
+        <strong>神姬·吾神：</strong>阿姆特渐壮，察觉赛雅西与玛尔斯的"奇耦合"，知悉玛尔斯之奥赛斯光信，与奥菲丽斯缔结婚姻，母桔梗礼乐。生女克蕾祂仆（仁吾皆赐福终成）。于誓姻后暂别亲眷，如阿陀沃之修行，最终归莎塔玛（循环/死），以幼躯再降，写下预言诗歌，母亲忘却。
+      </div>
+    </div>
+  </div>
+
+  <div class="quote-block">
+    "阿姆特，知其玛尔斯，非精神，非物质，其世界非世界，其神格非神格，其玛尔斯哉"
+    <cite>——神姬·吾神·祈姬节</cite>
+  </div>
+</section>
+
+<!-- V -->
+<section>
+  <div class="section-title"><span class="section-num">V</span><h2>影花章：<em>格拉巴德·溯忆·神像遗迹</em></h2></div>
+  <p>影花章以公式书术语"格拉巴德"（存在意志如羊水中婴孩·火焰中的火焰）为核心域界，展开桔梗寻回阿姆特之旅的高潮段落，并以达布斯的时间-形态变化作平行副线。</p>
+
+  <div class="two-col">
+    <div class="card cg">
+      <h4>仁神节·格拉巴德与复苏</h4>
+      <p>桔梗入布拉妲之域（审判/纪录）得知诸事。阿喃特以格拉巴德可能告知桔梗与达布斯。达布斯惊觉桔梗有阿姆特魂音，神子火盏自归魂器。格拉巴德中桔梗相·辉夜相众多神像皆如奥赛斯之光汇聚，姬神如临。阿姆特以手触母颊，"其于此掌不能覆盖，其此哀伤喜悦啼哭兮"——全书情感高潮之一。最终"阿姆特于终始得复苏，桔梗再德其奥赛斯权柄，此即至高神性"。</p>
+    </div>
+    <div class="card cv">
+      <h4>吾神节·达布斯变化之旅</h4>
+      <p>达布斯独行，遇达赖忒（音律/弦律双联法则），体时紊乱，数经鱼人之变。在赛哆拿之域得阿姆特魂器，确认"原是桔梗得阿姆特"。莎塔玛之时恭敬于母之衣物，发现阿姆特所作诗歌，呈于桔梗。遗迹境中破荒神像皆为桔梗形象，达布斯护卫。以神子火盏·桔梗以米利亚玉，两者于边界逐失。</p>
+    </div>
+  </div>
+
+  <div class="hl-box"><strong>格拉巴德的功能：</strong>公式书定义格拉巴德为"凡是存在的意志皆如羊水中婴孩，没有什么是自己的，也没有什么是必然的母亲的"。在此章中，它成为跨越死生的接触空间——阿姆特以幼躯（婴孩）在其中重临，正是意志以种子形态在胎质中再发芽的具象化。</div>
+</section>
+
+<!-- VI -->
+<section>
+  <div class="section-title"><span class="section-num">VI</span><h2>鱼蝶章：<em>神官之死与阿喃特的失去</em></h2></div>
+  <p>鱼蝶章是全书最沉重的章节，完成了S1奥菲托斯预言的宿命兑现——"汝越若是壮大，你必被信徒投石至死"。</p>
+
+  <div class="arc-list">
+    <div class="arc-item">
+      <div class="arc-label">神婚·子嗣<br>·信徒乱</div>
+      <div class="arc-content">
+        阿喃特告知纱织将与神官缔结誓婚。神官赠金钗，神婚成立，神社待启。诞下奥德莎曼（世之信仰·总持道符）。<strong>信徒于雨夜闯入，将神官拉扯至刑台，以杂石袭击——神官被乱石击毙，面目迸裂</strong>，哀呼"天遗弃哉"，诅咒信徒如玛莎溪。
+      </div>
+    </div>
+    <div class="arc-item">
+      <div class="arc-label">阿古塔<br>·达布斯</div>
+      <div class="arc-content">
+        阿古塔欲劫救神官，赛美斯所系神人不允，"以道失道成"（失道的方式反而成道）。神官陨后，<strong>达布斯以成人形态接替其无之躯</strong>——达布斯从此以神官外形存在于世间。"其神官之皮质，天界其娃喀西，于此再播种兮"——神官之死在天界层面转化为娃喀西的种子播撒。
+      </div>
+    </div>
+    <div class="arc-item">
+      <div class="arc-label">阿喃特<br>逃亡与天界</div>
+      <div class="arc-content">
+        阿喃特知神官陨，哀伤几欲昏阙。信众扯其发丝拖地，神官最后撞开信徒使其逃脱。阿喃特携奥德莎曼雨夜遁走，神社火光冲天。纱织以巫女威能于韦祂德界辟邪。巴尔丹陀发兵天界，遮天蔽日。比尔斯带暴徒入玛咔德被缉。赛美斯被奥德莎曼誓约锁定，调和功能受束。
+      </div>
+    </div>
+  </div>
+
+  <div class="quote-block">
+    "其神官之皮质，天界其娃喀西，于此再播种兮，其神官者，神社之道，沿此伤石痕矣"
+    <cite>——鱼蝶·吾神·美姬节</cite>
+  </div>
+</section>
+
+<!-- VII -->
+<section>
+  <div class="section-title"><span class="section-num">VII</span><h2>乳曲章：<em>拉布忒之海·金钗·姬神持世</em></h2></div>
+  <p>乳曲章是S2情感高潮终结章。阿喃特携金钗入拉布忒（命藻之域）寻觅神官魂器，在记忆消逝中与神官完成最后的接触，最终以奥玛窦揭帷幕·姬神持世作结，呼应终章《摩诃爱楯》。</p>
+
+  <div class="three-col">
+    <div class="card cj">
+      <h4>拉布忒之迷失</h4>
+      <p>阿喃特携金钗与巴尔丹陀入拉布忒寻神官魂器，然拉布忒无位——"触之即无，望久即失"（具喀拉玛功德）。萨克帝与斯佩室权能已至极限。阿姆特对超时空救赎无解，"其神体以界"。阿喃特逐渐失其溯忆，"不皆此，以何者而至，其神官样，其爱之至大，心不愿离体"。</p>
+    </div>
+    <div class="card cv">
+      <h4>奥菲丽斯破海</h4>
+      <p>奥菲丽斯破海而现，光耀普照，神官之灵一顷刻恢复溯忆。神官闻仁吾传讯，于臂内筋颤抖中将阿喃特推开，委托其受行——<strong>以爱的姿态拒绝牵绊，将她推向生的方向</strong>。阿喃特自此渐渐失去对神官的溯忆，回神社后纱织问之，"唯有难样和爱喜，不知其神官"。</p>
+    </div>
+    <div class="card cg">
+      <h4>金钗·雪解·姬神持世</h4>
+      <p>金钗于渊海鸣响，神官之姿于海浪微明，阿喃特惊呼。二者同持金钗，"以无诸思绪"呼唤，神官之灵颤抖而难执持。萨克帝稳海浪，斯佩室托付，娃喀西播种，雪解。<strong>奥玛窦慨其帷幕，姬神持世</strong>——以姬神降临终结全篇。</p>
+    </div>
+  </div>
+
+  <div class="quote-block">
+    "诸神，于此虔爱，其雪解之刻，奥玛窦，慨其帷幕，姬神持世，其爱乎，其胜神之意，唯"
+    <cite>——乳曲·吾神·希姬节（S2终结时刻）</cite>
+  </div>
+</section>
+
+<!-- VIII -->
+<section>
+  <div class="section-title"><span class="section-num">VIII</span><h2>神姬章插叙·鱼蝶-乳曲先知论述：<em>村落回忆与问道哲学</em></h2></div>
+
+  <div class="two-col">
+    <div class="card cl">
+      <h4>桔梗村落时代（倒叙）</h4>
+      <p>桔梗少女时代与村民孩童为友，因浮躁被责怪，独身入魔窟救孩童，被谅解但被疏远。与纱织：同为巫女，纱织婉拒村民求助（"此为神社储备"），两人仅为同事。虹月大照之夜遇阿萨黑，其幻力使桔梗沉浸贵族幻觉。家族于昏聩时代遭喜比尔全灭，桔梗以贵族之便入神社存活。<br><br>
+      <strong>赛塔斯弧线：</strong>喜比尔欲化融桔梗满门，仅余赛塔斯于暗箱被阿姆特（未来之子）救出——时间悖论：阿姆特以未来身份拯救过去的姑母。赛塔斯拜会吾神获神权，于神池知达布斯奇迹，以权柄使桔梗重获罗摩莎吹息权柄。</p>
+    </div>
+    <div class="card cj">
+      <h4>先知问道（桔梗四问）</h4>
+      <p>桔梗先后向乌拉德·阿陀沃求教：</p>
+      <div class="cosmo-wrap" style="margin-top:0.7rem; padding:0.8rem;">
+        <div class="cosmo-row" style="margin-bottom:0.4rem;">
+          <div class="cosmo-node cn-v" style="font-size:0.7rem;padding:0.25em 0.5em;">桔梗问：能超脱吗？</div>
+          <div class="cosmo-arr">→</div>
+          <div class="cosmo-node cn-j" style="font-size:0.7rem;padding:0.25em 0.5em;">乌拉德：善良亦无超脱</div>
+        </div>
+        <div class="cosmo-row" style="margin-bottom:0.4rem;">
+          <div class="cosmo-node cn-v" style="font-size:0.7rem;padding:0.25em 0.5em;">桔梗问：如何作为？</div>
+          <div class="cosmo-arr">→</div>
+          <div class="cosmo-node cn-j" style="font-size:0.7rem;padding:0.25em 0.5em;">乌拉德：必无有作为</div>
+        </div>
+        <div class="cosmo-row" style="margin-bottom:0.4rem;">
+          <div class="cosmo-node cn-v" style="font-size:0.7rem;padding:0.25em 0.5em;">同一问</div>
+          <div class="cosmo-arr">→</div>
+          <div class="cosmo-node cn-d" style="font-size:0.7rem;padding:0.25em 0.5em;">阿陀沃（反答）：必有此作为</div>
+        </div>
+        <div class="cosmo-row">
+          <div class="cosmo-node cn-v" style="font-size:0.7rem;padding:0.25em 0.5em;">桔梗问：何以妾身乎？</div>
+          <div class="cosmo-arr">→</div>
+          <div class="cosmo-node cn-g" style="font-size:0.7rem;padding:0.25em 0.5em;">乌拉德：唯少至诚挚爱</div>
+        </div>
+      </div>
+      <p style="font-size:0.76rem;margin-top:0.6rem;">乌拉德（道家无为之路）与阿陀沃（吠陀行动之路）的矛盾答案，是S2哲学的核心张力。桔梗最终以"吾之真挚之基，未与劫难而改"作为个人解答。</p>
+    </div>
+  </div>
+</section>
+
+<!-- IX -->
+<section>
+  <div class="section-title"><span class="section-num">IX</span><h2>终章《摩诃爱楯》：<em>四摩诃与仁吾圆舞</em></h2></div>
+
+  <div class="quote-block" style="font-size:0.86rem;line-height:2.1;">
+    "吾神，以无量簇中窥觉仁神，仁神，以无量肇中窥觉吾神。这是是，这是我，这是何，这非我，这此是，这可非。仁吾，问答圆舞，意识褚现，爱，我，觉，昧，慧，楽，诸寓意非寓意，诸行静非行静，诸相法非相法。神象映至物功，仁神取出未来，物功琢印神象，吾神抽入过去，曲姿姬转，现世踵至，仁神，智辨吾神化作摩诃式，摩诃境，吾神，智辨仁神化作摩诃爱，摩诃识。"
+    <cite>——《摩诃爱楯·续道》终章全文</cite>
+  </div>
+
+  <div class="maha-box">
+    <span class="maha-title">THE FOUR MAHĀ · 四摩诃 · 仁吾互相觉见之终极形态</span>
+    <div class="maha-row">
+      <div class="maha-item wu">
+        <span class="mn">摩诃式</span>
+        <span class="ms">Mahā Form · 至高形式</span>
+        <span class="mg">仁神 → 智辨吾神 → 所见</span>
+      </div>
+      <div class="maha-arr">+</div>
+      <div class="maha-item wu">
+        <span class="mn">摩诃境</span>
+        <span class="ms">Mahā Realm · 至高境界</span>
+        <span class="mg">仁神 → 智辨吾神 → 所见</span>
+      </div>
+      <div class="maha-arr">⟺</div>
+      <div class="maha-item jin">
+        <span class="mn">摩诃爱</span>
+        <span class="ms">Mahā Love · 至高爱</span>
+        <span class="mg">吾神 → 智辨仁神 → 所见</span>
+      </div>
+      <div class="maha-arr">+</div>
+      <div class="maha-item jin">
+        <span class="mn">摩诃识</span>
+        <span class="ms">Mahā Consciousness · 至高识</span>
+        <span class="mg">吾神 → 智辨仁神 → 所见</span>
+      </div>
+    </div>
+    <p>"神象映至物功，仁神取出未来 ⟺ 物功琢印神象，吾神抽入过去，曲姿姬转，现世踵至"</p>
+  </div>
+
+  <div class="dual-pillar">
+    <div>
+      <div class="pillar-title">仁神所见（自吾神之中）</div>
+      <div class="pillar-item">以"无量肇中"窥觉吾神——肇=创始，仁神于无量创始可能中看见吾神</div>
+      <div class="pillar-item">时间方向：取出未来（仁神持未来）</div>
+      <div class="pillar-item">智辨吾神，化作：<strong>摩诃式</strong>（至上形式）+ <strong>摩诃境</strong>（至上境界）</div>
+      <div class="pillar-item">仁神眼中的吾神 = 形式与境界的至高升华</div>
+    </div>
+    <div class="dp-line"></div>
+    <div>
+      <div class="pillar-title">吾神所见（自仁神之中）</div>
+      <div class="pillar-item">以"无量簇中"窥觉仁神——簇=聚集，吾神于无量聚集中看见仁神</div>
+      <div class="pillar-item">时间方向：抽入过去（吾神持过去）</div>
+      <div class="pillar-item">智辨仁神，化作：<strong>摩诃爱</strong>（至上爱）+ <strong>摩诃识</strong>（至上意识）</div>
+      <div class="pillar-item">吾神眼中的仁神 = 爱与意识的至高升华</div>
+    </div>
+  </div>
+
+  <div class="hl-box"><strong>终章的深层结构：</strong>六组否定式（"诸寓意非寓意，诸行静非行静，诸相法非相法"）延续S1否定神学传统，但指向已非神道之沉默，而是四摩诃的超越性——超越意义、行为与法相。末句六字（爱·我·觉·昧·慧·楯）直接回应标题"摩诃爱楯"：<em>爱与乐，才是整个第二季从神道升至摩诃道的终极驱动力</em>。</div>
+</section>
+
+<!-- X -->
+<section>
+  <div class="section-title"><span class="section-num">X</span><h2>跨文献整合：<em>三季文本情报对照</em></h2></div>
+
+  <table class="main-table">
+    <thead><tr><th>情报类别</th><th>S1《仁楯·神道》</th><th>S2公式书（预设）</th><th>S2正篇（实现）</th></tr></thead>
+    <tbody>
+      <tr>
+        <td class="nc">神官之死</td>
+        <td>奥菲托斯预言：信徒投石至死</td>
+        <td>未提及</td>
+        <td>鱼蝶章完成：乱石袭击，神官陨，达布斯接替其形体</td>
+      </tr>
+      <tr>
+        <td class="nc">奥德莎曼</td>
+        <td>未出现</td>
+        <td>术语"信崇"（恭皈·应然·神律）</td>
+        <td>神官与阿喃特之子，"世之信仰兮，总持道符"</td>
+      </tr>
+      <tr>
+        <td class="nc">克蕾祂仆</td>
+        <td>未出现</td>
+        <td>术语"札纪"（曲调·氛象·秩律）</td>
+        <td>阿姆特与奥菲丽斯之女，S2叙事终点之子</td>
+      </tr>
+      <tr>
+        <td class="nc">格拉巴德</td>
+        <td>未出现</td>
+        <td>神篇：意志如羊水中婴孩·火焰中的火焰</td>
+        <td>影花章：桔梗与阿姆特跨越死生的接触域界</td>
+      </tr>
+      <tr>
+        <td class="nc">达赖忒</td>
+        <td>未出现</td>
+        <td>音律/弦律双联法则（六神格属性）</td>
+        <td>影花章：达布斯遇达赖忒，体时紊乱，数经鱼人之变</td>
+      </tr>
+      <tr>
+        <td class="nc">赛美斯的调和</td>
+        <td>被放逐·悬挂于追逐日月者中</td>
+        <td>达赖忒（弦律）三元之一</td>
+        <td>鱼蝶章：被奥德莎曼誓约束缚，信徒不得其遂调和</td>
+      </tr>
+      <tr>
+        <td class="nc">巴尔特→巴尔丹陀</td>
+        <td>盗神权·建阿撒西·荒废游荡</td>
+        <td>未直接出现</td>
+        <td>珠华章：化成巴尔丹陀，建哒撒西，持神德权柄系</td>
+      </tr>
+      <tr>
+        <td class="nc">娃喀西（未来之痕）</td>
+        <td>未出现</td>
+        <td>神篇：意志的圣痕，每一刻都为下一刻而存在</td>
+        <td>鱼蝶·乳曲：神官之皮质于天界娃喀西播种，雪解</td>
+      </tr>
+      <tr>
+        <td class="nc">四摩诃</td>
+        <td>未出现</td>
+        <td>Ψ（HyperPloy）戈拉姆预设最高神圣意志</td>
+        <td>终章《摩诃爱楯》：摩诃式·摩诃境（吾神）+ 摩诃爱·摩诃识（仁神）</td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<div class="divider">✦ &nbsp;·&nbsp; ✦ &nbsp;·&nbsp; ✦</div>
+
+<div class="doc-footer">
+  <span class="ft">《摩诃姬楯·续道》文献研报 · 第二季正篇完整解析</span>
+  <span class="pm">MAHĀ SACRED TEXT · SEASON 2 COMPLETE</span>
+</div>
+
+</div></div>
+</body>
+</html>

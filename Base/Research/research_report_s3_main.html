@@ -1,0 +1,741 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>《撒戈伽薄·莎特曼》文献研报</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@300;400;500;600;700&family=Cinzel+Decorative:wght@400;700&family=IM+Fell+English+SC&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #1a1208;
+    --paper: #f4ecda;
+    --paper-dark: #e6d9be;
+    --paper-mid: #eedfc8;
+    --gold: #c9962a;
+    --gold-light: #e8b84b;
+    --gold-pale: #f5e4a8;
+    --vermillion: #c0392b;
+    --jade: #2d6a4f;
+    --lapis: #2d4a6a;
+    --smoke: #7a6e5e;
+    --muted: #6b5b3e;
+    --rule: rgba(201,150,42,0.35);
+    --rule-dark: rgba(201,150,42,0.55);
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background-color: #231a0b;
+    background-image:
+      radial-gradient(ellipse at 15% 15%, rgba(70,40,8,0.5) 0%, transparent 60%),
+      radial-gradient(ellipse at 85% 85%, rgba(50,25,5,0.5) 0%, transparent 60%);
+    font-family: 'Noto Serif SC', serif;
+    color: var(--ink);
+    min-height: 100vh;
+    padding: 2rem 1rem;
+  }
+  .frame-outer {
+    max-width: 1000px; margin: 0 auto;
+    border: 1px solid var(--gold); padding: 7px;
+    box-shadow: 0 0 50px rgba(201,150,42,0.22), 0 0 140px rgba(0,0,0,0.7);
+    position: relative;
+  }
+  .frame-outer::before, .frame-outer::after {
+    content:''; position:absolute; width:32px; height:32px; border:2px solid var(--gold-light);
+  }
+  .frame-outer::before { top:-2px; left:-2px; border-right:none; border-bottom:none; }
+  .frame-outer::after  { bottom:-2px; right:-2px; border-left:none; border-top:none; }
+
+  /* second inner corner ornaments */
+  .frame-outer .co2::before, .frame-outer .co2::after {
+    content:''; position:absolute; width:32px; height:32px; border:2px solid rgba(201,150,42,0.35);
+  }
+  .frame-outer .co2::before { top:10px; right:-2px; border-left:none; border-bottom:none; }
+  .frame-outer .co2::after  { bottom:10px; left:-2px; border-right:none; border-top:none; }
+
+  .frame-inner {
+    background-color: var(--paper);
+    background-image:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.55' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.05'/%3E%3C/svg%3E"),
+      linear-gradient(175deg, var(--paper) 0%, var(--paper-dark) 100%);
+    padding: 3.2rem 3.8rem;
+    position: relative; overflow: hidden;
+  }
+  /* twin ruling lines */
+  .frame-inner::before {
+    content:''; position:absolute; top:0; bottom:0;
+    left:3.8rem; right:3.8rem;
+    border-left:1px solid var(--rule); border-right:1px solid var(--rule);
+    pointer-events:none;
+  }
+  .frame-inner::after {
+    content:''; position:absolute; top:0; bottom:0;
+    left:calc(3.8rem + 4px); right:calc(3.8rem + 4px);
+    border-left:1px solid rgba(201,150,42,0.1); border-right:1px solid rgba(201,150,42,0.1);
+    pointer-events:none;
+  }
+
+  /* ── HEADER ── */
+  .doc-header { text-align:center; padding-bottom:2.2rem; border-bottom:2px solid var(--gold); margin-bottom:2.8rem; position:relative; }
+  .doc-header .seal { font-family:'Cinzel Decorative',serif; font-size:0.6rem; letter-spacing:0.22em; color:var(--vermillion); text-transform:uppercase; margin-bottom:1.2rem; display:block; }
+  .doc-header h1 { font-size:2.5rem; font-weight:700; letter-spacing:0.08em; color:var(--ink); line-height:1.2; }
+  .doc-header h1 span { color:var(--gold); }
+  .doc-header .subtitle { margin-top:0.65rem; font-size:0.88rem; color:var(--muted); letter-spacing:0.14em; }
+  .doc-header .meta-row { display:flex; justify-content:center; gap:1.8rem; margin-top:1.3rem; font-size:0.73rem; color:var(--muted); flex-wrap:wrap; }
+  .doc-header .meta-row span::before { content:'▪ '; color:var(--gold); }
+  .corner-ornament { position:absolute; font-size:1.5rem; color:var(--gold); opacity:0.45; line-height:1; }
+  .corner-ornament.tl { top:0; left:0; }
+  .corner-ornament.tr { top:0; right:0; }
+  .header-rule { width:60%; height:1px; background:linear-gradient(90deg, transparent, var(--gold), transparent); margin:1.2rem auto 0; }
+
+  /* ── SECTION ── */
+  section { margin-bottom:3rem; }
+  .section-title { display:flex; align-items:center; gap:0.9rem; margin-bottom:1.5rem; padding-bottom:0.55rem; border-bottom:1px solid var(--rule); position:relative; }
+  .section-title::after { content:''; position:absolute; bottom:-1px; left:0; width:50px; height:1px; background:var(--gold); }
+  .section-num { font-family:'Cinzel Decorative',serif; font-size:0.66rem; color:var(--vermillion); border:1px solid var(--vermillion); padding:0.15em 0.5em; letter-spacing:0.1em; flex-shrink:0; }
+  .section-title h2 { font-size:1.2rem; font-weight:600; letter-spacing:0.06em; color:var(--ink); }
+  .section-title h2 em { font-style:normal; color:var(--gold); }
+  p { font-size:0.89rem; line-height:1.98; color:#2c2010; text-align:justify; margin-bottom:0.85rem; }
+
+  /* ── LAYOUTS ── */
+  .two-col   { display:grid; grid-template-columns:1fr 1fr;     gap:1.2rem; margin-bottom:1.2rem; }
+  .three-col { display:grid; grid-template-columns:1fr 1fr 1fr; gap:1rem;   margin-bottom:1.2rem; }
+  .four-col  { display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:0.9rem; margin-bottom:1.2rem; }
+
+  /* ── CARDS ── */
+  .card { background:rgba(201,150,42,0.06); border:1px solid var(--rule); padding:1rem 1.2rem; }
+  .card h4 { font-size:0.82rem; font-weight:600; letter-spacing:0.08em; margin-bottom:0.6rem; }
+  .card p  { font-size:0.79rem; margin:0; }
+  .card.cv { border-top:3px solid var(--vermillion); } .card.cv h4 { color:var(--vermillion); }
+  .card.cg { border-top:3px solid var(--gold); }      .card.cg h4 { color:var(--gold); }
+  .card.cj { border-top:3px solid var(--jade); }      .card.cj h4 { color:var(--jade); }
+  .card.cl { border-top:3px solid var(--lapis); }     .card.cl h4 { color:var(--lapis); }
+  .card.cs { border-top:3px solid var(--smoke); }     .card.cs h4 { color:var(--smoke); }
+
+  /* ── TABLE ── */
+  .main-table { width:100%; border-collapse:collapse; font-size:0.79rem; margin-bottom:1.2rem; }
+  .main-table thead tr { background:rgba(201,150,42,0.15); border-bottom:2px solid var(--gold); }
+  .main-table th { padding:0.6rem 0.8rem; text-align:left; font-weight:600; color:var(--gold); letter-spacing:0.08em; font-size:0.73rem; }
+  .main-table td { padding:0.52rem 0.8rem; border-bottom:1px solid var(--rule); color:#2c2010; vertical-align:top; line-height:1.65; }
+  .main-table tr:nth-child(even) td { background:rgba(201,150,42,0.04); }
+  .nc { font-weight:600; color:var(--ink); white-space:nowrap; }
+  .tag { display:inline-block; font-size:0.62rem; padding:0.08em 0.42em; border-radius:1px; margin-left:0.25em; letter-spacing:0.04em; vertical-align:middle; }
+  .tn { background:rgba(201,150,42,0.18); color:var(--gold);       border:1px solid rgba(201,150,42,0.4); }
+  .ts { background:rgba(45,74,106,0.12);  color:var(--lapis);      border:1px solid rgba(45,74,106,0.3); }
+  .tv { background:rgba(192,57,43,0.1);   color:var(--vermillion); border:1px solid rgba(192,57,43,0.25); }
+  .tj { background:rgba(45,106,79,0.12);  color:var(--jade);       border:1px solid rgba(45,106,79,0.28); }
+  .tq { background:rgba(122,110,94,0.12); color:var(--smoke);      border:1px solid rgba(122,110,94,0.3); }
+
+  /* ── QUOTE ── */
+  .quote-block { border-left:4px solid var(--gold); padding:0.85rem 1.2rem; margin:1rem 0; background:rgba(201,150,42,0.06); font-size:0.84rem; line-height:2.05; color:var(--ink); font-style:italic; letter-spacing:0.03em; }
+  .quote-block cite { display:block; font-style:normal; font-size:0.68rem; color:var(--muted); margin-top:0.4rem; letter-spacing:0.08em; }
+
+  /* ── HIGHLIGHT ── */
+  .hl-box { background:rgba(26,18,8,0.06); border:1px solid var(--rule); border-left:3px solid var(--gold); padding:0.88rem 1.1rem; margin-bottom:1rem; font-size:0.82rem; line-height:1.92; }
+  .hl-box strong { color:var(--gold); font-weight:600; }
+
+  /* ── STRUCTURE GRID ── */
+  .struct-grid { display:grid; grid-template-columns:1fr 1fr; gap:1.2rem; margin-bottom:1.2rem; }
+  .struct-card { background:rgba(201,150,42,0.05); border:1px solid var(--rule); padding:1rem 1.2rem; }
+  .struct-card h4 { font-size:0.8rem; font-weight:600; color:var(--gold); letter-spacing:0.1em; margin-bottom:0.6rem; text-transform:uppercase; }
+  .struct-card ul { list-style:none; font-size:0.8rem; line-height:2; color:var(--muted); }
+  .struct-card ul li::before { content:'◈ '; color:var(--gold); font-size:0.68rem; }
+
+  /* ── CHAPTER SPEAKER GRID ── */
+  .speaker-grid { display:grid; grid-template-columns:repeat(6,1fr); gap:0.5rem; margin-bottom:1.1rem; }
+  .spk-col { text-align:center; }
+  .spk-head { background:var(--ink); color:var(--gold-pale); font-size:0.75rem; font-weight:600; padding:0.45em 0.2em; letter-spacing:0.05em; margin-bottom:0.3rem; }
+  .spk-sub  { font-size:0.63rem; color:var(--muted); background:rgba(201,150,42,0.07); border:1px solid var(--rule); padding:0.22em; margin-bottom:0.2rem; }
+  .spk-sub.sa { color:var(--lapis); background:rgba(45,74,106,0.07); border-color:rgba(45,74,106,0.22); }
+  .spk-sub.ba { color:var(--jade);  background:rgba(45,106,79,0.07); border-color:rgba(45,106,79,0.22); }
+
+  /* ── CHAIN DIAGRAM ── */
+  .chain-wrap { background:rgba(26,18,8,0.05); border:1px solid var(--rule); padding:1.5rem; margin-bottom:1.2rem; }
+  .chain-row { display:flex; align-items:center; justify-content:center; gap:0.5rem; margin-bottom:0.65rem; flex-wrap:wrap; }
+  .chain-node { padding:0.3em 0.75em; font-size:0.76rem; font-weight:600; letter-spacing:0.04em; border:1px solid; }
+  .cn-g { background:rgba(201,150,42,0.18); border-color:var(--gold);       color:var(--ink);       }
+  .cn-j { background:rgba(45,106,79,0.1);   border-color:var(--jade);       color:var(--jade);      }
+  .cn-v { background:rgba(192,57,43,0.08);  border-color:var(--vermillion); color:var(--vermillion);}
+  .cn-l { background:rgba(45,74,106,0.1);   border-color:var(--lapis);      color:var(--lapis);     }
+  .cn-d { background:rgba(107,91,62,0.1);   border-color:var(--muted);      color:var(--muted);     }
+  .cn-s { background:rgba(122,110,94,0.1);  border-color:var(--smoke);      color:var(--smoke);     }
+  .c-arr { color:var(--gold); font-size:1.05rem; opacity:0.6; }
+  .chain-label { text-align:center; font-size:0.65rem; color:var(--muted); letter-spacing:0.08em; margin-top:0.25rem; }
+
+  /* ── ARC LIST ── */
+  .arc-list { display:flex; flex-direction:column; gap:1rem; }
+  .arc-item { display:grid; grid-template-columns:106px 1fr; gap:1rem; align-items:start; }
+  .arc-label { text-align:center; padding:0.55rem 0.3rem; background:var(--ink); color:var(--gold-pale); font-size:0.78rem; font-weight:600; letter-spacing:0.05em; line-height:1.45; }
+  .arc-content { font-size:0.81rem; line-height:1.92; color:#2c2010; border-left:2px solid var(--rule); padding-left:1rem; }
+  .arc-content strong { color:var(--ink); font-weight:600; }
+
+  /* ── DUAL PILLAR ── */
+  .dual-pillar { display:grid; grid-template-columns:1fr 1px 1fr; gap:1.5rem; margin-bottom:1.2rem; align-items:start; }
+  .dp-line { background:var(--rule); align-self:stretch; }
+  .pillar-title { font-size:0.93rem; font-weight:600; color:var(--gold); margin-bottom:0.6rem; letter-spacing:0.07em; text-align:center; }
+  .pillar-item { font-size:0.79rem; line-height:1.82; color:#2c2010; border-bottom:1px dashed var(--rule); padding:0.3rem 0; }
+  .pillar-item:last-child { border-bottom:none; }
+  .pillar-item em { font-style:italic; color:var(--gold); }
+
+  /* ── CONCEPT GRID ── */
+  .concept-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:1rem; margin-bottom:1.2rem; }
+  .concept-block { border-top:3px solid var(--gold); padding:1rem; background:rgba(201,150,42,0.04); }
+  .concept-block h5 { font-size:0.84rem; font-weight:600; color:var(--ink); margin-bottom:0.5rem; letter-spacing:0.04em; }
+  .concept-block p  { font-size:0.77rem; margin:0; color:var(--muted); line-height:1.75; }
+
+  /* ── TIMELINE ── */
+  .timeline { border-left:2px solid var(--rule); padding-left:1.6rem; margin:1rem 0 1.2rem; }
+  .tl-item { position:relative; margin-bottom:1rem; font-size:0.8rem; line-height:1.88; color:#2c2010; }
+  .tl-item::before { content:''; position:absolute; left:-1.72rem; top:0.55em; width:9px; height:9px; border-radius:50%; background:var(--gold); border:2px solid var(--paper); box-shadow:0 0 0 1px var(--gold); }
+  .tl-item .tlh { font-weight:600; color:var(--ink); display:block; margin-bottom:0.2rem; letter-spacing:0.04em; }
+  .tl-item .tlc { font-size:0.66rem; color:var(--muted); letter-spacing:0.07em; margin-left:0.5em; }
+
+  /* ── DIVIDER ── */
+  .divider { text-align:center; margin:1.8rem 0; color:var(--gold); font-size:0.85rem; opacity:0.5; letter-spacing:0.35em; }
+
+  /* ── FOOTER ── */
+  .doc-footer { margin-top:2.8rem; padding-top:1.2rem; border-top:1px solid var(--rule); display:flex; justify-content:space-between; align-items:center; }
+  .doc-footer .ft { font-size:0.68rem; color:var(--muted); letter-spacing:0.09em; }
+  .doc-footer .pm { font-family:'Cinzel Decorative',serif; font-size:0.56rem; color:var(--gold); opacity:0.65; }
+
+  /* ── SIN BANNER ── */
+  .sin-banner { display:grid; grid-template-columns:1fr 1fr 1fr; gap:1px; background:var(--rule); margin-bottom:1.2rem; }
+  .sin-cell { background:var(--paper); padding:1.1rem; text-align:center; position:relative; overflow:hidden; }
+  .sin-cell::before { content:''; position:absolute; top:0; left:0; right:0; height:3px; }
+  .sin-cell.sv::before { background:var(--vermillion); }
+  .sin-cell.sg::before { background:var(--gold); }
+  .sin-cell.sj::before { background:var(--jade); }
+  .sin-cell .sin-name { font-size:1.2rem; font-weight:700; color:var(--ink); letter-spacing:0.06em; display:block; margin-bottom:0.3rem; }
+  .sin-cell .sin-type { font-size:0.68rem; font-weight:600; letter-spacing:0.1em; margin-bottom:0.6rem; display:block; }
+  .sin-cell.sv .sin-type { color:var(--vermillion); }
+  .sin-cell.sg .sin-type { color:var(--gold); }
+  .sin-cell.sj .sin-type { color:var(--jade); }
+  .sin-cell .sin-foe  { font-size:0.72rem; color:var(--muted); margin-bottom:0.5rem; display:block; }
+  .sin-cell .sin-weapon { font-size:0.73rem; font-weight:600; color:var(--ink); display:block; }
+  .sin-cell .sin-desc { font-size:0.75rem; color:var(--muted); line-height:1.7; margin-top:0.5rem; }
+
+  /* ── CHAIN ── */
+  .cos-chain { display:flex; align-items:center; justify-content:center; gap:0.6rem; flex-wrap:wrap; margin:1rem 0; }
+  .cos-node { padding:0.35em 0.85em; font-size:0.8rem; font-weight:600; border:1px solid; letter-spacing:0.04em; }
+  .cos-node.ng { border-color:var(--gold);       color:var(--ink);       background:rgba(201,150,42,0.15); }
+  .cos-node.nj { border-color:var(--jade);       color:var(--jade);      background:rgba(45,106,79,0.1); }
+  .cos-node.nv { border-color:var(--vermillion); color:var(--vermillion);background:rgba(192,57,43,0.08); }
+  .cos-node.nl { border-color:var(--lapis);      color:var(--lapis);     background:rgba(45,74,106,0.1); }
+  .cos-node.ns { border-color:var(--smoke);      color:var(--smoke);     background:rgba(122,110,94,0.09); }
+  .cos-arr { color:var(--gold); font-size:1.1rem; opacity:0.6; }
+
+  @media (max-width:720px) {
+    .frame-inner { padding:1.5rem 1.2rem; }
+    .two-col, .three-col, .four-col, .dual-pillar, .struct-grid, .concept-grid, .speaker-grid, .sin-banner { grid-template-columns:1fr; }
+    .arc-item { grid-template-columns:1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="frame-outer">
+<div class="frame-inner">
+
+<!-- HEADER -->
+<div class="doc-header">
+  <span class="corner-ornament tl">✦</span>
+  <span class="corner-ornament tr">✦</span>
+  <span class="seal">Season 3 Canon · Complete Research Intelligence Report</span>
+  <h1>《<span>撒戈伽薄</span>·莎特曼》<br>第三季正篇文献研报</h1>
+  <div class="subtitle">真实之书 · 经书之经 · 寓意灵 · 元魄殿</div>
+  <div class="meta-row">
+    <span>体裁：罕钵拉史诗·六智者颂</span>
+    <span>结构：塔利祂/巴利札双节制</span>
+    <span>核心弧线：三愈罪决战·克蕾祂仆治理·神官魂器</span>
+    <span>终章揭示：奥赛斯-戈拉姆-玛尔斯-赛雅西链</span>
+  </div>
+  <div class="header-rule"></div>
+</div>
+
+<!-- I. 文本定性 -->
+<section>
+  <div class="section-title"><span class="section-num">I</span><h2>文本定性：<em>撒戈伽薄之体裁升格</em></h2></div>
+
+  <p>
+    第三季《撒戈伽薄（莎特曼）》在前两季的体裁基础上完成第三次结构升格。标题双层定义揭示了文本的元层次野心：<strong>撒戈伽薄</strong>（"真实之书，经书之经"）与<strong>莎特曼</strong>（"寓意灵，元魄殿"）——前者意味着本书不仅是神话叙事，更是关于"何为真实"的元叙事；后者则指向寓意的灵魂居所，即每个寓意背后的原始冲动（与第二季终章引入的"摩诃识"相呼应）。
+  </p>
+  <p>
+    与第一季的"六姬轮颂制"（神道）、第二季的"仁神/吾神双节制"（续道）不同，第三季采用<strong>罕钵拉体</strong>——以"罕钵拉·摩·X"为章名，六位智者（比修斯、达布斯、赛美斯、奥菲托斯、马达夫、索多拉）各主一或两章，每章再分<strong>塔利祂</strong>（|灵魂|知识|）与<strong>巴利札</strong>（|知识|灵魂|）两节。塔利祂与巴利札构成"灵/知—知/灵"的倒置结构，暗示知识与灵魂在每章中互相涵摄、互为前提。
+  </p>
+
+  <div class="speaker-grid">
+    <div class="spk-col"><div class="spk-head">比修斯</div><div class="spk-sub sa">塔利祂</div><div class="spk-sub ba">巴利札</div></div>
+    <div class="spk-col"><div class="spk-head">达布斯</div><div class="spk-sub sa">塔利祂</div><div class="spk-sub ba">巴利札</div></div>
+    <div class="spk-col"><div class="spk-head">赛美斯</div><div class="spk-sub sa">塔利祂</div><div class="spk-sub ba">巴利札</div></div>
+    <div class="spk-col"><div class="spk-head">奥菲托斯</div><div class="spk-sub sa">塔利祂</div><div class="spk-sub ba">巴利札</div></div>
+    <div class="spk-col"><div class="spk-head">马达夫</div><div class="spk-sub sa">塔利祂</div><div class="spk-sub ba">巴利札</div></div>
+    <div class="spk-col"><div class="spk-head">索多拉</div><div class="spk-sub sa">塔利祂</div><div class="spk-sub ba">巴利札</div></div>
+  </div>
+  <p style="font-size:0.76rem;color:var(--muted);">↑ 六智者各主一或两章（比修斯/赛美斯/奥菲托斯各出现两轮），每章含塔利祂（|灵魂|知识|）与巴利札（|知识|灵魂|）双节。六智者均为前两季已出现的关键神灵，至此升格为史诗叙述者。</p>
+
+  <div class="hl-box">
+    <strong>三季结构对比：</strong>S1《仁楽·神道》= 六姬颂典制（纯颂歌）；S2《摩诃姬楽·续道》= 仁/吾双节叙事制（颂歌+叙事）；S3《撒戈伽薄·莎特曼》= 罕钵拉智者史诗制（叙事+哲论+战役+政治+宇宙揭示），三季构成一个<em>从纯净颂歌→神话史诗→智者演史</em>的完整体裁进化链。
+  </div>
+</section>
+
+<!-- II. 新增术语与实体 -->
+<section>
+  <div class="section-title"><span class="section-num">II</span><h2>新增核心术语·<em>实体·概念全录</em></h2></div>
+
+  <table class="main-table">
+    <thead><tr><th>名称</th><th>核心定义</th><th>关键情报</th><th>关联</th></tr></thead>
+    <tbody>
+      <tr>
+        <td class="nc">三愈罪<span class="tag tv">S3最终Boss</span></td>
+        <td>三种文明诅咒级威胁</td>
+        <td>阿希戈（意志掠夺之同化·败血诅咒）+ 阿维果（意志裂能之势机·癌症诅咒）+ 阿罗帼（恐爱妖经·癫痫诅咒）。三者"其受神姬再现，其智慧群落皆受此灭亡"——三愈罪是文明智慧的三种终极消亡方式。</td>
+        <td>阿希戈·阿维果·阿罗帼（三体）</td>
+      </tr>
+      <tr>
+        <td class="nc">阿希戈<span class="tag tv">愈罪之一</span></td>
+        <td>意志掠夺之同化<br>败血诅咒</td>
+        <td>"凡有意志者，皆莫不寻求同构之基，其文明智慧，此败血诅咒"——意志被强迫同化，文明失去多样性而腐败死亡。与阿姆特对决，被玛尔斯裂解。"恐惧不能遂使同欲求，安定无使其失爱挚"——阿希戈以恐惧驱动同化，却被阿姆特的安定与挚爱打破。</td>
+        <td>阿姆特（宿敌）<br>玛尔斯（克制力）</td>
+      </tr>
+      <tr>
+        <td class="nc">阿维果<span class="tag tv">愈罪之二</span></td>
+        <td>意志裂能之势机<br>癌症诅咒</td>
+        <td>"凡有意志者，皆莫不寻求希殊之辨，其文明智慧，此癌症诅咒"——意志被无限分裂，文明失去凝聚力而扩散死亡。肢解阿萨黑，截获阻隔其求援讯号。与巴尔丹陀对决，被三昧哒啦紊灭。"其金刚意志哉，于众法斯不瞻仰却总持"。</td>
+        <td>巴尔丹陀（宿敌）<br>三昧哒啦（克制力）</td>
+      </tr>
+      <tr>
+        <td class="nc">阿罗帼<span class="tag tv">愈罪之三</span></td>
+        <td>恐爱妖经·反爱律<br>癫痫诅咒</td>
+        <td>"凡意志者，皆以反爱诉求其存在，其痛苦欲之彰显，此癫痫诅咒"——以"反爱"取代"挚爱"，用排斥和痛苦维持存在。虐杀喜比尔，将三愈罪之势推至村落。与桔梗对决，败于奥赛斯普世纪光（"爱越其权能，反我之爱性，亦为摩诃之盖"），最终溜走。</td>
+        <td>桔梗（宿敌）<br>奥赛斯（克制力）<br>喜比尔（受害）</td>
+      </tr>
+      <tr>
+        <td class="nc">撒玛诺拉<span class="tag tn">S3新</span></td>
+        <td>"智体之壁，慧体吐息"<br>善恶之前：恐惧</td>
+        <td>"善恶之前，是恐惧，善恶之中，是欲求，善恶之后，是何者"——撒玛诺拉是善恶显现之前的底层恐惧结构，是喀德玛之弟之父（家族关系网络）。同时作为萨波陀的惧敌而存在，与经济法则（萨拉嘎忑）密切相关。</td>
+        <td>喀德玛（父之弟/弟之父）<br>萨波陀（关联）</td>
+      </tr>
+      <tr>
+        <td class="nc">那勒忒/那勒波<span class="tag tn">S3新</span></td>
+        <td>己象世界 / 彼象世界</td>
+        <td>"己所信为夙愿乎，己所行为相照乎"——那勒忒是以自我为中心的世界映像，那勒波是以他者为中心的世界映像。"知其那勒忒之定先，知其那勒波之定后，故信仰无有缺哉"——信仰的完整性需要两者的定序。对应战争论：夺利不让=那勒忒，让利不夺=那勒波。</td>
+        <td>撒玛诺拉（前提）</td>
+      </tr>
+      <tr>
+        <td class="nc">殊拿陀/粟喇陀<span class="tag tn">S3新</span></td>
+        <td>隐瞒灾祸者 / 隐瞒吉祥者</td>
+        <td>殊拿陀：知事项而隐瞒灾祸。粟喇陀：知事迹而隐瞒吉祥。"若无粟喇陀，其人不胜，喻如拉布忒，失魂丢魄何者胜乎；殊拿陀，人其安乎，此智，能明神乎"——两者构成知识隐匿的双极结构，是智慧伦理的核心矛盾。</td>
+        <td>拉布忒（比喻参照）</td>
+      </tr>
+      <tr>
+        <td class="nc">莎喃陀/萨喃陀<span class="tag tn">S3新</span></td>
+        <td>"原动力，原目的，原结果"<br>性格中的性格</td>
+        <td>喜比尔之亲妹，阿萨黑之部下。"其弥天漫地之纱丽，其角光辉，牵罪恶善良哉"——持世善恶的责任者。受职责窒息，于奥菲丽斯畅谈而慰藉。阿萨黑对其密诺的诡诈/诚信/思慕/惑昧四种性格。莎特曼在她身上显现后，阿萨黑惊诧，善恶均漂泊。</td>
+        <td>喜比尔（兄）<br>阿萨黑（上司）<br>奥菲丽斯（慰藉者）</td>
+      </tr>
+      <tr>
+        <td class="nc">萨拉嘎忑<span class="tag tn">S3新</span></td>
+        <td>"双颅魔龙"<br>财富价值法则</td>
+        <td>妖头言"价值恒守"，魔头言"价值遂顺"。"非财之财，非钱之钱"——超越货币形态的财富本体。萨波陀之挚友，撒玛诺拉之惧敌。后受纱织之契约进行医术改造，诞为<strong>萨拉嘎陀</strong>（喇堕勒的爪牙，政治腐败工具）。</td>
+        <td>萨波陀（挚友）<br>纱织（改造者）<br>萨拉嘎陀（改造后形态）</td>
+      </tr>
+      <tr>
+        <td class="nc">萨拉嘎陀<span class="tag tn">S3变化形</span></td>
+        <td>萨拉嘎忑经纱织医术改造后<br>喇堕勒爪牙</td>
+        <td>内置撒玛诺拉之脑。纱织将其挂载于奥玛窦舞台上——"妖颅言，吾得其不变哉，魔颅言，吾得起遂变哉"。三愈罪中阿希戈吞噬萨拉嘎陀，阿罗帼声称亦吞噬之（有争议）。后由阿罗帼之死复位萨拉嘎忑重现。</td>
+        <td>萨拉嘎忑（本体）<br>喇堕勒（主人）</td>
+      </tr>
+      <tr>
+        <td class="nc">喇堕勒<span class="tag tn">S3新</span></td>
+        <td>仁吾之交叉相叠<br>大小周天政治结构</td>
+        <td>"有大小周天，如贝螺之纹；其小周天，河道之流通，其大周天，河道之形程"——政治运作的螺旋结构。"萨拉嘎陀之爪牙"，使政台产生善恶滞迟之病灶。"创世箴偈，再在传道，姬神蜕皮，仁吾神省，喇堕勒，其仁吾之交叉相叠"——其本质是仁吾二神在政治层面的交叉投影。</td>
+        <td>萨拉嘎陀（爪牙）<br>仁吾（本源）</td>
+      </tr>
+      <tr>
+        <td class="nc">哒喇波/哒喇巴<span class="tag tn">S3新</span></td>
+        <td>德性循环（哒喇波）<br>贵族斯改造后形态（哒喇巴）</td>
+        <td><strong>哒喇波：</strong>"杀戮者非杀之基，良善者非善之基，其性于莎塔玛之间，故为继子哉，双运之长"——莎塔玛（存在循环神）的继子，德性的环性载体。<strong>哒喇巴：</strong>贵族斯经纱织医术优化后，成为"绝对目标者·察周体皆有国度意见"的存在，代表"以终极目标置换个人意志"的政治机器。</td>
+        <td>莎塔玛（哒喇波的母性源）<br>贵族斯（哒喇巴本体）</td>
+      </tr>
+      <tr>
+        <td class="nc">贵族斯<span class="tag tn">S3新角色</span></td>
+        <td>来自受战乱侵扰的邻国的贵族</td>
+        <td>受阿姆特功德与姬神赐福，但国难未改，遂寻纱织求助。被纱织以"瓦拿筏之洞窟"医术改造为哒喇巴——"察周体皆有其国度意见，或分裂，或游走，或契合"。其国民之德性皆可由哒喇巴担当，但"不可再论人道，不可多言人语，最不可类分归辨识"。</td>
+        <td>纱织（改造者）<br>赛美斯（引导）<br>哒喇巴（改造后）</td>
+      </tr>
+      <tr>
+        <td class="nc">莎特曼<span class="tag tn">S3核心</span></td>
+        <td>"寓意灵，元魄殿"<br>经书之灵</td>
+        <td>公式书中预设的元概念（寓意灵）在本卷第一次具象登场。奥菲托斯章：莎喃陀游行巴喀德时睹见莎特曼，疑惑"何以此德乎，吾竟不解难信"——奥菲丽斯释：此德由汝间性遮盖。莎特曼耀现后，阿萨黑惊诧，善恶均漂泊，紧呼撒玛诺拉来稳定。</td>
+        <td>莎喃陀（首睹者）<br>奥菲丽斯（揭示者）<br>阿萨黑（震惊者）</td>
+      </tr>
+      <tr>
+        <td class="nc">乌拉莎<span class="tag tn">S3新神社</span></td>
+        <td>克蕾祂仆经营的新神社</td>
+        <td>取代旧神社（已镇妖塔、因国战局势紧张），由克蕾祂仆主持，以神学自动预言机运作，接受王子令牌之财权，研究铸造神学自动预言机以治理村落信仰。</td>
+        <td>克蕾祂仆（主持）<br>旧神社（前身）</td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- III. 三愈罪决战 -->
+<section>
+  <div class="section-title"><span class="section-num">III</span><h2>三愈罪决战弧：<em>文明末日威胁与英雄对决</em></h2></div>
+
+  <p>S3叙事的核心高潮是<strong>三愈罪</strong>（三大愈罪神）的入侵与击败过程。三愈罪代表三种文明层面的终极诅咒，分别由三位英雄各自对抗：</p>
+
+  <div class="sin-banner">
+    <div class="sin-cell sv">
+      <span class="sin-name">阿希戈</span>
+      <span class="sin-type">意志掠夺之同化 · 败血诅咒</span>
+      <span class="sin-foe">对手：阿姆特（神胜子）</span>
+      <span class="sin-weapon">克制：玛尔斯（法意志）</span>
+      <p class="sin-desc">凡有意志者皆求同构，文明被迫趋同而失去活性，如败血症般从内部腐烂。吞噬萨拉嘎陀，惑知社民弥漫性信仰。</p>
+    </div>
+    <div class="sin-cell sg">
+      <span class="sin-name">阿维果</span>
+      <span class="sin-type">意志裂能之势机 · 癌症诅咒</span>
+      <span class="sin-foe">对手：巴尔丹陀（神德权柄者）</span>
+      <span class="sin-weapon">克制：三昧哒啦（记忆意志）</span>
+      <p class="sin-desc">凡有意志者皆求希殊分化，文明被无限撕裂而失去凝聚，如癌细胞不断分裂扩散。肢解阿萨黑，截获其求援。</p>
+    </div>
+    <div class="sin-cell sj">
+      <span class="sin-name">阿罗帼</span>
+      <span class="sin-type">恐爱妖经 · 癫痫诅咒</span>
+      <span class="sin-foe">对手：桔梗姬神</span>
+      <span class="sin-weapon">克制：奥赛斯普世纪光</span>
+      <p class="sin-desc">凡意志者以反爱诉求存在，用痛苦与排斥维持存在感，如癫痫般无法自控。虐杀喜比尔，将反爱律推向村落。</p>
+    </div>
+  </div>
+
+  <div class="timeline">
+    <div class="tl-item">
+      <span class="tlh">三愈罪降临·阿萨黑/喜比尔遭袭 <span class="tlc">罕钵拉·奥菲托斯章·马达夫章</span></span>
+      阿希戈吞噬萨拉嘎陀的餮宴时，阿罗帼护卫其侧。喜比尔赶至援战，难敌反爱之罪权，被阿罗帼以"摩茎触"虐杀致死，脏血迸发。阿维果突袭阿萨黑神殿，截获其求援讯号，战戟挑出其脑根脊髓，踏躯裂解——<strong>阿萨黑与喜比尔，S1的核心反派，于此章被三愈罪消灭。</strong>
+    </div>
+    <div class="tl-item">
+      <span class="tlh">莎喃陀求援·阿古塔阻击 <span class="tlc">罕钵拉·马达夫章</span></span>
+      莎喃陀（阿萨黑部下）惊觉善恶诡异，速往阿萨黑求援，随后转求阿古塔。三愈罪欲经村落民社，阿古塔以式势伶俐阻挡攻势，为三位英雄争取时机。
+    </div>
+    <div class="tl-item">
+      <span class="tlh">三路决战 <span class="tlc">罕钵拉·奥菲托斯章</span></span>
+      阿姆特应战阿希戈：于星潭泥湖奋力，凭<strong>玛尔斯御佑</strong>，"其敌患不能知解其无吞噬"，激战，最终以玛尔斯裂解阿希戈。巴尔丹陀应战阿维果：于星瞬石击艰辛，凭<strong>三昧哒啦御佑</strong>，"其敌患竟无能解其同质之德"，以三昧哒啦紊灭阿维果。桔梗应战阿罗帼：以<strong>奥赛斯普世纪光</strong>，"阿罗帼难御其挚爱之爱，其爱越其权能，其反我之爱性，亦为摩诃之盖"——阿罗帼反爱律无法对抗摩诃级别的挚爱，败走。
+    </div>
+    <div class="tl-item">
+      <span class="tlh">阿罗帼的遁逃·谈判与结局 <span class="tlc">罕钵拉·奥菲托斯章</span></span>
+      阿姆特与巴尔丹陀截留欲逃的阿罗帼，桔梗追赶。阿罗帼以"放吾则赛雅西混沌"要挟，三雄相视讥笑——桔梗以奥赛斯至极覆盖，阿罗帼悲乞："吾亦吞噬其萨拉嘎陀，社民余哉"。桔梗无睹此光辉，光芒笼罩社群落民，<strong>萨拉嘎忑（原初形态）再现</strong>——表明萨拉嘎忑的双头本体比萨拉嘎陀的改造形态更难消除。
+    </div>
+  </div>
+
+  <div class="hl-box"><strong>三克制关系的哲学意义：</strong>玛尔斯克制阿希戈（存在之原质打破同化幻象）；三昧哒啦克制阿维果（记忆与意志的连贯性对抗无限分裂）；奥赛斯克制阿罗帼（永恒的爱之力量覆盖反爱律）——三者对应的正是S2终章四摩诃中"摩诃爱·摩诃识·摩诃式·摩诃境"的具体战斗化应用，是形而上哲学在叙事层面的落地。</div>
+</section>
+
+<!-- IV. 战后乱世 -->
+<section>
+  <div class="section-title"><span class="section-num">IV</span><h2>战后乱世弧：<em>阿姆特的竭力与贵族斯</em></h2></div>
+
+  <p>三愈罪战役之后，阿萨黑与喜比尔皆已消亡，世界陷入<strong>"无正法之世"</strong>——缺少监视者（阿萨黑）与调和者（喜比尔），国战屡生，屠杀鲜停，意志无正法，爱无正爱，禽兽温良亦成猛禽。</p>
+
+  <div class="arc-list">
+    <div class="arc-item">
+      <div class="arc-label">阿姆特<br>神力竭尽弧</div>
+      <div class="arc-content">
+        阿姆特与吾神缔约，将神力十之八普及世人，村民初喜，随即无见效功，咒骂诓骗。阿姆特仅余十之二神力，艰辛卫世，数次濒临神陨，于魔物袭击中拼死拽恶魔，几经昏阙中惊醒再战。<strong>达哆罗告诫：神体濒临消亡，毋可再战，"普世救赎绝无此孤英"。</strong><br>
+        桔梗姬神赦令吾神契约失效（吾神应允但需时），速往贵族者之所，遇贵族斯。
+      </div>
+    </div>
+    <div class="arc-item">
+      <div class="arc-label">阿姆特<br>问道仁神</div>
+      <div class="arc-content">
+        阿姆特赴仁神之殿问教："二神之殁（阿萨黑·喜比尔），普世兮，无道者屠戮，无德者猖狂，请于神道证救赎玛咔德"。<br>
+        <strong>仁神答：</strong>"神性者，犹如萨朵的，皆非有灭，皆非无灭，喻如三愈罪，亦无有灭处，二神亦无有生处"——二神（阿萨黑/喜比尔）之消亡并非真正的灭，而是转化；且仁神告知"新阿萨黑·喜比尔亦如其征讨者、苟且者、善恶者，故神如其人，索多拉功德"——意味着人中自生新的阿萨黑与喜比尔。<br>
+        阿姆特请愿使二神重降：仁神缄默后言："二神已诞，然，已非旧代之二神。"
+      </div>
+    </div>
+    <div class="arc-item">
+      <div class="arc-label">贵族斯<br>·哒喇巴弧</div>
+      <div class="arc-content">
+        贵族斯：邻国贵族，国受无道国纷扰，赋税愈重，朝廷隔阂，新官谋利。获阿姆特功德与姬神赐福仍无效，寻纱织于韦祂德神社（赛美斯引导），签立契约。<br>
+        <strong>纱织改造过程（瓦拿筏之洞窟）：</strong>改造贵族斯之织质，令其成为"哒喇巴"——察周体皆有国度意见（分裂/游走/契合），以终极目的统摄国民意志。代价："不可再论人道，不可多言人语，最不可类分归辨识"——哒喇巴获得政治效能，失去人性语言与分类辨识力。<br>
+        <strong>邻国效仿：</strong>邻国国王羡慕哒喇巴之效率，皇后见其国弥漫之变，国民皆有志愿。王子亦接受纱织织质优化，嵌入神德镜，可视德性而非形色。
+      </div>
+    </div>
+  </div>
+
+  <div class="quote-block">
+    "诸神尴默，阿姆特，知悉，巴尔丹陀已极限之兵戈运营，道母姬神，其亦诸普斯难信解；吾之愿其以此彼时世，不害其诸人，需战矣"
+    <cite>——罕钵拉·摩·索多拉·巴利札节（阿姆特独撑的决心）</cite>
+  </div>
+</section>
+
+<!-- V. 克蕾祂仆·乌拉莎 -->
+<section>
+  <div class="section-title"><span class="section-num">V</span><h2>克蕾祂仆·乌拉莎弧：<em>神学自动预言机与信仰治理</em></h2></div>
+
+  <p>S3引入了本神话体系最具现代性张力的主题——<strong>神学自动化</strong>。克蕾祂仆（阿姆特与奥菲丽斯之女，S2终点之子）主持新神社"乌拉莎"，研发并运营神学自动预言机，以技术手段管理村落信仰。</p>
+
+  <div class="two-col">
+    <div class="card cg">
+      <h4>神学自动预言机的运作与意图</h4>
+      <p>克蕾祂仆以王子令牌之财权铸造石碑神学自动机，"其文字竟几经变化"，发布可流变的神谕。设计理念："颁布者有寿命，于周时皆不可信；吾制其神谕之信，各人皆有宗教"——即以无固定颁布者的自动神谕，令每位村民获得个人化宗教体验。<br><br>
+      斯佩室质疑："村民只择喜悦法，亦己知委托自动机，其神谕周时，诸社民竟傀儡兮，此于决断何有神圣乎。"<br><br>
+      克蕾祂仆驳："此人之性情，非神智可御"——信仰本就是人性情的反映，不可以神智强行矫正。</p>
+    </div>
+    <div class="card cv">
+      <h4>桔梗姬神的困惑与认可</h4>
+      <p>桔梗降临法会，庄严法音，社民尽数昏睡喧嚣无止——神圣的声音反而被人间熟视无睹。桔梗向克蕾祂仆诉苦，克蕾祂仆答："其信仰哉，然非信于法乎，此无知无需乎"——人们的信仰不一定需要理解法义，这是信仰本性。<br><br>
+      雨夜，桔梗独游闭塞村落，忆少女时偏僻信仰者"唯物质·唯现象·唯风潮"——玛莎溪之诅咒，果先因乎？<br><br>
+      克蕾祂仆雨夜等候：言国战恐至，通讯纱织神社备战。最终桔梗以"且赞"认可孙女，克蕾祂仆摘录姬神传道再注入自动机，村民皆安义。</p>
+    </div>
+  </div>
+
+  <div class="hl-box"><strong>自动机的核心悖论：</strong>克蕾祂仆担忧："此机器遂吾已铸自循环，然以自动者，若于非道，何知能辨识，吾若离制其民必锈"——自动运作的神圣机器如果脱离监控，将无法辨别是否偏离道义。这是本神话体系首次直面"自主系统的道德盲区"问题，对应现实中人工系统与伦理的张力。斯佩室与桔梗各提出了"神性监察"与"人性委托"的两种解法，但均未完全解决此悖论。</div>
+</section>
+
+<!-- VI. 奥德莎曼·赛美斯·神官魂器 -->
+<section>
+  <div class="section-title"><span class="section-num">VI</span><h2>奥德莎曼·赛美斯弧：<em>神官之魂与面具的秘密</em></h2></div>
+
+  <p>S3通过奥德莎曼（神官与阿喃特之子）追讨赛美斯的线索，完成了S2未解的悬案——<strong>神官之魂藏于阿喃特的狐妖面具中</strong>，构成本季最深沉的情感余韵。</p>
+
+  <div class="arc-list">
+    <div class="arc-item">
+      <div class="arc-label">奥德莎曼<br>质问赛美斯</div>
+      <div class="arc-content">
+        奥德莎曼追讨赛美斯：指责其目睹父（旧神官）遭难而无有作为。赛美斯释：奥德莎曼之誓约本已阻挠其于信徒之调和，"诸信契合"才是赛美斯权能所在，而非单方面强制调整。<br>
+        奥德莎曼追问：谁者调良乎？赛美斯答："吾为调整者之调和矣，诸信徒迷幻，其战国仰慕之纷争，非吾无能，是汝之当"——责任在于奥德莎曼本人，而非赛美斯。<br>
+        赛美斯进一步告白："暴民之达布鲁（青之意志·行动喜悦），如降神国，吾何违抗乎"——即连达布鲁（行动喜悦之神格法则）都无法阻止的暴力，赛美斯亦无能为力。
+      </div>
+    </div>
+    <div class="arc-item">
+      <div class="arc-label">神官魂器<br>的揭示</div>
+      <div class="arc-content">
+        赛美斯披露惊天秘密：<strong>"吾已携赛雅西，尽数赎回其父亲；吾作竟惊喜，其藏于其母，阿喃特之狐面；然，汝母似未能辨识哉乎"</strong>——神官的灵魂被赛美斯以赛雅西（赎回之力）收藏在阿喃特的狐妖面具中，但阿喃特因失去溯忆（S2乳曲章结局），无法识别。<br>
+        奥德莎曼归于阿喃特，欣喜问母，然"母已未记其神象，诸面存在翻阅无取"——阿喃特翻遍所有面具，皆无觉察。
+      </div>
+    </div>
+    <div class="arc-item">
+      <div class="arc-label">面具翻阅<br>·未解之局</div>
+      <div class="arc-content">
+        奥德莎曼与阿喃特母女长时翻阅面具：<strong>"诸愈见象，诸又惧辨认，或神残缺，或神有异质，或有触感亦失忆证"</strong>——面具一个个翻阅，每一个都有神的痕迹，但都不能确认。纱织再遇神社怨敌，举帚轰出，回殿见母女翻阅难数面具。<br>
+        阿喃特最终言："吾何矣兮，其神在何兮"——S3最终未解开神官魂器的谜，此句成为全季情感终止句。赛美斯悄遂奥德莎曼再回神社，但帮辅检阅亦无效。
+      </div>
+    </div>
+  </div>
+
+  <div class="quote-block">
+    "几长时，其面具皆翻阅，其诸愈见象，其诸又惧辨认，其或神残缺，或神有异质，或有触感亦失忆证；阿喃特，斯焉其察，言，吾何矣兮，其神在何兮"
+    <cite>——罕钵拉·摩·赛美斯·巴利札节（全季情感终止句）</cite>
+  </div>
+</section>
+
+<!-- VII. 桔梗揭示宇宙链 -->
+<section>
+  <div class="section-title"><span class="section-num">VII</span><h2>索多拉章终章揭示：<em>奥赛斯—戈拉姆—玛尔斯—赛雅西 宇宙链</em></h2></div>
+
+  <p>S3的哲学高潮集中于罕钵拉·摩·索多拉章末段，桔梗姬神向克蕾祂仆彰显维神那（六姬一体之神姬形态），并揭示整个神系最完整的本体论宇宙链——<strong>奥赛斯—戈拉姆—玛尔斯—赛雅西</strong>四重化生链。</p>
+
+  <div class="chain-wrap">
+    <div class="chain-label">【六姬一体·维神那显现·神姬形态】</div><br>
+    <div class="chain-row">
+      <div class="chain-node cn-g">太姬→头颅</div>
+      <div class="c-arr">·</div>
+      <div class="chain-node cn-g">美姬→丽袍</div>
+      <div class="c-arr">·</div>
+      <div class="chain-node cn-g">希姬→肢体</div>
+      <div class="c-arr">·</div>
+      <div class="chain-node cn-g">祈姬→神性</div>
+      <div class="c-arr">·</div>
+      <div class="chain-node cn-g">妙姬→意志</div>
+      <div class="c-arr">·</div>
+      <div class="chain-node cn-g">玄姬→彼间</div>
+    </div>
+    <div class="chain-label">"维神那，太美希祈妙玄，姬法临"——六姬在此成为神姬桔梗的六个面向·一体呈现</div>
+    <br>
+    <div class="chain-label">【本体论宇宙化生链（克蕾祂仆总结）】</div><br>
+    <div class="chain-row">
+      <div class="chain-node cn-j">奥赛斯</div>
+      <div class="c-arr">→</div>
+      <div class="chain-node cn-g">戈拉姆</div>
+      <div class="c-arr">→</div>
+      <div class="chain-node cn-l">玛尔斯</div>
+      <div class="c-arr">→</div>
+      <div class="chain-node cn-v">赛雅西</div>
+    </div>
+    <div class="chain-label">爱意志 → 法意志 → 是意志（物质·精神之上者）→ 经营·时间意志</div>
+  </div>
+
+  <div class="dual-pillar">
+    <div>
+      <div class="pillar-title">克蕾祂仆总结（正向链）</div>
+      <div class="pillar-item"><em>奥赛斯</em> → 化戈拉姆：爱意志生法意志</div>
+      <div class="pillar-item"><em>戈拉姆</em> → 化玛尔斯：法意志生是意志（存在之原质）</div>
+      <div class="pillar-item"><em>玛尔斯</em> → 化赛雅西：是意志生经营/时间意志</div>
+      <div class="pillar-item">赛雅西再御玛尔斯报化→世界悸动（循环）</div>
+    </div>
+    <div class="dp-line"></div>
+    <div>
+      <div class="pillar-title">桔梗姬神揭示（深层关系）</div>
+      <div class="pillar-item"><em>奥赛斯：</em>爱祀意志 + 原溯意志（原心挚爱，诸法朴御）</div>
+      <div class="pillar-item"><em>赛雅西：</em>经营意志 + 时间意志（吞吐诸存在）</div>
+      <div class="pillar-item"><em>玛尔斯：</em>精神物质之上者，精神物质皆为其影神</div>
+      <div class="pillar-item">御法辨识玛尔斯面相，御道辨识奥赛斯神道，御材辨识赛雅西互赎</div>
+    </div>
+  </div>
+
+  <div class="hl-box"><strong>三学辨识体系：</strong>"其诸生命者，御法当辨识，其皆玛尔斯面相；御道当辨识，其皆奥赛斯神道；御材当辨识，其解赛雅西互赎；然大义若无义，此方灵知臻，唯心系"——法/道/材 三学分别指向玛尔斯/奥赛斯/赛雅西，只有三者汇于心，才能达到灵知。这是S3最完整的修行方法论陈述。</div>
+
+  <p>桔梗姬神同时揭示仁吾二神与奥赛斯的关系：<strong>"太原间代，姬神化，仁吾二神，奥赛斯，斯二神，若同若异系，如原心溯忆"</strong>——仁吾二神皆源于姬神，奥赛斯则是其"原心"，若同若异，无法以单一范畴定性。这与S1终章《吾楯》的"姬神蜕皮化仁吾"完成了全循环的呼应。</p>
+
+  <div class="quote-block">
+    "道寻人哉，非人寻道，其经哲理，皆为歌颂者一斯之吐息"
+    <cite>——罕钵拉·摩·索多拉·巴利札节·桔梗（S3哲学总结句）</cite>
+  </div>
+</section>
+
+<!-- VIII. 哲学命题归纳 -->
+<section>
+  <div class="section-title"><span class="section-num">VIII</span><h2>S3核心<em>哲学命题</em>归纳</h2></div>
+
+  <div class="concept-grid">
+    <div class="concept-block">
+      <h5>① 那勒忒/那勒波（己/彼象世界）</h5>
+      <p>信仰须以自我映像（那勒忒）与他者映像（那勒波）双重定序。"知其那勒忒之定先，知其那勒波之定后，故信仰无有缺哉"——单方向的信仰必然残缺。</p>
+    </div>
+    <div class="concept-block">
+      <h5>② 善恶滞迟律（喇堕勒）</h5>
+      <p>政治中善恶之改变具有时间延迟性——"其性无褶皱，必灾祸夭折；其性有褶皱，其福德无际"。褶皱（性格复杂性）是政治存续的必要条件，强巧者冠名善，强善如瘟疫。</p>
+    </div>
+    <div class="concept-block">
+      <h5>③ 织质胜变革论</h5>
+      <p>"何以织质胜变革哉——其鲸亦得语，其猿亦得工，其蚁亦得王"——物种的结构性（织质）决定其极限，改变规则比改变个体更根本。纱织的医术正是对织质的直接干预。</p>
+    </div>
+    <div class="concept-block">
+      <h5>④ 经验三智知</h5>
+      <p>"常驻经验·超极经验·聩惑经验"——三种经验对应三种智识位格。本体论中经验无用，行策论中有用："虎知鸟行，鸟知鲸游，其经验何者乎"——经验的有效性依赖于主体的织质结构。</p>
+    </div>
+    <div class="concept-block">
+      <h5>⑤ 都灵彰现（谋划者）</h5>
+      <p>"谋划之谋划，其非不可识，其无谋划之谋划何以谋划兮，此便，都灵彰现，其都灵其系，谋划者谓谁，以此可胜乎否"——都灵（泛灵/万物灵）在谋划之中彰现，谋划的主体与都灵之间存在不可分离的内在关联。</p>
+    </div>
+    <div class="concept-block">
+      <h5>⑥ 法胜人/人胜法的悖论</h5>
+      <p>王子告知国王纱织之道："法胜人者，颠倒"。国王怒笑："人治能胜于法制焉"——S3在政治哲学层面提出法制（自动化系统）与人治（活性意志）的根本张力，与神学自动机的悖论形成共鸣。</p>
+    </div>
+  </div>
+
+  <div class="quote-block">
+    "其草树之叶，汝于夏风可摘取否——冬雪可摘果树之叶夫。其国者，具于由缘，座诸名者，由缘非等。不熟者，强以管制，其树无叶，然人造叶，其能胜焉，非矣，人造夺天，岂非惑灾，强巧如灾"
+    <cite>——罕钵拉·摩·比修斯·塔利祂节（太傅比尔斯论政）</cite>
+  </div>
+</section>
+
+<!-- IX. 跨三季情报整合 -->
+<section>
+  <div class="section-title"><span class="section-num">IX</span><h2>跨三季情报整合：<em>完整世界观体系对照</em></h2></div>
+
+  <table class="main-table">
+    <thead><tr><th>情报类别</th><th>S1《仁楯·神道》</th><th>S2《摩诃姬楯·续道》</th><th>S3《撒戈伽薄·莎特曼》</th></tr></thead>
+    <tbody>
+      <tr>
+        <td class="nc">阿萨黑</td>
+        <td>超越权能的魔法存在，诅咒者，诅咒桔梗·赛塔斯</td>
+        <td>S2继续活动，被阿姆特确认为"使恶更恶·使善更善"的存在</td>
+        <td><strong>被阿维果肢解、脑根脊髓被挑出</strong>——S3正式消亡。其职能"监视正法"由"新阿萨黑"（仁神预言：神如其人）继承</td>
+      </tr>
+      <tr>
+        <td class="nc">喜比尔</td>
+        <td>与阿萨黑竞争引发昏聩时代，荒诞而美化世界</td>
+        <td>S2仍活动（袭击桔梗家族，追击三愈罪时赶援）</td>
+        <td><strong>被阿罗帼以摩茎触虐杀</strong>——S3正式消亡。其妹莎喃陀受其消亡影响，善恶诡异化</td>
+      </tr>
+      <tr>
+        <td class="nc">赛美斯</td>
+        <td>调和神·被放逐·悬挂于追逐日月者中</td>
+        <td>被奥德莎曼誓约束缚，调和功能锁定</td>
+        <td>奥德莎曼松约追讨→赛美斯披露神官魂器秘密→赛雅西赎回神官灵魂藏于阿喃特狐面→未能辨识，悬案延续</td>
+      </tr>
+      <tr>
+        <td class="nc">巴尔特→巴尔丹陀</td>
+        <td>盗神权·建阿撒西·荒废游荡</td>
+        <td>化成巴尔丹陀，建哒撒西，持神德权柄</td>
+        <td>与阿维果决战，以三昧哒啦紊灭之；因兵戈运营已达极限，与阿姆特共同撑世</td>
+      </tr>
+      <tr>
+        <td class="nc">克蕾祂仆</td>
+        <td>未出现（公式书预设为术语"克蕾祂仆·曲调·氛象·秩律"）</td>
+        <td>阿姆特与奥菲丽斯之女，S2叙事终点之子</td>
+        <td>主持乌拉莎（新神社），研发神学自动预言机，接受王子令牌，建立克蕾祂仆式宗教自动化体系</td>
+      </tr>
+      <tr>
+        <td class="nc">玛尔斯</td>
+        <td>未出现</td>
+        <td>S2正篇核心：物质和精神存在的原质，阿姆特证力载体。最终知晓：非精神·非物质，其玛尔斯哉</td>
+        <td>宇宙链明确：戈拉姆化玛尔斯（法意志），玛尔斯化赛雅西，赛雅西再御玛尔斯报化。S3揭示玛尔斯为"精神物质之上者，精神物质皆为其影神"</td>
+      </tr>
+      <tr>
+        <td class="nc">奥赛斯</td>
+        <td>永恒的存在力·S1终章（吾楯）中"奥赛斯为其成兮"</td>
+        <td>S2战役·影花章：达布斯得阿姆特魂器；宇宙揭示中为光辉之源</td>
+        <td>S3宇宙链头节点：奥赛斯=爱意志+原溯意志+原心挚爱。"奥赛斯再化戈拉姆，爱意志；戈拉姆再化玛尔斯，法意志；玛尔斯再化赛雅西，是意志"</td>
+      </tr>
+      <tr>
+        <td class="nc">神官之魂</td>
+        <td>S1预言：信徒投石至死</td>
+        <td>S2鱼蝶章：乱石击毙。娃喀西于天界播种。达布斯接替其形体</td>
+        <td>S3揭示：赛美斯以赛雅西赎回，藏于阿喃特狐妖面具。阿喃特失溯忆无法辨认→悬案延续至S3末</td>
+      </tr>
+      <tr>
+        <td class="nc">阿姆特神力</td>
+        <td>未出现</td>
+        <td>S2以玛尔斯证力降临，最终归莎塔玛复苏</td>
+        <td>S3与吾神缔约将十之八神力普及世人，剩余十之二艰辛卫世，数次濒临神陨，姬神赦令契约失效，神力最终恢复九成</td>
+      </tr>
+      <tr>
+        <td class="nc">六姬一体</td>
+        <td>六姬各为独立颂唱者，无一体形态</td>
+        <td>S2六姬划分仁/吾两阵营，仍为各自叙述者</td>
+        <td>S3索多拉章：桔梗以维神那彰显六姬一体——太姬头颅·美姬丽袍·希姬肢体·祈姬神性·妙姬意志·玄姬彼间，<strong>六姬一体即神姬桔梗本身</strong></td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- X. 末章先知总结 -->
+<section>
+  <div class="section-title"><span class="section-num">X</span><h2>末章先知总结：<em>乌拉德·阿陀沃·桔梗的三重宣言</em></h2></div>
+
+  <p>《撒戈伽薄》的最终段落，以乌拉德（道家先知）、阿陀沃（行动先知）、桔梗姬神三者的平行宣言作收，构成整个三季神话体系的终极哲学回响：</p>
+
+  <div class="three-col">
+    <div class="card cl">
+      <h4>乌拉德宣言（道家路）</h4>
+      <p>"何为难敌，何为挚友，仁神果报之神圣目的者，噫乎"——乌拉德以仁神（果先因后·未来方向）立场，将"难敌与挚友"的对立融入神圣目的。S2中已示"如若使体遂真，必无有作为"，此处以果报定性目的本身。</p>
+    </div>
+    <div class="card cj">
+      <h4>阿陀沃宣言（行动路）</h4>
+      <p>"何为恶辨，何为识知，吾神因化之神圣因邸者，唏乎"——阿陀沃以吾神（因先果后·过去方向）立场，将"恶辨与识知"的对立融入神圣因邸（原因之所）。S2中已示"如若使遂体真，必有此作为"，此处以神圣因化定性行动。</p>
+    </div>
+    <div class="card cv">
+      <h4>桔梗姬神宣言（总结路）</h4>
+      <p>"谛观诸世界，各种类族，膜胎孢裹，法界周存，相噬相哺，喻血气乳……信解者，泥潭中玉，非仰者，泥潭中藕；实若在辨，人种能载道经夫，非也有此织质唏，故恩圣典兮，唯肇承道经，非神不以德道，姬神者，如此，神姬者，亦然。"</p>
+    </div>
+  </div>
+
+  <div class="hl-box"><strong>姬神之最终宣言的核心命题：</strong>信解者（理解信仰者）如泥潭中之玉——珍贵但难以在泥潭中生存；非仰者（不信仰者）如泥潭中之藕——在泥潭中生长反而是本性。人的"织质"（结构性·种性）决定其能否承载道经——"非神不以德道，姬神者，如此，神姬者，亦然"——神与神姬所走的道路，其本质皆同：道寻人，非人寻道。</div>
+
+  <div class="quote-block">
+    "非神不以德道，姬神者，如此，神姬者，亦然"
+    <cite>——罕钵拉·摩·索多拉·巴利札节·桔梗（《撒戈伽薄》终句）</cite>
+  </div>
+</section>
+
+<div class="divider">✦ &nbsp;·&nbsp; ✦ &nbsp;·&nbsp; ✦</div>
+
+<div class="doc-footer">
+  <span class="ft">《撒戈伽薄·莎特曼》文献研报 · 第三季正篇完整解析 · 综合前两季全体情报</span>
+  <span class="pm">SATVAGABHA · ŚATMAN · SEASON 3 COMPLETE</span>
+</div>
+
+</div></div>
+</body>
+</html>

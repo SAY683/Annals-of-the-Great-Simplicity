@@ -1,0 +1,1247 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>公式书研报·第二季设定情报</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@300;400;500;600;700&family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Cinzel:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --void: #07080f;
+  --deep: #0d1022;
+  --panel: #111528;
+  --panel-bright: #161d35;
+  --border: rgba(120,140,220,0.18);
+  --border-bright: rgba(180,200,255,0.28);
+  --silver: #c8d0e8;
+  --silver-dim: #8090b8;
+  --gold: #d4a843;
+  --gold-dim: rgba(212,168,67,0.35);
+  --gold-glow: rgba(212,168,67,0.12);
+  --teal: #4ecdc4;
+  --teal-dim: rgba(78,205,196,0.2);
+  --rose: #e07070;
+  --rose-dim: rgba(224,112,112,0.2);
+  --jade: #5db88a;
+  --jade-dim: rgba(93,184,138,0.18);
+  --white: #e8edf8;
+}
+
+* { margin:0; padding:0; box-sizing:border-box; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--void);
+  background-image:
+    radial-gradient(ellipse 60% 40% at 15% 10%, rgba(30,40,90,0.6) 0%, transparent 70%),
+    radial-gradient(ellipse 50% 60% at 85% 90%, rgba(20,30,70,0.5) 0%, transparent 70%);
+  font-family: 'Noto Serif SC', serif;
+  color: var(--silver);
+  min-height: 100vh;
+  padding: 2.5rem 1rem;
+  line-height: 1.7;
+}
+
+/* ── OUTER FRAME ── */
+.codex {
+  max-width: 1020px;
+  margin: 0 auto;
+  border: 1px solid rgba(120,140,220,0.3);
+  box-shadow:
+    0 0 60px rgba(30,50,150,0.3),
+    0 0 200px rgba(10,15,50,0.8),
+    inset 0 0 40px rgba(15,20,60,0.5);
+  position: relative;
+}
+.codex::before, .codex::after {
+  content: '';
+  position: absolute;
+  width: 40px; height: 40px;
+  border: 1px solid var(--gold);
+  z-index: 2;
+}
+.codex::before { top:-1px; left:-1px; border-right:none; border-bottom:none; }
+.codex::after  { bottom:-1px; right:-1px; border-left:none; border-top:none; }
+
+.codex-inner {
+  background: var(--deep);
+  padding: 3rem 3.5rem;
+  position: relative;
+}
+
+/* ── SCAN LINES TEXTURE ── */
+.codex-inner::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 3px,
+    rgba(255,255,255,0.008) 3px,
+    rgba(255,255,255,0.008) 4px
+  );
+  pointer-events: none;
+}
+
+/* ── HEADER ── */
+.doc-header {
+  text-align: center;
+  padding-bottom: 2.5rem;
+  border-bottom: 1px solid var(--border-bright);
+  margin-bottom: 3rem;
+  position: relative;
+}
+.doc-header .classify {
+  font-family: 'Cinzel', serif;
+  font-size: 0.6rem;
+  letter-spacing: 0.35em;
+  color: var(--gold);
+  text-transform: uppercase;
+  display: block;
+  margin-bottom: 1.2rem;
+}
+.doc-header h1 {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 2.6rem;
+  font-weight: 300;
+  color: var(--white);
+  letter-spacing: 0.05em;
+  line-height: 1.3;
+  margin-bottom: 0.4rem;
+}
+.doc-header h1 strong { font-weight: 600; color: var(--gold); }
+.doc-header .sub {
+  font-size: 0.82rem;
+  color: var(--silver-dim);
+  letter-spacing: 0.15em;
+  margin-top: 0.5rem;
+}
+.doc-header .meta {
+  display: flex;
+  justify-content: center;
+  gap: 2.5rem;
+  margin-top: 1.5rem;
+  font-size: 0.72rem;
+  color: var(--silver-dim);
+  letter-spacing: 0.1em;
+}
+.doc-header .meta span::before { content: '◆ '; color: var(--gold); font-size: 0.55rem; }
+
+.season-badge {
+  display: inline-block;
+  background: linear-gradient(135deg, rgba(212,168,67,0.15), rgba(212,168,67,0.05));
+  border: 1px solid var(--gold-dim);
+  color: var(--gold);
+  font-family: 'Cinzel', serif;
+  font-size: 0.6rem;
+  letter-spacing: 0.2em;
+  padding: 0.3em 1em;
+  margin-bottom: 1rem;
+}
+
+/* ── SECTION ── */
+section { margin-bottom: 3rem; }
+
+.sec-head {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.6rem;
+  padding-bottom: 0.6rem;
+  border-bottom: 1px solid var(--border);
+  position: relative;
+}
+.sec-head::after {
+  content: '';
+  position: absolute;
+  bottom: -1px; left: 0;
+  width: 60px; height: 1px;
+  background: var(--gold);
+}
+.sec-num {
+  font-family: 'Cinzel', serif;
+  font-size: 0.58rem;
+  letter-spacing: 0.2em;
+  color: var(--gold);
+  border: 1px solid var(--gold-dim);
+  padding: 0.2em 0.5em;
+  flex-shrink: 0;
+  background: var(--gold-glow);
+}
+.sec-head h2 {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1.4rem;
+  font-weight: 400;
+  color: var(--white);
+  letter-spacing: 0.05em;
+}
+.sec-head h2 em { font-style: italic; color: var(--gold); }
+
+p {
+  font-size: 0.88rem;
+  line-height: 2;
+  color: var(--silver);
+  margin-bottom: 0.9rem;
+  text-align: justify;
+}
+
+/* ── INTRO CARD ── */
+.intro-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.2rem;
+  margin-bottom: 1.5rem;
+}
+.doc-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  padding: 1.2rem 1.4rem;
+  position: relative;
+  overflow: hidden;
+}
+.doc-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+}
+.doc-card.card-a::before { background: linear-gradient(90deg, var(--teal), transparent); }
+.doc-card.card-b::before { background: linear-gradient(90deg, var(--rose), transparent); }
+.doc-card h4 {
+  font-family: 'Cinzel', serif;
+  font-size: 0.68rem;
+  letter-spacing: 0.15em;
+  margin-bottom: 0.7rem;
+}
+.doc-card.card-a h4 { color: var(--teal); }
+.doc-card.card-b h4 { color: var(--rose); }
+.doc-card p { font-size: 0.8rem; margin: 0; }
+.doc-card .doc-label {
+  font-size: 1.1rem;
+  font-family: 'Cormorant Garamond', serif;
+  color: var(--white);
+  margin-bottom: 0.4rem;
+  letter-spacing: 0.05em;
+}
+
+/* ── TAXONOMY TABLE ── */
+.tax-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+  margin-bottom: 1.2rem;
+}
+.tax-table thead tr {
+  border-bottom: 1px solid var(--border-bright);
+  background: rgba(120,140,220,0.08);
+}
+.tax-table th {
+  padding: 0.6rem 0.9rem;
+  text-align: left;
+  font-family: 'Cinzel', serif;
+  font-size: 0.6rem;
+  letter-spacing: 0.12em;
+  color: var(--gold);
+  font-weight: 400;
+}
+.tax-table td {
+  padding: 0.5rem 0.9rem;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+  line-height: 1.7;
+}
+.tax-table tr:hover td { background: rgba(120,140,220,0.04); }
+.tax-table .name-col {
+  font-weight: 600;
+  color: var(--white);
+  white-space: nowrap;
+  font-size: 0.85rem;
+}
+.tax-table .def-col {
+  color: var(--silver);
+}
+.tax-table .attr-col {
+  color: var(--silver-dim);
+  font-size: 0.75rem;
+}
+.tax-table .ref-col {
+  font-size: 0.72rem;
+}
+
+.tag-s1 { display:inline-block; font-size:0.62rem; padding:0.1em 0.45em; border-radius:1px; background:rgba(212,168,67,0.15); color:var(--gold); border:1px solid var(--gold-dim); letter-spacing:0.05em; }
+.tag-new { display:inline-block; font-size:0.62rem; padding:0.1em 0.45em; border-radius:1px; background:rgba(78,205,196,0.12); color:var(--teal); border:1px solid rgba(78,205,196,0.3); letter-spacing:0.05em; }
+.tag-core { display:inline-block; font-size:0.62rem; padding:0.1em 0.45em; border-radius:1px; background:rgba(224,112,112,0.12); color:var(--rose); border:1px solid rgba(224,112,112,0.3); letter-spacing:0.05em; }
+.tag-law { display:inline-block; font-size:0.62rem; padding:0.1em 0.45em; border-radius:1px; background:rgba(93,184,138,0.1); color:var(--jade); border:1px solid rgba(93,184,138,0.25); letter-spacing:0.05em; }
+
+/* ── THREE WORLDS ── */
+.worlds-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 1px;
+  background: var(--border);
+  margin-bottom: 1.5rem;
+}
+.world-col {
+  background: var(--panel);
+  padding: 1.2rem;
+}
+.world-col .world-name {
+  font-family: 'Cinzel', serif;
+  font-size: 0.75rem;
+  letter-spacing: 0.12em;
+  margin-bottom: 0.8rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border);
+}
+.world-col.w1 .world-name { color: var(--gold); }
+.world-col.w2 .world-name { color: var(--teal); }
+.world-col.w3 .world-name { color: var(--rose); }
+.world-item {
+  font-size: 0.78rem;
+  line-height: 1.9;
+  color: var(--silver-dim);
+  padding: 0.2rem 0;
+  border-bottom: 1px dashed rgba(120,140,220,0.1);
+}
+.world-item:last-child { border-bottom: none; }
+.world-item strong { color: var(--silver); font-weight: 500; }
+
+/* ── ENTITY CARDS ── */
+.entity-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-bottom: 1.2rem;
+}
+.entity-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  padding: 1.1rem 1.3rem;
+  position: relative;
+}
+.entity-card .e-name {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1.15rem;
+  color: var(--white);
+  margin-bottom: 0.3rem;
+  letter-spacing: 0.04em;
+}
+.entity-card .e-def {
+  font-size: 0.72rem;
+  color: var(--gold);
+  font-family: 'Cinzel', serif;
+  letter-spacing: 0.1em;
+  margin-bottom: 0.6rem;
+}
+.entity-card .e-desc {
+  font-size: 0.79rem;
+  line-height: 1.85;
+  color: var(--silver-dim);
+  margin: 0;
+}
+.entity-card .e-desc em { font-style: italic; color: var(--silver); }
+
+/* ── PSI SYSTEM ── */
+.psi-wrap {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  padding: 1.5rem;
+  margin-bottom: 1.2rem;
+}
+.psi-title {
+  font-family: 'Cinzel', serif;
+  font-size: 0.7rem;
+  letter-spacing: 0.2em;
+  color: var(--gold);
+  margin-bottom: 1.2rem;
+  text-align: center;
+}
+.psi-row {
+  display: grid;
+  grid-template-columns: 120px repeat(6, 1fr);
+  gap: 2px;
+  margin-bottom: 2px;
+}
+.psi-cell {
+  padding: 0.45rem 0.3rem;
+  font-size: 0.7rem;
+  text-align: center;
+  line-height: 1.4;
+}
+.psi-header { background: rgba(212,168,67,0.12); color: var(--gold); font-family:'Cinzel',serif; font-size:0.58rem; letter-spacing:0.08em; }
+.psi-label { color: var(--silver-dim); font-size: 0.72rem; text-align: left; padding-left: 0.5rem; background: var(--panel-bright); }
+.psi-seed { background: rgba(78,205,196,0.08); color: var(--teal); border: 1px solid rgba(78,205,196,0.15); }
+.psi-flower { background: rgba(212,168,67,0.06); color: var(--gold); border: 1px solid rgba(212,168,67,0.15); }
+.psi-fruit { background: rgba(224,112,112,0.07); color: var(--rose); border: 1px solid rgba(224,112,112,0.15); }
+.psi-god { background: rgba(93,184,138,0.06); color: var(--jade); border: 1px solid rgba(93,184,138,0.15); font-size:0.65rem; }
+.psi-note { font-size: 0.68rem; color: var(--silver-dim); text-align: center; margin-top: 0.8rem; letter-spacing: 0.06em; }
+
+/* ── CHARACTER ASSIGNMENT ── */
+.cast-grid {
+  display: grid;
+  grid-template-columns: 1fr 60px 1fr;
+  gap: 1rem;
+  align-items: start;
+  margin-bottom: 1.2rem;
+}
+.cast-side { }
+.cast-side-title {
+  font-family: 'Cinzel', serif;
+  font-size: 0.68rem;
+  letter-spacing: 0.15em;
+  padding: 0.5rem 0.8rem;
+  margin-bottom: 0.6rem;
+  text-align: center;
+}
+.cast-side.wuji .cast-side-title { background: rgba(212,168,67,0.1); color: var(--gold); border: 1px solid var(--gold-dim); }
+.cast-side.renji .cast-side-title { background: rgba(78,205,196,0.08); color: var(--teal); border: 1px solid rgba(78,205,196,0.25); }
+.cast-member {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.82rem;
+  padding: 0.35rem 0.7rem;
+  border-bottom: 1px solid var(--border);
+  color: var(--silver);
+}
+.cast-member .dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.cast-side.wuji .dot { background: var(--gold); }
+.cast-side.renji .dot { background: var(--teal); }
+.cast-divider { display: flex; align-items: center; justify-content: center; color: var(--silver-dim); font-size: 1.2rem; }
+
+/* ── QUOTE ── */
+.quote {
+  border-left: 3px solid;
+  padding: 0.8rem 1.2rem;
+  margin: 1rem 0;
+  font-size: 0.84rem;
+  line-height: 2;
+  font-family: 'Cormorant Garamond', serif;
+  font-style: italic;
+}
+.quote.q-gold { border-color: var(--gold); background: var(--gold-glow); color: var(--silver); }
+.quote.q-teal { border-color: var(--teal); background: var(--teal-dim); color: var(--silver); }
+.quote cite { display: block; font-style: normal; font-family: 'Noto Serif SC', serif; font-size: 0.68rem; color: var(--silver-dim); margin-top: 0.4rem; letter-spacing: 0.08em; }
+
+/* ── HIGHLIGHT ── */
+.hl-box {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--gold);
+  padding: 0.9rem 1.2rem;
+  margin-bottom: 1rem;
+  font-size: 0.83rem;
+  line-height: 1.9;
+}
+.hl-box strong { color: var(--gold); }
+
+/* ── CROSS-REF TABLE ── */
+.cross-wrap {
+  overflow-x: auto;
+}
+
+/* ── COSMO DIAGRAM ── */
+.cosmo {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  padding: 1.5rem;
+  margin-bottom: 1.2rem;
+}
+.cosmo-tier {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.8rem;
+}
+.cosmo-node {
+  font-size: 0.75rem;
+  padding: 0.3em 0.8em;
+  border: 1px solid;
+  letter-spacing: 0.04em;
+  font-family: 'Cinzel', serif;
+  font-size: 0.62rem;
+}
+.cn-gold { border-color: var(--gold-dim); color: var(--gold); background: var(--gold-glow); }
+.cn-teal { border-color: rgba(78,205,196,0.3); color: var(--teal); background: var(--teal-dim); }
+.cn-rose { border-color: rgba(224,112,112,0.3); color: var(--rose); background: var(--rose-dim); }
+.cn-jade { border-color: rgba(93,184,138,0.25); color: var(--jade); background: var(--jade-dim); }
+.cn-dim  { border-color: var(--border); color: var(--silver-dim); background: rgba(120,140,220,0.05); }
+.cosmo-arrow { color: var(--silver-dim); font-size: 0.85rem; }
+.cosmo-tier-label {
+  text-align: center;
+  font-size: 0.65rem;
+  color: var(--silver-dim);
+  letter-spacing: 0.08em;
+  margin-bottom: 0.8rem;
+}
+
+/* ── DIVIDER ── */
+.divider {
+  text-align: center;
+  color: var(--border-bright);
+  letter-spacing: 0.4em;
+  font-size: 0.8rem;
+  margin: 1.8rem 0;
+}
+
+/* ── TWO-COL COMPARE ── */
+.two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.2rem;
+  margin-bottom: 1.2rem;
+}
+.col-box {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  padding: 1rem 1.2rem;
+}
+.col-box .col-title {
+  font-family: 'Cinzel', serif;
+  font-size: 0.62rem;
+  letter-spacing: 0.15em;
+  margin-bottom: 0.7rem;
+  padding-bottom: 0.4rem;
+  border-bottom: 1px solid var(--border);
+}
+.col-box.ct-gold .col-title { color: var(--gold); }
+.col-box.ct-teal .col-title { color: var(--teal); }
+.col-box .col-item {
+  font-size: 0.79rem;
+  padding: 0.25rem 0;
+  border-bottom: 1px solid rgba(120,140,220,0.06);
+  color: var(--silver-dim);
+  line-height: 1.7;
+}
+.col-box .col-item strong { color: var(--silver); font-weight: 500; }
+
+/* ── FOOTER ── */
+.doc-footer {
+  margin-top: 2.5rem;
+  padding-top: 1.2rem;
+  border-top: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.doc-footer .footer-text { font-size: 0.68rem; color: var(--silver-dim); letter-spacing: 0.1em; }
+.doc-footer .page-mark { font-family: 'Cinzel', serif; font-size: 0.55rem; color: var(--gold); opacity: 0.6; letter-spacing: 0.15em; }
+
+/* ── ATTRIBUTE PILLS ── */
+.attr-pill {
+  display: inline-block;
+  font-size: 0.67rem;
+  padding: 0.15em 0.55em;
+  border: 1px solid var(--border);
+  color: var(--silver-dim);
+  margin: 0.15em;
+  letter-spacing: 0.04em;
+  background: rgba(120,140,220,0.04);
+}
+
+@media (max-width: 720px) {
+  .codex-inner { padding: 1.5rem 1.2rem; }
+  .intro-grid, .entity-grid, .two-col, .worlds-grid, .cast-grid { grid-template-columns: 1fr; }
+  .cast-divider { display: none; }
+  .psi-row { grid-template-columns: 100px repeat(3, 1fr); }
+}
+</style>
+</head>
+<body>
+<div class="codex">
+<div class="codex-inner">
+
+<!-- HEADER -->
+<div class="doc-header">
+  <span class="season-badge">SEASON 2 PRE-PUBLICATION · FORMULA BOOKS</span>
+  <span class="classify">Divine Codex Intelligence Report · Classified</span>
+  <h1><strong>嗒喀玛·筏拿咕</strong> &amp; <strong>魔法祀原</strong><br><span style="font-weight:300;font-size:1.8rem;">公式书研报</span></h1>
+  <div class="sub">第二季未登场设定 · 形而上分类法 · 三界宇宙论</div>
+  <div class="meta">
+    <span>文献数量：二卷</span>
+    <span>性质：公式书·设定底稿</span>
+    <span>关联：第一季《仁楽·神道》</span>
+    <span>层级：本体论·宇宙论·神学</span>
+  </div>
+</div>
+
+<!-- I. 文献定位 -->
+<section>
+  <div class="sec-head">
+    <span class="sec-num">I</span>
+    <h2>文献定位：<em>第二季公式书解析</em></h2>
+  </div>
+
+  <p>用户注明，《仁楽·神道》为"第一季"已登场内容，而此二卷为"公式书"性质的<strong>未登场设定</strong>——即构成世界观底层逻辑但尚未在正式叙事中出现的架构文档。其功能类似于：神话体系的"宪法典"与"物理定律手册"，为后续季度的叙事展开预埋伏线与规则基础。</p>
+
+  <div class="intro-grid">
+    <div class="doc-card card-a">
+      <div class="doc-label">嗒喀玛（筏拿咕）</div>
+      <h4>TAXONOMIC CODEX · 形而上分类法</h4>
+      <p>共列约三十个形而上学术语，采用"名称：概念（属性一|属性二|属性三）"的三元结构，并附有关联神灵名称。构成一套从"意志层"到"法则层"的宇宙运作基础分类体系。可理解为本神话宇宙的"物理常数表"。</p>
+    </div>
+    <div class="doc-card card-b">
+      <div class="doc-label">魔法祀原（歌剧）</div>
+      <h4>OPERATIC LIBRETTO · 歌剧剧本框架</h4>
+      <p>包含：角色分配表（六姬二神对应）、三界宇宙结构（神德/人德/德灵世界）、新神格实体的神学定义、"都灵"神学长诗、十二神格词典，以及Ψ（种子音/果子音）六阶体系。是叙事框架与神学宣言的结合体。</p>
+    </div>
+  </div>
+
+  <div class="hl-box">
+    <strong>与第一季的关系：</strong>《嗒喀玛·筏拿咕》中出现了大量第一季已知神灵名称（阿萨黑、索多拉、罗摩莎、斯佩室等），说明这些名称在第二季体系中被重新定位为"法则运作的具体承载者"，即从"角色"升格为"法则化身"。《魔法祀原》则引入了"HyperPloy（Ψ）"这一贯穿全体系的终极元概念。
+  </div>
+</section>
+
+<!-- II. 嗒喀玛·筏拿咕 分析 -->
+<section>
+  <div class="sec-head">
+    <span class="sec-num">II</span>
+    <h2>《嗒喀玛·筏拿咕》：<em>形而上分类法全解</em></h2>
+  </div>
+
+  <p>文献顶端定义两个元概念，作为整个分类法的方法论框架：<strong>嗒喀玛</strong>（觉悟·过程·流经·管道）与<strong>筏拿咕</strong>（证言·圣序·持世·真理）。前者是"经历之路"，后者是"记录之果"——二者构成认知宇宙法则的双轨方法论。</p>
+
+  <p>分类法由 <strong>|乌拉莎|耶露路|</strong> 与 <strong>|耶露路|乌拉莎|</strong> 两个符号括号将全列内容划分为"上层神性区"和"下层法则区"，形成内外嵌套结构。</p>
+
+  <div class="divider">· · · ◆ 上层神性区（括号外） ◆ · · ·</div>
+
+  <table class="tax-table">
+    <thead>
+      <tr>
+        <th>术语名</th>
+        <th>核心概念</th>
+        <th>三元属性</th>
+        <th>关联神灵 / 对应</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="name-col">嗒喀玛</td>
+        <td>觉悟</td>
+        <td><span class="attr-pill">过程</span><span class="attr-pill">流经</span><span class="attr-pill">管道</span></td>
+        <td><span class="tag-new">元方法</span> 认识论之路</td>
+      </tr>
+      <tr>
+        <td class="name-col">筏拿咕</td>
+        <td>证言</td>
+        <td><span class="attr-pill">圣序</span><span class="attr-pill">持世</span><span class="attr-pill">真理</span></td>
+        <td><span class="tag-new">元方法</span> 认识论之果</td>
+      </tr>
+      <tr>
+        <td class="name-col">耶露鲁</td>
+        <td>神的血气/神经/神脉</td>
+        <td><span class="attr-pill">血气</span><span class="attr-pill">神经</span><span class="attr-pill">神脉</span></td>
+        <td>神性的基础载体 <span class="tag-new">新术语</span></td>
+      </tr>
+      <tr>
+        <td class="name-col">戈拉哒</td>
+        <td>神之溯忆/善处/明贤</td>
+        <td><span class="attr-pill">溯忆</span><span class="attr-pill">善处</span><span class="attr-pill">明贤</span></td>
+        <td>神圣记忆与智慧之法则 <span class="tag-new">新术语</span></td>
+      </tr>
+      <tr>
+        <td class="name-col">瓦纳哈</td>
+        <td>光音（启示·终焉·韦陀）</td>
+        <td><span class="attr-pill">启示</span><span class="attr-pill">终焉</span><span class="attr-pill">韦陀</span></td>
+        <td>吾神(1) · 仁神(2) <span class="tag-s1">Ψ编号</span></td>
+      </tr>
+      <tr>
+        <td class="name-col">韦檀德</td>
+        <td>神奏（福音·箴谏·符襢）</td>
+        <td><span class="attr-pill">福音</span><span class="attr-pill">箴谏</span><span class="attr-pill">符襢</span></td>
+        <td>吾神(3) · 仁神(4) <span class="tag-s1">Ψ编号</span></td>
+      </tr>
+      <tr>
+        <td class="name-col">布拉妲</td>
+        <td>审判（纪录·裁决·肇神）</td>
+        <td><span class="attr-pill">纪录</span><span class="attr-pill">裁决</span><span class="attr-pill">肇神</span></td>
+        <td>吾神(5) · 仁神(6) <span class="tag-s1">Ψ编号</span></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="hl-box">
+    <strong>关键发现：</strong>瓦纳哈/韦檀德/布拉妲三项与吾神仁神的Ψ编号（1-6）精确对应，说明这三个"神性法则"是吾仁二神在三对"启示-福音-纪录"书卷中的存在模式的形而上载体。可理解为：<em>二神的降临行动，通过这三个法则进行结构化</em>。
+  </div>
+
+  <div class="divider">· · · ◆ 下层法则区（括号内·核心法则库） ◆ · · ·</div>
+
+  <table class="tax-table">
+    <thead>
+      <tr>
+        <th>术语名</th>
+        <th>核心概念</th>
+        <th>三元属性</th>
+        <th>关联 / 备注</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="name-col">瓦拿筏</td>
+        <td>互动</td>
+        <td><span class="attr-pill">权属</span><span class="attr-pill">耦链</span><span class="attr-pill">然此</span></td>
+        <td>第一季已出现 <span class="tag-s1">S1已知</span></td>
+      </tr>
+      <tr>
+        <td class="name-col">瓦喇嘎</td>
+        <td>意志</td>
+        <td><span class="attr-pill">群首</span><span class="attr-pill">同体</span><span class="attr-pill">花叶</span></td>
+        <td>意志的群体性结构 <span class="tag-new">新</span></td>
+      </tr>
+      <tr>
+        <td class="name-col">布拉德</td>
+        <td>神式</td>
+        <td><span class="attr-pill">境具</span><span class="attr-pill">雏菊</span><span class="attr-pill">象体</span></td>
+        <td>慨爱斯哒 · 瓦坦陀罗 <span class="tag-core">关联核心神格</span></td>
+      </tr>
+      <tr>
+        <td class="name-col">乌拿扎</td>
+        <td>首领</td>
+        <td><span class="attr-pill">单首</span><span class="attr-pill">多体</span><span class="attr-pill">根茎</span></td>
+        <td>单一领导与多元化身的法则 <span class="tag-new">新</span></td>
+      </tr>
+      <tr>
+        <td class="name-col">萨摩筏</td>
+        <td>神境</td>
+        <td><span class="attr-pill">式具</span><span class="attr-pill">蔷薇</span><span class="attr-pill">法体</span></td>
+        <td>瓦坦陀罗 · 慨爱斯哒（顺序颠倒，与布拉德对仗）</td>
+      </tr>
+      <tr>
+        <td class="name-col">乌拉德</td>
+        <td>接壤</td>
+        <td><span class="attr-pill">神达</span><span class="attr-pill">令神</span><span class="attr-pill">溶解</span></td>
+        <td>神与界域的接触法则 <span class="tag-new">新</span></td>
+      </tr>
+      <tr>
+        <td class="name-col">拉布德</td>
+        <td>神运</td>
+        <td><span class="attr-pill">接壤</span><span class="attr-pill">耦合</span><span class="attr-pill">核丝</span></td>
+        <td>喀拉玛 · 阿萨黑 <span class="tag-s1">S1神灵化身</span></td>
+      </tr>
+      <tr>
+        <td class="name-col">拉布忒</td>
+        <td>命藻</td>
+        <td><span class="attr-pill">捕获</span><span class="attr-pill">精元</span><span class="attr-pill">神血</span></td>
+        <td>索多拉 · 罗摩莎 <span class="tag-s1">S1神灵化身</span></td>
+      </tr>
+      <tr>
+        <td class="name-col">奥德莎曼</td>
+        <td>信崇</td>
+        <td><span class="attr-pill">恭皈</span><span class="attr-pill">应然</span><span class="attr-pill">神律</span></td>
+        <td>虔信体系的形而上基础 <span class="tag-new">新</span></td>
+      </tr>
+      <tr>
+        <td class="name-col">斯诺阿筏</td>
+        <td>启斯</td>
+        <td><span class="attr-pill">著神</span><span class="attr-pill">性则</span><span class="attr-pill">健在</span></td>
+        <td>神性显发的初始法则 <span class="tag-new">新</span></td>
+      </tr>
+      <tr>
+        <td class="name-col">戈拉撒姆</td>
+        <td>着实</td>
+        <td><span class="attr-pill">圣褚</span><span class="attr-pill">具象</span><span class="attr-pill">神孕</span></td>
+        <td>与魔法祀原中"戈拉撒"同源 <span class="tag-core">衍生关联</span></td>
+      </tr>
+      <tr>
+        <td class="name-col">忒亚波斯</td>
+        <td>质感</td>
+        <td><span class="attr-pill">实体</span><span class="attr-pill">交感</span><span class="attr-pill">域察</span></td>
+        <td>物质感知之法则 <span class="tag-new">新</span></td>
+      </tr>
+      <tr>
+        <td class="name-col">乌亚瑟跋</td>
+        <td>涓流</td>
+        <td><span class="attr-pill">石乳</span><span class="attr-pill">涌体</span><span class="attr-pill">砂降</span></td>
+        <td>缓慢渗透与流动之法则 <span class="tag-new">新</span></td>
+      </tr>
+      <tr>
+        <td class="name-col">布拉婆特</td>
+        <td>界域</td>
+        <td><span class="attr-pill">渲染</span><span class="attr-pill">自性</span><span class="attr-pill">睹可</span></td>
+        <td>域界染色与可见性法则 <span class="tag-new">新</span></td>
+      </tr>
+      <tr>
+        <td class="name-col">古拉阔特</td>
+        <td>门域</td>
+        <td><span class="attr-pill">象征</span><span class="attr-pill">反神</span><span class="attr-pill">环尼</span></td>
+        <td>入口与反神性的张力 <span class="tag-new">新</span></td>
+      </tr>
+      <tr>
+        <td class="name-col">阿陀沃</td>
+        <td>灵褚</td>
+        <td><span class="attr-pill">喀哆拉</span><span class="attr-pill">达哆罗</span><span class="attr-pill">奥玛窦</span></td>
+        <td>马萨栖 · 达布鲁 <span class="tag-s1">S1神灵化身</span></td>
+      </tr>
+      <tr>
+        <td class="name-col">巴拉刹</td>
+        <td>疑质</td>
+        <td><span class="attr-pill">无悦</span><span class="attr-pill">无孕</span><span class="attr-pill">神违</span></td>
+        <td>疑问与否定性的法则 <span class="tag-new">新</span></td>
+      </tr>
+      <tr>
+        <td class="name-col">巴嗒埵</td>
+        <td>无执</td>
+        <td><span class="attr-pill">无著</span><span class="attr-pill">质壁</span><span class="attr-pill">着健</span></td>
+        <td>非执着之佛学法则化 <span class="tag-law">法则</span></td>
+      </tr>
+      <tr>
+        <td class="name-col">戈蒙斯耆</td>
+        <td>系惯</td>
+        <td><span class="attr-pill">光丝</span><span class="attr-pill">周界</span><span class="attr-pill">星域</span></td>
+        <td>惯性与周期之宇宙法则 <span class="tag-new">新</span></td>
+      </tr>
+      <tr>
+        <td class="name-col">苯哆拉筏</td>
+        <td>意愿</td>
+        <td><span class="attr-pill">星鸣</span><span class="attr-pill">周领</span><span class="attr-pill">奥仪</span></td>
+        <td>阿拉埵 · 莎塔玛 <span class="tag-core">关联核心神格</span></td>
+      </tr>
+      <tr>
+        <td class="name-col">三昧喀拉</td>
+        <td>谛愿</td>
+        <td><span class="attr-pill">域响</span><span class="attr-pill">神壁</span><span class="attr-pill">祷告</span></td>
+        <td>瓦拉罗 · 斯佩室 <span class="tag-s1">S1神灵化身</span></td>
+      </tr>
+      <tr>
+        <td class="name-col">达赖忒（赛哆拿）</td>
+        <td>音律 / 弦律</td>
+        <td><span class="attr-pill">艾琳斯</span><span class="attr-pill">比修斯</span><span class="attr-pill">萨克帝</span> · <span class="attr-pill">赛美斯</span><span class="attr-pill">奥赛斯</span><span class="attr-pill">阿难埵</span></td>
+        <td>双面法则：音律（时间维）/ 弦律（存在维）<span class="tag-core">双联法则</span></td>
+      </tr>
+      <tr>
+        <td class="name-col">嘚蕾祂仆</td>
+        <td>吟颂</td>
+        <td><span class="attr-pill">音程</span><span class="attr-pill">曲律</span><span class="attr-pill">秩则</span></td>
+        <td>神圣歌颂的形式法则 <span class="tag-new">新</span></td>
+      </tr>
+      <tr>
+        <td class="name-col">克蕾祂仆</td>
+        <td>札纪</td>
+        <td><span class="attr-pill">曲调</span><span class="attr-pill">氛象</span><span class="attr-pill">秩律</span></td>
+        <td>与嘚蕾祂仆对仗，"吟颂-记录"的两极 <span class="tag-new">新</span></td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- III. 魔法祀原框架 -->
+<section>
+  <div class="sec-head">
+    <span class="sec-num">III</span>
+    <h2>《魔法祀原》：<em>歌剧框架与三界宇宙论</em></h2>
+  </div>
+
+  <p>本文献开篇即呈现三组平行的二元对立：<strong>神姬/吾神</strong> vs <strong>姬神/仁神</strong>，并标注六姬的归属分配。这说明在第二季的叙事框架中，六姬被明确划分为两个"属灵阵营"——仁吾两神各自的歌颂者/代言者。</p>
+
+  <div class="cast-grid">
+    <div class="cast-side wuji">
+      <div class="cast-side-title">神姬 · 吾神阵营</div>
+      <div class="cast-member"><div class="dot"></div>玄姬（双重出现，首尾位）</div>
+      <div class="cast-member"><div class="dot"></div>美姬</div>
+      <div class="cast-member"><div class="dot"></div>祈姬</div>
+    </div>
+    <div class="cast-divider">⟺</div>
+    <div class="cast-side renji">
+      <div class="cast-side-title">姬神 · 仁神阵营</div>
+      <div class="cast-member"><div class="dot"></div>太姬（双重出现，首尾位）</div>
+      <div class="cast-member"><div class="dot"></div>希姬</div>
+      <div class="cast-member"><div class="dot"></div>妙姬</div>
+    </div>
+  </div>
+
+  <p>整部歌剧的世界观核心为<strong>三界体系</strong>，每界有独特的意志模式、祭祀方式与界域交接点：</p>
+
+  <div class="worlds-grid">
+    <div class="world-col w1">
+      <div class="world-name">神德世界</div>
+      <div class="world-item"><strong>意志</strong>：镜的意志（神境如式）</div>
+      <div class="world-item"><strong>祭祀方式</strong>：源式语序</div>
+      <div class="world-item"><strong>本质</strong>：神和人的世界</div>
+      <div class="world-item"><strong>交界处</strong>：巴喀德（神和人）</div>
+      <div class="world-item"><strong>传入下界</strong>：众灵→源式语序</div>
+    </div>
+    <div class="world-col w2">
+      <div class="world-name">人德世界</div>
+      <div class="world-item"><strong>意志</strong>：秩的意志（神如式境）</div>
+      <div class="world-item"><strong>祭祀方式</strong>：阐释语言</div>
+      <div class="world-item"><strong>本质</strong>：人和人的世界</div>
+      <div class="world-item"><strong>交界处</strong>：玛咔德（人和人）</div>
+      <div class="world-item"><strong>传入下界</strong>：众灵→鸣神咒界</div>
+    </div>
+    <div class="world-col w3">
+      <div class="world-name">德灵世界</div>
+      <div class="world-item"><strong>意志</strong>：弥的意志（神响境式）</div>
+      <div class="world-item"><strong>祭祀方式</strong>：鸣神咒界</div>
+      <div class="world-item"><strong>本质</strong>：人和神的世界</div>
+      <div class="world-item"><strong>交界处</strong>：韦祂德（人和神）</div>
+      <div class="world-item"><strong>传入上界</strong>：众灵→源式语序</div>
+    </div>
+  </div>
+
+  <div class="hl-box">
+    <strong>三界循环结构：</strong>三个世界的"意志"名称（神境如式→神如式境→神响境式）呈现一种<em>字符序列的旋转置换</em>（"神·境·式"三字位置互换），暗示三界并非线性层级，而是同一本质的三种旋转相位。三个"交界处"（巴喀德/玛咔德/韦祂德）则构成神-人往返通道的节点体系。
+  </div>
+
+  <p>文献还列出了<strong>苯哆拉（潘多拉）Ψ(HyperPloy)</strong>的"默示录"结构：神德纪（祂志）与人德纪（志祂）各有七个"祂即……"对应项，构成两个七元素光谱，分别对应神性与人性的完整表达：</p>
+
+  <div class="two-col">
+    <div class="col-box ct-gold">
+      <div class="col-title">神德纪（祂志）· MZ</div>
+      <div class="col-item">祂即 <strong>神舍</strong></div>
+      <div class="col-item">祂即 <strong>影魂</strong></div>
+      <div class="col-item">祂即 <strong>水仪</strong></div>
+      <div class="col-item">祂即 <strong>月巫</strong></div>
+      <div class="col-item">祂即 <strong>洞觉</strong></div>
+      <div class="col-item">祂即 <strong>鸾然</strong></div>
+      <div class="col-item">祂即 <strong>MZ</strong>（终极化身）</div>
+    </div>
+    <div class="col-box ct-teal">
+      <div class="col-title">人德纪（志祂）· WS</div>
+      <div class="col-item">祂即 <strong>白舍</strong></div>
+      <div class="col-item">祂即 <strong>红魂</strong></div>
+      <div class="col-item">祂即 <strong>绿仪</strong></div>
+      <div class="col-item">祂即 <strong>青巫</strong></div>
+      <div class="col-item">祂即 <strong>黑觉</strong></div>
+      <div class="col-item">祂即 <strong>太皇</strong></div>
+      <div class="col-item">祂即 <strong>WS</strong>（终极化身）</div>
+    </div>
+  </div>
+</section>
+
+<!-- IV. 新增核心神格 -->
+<section>
+  <div class="sec-head">
+    <span class="sec-num">IV</span>
+    <h2>新增核心神格：<em>六大实体定义</em></h2>
+  </div>
+
+  <p>《魔法祀原》的神格词典部分，为六个关键实体给出了神学定义性描述。这些实体在第一季中未曾出现，是第二季世界观的核心扩展。</p>
+
+  <div class="entity-grid">
+    <div class="entity-card">
+      <div class="e-name">撒巴朵</div>
+      <div class="e-def">无头之镜 · 无眼之神 · 悲伤之源</div>
+      <div class="e-desc">需要维持的自我性，是<em>业承之根</em>。这是一种没有主体（无头）却依然产生反射（镜）的存在——即"没有主体的自我意识"，是存在中最根本的痛苦来源，也是轮回的驱动力。</div>
+    </div>
+    <div class="entity-card">
+      <div class="e-name">莎塔玛</div>
+      <div class="e-def">存在的存在 · 存在的意志 · 存在的重生</div>
+      <div class="e-desc">是<em>必然的媛星</em>，是神迹的意志。使存在再存在，循环：壮大→消解→变易。"预见的未来，它并非如此；未知的结束，是真实的未来。" 第一季中亦曾出现（苯哆拉筏的关联实体）。</div>
+    </div>
+    <div class="entity-card">
+      <div class="e-name">慨爱斯哒</div>
+      <div class="e-def">存在的育种 · 业力 · 习气 · 本能</div>
+      <div class="e-desc">土壤中的种子，是等待显发的未来，是树木的果。灵神将<em>下一神所回溯的记忆植入土壤</em>，以此神得以重生。与喀哆拉互为孪生兄弟。其衰落比土壤现世的荒芜更恐怖——即内在种子的灭绝。</div>
+    </div>
+    <div class="entity-card">
+      <div class="e-name">戈拉撒</div>
+      <div class="e-def">绝对真实默示录 · 一切皆真实 · 一切皆恩典</div>
+      <div class="e-desc">圣徒与智圣的神格："将虚空都视作真实的。"戒令：<em>毋以人界智慧亵渎神界智慧</em>，毋以辨释亵渎阐释的灵智。是无法撼动的真实之神，向圣域弥撒。</div>
+    </div>
+    <div class="entity-card">
+      <div class="e-name">戈拉姆</div>
+      <div class="e-def">HyperPloy · 胜极之神圣意志</div>
+      <div class="e-desc"><em>自有永有（I AM WHO I AM）</em>——直引《出埃及记》上帝之名。是一切的因，一切的果。戈拉撒称其为"神的代赦"，闻到这一切的即闻到了神恩。戈拉姆即Ψ(HyperPloy)的神格化形态。</div>
+    </div>
+    <div class="entity-card">
+      <div class="e-name">喀哆拉</div>
+      <div class="e-def">路旁的神 · 慨爱斯哒的孪生兄弟</div>
+      <div class="e-desc">不同的信仰者以不同方式来应对它；首祭者、首询者、首戒者。服务于神的真相，是<em>神给予的残留之意志和感知</em>。"人将自己披在了神的衣着上"——人神错位的呈现者，显现人对神的投射。</div>
+    </div>
+  </div>
+</section>
+
+<!-- V. 都灵神学 -->
+<section>
+  <div class="sec-head">
+    <span class="sec-num">V</span>
+    <h2>诗篇·"谁是神"：<em>都灵神学</em>解析</h2>
+  </div>
+
+  <p>本节是文献中最长的散文性神学叙事，以"上帝告诉世人"的启示录体裁，阐述<strong>都灵（Pan-Anima）</strong>神学——即"万物皆有灵魂、灵魂皆互为承载"的彻底泛灵论体系。</p>
+
+  <div class="quote q-gold">
+    "上帝告诉世人，这世间若是出现一个窗子，必要出现窗子的灵魂，那工匠就是窗子的灵；至此那窗户上发生的事，自要发生在那工匠的身上，那就是灵魂的承载。"
+    <cite>——诗篇·谁是神·第一段</cite>
+  </div>
+
+  <p><strong>核心命题（都灵五则）：</strong></p>
+
+  <div class="hl-box" style="margin-bottom:0.7rem;">
+    <strong>① 灵魂承载律：</strong>谁产出什么，谁就要养育什么、听谁的苦声、提供谁的乳液。工匠产出窗子，工匠承载窗子的命运。
+  </div>
+  <div class="hl-box" style="margin-bottom:0.7rem;">
+    <strong>② 父母结构律：</strong>母亲＝产出者（货郎/创造者），父亲＝收养者（买者/使用者）。父亲越多，母亲越劳累；父亲越少，母亲越疲惫。孩子（都灵/灵魂）从中流通成长。
+  </div>
+  <div class="hl-box" style="margin-bottom:0.7rem;">
+    <strong>③ 国王-国民同体律：</strong>国王是国民的灵魂。不义的国民→邪恶的国王；正义的国民→正因的国王。"那国民就成为国王的皮和肉"——政治体是灵魂结构的宏观具象。
+  </div>
+  <div class="hl-box" style="margin-bottom:0.7rem;">
+    <strong>④ 神战律：</strong>世间战争皆是神的战争——神借自己的民而战。阿索比亚人（重祭祀）vs 克轮比修人（重技艺）的战争，实为两国之神的战争，战后双方神灵皆不得分出胜负，以永续信徒奉献。
+  </div>
+  <div class="hl-box">
+    <strong>⑤ 义人刀律：</strong>"刀在头颅上的义人"去征服，"刀在脚踝上的义人"去行动。义人的头颅/脚踝成为神的兵器——即神以义人为工具进行彼此间的争战。
+  </div>
+
+  <div class="quote q-teal">
+    "上帝言，都灵啊，谁若听从你的哭声，谁就是母亲，谁若使得你、差使你，谁就是父亲。"
+    <cite>——诗篇·谁是神·末段</cite>
+  </div>
+</section>
+
+<!-- VI. 神篇十二词典 -->
+<section>
+  <div class="sec-head">
+    <span class="sec-num">VI</span>
+    <h2>神篇：<em>十二神格词典</em></h2>
+  </div>
+
+  <p>《魔法祀原》神篇部分对十二个形而上概念/神格给出了诗性定义，其中多个名称与《嗒喀玛》中的术语直接对应，是"法则之形而上定义"的展开版本：</p>
+
+  <table class="tax-table">
+    <thead>
+      <tr><th>神格名</th><th>核心诗性定义</th><th>对应嗒喀玛术语</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="name-col">格纳宏</td>
+        <td>存在的悖论本质："存在本身的存在性，即那悖论的永恒神"——存在依存在而存在，是必然计划的永恒本质</td>
+        <td>—（新增，Ψ上层）</td>
+      </tr>
+      <tr>
+        <td class="name-col">艾琳斯</td>
+        <td>"是存在的一念，思维的旋律中的一节"——绝对的价值，来之则去之，是神的气息与存在的即刻</td>
+        <td>达赖忒（音律三元之一）</td>
+      </tr>
+      <tr>
+        <td class="name-col">喀拉玛</td>
+        <td>"拟态相位空间，想象力和感知空间的发生地"——基督糖球之骨埙声音分泌的地方，辨识得以成为演奏辨识</td>
+        <td>拉布德（关联神：阿萨黑）</td>
+      </tr>
+      <tr>
+        <td class="name-col">阿拉埵</td>
+        <td>"存在的回响，是存在的固定"——不依附于何界却依附于喀拉玛的锚定；"自己的背相的神的头颅"</td>
+        <td>苯哆拉筏（关联神格之一）</td>
+      </tr>
+      <tr>
+        <td class="name-col">格拉巴德</td>
+        <td>"凡是存在的意志，皆如羊水中的婴孩"——意志是孩子，诞临或受体，是"火焰中的火焰"，神性中最难胜极之觉</td>
+        <td>—（新增）</td>
+      </tr>
+      <tr>
+        <td class="name-col">三昧哒啦</td>
+        <td>"记忆和感质属于意志，意志和意志却属于神性"——忆质并行意志；仁吾的话语秘藏进其中，即神子火（永恒）</td>
+        <td>—（三昧喀拉同源变体）</td>
+      </tr>
+      <tr>
+        <td class="name-col">喀啦波</td>
+        <td>"真挚的情感，是可信仰的、不可信任的一刻"——性品与法德，是艾琳斯的乐章，维可增益的智慧</td>
+        <td>—（新增）</td>
+      </tr>
+      <tr>
+        <td class="name-col">萨克帝</td>
+        <td>"意志随着智的海浪"——智力如海浪，慧力如海风，萨克帝是海洋的尺度；人鱼是斯佩室之子主、诸褚之主</td>
+        <td>达赖忒（音律三元之三）</td>
+      </tr>
+      <tr>
+        <td class="name-col">喀德玛</td>
+        <td>"意志的感质，玛咔德的姊妹"——是草地秩序（玛咔德）与风味秩序（喀德玛）之分；普遍风味的介质</td>
+        <td>—（新增，与三界中玛咔德关联）</td>
+      </tr>
+      <tr>
+        <td class="name-col">娃喀西</td>
+        <td>"未来，接踵至的痕迹，是意志的圣痕"——不是未来，却是雏形，是"没有停驻的停留"；喀啦波之姝</td>
+        <td>—（新增）</td>
+      </tr>
+      <tr>
+        <td class="name-col">瓦拉罗</td>
+        <td>"负责的负责，维护的维护，不可侵犯的神圣意体"——万神的神王，是总持中的神性，维源性；"自我不对我自负责"</td>
+        <td>三昧喀拉（关联神格之一）</td>
+      </tr>
+      <tr>
+        <td class="name-col">瓦坦陀罗</td>
+        <td>"天然特质导致的原朴"——"阴道的至极阴茎，阴茎的至极阴道"，是必然缺陷亦是必然圆顿；"林伽要作的事情，其实即就的朴位自体"</td>
+        <td>布拉德/萨摩筏（双重关联）</td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- VII. Ψ六阶体系 -->
+<section>
+  <div class="sec-head">
+    <span class="sec-num">VII</span>
+    <h2>Ψ种子音体系：<em>六阶降临纪</em></h2>
+  </div>
+
+  <p>文献末尾呈现了体系中最为关键的<strong>Ψ（种子音/果子音）六阶体系</strong>，揭示吾神与仁神在"神道·降临纪"中的完整行动结构。六阶按"创世意志→传道意志→箴偈意志"三组二阶分布，与《嗒喀玛》中瓦纳哈/韦檀德/布拉妲的编号（1-2, 3-4, 5-6）精确吻合。</p>
+
+  <div class="psi-wrap">
+    <div class="psi-title">Ψ (HYPER-PLOY) · SEED TONE / FRUIT TONE · SIX-STAGE SYSTEM</div>
+    <div class="psi-row">
+      <div class="psi-cell psi-header">意志组</div>
+      <div class="psi-cell psi-header">Ψ-1</div>
+      <div class="psi-cell psi-header">Ψ-2</div>
+      <div class="psi-cell psi-header">Ψ-3</div>
+      <div class="psi-cell psi-header">Ψ-4</div>
+      <div class="psi-cell psi-header">Ψ-5</div>
+      <div class="psi-cell psi-header">Ψ-6</div>
+    </div>
+    <div class="psi-row">
+      <div class="psi-cell psi-label">神灵归属</div>
+      <div class="psi-cell psi-god">吾神<br>启示</div>
+      <div class="psi-cell psi-god">仁神<br>启示</div>
+      <div class="psi-cell psi-god">吾神<br>福音</div>
+      <div class="psi-cell psi-god">仁神<br>福音</div>
+      <div class="psi-cell psi-god">吾神<br>纪录</div>
+      <div class="psi-cell psi-god">仁神<br>纪录</div>
+    </div>
+    <div class="psi-row">
+      <div class="psi-cell psi-label">意志组</div>
+      <div class="psi-cell psi-seed" colspan="2" style="grid-column:span 2">创世意志<br>（瓦纳哈·光音）</div>
+      <div class="psi-cell psi-flower" colspan="2" style="grid-column:span 2">传道意志<br>（韦檀德·神奏）</div>
+      <div class="psi-cell psi-fruit" colspan="2" style="grid-column:span 2">箴偈意志<br>（布拉妲·审判）</div>
+    </div>
+    <div class="psi-row">
+      <div class="psi-cell psi-label">阶段名</div>
+      <div class="psi-cell psi-seed">种子</div>
+      <div class="psi-cell psi-flower">花子</div>
+      <div class="psi-cell psi-fruit">果子</div>
+      <div class="psi-cell psi-seed">种子</div>
+      <div class="psi-cell psi-flower">花子</div>
+      <div class="psi-cell psi-fruit">果子</div>
+    </div>
+    <div class="psi-row">
+      <div class="psi-cell psi-label">存在模式</div>
+      <div class="psi-cell psi-seed" style="font-size:0.63rem">使得其存在的<br>【还是】存在</div>
+      <div class="psi-cell psi-flower" style="font-size:0.63rem">使得其存在的<br>【成为】存在</div>
+      <div class="psi-cell psi-fruit" style="font-size:0.63rem">使得其存在的<br>【成就】存在</div>
+      <div class="psi-cell psi-seed" style="font-size:0.63rem">使得其存在的<br>【成即】存在</div>
+      <div class="psi-cell psi-flower" style="font-size:0.63rem">使得其存在的<br>【即此】存在</div>
+      <div class="psi-cell psi-fruit" style="font-size:0.63rem">使得其存在的<br>【还会】存在</div>
+    </div>
+    <div class="psi-row">
+      <div class="psi-cell psi-label">书卷对应</div>
+      <div class="psi-cell" style="font-size:0.62rem;color:var(--silver-dim)">启示录</div>
+      <div class="psi-cell" style="font-size:0.62rem;color:var(--silver-dim)">创世纪</div>
+      <div class="psi-cell" style="font-size:0.62rem;color:var(--silver-dim)">福音书</div>
+      <div class="psi-cell" style="font-size:0.62rem;color:var(--silver-dim)">传道书</div>
+      <div class="psi-cell" style="font-size:0.62rem;color:var(--silver-dim)">纪录书</div>
+      <div class="psi-cell" style="font-size:0.62rem;color:var(--silver-dim)">箴偈书</div>
+    </div>
+    <div class="psi-note">另有"阿奥意志"作为独立第七项，地位待定 · 全部六阶标记为"未记·未知"（公式书尚未展开）</div>
+  </div>
+
+  <div class="hl-box">
+    <strong>六阶存在模式解读：</strong>六个"使得其存在的【关键词】存在"构成一个完整的存在循环——从"还是"（持续性）→"成为"（生成性）→"成就"（完成性）→"成即"（当下性）→"即此"（指示性）→"还会"（未来持续性），再回到"还是"，形成<em>存在的六相环形轮转</em>。吾神与仁神在此体系中交错出现，各持奇偶位，意味着创造（吾神）与智慧（仁神）在每个阶段轮流主导。
+  </div>
+</section>
+
+<!-- VIII. 跨季情报 -->
+<section>
+  <div class="sec-head">
+    <span class="sec-num">VIII</span>
+    <h2>跨季情报：<em>第一季到第二季的升格对照</em></h2>
+  </div>
+
+  <p>以下梳理第一季中已出现的神灵/概念，在第二季公式书中的<strong>新定位</strong>——从叙事角色升格为宇宙法则的承载者：</p>
+
+  <table class="tax-table">
+    <thead>
+      <tr><th>名称</th><th>第一季定位</th><th>第二季升格为</th><th>对应法则</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="name-col">索多拉</td>
+        <td>神以人形降临的信使</td>
+        <td>命藻法则（拉布忒）的神灵化身</td>
+        <td><span class="tag-law">拉布忒：捕获·精元·神血</span></td>
+      </tr>
+      <tr>
+        <td class="name-col">罗摩莎</td>
+        <td>神姬血气，神格载体</td>
+        <td>命藻法则（拉布忒）的神灵化身（与索多拉并列）</td>
+        <td><span class="tag-law">拉布忒：捕获·精元·神血</span></td>
+      </tr>
+      <tr>
+        <td class="name-col">阿萨黑</td>
+        <td>超越权能的魔法存在，诅咒者</td>
+        <td>神运法则（拉布德）的承载者</td>
+        <td><span class="tag-law">拉布德：接壤·耦合·核丝</span></td>
+      </tr>
+      <tr>
+        <td class="name-col">马萨栖</td>
+        <td>红之意志，世界的悦动</td>
+        <td>灵褚法则（阿陀沃）的神灵化身</td>
+        <td><span class="tag-law">阿陀沃：喀哆拉·达哆罗·奥玛窦</span></td>
+      </tr>
+      <tr>
+        <td class="name-col">达布鲁</td>
+        <td>青之意志，行动的喜悦</td>
+        <td>灵褚法则（阿陀沃）的神灵化身（与马萨栖并列）</td>
+        <td><span class="tag-law">阿陀沃：喀哆拉·达哆罗·奥玛窦</span></td>
+      </tr>
+      <tr>
+        <td class="name-col">斯佩室</td>
+        <td>不可现的人鱼，斯佩室家族</td>
+        <td>谛愿法则（三昧喀拉）的承载者</td>
+        <td><span class="tag-law">三昧喀拉：域响·神壁·祷告</span></td>
+      </tr>
+      <tr>
+        <td class="name-col">赛美斯</td>
+        <td>调和神，被放逐</td>
+        <td>达赖忒（弦律）的三元神格之一</td>
+        <td><span class="tag-law">赛哆拿：赛美斯·奥赛斯·阿难埵</span></td>
+      </tr>
+      <tr>
+        <td class="name-col">奥赛斯</td>
+        <td>永恒的存在力</td>
+        <td>达赖忒（弦律）的三元神格之一</td>
+        <td><span class="tag-law">赛哆拿：赛美斯·奥赛斯·阿难埵</span></td>
+      </tr>
+      <tr>
+        <td class="name-col">阿难埵</td>
+        <td>阿喃特与萨波陀之子，司辨识</td>
+        <td>达赖忒（弦律）的三元神格之一</td>
+        <td><span class="tag-law">赛哆拿：赛美斯·奥赛斯·阿难埵</span></td>
+      </tr>
+      <tr>
+        <td class="name-col">比修斯</td>
+        <td>存在律"该存在必存在"</td>
+        <td>达赖忒（音律）的三元神格之一</td>
+        <td><span class="tag-law">达赖忒：艾琳斯·比修斯·萨克帝</span></td>
+      </tr>
+      <tr>
+        <td class="name-col">奥玛窦</td>
+        <td>神格的舞台，命运编织者</td>
+        <td>灵褚法则（阿陀沃）三元之三</td>
+        <td><span class="tag-law">阿陀沃：喀哆拉·达哆罗·奥玛窦</span></td>
+      </tr>
+      <tr>
+        <td class="name-col">达哆罗</td>
+        <td>马达夫与米利亚之子</td>
+        <td>灵褚法则（阿陀沃）三元之二</td>
+        <td><span class="tag-law">阿陀沃：喀哆拉·达哆罗·奥玛窦</span></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="quote q-gold">
+    "众神披上我的华丽，使得，我如同看到神一般的信任，这是神祀的。仁神就举起众神，吾神就举起乳海，以使得，灵神诞临，以得人使以辨知。"
+    <cite>——魔法祀原·撒巴朵段落末</cite>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<div class="doc-footer">
+  <span class="footer-text">公式书研报 · 嗒喀玛·筏拿咕 &amp; 魔法祀原（歌剧）· 完整解析</span>
+  <span class="page-mark">FORMULA CODEX INTELLIGENCE · SEASON 2 PRERELEASE</span>
+</div>
+
+</div>
+</div>
+</body>
+</html>
