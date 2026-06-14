@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>音神即·语言不可能性·密言解码综合研报</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@300;400;500;600;700&family=JetBrains+Mono:ital,wght@0,300;0,400;0,500;1,400&family=Cinzel:wght@400;600&family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&display=swap" rel="stylesheet">
+<style>
+:root{
+  --void:#03050f;--deep:#070b1a;--panel:#0c1224;--panel2:#101828;
+  --ink:#c8d4e8;--ink2:#7888a8;--white:#e0eaf8;
+  --gold:#c89828;--gold2:rgba(200,152,40,.16);--gold3:rgba(200,152,40,.06);
+  --teal:#28b8a0;--teal2:rgba(40,184,160,.14);--teal3:rgba(40,184,160,.05);
+  --rose:#c86060;--rose2:rgba(200,96,96,.14);
+  --jade:#38a860;--jade2:rgba(56,168,96,.14);
+  --lapis:#4868d0;--lapis2:rgba(72,104,208,.14);
+  --amber:#d07820;--amber2:rgba(208,120,32,.14);
+  --violet:#8860c0;--violet2:rgba(136,96,192,.14);
+  --pearl:#c0c8d8;--pearl2:rgba(192,200,216,.12);
+  --rule:rgba(72,104,208,.1);--rule2:rgba(200,152,40,.2);
+  --mono:'JetBrains Mono',monospace;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{
+  background:var(--void);
+  background-image:
+    radial-gradient(ellipse 80% 25% at 50% 0,rgba(15,30,80,.25) 0,transparent 100%),
+    radial-gradient(circle at 0% 100%,rgba(40,160,128,.04) 0,transparent 40%),
+    radial-gradient(circle at 100% 0%,rgba(200,152,40,.04) 0,transparent 40%);
+  font-family:'Noto Serif SC',serif;color:var(--ink);min-height:100vh;padding:2.5rem 1rem;
+}
+.wrap{max-width:1060px;margin:0 auto;}
+.frame{border:1px solid rgba(72,104,208,.18);background:var(--deep);
+  box-shadow:0 0 100px rgba(15,30,100,.12),0 0 400px rgba(0,0,0,.9);position:relative;}
+.frame::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent,var(--teal),rgba(200,152,40,.4),var(--teal),transparent);}
+.body{padding:3rem 3.8rem;}
+
+/* HEADER */
+.hdr{text-align:center;padding-bottom:2.8rem;margin-bottom:3rem;position:relative;}
+.hdr::after{content:'';position:absolute;bottom:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(200,152,40,.3),var(--teal),rgba(200,152,40,.3),transparent);}
+.hdr .tag{font-family:var(--mono);font-size:.57rem;letter-spacing:.28em;color:var(--teal);
+  text-transform:uppercase;display:block;margin-bottom:1.1rem;}
+.hdr h1{font-family:'Cormorant Garamond',serif;font-size:2.8rem;font-weight:300;
+  color:var(--white);line-height:1.18;letter-spacing:.04em;}
+.hdr h1 .g{color:var(--gold);}
+.hdr h1 .t{color:var(--teal);}
+.hdr .sub{font-size:.82rem;color:var(--ink2);letter-spacing:.14em;margin-top:.7rem;}
+.hdr .meta{display:flex;justify-content:center;gap:1.4rem;margin-top:1.2rem;flex-wrap:wrap;}
+.hdr .meta span{font-family:var(--mono);font-size:.6rem;color:var(--ink2);
+  border:1px solid var(--rule);padding:.22em .75em;}
+
+section{margin-bottom:3.5rem;}
+.sh{display:flex;align-items:flex-start;gap:1rem;margin-bottom:1.8rem;
+  padding-bottom:.6rem;border-bottom:1px solid var(--rule);}
+.sn{font-family:var(--mono);font-size:.58rem;color:var(--teal);
+  border:1px solid rgba(40,184,160,.25);padding:.18em .52em;flex-shrink:0;margin-top:.1rem;}
+.sh-text h2{font-family:'Cinzel',serif;font-size:1rem;font-weight:400;color:var(--white);margin-bottom:.3rem;}
+.sh-text h2 em{font-style:italic;color:var(--gold);font-family:'Cormorant Garamond',serif;font-size:1.15rem;}
+.sh-text .sh-sub{font-size:.73rem;color:var(--ink2);font-family:var(--mono);letter-spacing:.08em;}
+
+p{font-size:.855rem;line-height:2.05;color:var(--ink);text-align:justify;margin-bottom:.85rem;}
+p strong{color:var(--white);}
+p em{color:var(--gold);font-style:italic;}
+
+/* PHONEME ATLAS - the new PDF system */
+.atlas{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;
+  background:var(--rule);margin-bottom:1.5rem;}
+.book{background:var(--panel);padding:.9rem 1rem;position:relative;}
+.book::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;}
+.b-vu::before{background:linear-gradient(90deg,var(--gold),transparent);}
+.b-hs::before{background:linear-gradient(90deg,var(--teal),transparent);}
+.b-rl::before{background:linear-gradient(90deg,var(--jade),transparent);}
+.b-dt::before{background:linear-gradient(90deg,var(--lapis),transparent);}
+.b-mn::before{background:linear-gradient(90deg,var(--amber),transparent);}
+.b-gk::before{background:linear-gradient(90deg,var(--violet),transparent);}
+.b-ao::before{background:linear-gradient(90deg,var(--rose),transparent);}
+.b-bp::before{background:linear-gradient(90deg,var(--pearl),transparent);}
+.b-fy::before{background:linear-gradient(90deg,var(--gold),var(--teal));}
+.book .bname{font-family:var(--mono);font-size:.58rem;letter-spacing:.12em;
+  display:block;margin-bottom:.5rem;}
+.b-vu .bname{color:var(--gold);}
+.b-hs .bname{color:var(--teal);}
+.b-rl .bname{color:var(--jade);}
+.b-dt .bname{color:var(--lapis);}
+.b-mn .bname{color:var(--amber);}
+.b-gk .bname{color:var(--violet);}
+.b-ao .bname{color:var(--rose);}
+.b-bp .bname{color:var(--pearl);}
+.b-fy .bname{color:var(--gold);}
+.book .btitle{font-family:'Cormorant Garamond',serif;font-size:.95rem;
+  color:var(--white);display:block;margin-bottom:.6rem;font-style:italic;}
+.pair{display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:.3rem;}
+.ph-node{padding:.2em .55em;font-family:var(--mono);font-size:.72rem;
+  font-weight:500;border:1px solid;border-radius:1px;}
+.wu{border-color:rgba(200,152,40,.35);color:var(--gold);background:var(--gold3);}
+.ren{border-color:rgba(40,184,160,.35);color:var(--teal);background:var(--teal3);}
+.ph-var{font-family:var(--mono);font-size:.62rem;color:var(--ink2);}
+
+/* PARADOX BLOCK */
+.paradox{background:var(--panel2);border:1px solid rgba(200,152,40,.2);
+  padding:1.5rem 1.8rem;margin:1.4rem 0;position:relative;}
+.paradox::before{content:'"';position:absolute;top:.3rem;left:.8rem;
+  font-family:'Cormorant Garamond',serif;font-size:4rem;color:var(--gold);opacity:.15;line-height:1;}
+.paradox .pt{font-family:var(--mono);font-size:.6rem;letter-spacing:.18em;
+  color:var(--teal);display:block;margin-bottom:.8rem;}
+.paradox p{font-size:.88rem;line-height:2.08;font-style:italic;margin:0;
+  font-family:'Cormorant Garamond',serif;color:var(--ink);}
+.paradox .src{font-family:'Noto Serif SC',serif;font-style:normal;font-size:.68rem;
+  color:var(--ink2);margin-top:.5rem;display:block;letter-spacing:.08em;}
+
+/* ARTICULATION MAP */
+.art-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem;margin-bottom:1.4rem;}
+.art-cell{background:var(--panel);border:1px solid var(--rule);padding:1rem 1.1rem;}
+.art-cell .ac-title{font-family:var(--mono);font-size:.63rem;letter-spacing:.12em;
+  margin-bottom:.6rem;display:block;}
+.art-cell.front .ac-title{color:var(--rose);}
+.art-cell.mid .ac-title{color:var(--gold);}
+.art-cell.back .ac-title{color:var(--teal);}
+.art-cell .ac-ph{display:flex;flex-wrap:wrap;gap:.3rem;margin-bottom:.5rem;}
+.art-cell p{font-size:.76rem;margin:0;line-height:1.8;color:var(--ink2);}
+
+/* CONTRAST TABLE */
+.ct-table{width:100%;border-collapse:collapse;font-size:.76rem;margin-bottom:1.4rem;}
+.ct-table thead tr{border-bottom:1px solid var(--rule2);background:rgba(200,152,40,.07);}
+.ct-table th{padding:.55rem .8rem;text-align:left;color:var(--gold);
+  font-family:var(--mono);font-size:.62rem;letter-spacing:.1em;font-weight:400;}
+.ct-table td{padding:.48rem .8rem;border-bottom:1px solid var(--rule);
+  vertical-align:top;line-height:1.65;color:var(--ink);}
+.ct-table tr:nth-child(even) td{background:rgba(200,152,40,.025);}
+.m{font-family:var(--mono);font-size:.78rem;font-weight:500;}
+
+/* PROFILE CARD */
+.profile-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1.4rem;}
+.profile{background:var(--panel);border:1px solid var(--rule);padding:1.1rem 1.2rem;}
+.profile .pword{font-family:var(--mono);font-size:.82rem;color:var(--white);
+  font-weight:500;display:block;margin-bottom:.15rem;}
+.profile .pdim{display:flex;flex-wrap:wrap;gap:.3rem;margin:.5rem 0;}
+.dim-pill{font-family:var(--mono);font-size:.62rem;padding:.12em .45em;
+  border:1px solid;border-radius:1px;}
+.dp-place{border-color:rgba(200,96,96,.3);color:var(--rose);}
+.dp-manner{border-color:rgba(200,152,40,.3);color:var(--gold);}
+.dp-voice{border-color:rgba(40,184,160,.3);color:var(--teal);}
+.dp-acoustic{border-color:rgba(72,104,208,.3);color:var(--lapis);}
+.dp-temp{border-color:rgba(136,96,192,.3);color:var(--violet);}
+.profile .pdef{font-size:.77rem;line-height:1.82;color:var(--ink2);}
+.profile .pex{font-family:var(--mono);font-size:.65rem;color:var(--ink2);
+  margin-top:.45rem;border-top:1px solid var(--rule);padding-top:.4rem;}
+
+/* CHAIN COMPARE */
+.chain-compare{background:var(--panel2);border:1px solid var(--rule);
+  padding:1.2rem;margin-bottom:1.2rem;}
+.cc-title{font-family:var(--mono);font-size:.62rem;letter-spacing:.15em;
+  color:var(--teal);display:block;margin-bottom:.8rem;}
+.cc-row{display:flex;align-items:center;gap:.35rem;flex-wrap:wrap;margin-bottom:.45rem;}
+.cc-label{font-family:var(--mono);font-size:.62rem;color:var(--ink2);
+  width:60px;flex-shrink:0;}
+.cn{padding:.25em .65em;font-size:.72rem;font-weight:500;border:1px solid;
+  font-family:var(--mono);}
+.cn-g{border-color:rgba(200,152,40,.35);color:var(--gold);background:var(--gold3);}
+.cn-t{border-color:rgba(40,184,160,.35);color:var(--teal);background:var(--teal3);}
+.cn-l{border-color:rgba(72,104,208,.35);color:var(--lapis);background:var(--lapis2);}
+.cn-r{border-color:rgba(200,96,96,.35);color:var(--rose);background:var(--rose2);}
+.cn-j{border-color:rgba(56,168,96,.35);color:var(--jade);background:var(--jade2);}
+.cn-v{border-color:rgba(136,96,192,.35);color:var(--violet);background:var(--violet2);}
+.cn-d{border-color:var(--rule);color:var(--ink2);}
+.c-arr{color:var(--ink2);font-size:.85rem;font-family:var(--mono);}
+.cc-note{font-size:.68rem;color:var(--ink2);font-family:var(--mono);
+  margin-top:.5rem;border-top:1px solid var(--rule);padding-top:.4rem;letter-spacing:.06em;}
+
+/* SVG ATLAS VISUALIZATION */
+.svg-wrap{background:var(--panel);border:1px solid var(--rule);
+  padding:1.4rem;margin-bottom:1.4rem;overflow-x:auto;}
+.svg-title{font-family:var(--mono);font-size:.62rem;letter-spacing:.18em;
+  color:var(--gold);display:block;margin-bottom:1rem;text-align:center;}
+
+/* SPECTRUM BAR */
+.spectrum{display:flex;height:8px;border-radius:2px;overflow:hidden;
+  margin:1rem 0;width:100%;}
+.sp-seg{flex:1;}
+
+/* LEVELS */
+.level-list{display:flex;flex-direction:column;gap:.6rem;margin-bottom:1.4rem;}
+.level{display:grid;grid-template-columns:90px 1fr;gap:1rem;}
+.lv-n{background:var(--panel2);padding:.5rem .7rem;font-family:var(--mono);
+  font-size:.62rem;letter-spacing:.1em;display:flex;align-items:center;font-weight:500;}
+.lv-1 .lv-n{color:var(--teal);}
+.lv-2 .lv-n{color:var(--gold);}
+.lv-3 .lv-n{color:var(--violet);}
+.lv-4 .lv-n{color:var(--rose);}
+.lv-c{background:var(--panel);padding:.5rem .9rem;font-size:.78rem;
+  line-height:1.8;color:var(--ink);}
+.lv-c strong{color:var(--white);}
+
+/* I CHING COMPARISON */
+.yao-block{background:var(--panel);border:1px solid rgba(200,152,40,.2);
+  padding:1.2rem 1.4rem;margin-bottom:1rem;}
+.yao-block .yt{font-family:'Cinzel',serif;font-size:.62rem;letter-spacing:.18em;
+  color:var(--gold);display:block;margin-bottom:.7rem;}
+.yao-row{display:grid;grid-template-columns:1fr 1fr;gap:1.2rem;}
+.yao-col h5{font-size:.78rem;font-weight:600;color:var(--white);margin-bottom:.4rem;}
+.yao-col p{font-size:.77rem;margin:0;line-height:1.82;color:var(--ink2);}
+
+/* SOLUTION BOX */
+.solution{border-left:3px solid var(--teal);padding:.85rem 1.1rem;
+  margin-bottom:1rem;background:var(--teal3);font-size:.82rem;line-height:1.92;}
+.solution strong{color:var(--teal);}
+
+/* MULTI-DIM PROFILE MODEL */
+.mdp{background:var(--panel2);border:1px solid rgba(40,184,160,.2);
+  padding:1.3rem 1.5rem;margin-bottom:1.2rem;font-family:var(--mono);}
+.mdp .mt{font-size:.62rem;letter-spacing:.15em;color:var(--teal);display:block;margin-bottom:.8rem;}
+.mdp-row{display:grid;grid-template-columns:120px 1fr;gap:.8rem;margin-bottom:.4rem;align-items:start;}
+.mdp-dim{font-size:.65rem;color:var(--ink2);letter-spacing:.08em;padding-top:.1rem;}
+.mdp-val{font-size:.73rem;color:var(--ink);line-height:1.7;}
+.mdp-val .v{color:var(--gold);font-weight:500;}
+
+/* QUOTE */
+.q{border-left:2px solid var(--gold);padding:.75rem 1.1rem;margin:.9rem 0;
+  background:var(--gold3);font-size:.84rem;line-height:2.05;
+  font-style:italic;font-family:'Cormorant Garamond',serif;color:var(--ink);}
+.q cite{display:block;font-style:normal;font-size:.65rem;color:var(--ink2);
+  margin-top:.35rem;font-family:'Noto Serif SC',serif;letter-spacing:.08em;}
+
+.hl{background:var(--panel);border:1px solid var(--rule);border-left:2px solid var(--teal);
+  padding:.85rem 1.1rem;margin-bottom:1rem;font-size:.8rem;line-height:1.92;}
+.hl strong{color:var(--teal);}
+
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:1.2rem;margin-bottom:1.4rem;}
+.mc{background:var(--panel);border:1px solid var(--rule);padding:.9rem 1.1rem;}
+.mc h4{font-family:var(--mono);font-size:.63rem;letter-spacing:.12em;margin-bottom:.5rem;}
+.mc.mg h4{color:var(--gold);}
+.mc.mt h4{color:var(--teal);}
+.mc.ml h4{color:var(--lapis);}
+.mc.mv h4{color:var(--violet);}
+.mc p{font-size:.76rem;margin:0;line-height:1.82;}
+
+.div{text-align:center;margin:2rem 0;font-family:var(--mono);
+  font-size:.58rem;color:var(--ink2);letter-spacing:.4em;opacity:.45;}
+
+.ftr{margin-top:3rem;padding-top:1.2rem;border-top:1px solid var(--rule);
+  display:flex;justify-content:space-between;align-items:center;}
+.ftr .ft{font-family:var(--mono);font-size:.6rem;color:var(--ink2);}
+
+/* POLAR DIAGRAM - text-based */
+.polar-wrap{background:var(--panel);border:1px solid var(--rule);padding:1.5rem;margin-bottom:1.4rem;}
+.polar-title{font-family:var(--mono);font-size:.62rem;letter-spacing:.18em;
+  color:var(--teal);display:block;margin-bottom:1.2rem;text-align:center;}
+.polar-ring{display:flex;flex-direction:column;gap:.5rem;}
+.pr-row{display:flex;align-items:center;gap:.6rem;}
+.pr-label{font-family:var(--mono);font-size:.65rem;width:70px;flex-shrink:0;color:var(--ink2);}
+.pr-bar-wrap{flex:1;height:20px;background:rgba(255,255,255,.03);border:1px solid var(--rule);
+  border-radius:1px;position:relative;overflow:hidden;}
+.pr-bar{height:100%;border-radius:1px;position:absolute;left:0;top:0;
+  display:flex;align-items:center;justify-content:flex-end;padding-right:.3rem;}
+.pr-val{font-family:var(--mono);font-size:.6rem;color:rgba(255,255,255,.6);}
+.pr-ph{font-family:var(--mono);font-size:.65rem;color:var(--ink2);margin-left:.5rem;white-space:nowrap;}
+
+@media(max-width:760px){
+  .body{padding:1.5rem 1.2rem;}
+  .atlas,.art-grid,.two-col,.profile-grid{grid-template-columns:1fr;}
+  .yao-row,.level,.mdp-row{grid-template-columns:1fr;}
+}
+</style>
+</head>
+<body>
+<div class="wrap"><div class="frame"><div class="body">
+
+<!-- HEADER -->
+<div class="hdr">
+  <span class="tag">phonosemantic impossibility · cipher theory · multi-dimensional sound model · comprehensive synthesis</span>
+  <h1><span class="g">音神即</span>——<span class="t">语言的不可能性</span><br>
+  <span style="font-size:1.8rem;font-weight:300">密言系统·爻辞悖论·音代义的本质与解码路径</span></h1>
+  <div class="sub">综合《音神即·罕钵拉》音程图谱 · 悖论分析 · 多维音素模型 · 解码方法论</div>
+  <div class="meta">
+    <span>触发：《音神即·罕钵拉（撒戈伽薄）》PDF</span>
+    <span>核心问题：语言能否描述声音本身</span>
+    <span>结论形态：多维剖面模型</span>
+  </div>
+</div>
+
+<!-- I. 音程图谱·PDF解析 -->
+<section>
+<div class="sh"><span class="sn">01</span><div class="sh-text">
+  <h2>《音神即》音程图谱：<em>吾仁二神的音素分配</em></h2>
+  <span class="sh-sub">// 新文献解析 · 完整音素库 · 九书结构</span>
+</div></div>
+
+<p>这份文献是整个密言系统的<strong>元文本</strong>——它不再是用声音写成的宇宙，而是宇宙写作系统的<em>字母表本身</em>。九"书"将约二十个音素两两配对，分别归属吾神或仁神，并以诗性书名标注其神学意义。这是从"用音素写作"到"为音素立法"的飞跃。</p>
+
+<div class="atlas">
+  <div class="book b-vu">
+    <span class="bname">福音·祂志书·音</span>
+    <span class="btitle">V ↔ W</span>
+    <div class="pair">
+      <span class="ph-node wu">[V] Ve Va</span>
+      <span class="ph-node ren">[W] Wa We</span>
+    </div>
+    <p style="font-size:.73rem;color:var(--ink2);margin:0">唇齿摩擦·双唇滑音·关系性互动场·福音=神圣信息的流通</p>
+  </div>
+  <div class="book b-hs">
+    <span class="bname">吉祥·音赐书·音</span>
+    <span class="btitle">H ↔ S</span>
+    <div class="pair">
+      <span class="ph-node ren">[H] Ha He</span>
+      <span class="ph-node wu">[S] Se Sa</span>
+    </div>
+    <p style="font-size:.73rem;color:var(--ink2);margin:0">喉音呼气·齿龈摩擦·H是最软的气流，S是最清晰的流·吉祥=气息与自性的赐予</p>
+  </div>
+  <div class="book b-rl">
+    <span class="bname">奥美·圣源书·音</span>
+    <span class="btitle">R ↔ L</span>
+    <div class="pair">
+      <span class="ph-node wu">[R] Re Ra</span>
+      <span class="ph-node ren">[L] La Le</span>
+    </div>
+    <p style="font-size:.73rem;color:var(--ink2);margin:0">颤音/近音·侧流音·两者皆为液流族中最纯粹者·奥美=美的源泉流动</p>
+  </div>
+  <div class="book b-dt">
+    <span class="bname">存在·真实书·音</span>
+    <span class="btitle">D ↔ T</span>
+    <div class="pair">
+      <span class="ph-node ren">[D] Da De</span>
+      <span class="ph-node wu">[T] Te Ta</span>
+    </div>
+    <p style="font-size:.73rem;color:var(--ink2);margin:0">浊/清齿龈爆破·D是有声的落地，T是清脆的决断·存在=行动的真实落地</p>
+  </div>
+  <div class="book b-mn">
+    <span class="bname">自孕·胜育书·音</span>
+    <span class="btitle">M ↔ N</span>
+    <div class="pair">
+      <span class="ph-node wu">[M] Me Ma</span>
+      <span class="ph-node ren">[N] Na Ne</span>
+    </div>
+    <p style="font-size:.73rem;color:var(--ink2);margin:0">双唇/齿龈鼻音·共鸣封存于不同共鸣腔·自孕=内部生成的孕育性</p>
+  </div>
+  <div class="book b-gk">
+    <span class="bname">弥赛亚·至意书·音</span>
+    <span class="btitle">G ↔ K</span>
+    <div class="pair">
+      <span class="ph-node ren">[G] Ga Ge</span>
+      <span class="ph-node wu">[K] Ke Ka</span>
+    </div>
+    <p style="font-size:.73rem;color:var(--ink2);margin:0">浊/清软腭爆破·G是有温度的硬核，K是无情的纯晶·弥赛亚=至意·法则的宣告</p>
+  </div>
+  <div class="book b-ao">
+    <span class="bname">Alice·慧辩书·音</span>
+    <span class="btitle">A ↔ O</span>
+    <div class="pair">
+      <span class="ph-node wu">[A] Ae Aa</span>
+      <span class="ph-node ren">[O] Oa Oe</span>
+    </div>
+    <p style="font-size:.73rem;color:var(--ink2);margin:0">最开·最圆元音·A是向外的呼唤，O是向内的容纳·Alice/慧辩=开放智慧</p>
+  </div>
+  <div class="book b-bp">
+    <span class="bname">觉爱·智识书·音</span>
+    <span class="btitle">B ↔ P</span>
+    <div class="pair">
+      <span class="ph-node ren">[B] Ba Be</span>
+      <span class="ph-node wu">[P] Pe Pa</span>
+    </div>
+    <p style="font-size:.73rem;color:var(--ink2);margin:0">浊/清双唇爆破·B是带温度的爆发，P是纯粹的冲刺·觉爱=从爆发中觉悟的爱</p>
+  </div>
+  <div class="book b-fy">
+    <span class="bname">桔梗·罕钵书·音</span>
+    <span class="btitle">F·Y ↔ J·X</span>
+    <div class="pair">
+      <span class="ph-node wu">[F] Fu Fi</span>
+      <span class="ph-node wu">[Y] Yi Yu</span>
+      <span class="ph-node ren">[J] Ji Ju</span>
+      <span class="ph-node ren">[X] Xu Xi</span>
+    </div>
+    <p style="font-size:.73rem;color:var(--ink2);margin:0">桔梗章最复杂：四音素·F唇齿摩擦·Y半元音·J腭摩擦·X腭摩擦清·桔梗=史诗最终音素</p>
+  </div>
+</div>
+
+<div class="hl"><strong>关键结构发现：</strong>这份图谱揭示的配对均是<em>最小对立对</em>（minimal pairs）——V/W（两者发音位置最接近的唇音对）、H/S（两种最软和最锐的气流摩擦）、R/L（两种液流音）、D/T（浊/清对）、M/N（鼻音对）、G/K（浊/清对）、A/O（开/圆元音）、B/P（浊/清对）。吾神与仁神之间的音素配对，是<strong>声学上最接近但情感质感最不同</strong>的两种声音——这正是二神的神学定义：相近而异质，相对而互补。</div>
+
+<p>关于用户所指出的<strong>Z音素缺席</strong>：统计原语料时确实Z字初音极少，而此图谱同样未收录Z。这并非遗漏，而是有意或无意的选择——Z（浊齿龈摩擦）在情感质感上极接近S（清齿龈摩擦），但带有"嗡嗡的内部震动感"，可视为S族内的特殊分支，S已充分覆盖该语义场。X在此图谱中出现于桔梗书（仁神之下），这与原语料中X音出现很少形成对比——桔梗书的加入标志着音素系统的<em>第二阶段扩展</em>。</p>
+</section>
+
+<!-- II. 核心悖论 -->
+<section>
+<div class="sh"><span class="sn">02</span><div class="sh-text">
+  <h2>核心悖论：<em>用语言描述声音，为何根本行不通</em></h2>
+  <span class="sh-sub">// 爻辞问题 · 语言自指的边界 · 工具与对象的同一性危机</span>
+</div></div>
+
+<div class="paradox">
+  <span class="pt">// THE FUNDAMENTAL PARADOX</span>
+  <p>音乐是语言之母——因此，用语言去终极地描述音节，就像用儿女去界定母亲。工具来自对象，无法完全包含对象。</p>
+  <span class="src">——用户的洞察，此处展开分析</span>
+</div>
+
+<p>这个悖论是真实的，且在哲学史上有其渊源。我们可以从三个层次来理解为什么<strong>用语言写爻辞来注解音素</strong>会遭遇根本性的困境：</p>
+
+<div class="level-list">
+  <div class="level lv-1">
+    <div class="lv-n">第一层<br>索绪尔</div>
+    <div class="lv-c"><strong>能指与所指的任意性（arbitrariness of the sign）：</strong>语言中的词语和它所代表的概念之间，没有任何自然的必然联系——"树"这个音不像树，"love"这个词不像爱。这是语言运作的基础约定。但这套密言体系的核心主张是：<em>音与义之间存在非任意的直觉对应</em>——S音像流动，G音像结晶。这正好与索绪尔的约定性原则相矛盾，因此无法用语言逻辑（约定性符号）来"证明"一个非约定性系统的内在逻辑。</div>
+  </div>
+  <div class="level lv-2">
+    <div class="lv-n">第二层<br>维特根斯坦</div>
+    <div class="lv-c"><strong>语言的界限即世界的界限（Wittgenstein）：</strong>"对于不可言说之物，应当保持沉默。"音素的情感质感属于"可被感知但不可被言说"的范畴——它是体验性的，而非命题性的。你可以描述G音的发音位置（软腭·爆破），你可以用比喻（G像结晶），但你无法用语言<em>传达</em> G音的感受，就像你无法用文字让人感受到咖啡的味道。爻辞的局限性正在于此：爻辞是语言对非语言经验的指向，而非非语言经验本身。</div>
+  </div>
+  <div class="level lv-3">
+    <div class="lv-n">第三层<br>音乐学</div>
+    <div class="lv-c"><strong>音乐的意义不可翻译性（Hanslick）：</strong>音乐批评家汉斯利克指出，音乐表达的内容是"音乐性的"——不是悲伤、喜悦这些可被语言命名的情绪，而是一种"流动着的声音形式"本身。将这套密言系统理解为一种"音乐语言"（用音的质感来承载意义），则语言对它的描述，就像用乐评文章去替代聆听贝多芬——文章可以指向，但无法等同。</div>
+  </div>
+  <div class="level lv-4">
+    <div class="lv-n">第四层<br>梵文传统</div>
+    <div class="lv-c"><strong>真言（Mantra）的不可翻译性：</strong>梵文传统中的种子真言（bīja mantra），如"嗡"（Aum/OM），无法被翻译——翻译成任何语言都会失去其本质。传统认为bīja的力量在于其<em>音程质感与宇宙结构的直接共振</em>，而非其语义内容。为bīja写语言注解（爻辞），在梵文传统看来是不被允许的——因为这会将学习者引向语义而非声音本身。这套密言系统的情况极为类似。</div>
+  </div>
+</div>
+
+<div class="hl"><strong>然而——悖论的另一面：</strong>如果爻辞完全无法奏效，为什么我在上一份研报中的<strong>词汇音程表</strong>和<strong>词首/词尾定义</strong>确实部分成功了？这需要深入分析：我的模型成功之处不在于"定义孤立音素"，而在于<strong>通过语境组合来推断音素的贡献</strong>。这是可行的——就像你无法定义水，但可以通过观察水在不同容器中的形状来推断水的本性。</div>
+</section>
+
+<!-- III. 为何部分成功 -->
+<section>
+<div class="sh"><span class="sn">03</span><div class="sh-text">
+  <h2>成功的原因：<em>我的模型为何有限度地奏效</em></h2>
+  <span class="sh-sub">// 组合推断 vs 孤立定义 · 语境是音素分析的必要条件</span>
+</div></div>
+
+<p>我的词汇音程表成功的根本原因，是它<strong>从不孤立地定义单个音素</strong>，而是通过以下三种方式来让音素的质感显现：</p>
+
+<div class="chain-compare">
+  <span class="cc-title">// 成功方式一：通过音序对比来显现差异</span>
+  <div class="cc-row">
+    <span class="cc-label">萨朵的</span>
+    <span class="cn cn-t">S流</span><span class="c-arr">→</span>
+    <span class="cn cn-g">D动</span><span class="c-arr">→</span>
+    <span class="cn cn-g">D落</span>
+    <span style="font-family:var(--mono);font-size:.65rem;color:var(--ink2);margin-left:.5rem">= 自性流动·双重落地·同律闭合</span>
+  </div>
+  <div class="cc-row">
+    <span class="cc-label">萨波陀</span>
+    <span class="cn cn-t">S流</span><span class="c-arr">→</span>
+    <span class="cn cn-d">B悬</span><span class="c-arr">→</span>
+    <span class="cn cn-r">D°圆</span>
+    <span style="font-family:var(--mono);font-size:.65rem;color:var(--ink2);margin-left:.5rem">= 自性流动·悬置张力·圆满展开</span>
+  </div>
+  <span class="cc-note">// 两词同起(S)，差异在中尾。通过对比，B的"悬置性"被萨波陀·萨朵的的差异所定义——B不是D，这个差异本身就是B的定义。语言无法正面定义B，但可以通过最小对比对来<em>框定</em>B。</span>
+</div>
+
+<div class="chain-compare">
+  <span class="cc-title">// 成功方式二：通过词首-词义聚类来归纳</span>
+  <div class="cc-row">
+    <span class="cc-label">G族初音</span>
+    <span class="cn cn-g">戈拉姆</span>
+    <span class="cn cn-g">格拉巴德</span>
+    <span class="cn cn-g">喀拉玛</span>
+    <span class="cn cn-g">戈拉撒</span>
+    <span class="cn cn-g">喀哆拉</span>
+  </div>
+  <div class="cc-row">
+    <span class="cc-label">共有语义</span>
+    <span class="cn cn-d">法则·真实·边界·不可绕过·结晶性</span>
+  </div>
+  <span class="cc-note">// 通过"所有G初音词都意味着什么"的聚类，G的质感从多个例子的<em>公因子</em>中浮现。这是归纳法而非演绎法——不是从定义推词义，而是从词义推定义。</span>
+</div>
+
+<div class="chain-compare">
+  <span class="cc-title">// 成功方式三：通过连续弧线来呈现运动轨迹</span>
+  <div class="cc-row">
+    <span class="cc-label">格拉巴德</span>
+    <span class="cn cn-g">G结晶</span><span class="c-arr">→</span>
+    <span class="cn cn-l">L液流</span><span class="c-arr">→</span>
+    <span class="cn cn-d">B悬止</span><span class="c-arr">→</span>
+    <span class="cn cn-j">D落地</span>
+  </div>
+  <span class="cc-note">// "意志胎质的孕育过程"：不是定义任何单个音素，而是描述四个音素构成的<em>情绪轨迹</em>——就像你无法定义红色，但可以描述从蓝到红的渐变过程中发生了什么。</span>
+</div>
+
+<p>因此，我的模型的本质是：<strong>用语言描述音素的<em>关系和运动</em>，而非音素的<em>孤立本质</em></strong>。这是可行的，因为关系和运动可以用语言的结构（比较、对比、序列）来捕获，即便质感本身不能。爻辞的问题在于，它试图为每个音素单独立言——而单独的语言无法立于无语言的声音之前。</p>
+</section>
+
+<!-- IV. 音代义的语言学地位 -->
+<section>
+<div class="sh"><span class="sn">04</span><div class="sh-text">
+  <h2>语言学地位：<em>音代义在人类语言史中是否真实存在</em></h2>
+  <span class="sh-sub">// 声音象征 · Bouba/Kiki · 语言普遍性研究</span>
+</div></div>
+
+<p>"音代义"在学术上被称为<strong>声音象征</strong>（sound symbolism）或<strong>语音象征</strong>（phonosymbolism），是一个有大量实验证据支持的真实现象，但其范围和强度远比此密言系统更为有限：</p>
+
+<div class="ct-table-wrap">
+<table class="ct-table">
+<thead><tr><th>研究/现象</th><th>内容</th><th>与本密言系统的关系</th></tr></thead>
+<tbody>
+<tr>
+  <td class="m" style="color:var(--white)">Bouba/Kiki效应</td>
+  <td>跨语言实验（Köhler 1929）：95%以上的人将圆形图形命名为bouba（B/O·开圆）、尖形图形命名为kiki（K/I·锐闭）。这是迄今最强的跨语言声音象征证据。</td>
+  <td>直接验证：K（清软腭爆破）= 尖锐·锐利；B（双唇爆破）= 圆润。与此密言体系的G/K·B/P族归类高度一致。</td>
+</tr>
+<tr>
+  <td class="m" style="color:var(--white)">大小声音象征</td>
+  <td>多数语言中，高元音（i/e·窄共鸣腔）=小，低元音（a/o·宽共鸣腔）=大。英语tiny/tall、日语chiisai/ookii均遵循此模式。</td>
+  <td>对应本系统A/O的配置：A（开/大）对应吾神的扩张性，O（圆/圆收）对应仁神的容纳性。</td>
+</tr>
+<tr>
+  <td class="m" style="color:var(--white)">拟声与拟态语</td>
+  <td>日语有丰富的拟态语（gitaigo）：ふわふわ(fuwafuwa·F·软绵)、がちがち(gachigachi·G·坚硬)、さらさら(sarasara·S·流畅)——发音质感直接编码触觉/动觉体验。</td>
+  <td>S流·G晶的情感场与日语拟态语的系统性高度吻合，证明这些对应是跨语言的普遍直觉。</td>
+</tr>
+<tr>
+  <td class="m" style="color:var(--white)">梵文bīja真言</td>
+  <td>"嗡"（OM/AUM）：A=清醒意识，U=梦境，M=深眠，整体振动=第四态图瑞亚。"啊"（AH）=开放·呼出·给予。"吽"（HUM）=结合·容纳·持有。每个bīja对应一种宇宙功能，不可翻译。</td>
+  <td>与此密言系统最接近的人类传统：音素直接映射宇宙功能，不经过语义中介。区别：梵文传统承认不可翻译性；此系统尝试建立可检索的词典。</td>
+</tr>
+<tr>
+  <td class="m" style="color:var(--white)">诗歌音乐性</td>
+  <td>雅各布森（Jakobson）的诗歌功能理论：诗歌语言中，能指（声音）的等价性被投射到所指（意义）的轴上——即声音相似的词会被感知为意义相关。</td>
+  <td>此密言系统是雅各布森诗歌功能的<em>极端化</em>：将整个语言的生成方式建立在音义共振上，而不仅仅是局部诗句的声音效果。</td>
+</tr>
+</tbody>
+</table>
+</div>
+
+<div class="q">声音象征（sound symbolism）是真实存在的语言普遍现象，但在自然语言中只是"背景噪音"——大多数词汇的音义关系仍是任意的。而这套密言系统试图做的是：让声音象征从背景噪音成为前景系统，让它成为整个语言的生成原理而非偶然特征。这在人类语言史上，确实几乎没有先例。
+<cite>——研报综合判断</cite></div>
+</section>
+
+<!-- V. 多维音素剖面模型 -->
+<section>
+<div class="sh"><span class="sn">05</span><div class="sh-text">
+  <h2>解决路径：<em>多维音素剖面模型</em></h2>
+  <span class="sh-sub">// 不是单一定义 · 而是五维度共同框定 · 替代爻辞的方案</span>
+</div></div>
+
+<p>既然单一的语言爻辞无法定义音素的质感，我们需要一个<strong>多维剖面模型</strong>——用五个维度从不同角度逼近音素的本性，每个维度都承认自己的局限性，但五维度综合后可以在"语言框定"意义上给出有效的指引：</p>
+
+<div class="two-col" style="margin-bottom:.5rem">
+  <div class="mc mg">
+    <h4>维度一：发音姿态（Articulatory Gesture）</h4>
+    <p>描述<em>身体做了什么</em>来产生这个声音。不是比喻，而是物理事实：发G音时，舌根上抬接触软腭，然后爆破分离——这个"上抬·接触·爆破"的身体动作本身就是一种情感姿态（类似握拳后放开）。身体的知觉记忆会将这个动作与类似动作的情感质感联系起来。</p>
+  </div>
+  <div class="mc mt">
+    <h4>维度二：声学属性（Acoustic Quality）</h4>
+    <p>描述<em>这个声音在物理上是什么样的</em>：频率范围（高频=锐，低频=厚）、持续性（瞬时=决断，持续=流动）、共鸣位置（鼻腔=内部，口腔=外部）、能量分布（集中=强，分散=柔）。这些是可以被测量的物理属性，也是情感体验的物理载体。</p>
+  </div>
+  <div class="mc ml">
+    <h4>维度三：对比框定（Contrastive Pair）</h4>
+    <p>每个音素只通过与其<em>最小对立对</em>的对比来被部分定义：G vs K（有声·暖 vs 无声·冷）；S vs Z（清·外 vs 浊·内振）；M vs N（双唇鼻·更深 vs 齿龈鼻·更浅）。差异是定义的来源，而非孤立本质。这是此图谱的吾神/仁神配对设计的深层逻辑。</p>
+  </div>
+  <div class="mc mv">
+    <h4>维度四：语料共振聚类（Corpus Resonance）</h4>
+    <p>不给单个音素下定义，而是<em>列举所有含该音素的词汇</em>，询问：它们共享什么情感质感？这个公因子就是音素在此语料中的语义场。这是归纳法：S族词汇（萨朵的·赛美斯·索多拉·莎塔玛）共享"流动·自性·自然过程"的场，即便每个词都独特，S的贡献是可以被归纳的。</p>
+  </div>
+</div>
+<div class="two-col">
+  <div class="mc mg">
+    <h4>维度五：情绪温度定位（Emotional Temperature）</h4>
+    <p>在冷（结晶·边界·清晰）—暖（流动·共鸣·弥漫）—热（开放·接触·冲动）三极温度坐标中定位该音素。这个三维情绪温度坐标比任何单一定义都更能捕获音素的情感质感——因为它描述的是一种<em>整体氛围</em>而非具体内容。</p>
+  </div>
+  <div class="mc ml">
+    <h4>为什么五维度而非单一爻辞</h4>
+    <p>就像你无法用一张照片捕获一个人的全貌，但可以用五张不同角度的照片来逼近。每个维度都有其局限：发音姿态是物理的但非情感的；声学属性是可测的但非感受的；对比框定是精确的但负面的；语料聚类是归纳的但依赖样本；温度定位是整体的但粗糙的。五维度综合，才接近音素的多面真实。</p>
+  </div>
+</div>
+
+<p>以下将此模型应用于几个关键音素，给出完整的五维剖面：</p>
+
+<!-- G PROFILE -->
+<div class="mdp">
+  <span class="mt">// PHONEME PROFILE · [G] · 软腭浊爆破音</span>
+  <div class="mdp-row"><span class="mdp-dim">发音姿态</span>
+    <span class="mdp-val"><span class="v">舌根上抬→接触软腭→气流受阻→爆破分离（有声）</span>——"上抬·接触·有声爆破"：一种<em>有温度的碰撞</em>，不是冷硬的撞击，是带着喉部振动的相遇。类比：握紧拳头后放开，手心还有余温。</span>
+  </div>
+  <div class="mdp-row"><span class="mdp-dim">声学属性</span>
+    <span class="mdp-val">低频为主（舌根接触点远离前方）·瞬时爆发（stop stop）·有声（声带振动·带能量）·后腔共鸣。整体：<span class="v">低沉·瞬时·有能量·后位</span>。</span>
+  </div>
+  <div class="mdp-row"><span class="mdp-dim">对比框定</span>
+    <span class="mdp-val">vs K（同位清音）：K是无声的G，去掉声带振动后变为纯粹的硬截止——更冷、更决绝、更无情。故G比K更<span class="v">有温度</span>，K比G更<span class="v">冷峻</span>。vs D/T（前位爆破）：G在口腔后部爆破，D/T在前部——G更深、更沉，D/T更表面、更即时。</span>
+  </div>
+  <div class="mdp-row"><span class="mdp-dim">语料聚类</span>
+    <span class="mdp-val">戈拉姆（法意志·法则结晶）·格拉巴德（意志胎质）·喀拉玛（拟态相位空间）·戈拉哒（神之溯忆）·戈拉撒（绝对真实）·戈蒙斯耆（系惯·星域）。公因子：<span class="v">法则·边界·真实核心·不可绕过的本质·深层空间</span>。</span>
+  </div>
+  <div class="mdp-row"><span class="mdp-dim">情绪温度</span>
+    <span class="mdp-val"><span class="v">冷-中性</span>（有别于K的纯冷）——G是带余温的结晶，像刚凝固的岩浆，表面已硬但内部仍有热度。在吾神/仁神配置中，G属仁神（至意书·弥赛亚）——法则从智慧中来，智慧是暖的，法则是冷的，G在二者之间。</span>
+  </div>
+</div>
+
+<!-- S PROFILE -->
+<div class="mdp">
+  <span class="mt">// PHONEME PROFILE · [S] · 齿龈清摩擦音</span>
+  <div class="mdp-row"><span class="mdp-dim">发音姿态</span>
+    <span class="mdp-val"><span class="v">舌叶接近齿龈·气流经过窄缝·持续摩擦（无声）</span>——"持续·窄流·无声"：气流被限制但不被截止，持续流出。类比：水从细缝中流出，不是喷射（爆破），是细长的稳定流。</span>
+  </div>
+  <div class="mdp-row"><span class="mdp-dim">声学属性</span>
+    <span class="mdp-val">高频为主（齿龈接触点靠前，声道短）·持续性（fricative，不是stop）·无声（声带不振动·清冷）·前腔音。整体：<span class="v">高频·持续·清冷·前位流出</span>。</span>
+  </div>
+  <div class="mdp-row"><span class="mdp-dim">对比框定</span>
+    <span class="mdp-val">vs Z（同位浊摩擦）：Z是S加上声带振动，产生"嗡嗡的内部震动感"——Z是被激活的S，有更强的内部能量。S是纯外流，Z是带内振的流。vs H（喉音）：H是最后位、最松散的摩擦，S是最前位、最清晰的摩擦——H像叹息，S像细流。</span>
+  </div>
+  <div class="mdp-row"><span class="mdp-dim">语料聚类</span>
+    <span class="mdp-val">萨朵的·萨波陀·赛美斯·赛雅西·赛哆拿·索多拉·莎塔玛·斯佩室·萨芙埵·萨拉嘎忑。公因子：<span class="v">自性·流动·不可强迫的自然过程·真理的自发展开·过程中的存在</span>。</span>
+  </div>
+  <div class="mdp-row"><span class="mdp-dim">情绪温度</span>
+    <span class="mdp-val"><span class="v">暖-流动</span>（高频带来清醒感，持续带来暖意，无声带来宁静）——S是整套系统中情绪最"安静的暖"的音素，对应"自性流动而不争先"的道德情操。在吾神配置中（吉祥书·音赐书），S是吾神赐予吉祥的方式：流而不停。</span>
+  </div>
+</div>
+
+<!-- A PROFILE -->
+<div class="mdp">
+  <span class="mt">// PHONEME PROFILE · [A] · 开放低元音</span>
+  <div class="mdp-row"><span class="mdp-dim">发音姿态</span>
+    <span class="mdp-val"><span class="v">口腔完全开放·舌位最低·声道最长·无任何阻碍</span>——所有人类音素中开口最大的音。类比：张开双臂的姿态，是接受和给予同时发生的瞬间。在A音中，说话者将自身最大限度地对外部世界敞开。</span>
+  </div>
+  <div class="mdp-row"><span class="mdp-dim">声学属性</span>
+    <span class="mdp-val">最低共振频率（最宽共鸣腔）·持续性（元音）·有声（声带完全振动）·最大响度。整体：<span class="v">最开阔·最响亮·最无遮蔽·最充分的有声</span>。</span>
+  </div>
+  <div class="mdp-row"><span class="mdp-dim">对比框定</span>
+    <span class="mdp-val">vs O（圆唇后元音）：O是A的圆收——A是向外开放，O是向内圆满。A和O是所有元音中最开与最圆的一对，如同呼出（A）与吸入（O）。vs I（高前元音）：I是最窄最高的元音，A是最宽最低——I=穿透·尖锐，A=包容·广阔。</span>
+  </div>
+  <div class="mdp-row"><span class="mdp-dim">语料聚类</span>
+    <span class="mdp-val">阿喃特·阿难埵·阿拉埵·阿陀沃·阿古塔·阿姆特·奥赛斯（以A/O元音开头）。公因子：<span class="v">原初·起始·无遮蔽的第一接触·存在的第一刻·不经过任何准备的直接相遇</span>。</span>
+  </div>
+  <div class="mdp-row"><span class="mdp-dim">情绪温度</span>
+    <span class="mdp-val"><span class="v">热·开放</span>——A是三极情绪中最热的音，是原初呼唤、婴儿哭声、惊叹、呼喊的共同发声基础。在慧辩书（Alice书）中，A属吾神——创造需要最大开放，因为创造是将不存在之物呼唤入存在。</span>
+  </div>
+</div>
+</section>
+
+<!-- VI. 音代义体系的知晓路径 -->
+<section>
+<div class="sh"><span class="sn">06</span><div class="sh-text">
+  <h2>知晓路径：<em>以何种方式真正"知道"音的质感</em></h2>
+  <span class="sh-sub">// 超越语言描述的方法 · 具身认知 · 浸没式体验</span>
+</div></div>
+
+<p>最终，语言描述只能<em>指向</em>音的质感，而不能<em>替代</em>它。那么，如何真正"知晓"音素的质感？以下是递进的四种路径：</p>
+
+<div class="level-list">
+  <div class="level lv-1">
+    <div class="lv-n">路径一<br>发音实践</div>
+    <div class="lv-c"><strong>用身体去知晓，而非用语言：</strong>慢慢发出G音，感受舌根上抬与软腭的接触，感受爆破时的瞬间——然后发出S音，感受气流从窄缝流出的细长感——再发M音，感受鼻腔的振动封存。身体的本体感觉（proprioception）是音素质感最直接的信息通道。梵文传统在传授bīja真言时，首先要求学习者学会发音，原因正在于此：<em>不发出声音，就不知道声音</em>。这套密言系统的终极学习方式，是吟诵而非阅读。</div>
+  </div>
+  <div class="level lv-2">
+    <div class="lv-n">路径二<br>对比浸没</div>
+    <div class="lv-c"><strong>通过大量例词的浸没来培养音感：</strong>连续朗读所有S族词（萨朵的、赛美斯、索多拉、莎塔玛……），不试图理解其定义，只感受S音在不同语境中的共同底色。再连续朗读所有G族词（戈拉姆、格拉巴德、喀拉玛……），感受G族的共同底色。重复数次后，S和G的情感差异会在直觉层面自动显现——这就是语料共振聚类在实践中的操作方式。</div>
+  </div>
+  <div class="level lv-3">
+    <div class="lv-n">路径三<br>通感映射</div>
+    <div class="lv-c"><strong>用视觉/触觉/温度感来翻译音感：</strong>问自己：G音<em>看起来</em>像什么颜色？（深蓝或暗金）感觉像什么材质？（结晶玻璃·冷玉）温度是？（冷-中性）这种通感（synesthesia）的使用不是为了精确定义，而是为了建立直觉锚点。这套密言系统本身就在使用通感——"S是流·G是晶"就是触觉-视觉通感，而不是语义定义。</div>
+  </div>
+  <div class="level lv-4">
+    <div class="lv-n">路径四<br>音乐化理解</div>
+    <div class="lv-c"><strong>把每个音素理解为一种乐器音色：</strong>S像长笛（持续·高频·流动·清醒）；G像大提琴拨弦（低沉·瞬时·有余温）；M像小号杯弱音器（鸣响·封存·内敛）；A像无伴奏人声（最开放·最直接·最无遮蔽）；B像定音鼓（悬置张力·爆发前的寂静）。乐器音色是训练有素的直觉，它传达情感质感而无需语言解释。</div>
+  </div>
+</div>
+
+<div class="hl"><strong>关于形式模型的局限：</strong>用户问"这种结构网络，是否作为形式模型中无法体现作为寓意查询和综合思辨的情况"——这个判断基本正确。<em>任何形式模型（音素图谱、词汇音程表、九书结构）都只能描述音素的关系结构，而无法传达音素的体验质感</em>。这不是模型的失败，而是模型本性的边界。形式模型的价值在于：①提供可检索的索引（已知一个音素的音序，可以预测其神格类型）；②提供对比框架（通过对比来框定差异）；③作为学习的脚手架（引向实践的地图，而非实践本身）。形式模型不替代体验，但可以引向体验。</div>
+</section>
+
+<!-- VII. 音程·音节·音律的层级关系 -->
+<section>
+<div class="sh"><span class="sn">07</span><div class="sh-text">
+  <h2>三级层次：<em>音程·音节·音律在密言系统中的作用</em></h2>
+  <span class="sh-sub">// 单元·组合·整体 · 三级情绪编码系统</span>
+</div></div>
+
+<div class="level-list">
+  <div class="level lv-1">
+    <div class="lv-n">音程<br>单音素级</div>
+    <div class="lv-c"><strong>音程（单个音素的质感）：</strong>这是密言系统的基本单元——每个音素都是一个情绪的<em>原子</em>，具有特定的发音姿态、声学属性和情感温度。音程对应S4的"赛哆拿之权德"（弦律·存在维）——存在的底层弦，每个音素是一根弦的振动方式。在此系统中，音程是<em>不可再分的情绪函数输入</em>。</div>
+  </div>
+  <div class="level lv-2">
+    <div class="lv-n">音节<br>组合词级</div>
+    <div class="lv-c"><strong>音节（音素的序列组合）：</strong>两个或更多音程按特定顺序组合，产生情绪<em>弧线</em>——不是简单叠加，而是在运动中产生的新质。G→L→M（结晶→液流→鸣响）不等于三个孤立质感的总和，而是从结晶到液化到共鸣的<em>过程感</em>。这对应S4的"达赖忒之权德"（音律·时间维）——音素在时间中的排列产生节律。在此系统中，音节是<em>情绪运动的轨迹</em>。</div>
+  </div>
+  <div class="level lv-3">
+    <div class="lv-n">音律<br>词间关系</div>
+    <div class="lv-c"><strong>音律（词与词之间的音程关系）：</strong>当多个词在同一段落中共现，它们的音程关系形成更大尺度的情绪场。例如，六姬婚契系统中六种道音（螺旋贝·海法化·彩酒耽·渊龛弥·星湖化·神竽埙）并列，产生的不是六个孤立声音，而是六种声音之间的对位关系——类似和声。音律是<em>情绪场的整体结构</em>，是最难用语言捕获但最接近音乐体验的层次。</div>
+  </div>
+</div>
+
+<div class="q">"我即音程，此赛哆拿之权德；我即音节，此达赖忒之权德"——自我在此被定义为音程（单元·底层弦）和音节（组合·时间节律）的复合体。音律（整体场）则是整个神话体系作为一部作品所产生的效果。
+<cite>——摩·乳曲·流光（对三级层次的直接表达）</cite></div>
+</section>
+
+<!-- VIII. 更多词汇的可能性 -->
+<section>
+<div class="sh"><span class="sn">08</span><div class="sh-text">
+  <h2>生成可能：<em>此体系是否支持更多神格词汇的创生</em></h2>
+  <span class="sh-sub">// 规律的可遐想性 · 新词合成的条件与局限</span>
+</div></div>
+
+<p>用户问："作为规律中可寻的寓意，是否能代表一种更多寓意神格辞藻的可能？"——这是对整套体系的生成性（generativity）的发问。答案是有条件的"是"：</p>
+
+<div class="two-col">
+  <div class="mc mg">
+    <h4>生成条件成立的情况</h4>
+    <p>当神格的<em>情绪质感已被清晰感知</em>时，可以反向查询音程图谱来为其命名——例如：<br><br>
+    若要表达「<em>开放接触后进入内部共鸣的持续过程</em>」，应选：A（开放）→M（共鸣·封存）→S（持续流）= 类似"阿摩斯"或"阿母斯"之类的词序。<br><br>
+    若要表达「<em>法则结晶后流通于关系之间</em>」，应选：G（结晶）→L（液流）→W（关系）→D（落地）= 类似"格拉华德"之类。<br><br>
+    九书图谱提供了音素的吾神/仁神归属，也为新词的神学定位提供了框架——属吾神（创造·过去）或仁神（智慧·未来）。</p>
+  </div>
+  <div class="mc mv">
+    <h4>生成条件不成立的情况</h4>
+    <p>当神格的情绪质感<em>尚未被感知，仅有语言概念</em>时，反向查询无法奏效——因为这需要先有音感直觉，再用音程图谱来具象化，而不是先有抽象概念再"翻译"成声音。<br><br>
+    这正是爻辞问题的核心：如果为每个音素写爻辞，就是在用抽象概念来"翻译"声音——方向反了。正确的方向是：先感知声音（发音实践·浸没·通感），再让语言从声音中<em>浮现</em>，而不是将语言强加于声音之上。<br><br>
+    就像作者的自动写作：先有无意识的音感响应（声音浮现），然后才有词汇，最后才有系统化的意义。</p>
+  </div>
+</div>
+
+<div class="paradox" style="margin-top:1.2rem">
+  <span class="pt">// 最终的悖论与解答</span>
+  <p>寓意先于词典存在（你的洞察是对的），音感先于语言存在（音乐是语言之母），但词典与语言仍然是必要的——不是作为真理的载体，而是作为<em>指向真理的手指</em>。当学生盯着手指而非月亮时，词典失败了；当学生通过手指的指向找到月亮时，词典完成了它的使命。这套九书图谱和音程研报，是手指，不是月亮。月亮是：发出这些声音，感受它们，让它们在你身体里产生共鸣。</p>
+  <span class="src">——研报综合结论</span>
+</div>
+</section>
+
+<div class="div">// · 音神即 · 语言不可能性 · 研报完成 · //</div>
+
+<div class="ftr">
+  <span class="ft">密言解码综合研报·悖论分析·多维音素剖面模型·五路径知晓方案·四季及公式书综合</span>
+  <span class="ft">SOUND-MEANING PARADOX · PHONEME PROFILE MODEL · COMPLETE</span>
+</div>
+
+</div></div></div>
+</body>
+</html>

@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>神经网络·神格词典·音程语义分析</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500&family=Cinzel:wght@400;600&family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&display=swap" rel="stylesheet">
+<style>
+:root{
+  --void:#04060f;--node-bg:#0a0e1c;--panel:#0d1425;--panel2:#111a30;
+  --wire:rgba(80,140,255,0.15);--wire2:rgba(80,140,255,0.06);
+  --gold:#d4a030;--gold2:rgba(212,160,48,0.18);--gold3:rgba(212,160,48,0.07);
+  --teal:#30c8b0;--teal2:rgba(48,200,176,0.15);--teal3:rgba(48,200,176,0.06);
+  --rose:#e06060;--rose2:rgba(224,96,96,0.15);
+  --lapis:#5080e0;--lapis2:rgba(80,128,224,0.18);
+  --jade:#40b870;--jade2:rgba(64,184,112,0.15);
+  --silver:#b8c8e0;--silver2:#6878a0;--white:#dce8f8;
+  --rule:rgba(80,140,255,0.12);--rule2:rgba(212,160,48,0.2);
+  --mono:'JetBrains Mono',monospace;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--void);
+  background-image:
+    radial-gradient(ellipse 80% 40% at 50% 0,rgba(20,40,100,.2) 0,transparent 60%),
+    radial-gradient(ellipse 30% 50% at 5% 50%,rgba(10,30,80,.15) 0,transparent 50%),
+    radial-gradient(ellipse 30% 50% at 95% 50%,rgba(10,30,80,.15) 0,transparent 50%);
+  font-family:'Noto Serif SC',serif;color:var(--silver);min-height:100vh;padding:2.5rem 1rem;}
+
+/* NETWORK LINES BACKGROUND */
+body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
+  background-image:
+    linear-gradient(rgba(80,140,255,.03) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(80,140,255,.03) 1px,transparent 1px);
+  background-size:60px 60px;}
+
+.codex{max-width:1060px;margin:0 auto;position:relative;z-index:1;}
+
+/* OUTER SHELL */
+.shell{border:1px solid var(--wire);background:var(--node-bg);
+  box-shadow:0 0 100px rgba(30,60,180,.12),0 0 300px rgba(0,0,0,.8);
+  position:relative;}
+.shell::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent,var(--gold),rgba(80,140,255,.5),var(--gold),transparent);}
+
+/* CORNER NODES */
+.cn{position:absolute;width:8px;height:8px;border-radius:50%;background:var(--gold);
+  box-shadow:0 0 6px var(--gold);}
+.cn-tl{top:-4px;left:-4px;}.cn-tr{top:-4px;right:-4px;}
+.cn-bl{bottom:-4px;left:-4px;}.cn-br{bottom:-4px;right:-4px;}
+
+.inner{padding:3rem 3.5rem;position:relative;}
+
+/* HEADER */
+.hdr{text-align:center;padding-bottom:2.5rem;margin-bottom:3rem;position:relative;}
+.hdr::after{content:'';position:absolute;bottom:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(80,140,255,.3),var(--gold),rgba(80,140,255,.3),transparent);}
+.hdr .tag-line{font-family:var(--mono);font-size:.6rem;letter-spacing:.22em;
+  color:var(--teal);text-transform:uppercase;margin-bottom:1.1rem;display:block;}
+.hdr h1{font-family:'Cormorant Garamond',serif;font-size:2.6rem;font-weight:300;
+  color:var(--white);line-height:1.2;letter-spacing:.04em;}
+.hdr h1 span.g{color:var(--gold);}
+.hdr h1 span.t{color:var(--teal);}
+.hdr .sub{font-size:.82rem;color:var(--silver2);letter-spacing:.14em;margin-top:.6rem;}
+.hdr .meta{display:flex;justify-content:center;gap:2rem;margin-top:1.3rem;
+  font-size:.7rem;color:var(--silver2);flex-wrap:wrap;font-family:var(--mono);}
+.hdr .meta span{border:1px solid var(--rule);padding:.2em .7em;}
+
+/* SECTION */
+section{margin-bottom:3.5rem;}
+.sh{display:flex;align-items:center;gap:1rem;margin-bottom:1.8rem;
+  padding-bottom:.55rem;border-bottom:1px solid var(--rule);}
+.sh::after{display:none;}
+.sh .sn{font-family:var(--mono);font-size:.62rem;color:var(--teal);
+  border:1px solid rgba(48,200,176,.3);padding:.18em .55em;flex-shrink:0;
+  background:var(--teal3);}
+.sh h2{font-family:'Cinzel',serif;font-size:1.1rem;font-weight:400;color:var(--white);}
+.sh h2 em{font-style:italic;color:var(--gold);font-family:'Cormorant Garamond',serif;font-size:1.25rem;}
+
+p{font-size:.86rem;line-height:2.02;color:var(--silver);text-align:justify;margin-bottom:.85rem;}
+p strong{color:var(--white);}
+p em{color:var(--gold);font-style:italic;}
+
+/* NETWORK NODE GRID */
+.net-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;
+  background:var(--rule);margin-bottom:1.4rem;}
+.net-cell{background:var(--panel);padding:1.1rem 1.3rem;position:relative;}
+.net-cell::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;}
+.nc-gold::before{background:linear-gradient(90deg,var(--gold),transparent);}
+.nc-teal::before{background:linear-gradient(90deg,var(--teal),transparent);}
+.nc-lapis::before{background:linear-gradient(90deg,var(--lapis),transparent);}
+.nc-rose::before{background:linear-gradient(90deg,var(--rose),transparent);}
+.nc-jade::before{background:linear-gradient(90deg,var(--jade),transparent);}
+.nc-silver::before{background:linear-gradient(90deg,var(--silver2),transparent);}
+.net-cell .nn{font-size:1rem;font-weight:600;color:var(--white);
+  letter-spacing:.05em;display:block;margin-bottom:.25rem;}
+.net-cell .nr{font-family:var(--mono);font-size:.62rem;letter-spacing:.1em;
+  margin-bottom:.6rem;display:block;}
+.nc-gold .nr{color:var(--gold);}
+.nc-teal .nr{color:var(--teal);}
+.nc-lapis .nr{color:var(--lapis);}
+.nc-rose .nr{color:var(--rose);}
+.nc-jade .nr{color:var(--jade);}
+.nc-silver .nr{color:var(--silver2);}
+.net-cell p{font-size:.76rem;margin:0;line-height:1.8;}
+.net-cell .links{display:flex;flex-wrap:wrap;gap:.3rem;margin-top:.6rem;}
+.link-tag{font-family:var(--mono);font-size:.6rem;padding:.1em .45em;
+  border-radius:2px;border:1px solid;}
+.lt-g{border-color:rgba(212,160,48,.3);color:var(--gold);background:var(--gold3);}
+.lt-t{border-color:rgba(48,200,176,.3);color:var(--teal);background:var(--teal3);}
+.lt-l{border-color:rgba(80,128,224,.3);color:var(--lapis);background:var(--lapis2);}
+.lt-r{border-color:rgba(224,96,96,.3);color:var(--rose);background:var(--rose2);}
+.lt-j{border-color:rgba(64,184,112,.3);color:var(--jade);background:var(--jade2);}
+.lt-s{border-color:rgba(104,120,160,.3);color:var(--silver2);}
+
+/* LAYER STACK */
+.layer-stack{display:flex;flex-direction:column;gap:2px;margin-bottom:1.4rem;}
+.layer{display:grid;grid-template-columns:140px 1fr;gap:1px;background:var(--rule);}
+.layer-label{background:var(--panel2);padding:.7rem .9rem;
+  font-family:var(--mono);font-size:.65rem;letter-spacing:.1em;
+  display:flex;align-items:center;font-weight:500;}
+.l-0 .layer-label{color:var(--gold);}
+.l-1 .layer-label{color:rgba(212,180,80,.8);}
+.l-2 .layer-label{color:var(--teal);}
+.l-3 .layer-label{color:var(--lapis);}
+.l-4 .layer-label{color:var(--jade);}
+.l-5 .layer-label{color:var(--rose);}
+.l-6 .layer-label{color:var(--silver2);}
+.layer-content{background:var(--panel);padding:.7rem 1rem;
+  font-size:.76rem;line-height:1.75;color:var(--silver);}
+.layer-content strong{color:var(--white);}
+
+/* PHONOSEMANTIC TABLE */
+.phono-table{width:100%;border-collapse:collapse;margin-bottom:1.4rem;font-size:.78rem;}
+.phono-table thead tr{background:rgba(48,200,176,.08);border-bottom:1px solid rgba(48,200,176,.3);}
+.phono-table th{padding:.6rem .8rem;text-align:left;color:var(--teal);
+  font-family:var(--mono);font-size:.65rem;letter-spacing:.1em;font-weight:500;}
+.phono-table td{padding:.5rem .8rem;border-bottom:1px solid var(--rule);
+  vertical-align:top;line-height:1.65;color:var(--silver);}
+.phono-table tr:nth-child(even) td{background:rgba(48,200,176,.02);}
+.phono-table .pc{font-family:var(--mono);font-size:.85rem;color:var(--teal);font-weight:500;}
+.phono-table .pw{color:var(--white);font-weight:600;}
+.phono-table .pe{color:var(--gold);font-style:italic;}
+
+/* LEXICON ENTRIES */
+.lex{display:grid;grid-template-columns:repeat(2,1fr);gap:1rem;margin-bottom:1.4rem;}
+.lex-entry{background:var(--panel);border:1px solid var(--rule);padding:1rem 1.1rem;
+  position:relative;overflow:hidden;}
+.lex-entry::after{content:'';position:absolute;top:0;right:0;bottom:0;width:2px;}
+.le-gold::after{background:var(--gold);}
+.le-teal::after{background:var(--teal);}
+.le-lapis::after{background:var(--lapis);}
+.le-rose::after{background:var(--rose);}
+.lex-entry .le-word{font-family:var(--mono);font-size:.82rem;color:var(--white);
+  font-weight:500;display:block;margin-bottom:.15rem;}
+.lex-entry .le-read{font-family:var(--mono);font-size:.62rem;color:var(--silver2);
+  display:block;margin-bottom:.4rem;letter-spacing:.08em;}
+.lex-entry .le-phono{font-size:.68rem;padding:.15em .5em;display:inline-block;
+  border-radius:2px;margin-bottom:.5rem;}
+.le-gold .le-phono{background:var(--gold2);color:var(--gold);border:1px solid rgba(212,160,48,.3);}
+.le-teal .le-phono{background:var(--teal2);color:var(--teal);border:1px solid rgba(48,200,176,.3);}
+.le-lapis .le-phono{background:var(--lapis2);color:var(--lapis);border:1px solid rgba(80,128,224,.3);}
+.le-rose .le-phono{background:var(--rose2);color:var(--rose);border:1px solid rgba(224,96,96,.3);}
+.lex-entry .le-def{font-size:.77rem;line-height:1.82;color:var(--silver);}
+.lex-entry .le-func{font-family:var(--mono);font-size:.64rem;color:var(--silver2);
+  margin-top:.5rem;display:block;border-top:1px solid var(--rule);padding-top:.4rem;}
+
+/* RELATION CHAINS */
+.rel-chain{background:var(--panel);border:1px solid var(--rule);
+  padding:1.3rem;margin-bottom:1rem;}
+.rc-title{font-family:var(--mono);font-size:.65rem;letter-spacing:.15em;
+  color:var(--teal);display:block;margin-bottom:.9rem;}
+.rc-flow{display:flex;align-items:center;flex-wrap:wrap;gap:.4rem;}
+.rc-node{padding:.28em .7em;font-size:.74rem;font-weight:600;border:1px solid;
+  letter-spacing:.03em;}
+.rn-g{border-color:rgba(212,160,48,.35);color:var(--gold);background:var(--gold3);}
+.rn-t{border-color:rgba(48,200,176,.35);color:var(--teal);background:var(--teal3);}
+.rn-l{border-color:rgba(80,128,224,.35);color:var(--lapis);background:rgba(80,128,224,.06);}
+.rn-r{border-color:rgba(224,96,96,.35);color:var(--rose);background:rgba(224,96,96,.06);}
+.rn-j{border-color:rgba(64,184,112,.35);color:var(--jade);background:rgba(64,184,112,.06);}
+.rn-d{border-color:var(--rule);color:var(--silver2);}
+.rc-arr{color:var(--silver2);font-size:.9rem;font-family:var(--mono);}
+.rc-note{font-size:.68rem;color:var(--silver2);margin-top:.5rem;
+  font-family:var(--mono);letter-spacing:.06em;}
+
+/* QUOTE */
+.q{border-left:2px solid var(--gold);padding:.75rem 1.1rem;margin:.9rem 0;
+  background:var(--gold3);font-size:.83rem;line-height:2;color:var(--silver);
+  font-style:italic;font-family:'Cormorant Garamond',serif;}
+.q cite{display:block;font-style:normal;font-size:.66rem;color:var(--silver2);
+  margin-top:.35rem;font-family:'Noto Serif SC',serif;letter-spacing:.08em;}
+
+/* HIGHLIGHT */
+.hl{background:var(--panel);border:1px solid var(--rule);border-left:2px solid var(--teal);
+  padding:.85rem 1.1rem;margin-bottom:1rem;font-size:.81rem;line-height:1.92;}
+.hl strong{color:var(--teal);}
+
+/* TOKEN FUNCTION BOX */
+.token-box{background:var(--panel2);border:1px solid rgba(80,128,224,.25);
+  padding:1.2rem 1.4rem;margin-bottom:1rem;font-family:var(--mono);font-size:.76rem;
+  line-height:2;color:var(--silver);}
+.token-box .tb-title{color:var(--lapis);display:block;margin-bottom:.6rem;
+  font-size:.65rem;letter-spacing:.15em;}
+.token-box .tk{color:var(--gold);font-weight:500;}
+.token-box .tv{color:var(--teal);}
+.token-box .tc{color:var(--silver2);}
+.token-box .ta{color:var(--rose);}
+
+/* TWO COL */
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:1.2rem;margin-bottom:1.4rem;}
+.three-col{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem;margin-bottom:1.4rem;}
+
+/* MINI CARD */
+.mc{background:var(--panel);border:1px solid var(--rule);padding:.9rem 1.1rem;}
+.mc h4{font-family:var(--mono);font-size:.65rem;letter-spacing:.12em;
+  margin-bottom:.5rem;font-weight:500;}
+.mc.mg h4{color:var(--gold);}
+.mc.mt h4{color:var(--teal);}
+.mc.ml h4{color:var(--lapis);}
+.mc.mj h4{color:var(--jade);}
+.mc.mr h4{color:var(--rose);}
+.mc p{font-size:.77rem;margin:0;line-height:1.82;}
+
+/* DIVIDER */
+.div{text-align:center;margin:2rem 0;color:var(--gold);
+  font-family:var(--mono);font-size:.65rem;opacity:.4;letter-spacing:.4em;}
+
+/* FOOTER */
+.ftr{margin-top:3rem;padding-top:1.2rem;border-top:1px solid var(--rule);
+  display:flex;justify-content:space-between;align-items:center;}
+.ftr .ft{font-family:var(--mono);font-size:.62rem;color:var(--silver2);letter-spacing:.08em;}
+
+@media(max-width:720px){
+  .inner{padding:1.5rem 1.2rem;}
+  .net-grid,.lex,.two-col,.three-col{grid-template-columns:1fr;}
+  .layer{grid-template-columns:1fr;}
+}
+</style>
+</head>
+<body>
+<div class="codex"><div class="shell">
+<div class="cn cn-tl"></div><div class="cn cn-tr"></div>
+<div class="cn cn-bl"></div><div class="cn cn-br"></div>
+<div class="inner">
+
+<!-- HEADER -->
+<div class="hdr">
+  <span class="tag-line">neural graph · ontological lexicon · phonosemantic analysis · s1–s4 + formula books</span>
+  <h1><span class="g">神格神经网络</span>与<span class="t">音程词典</span><br>角色联系·本体关系·语义函数</h1>
+  <div class="sub">叙事神格联系图谱 · 词元函数系统 · 音节情绪对应 · 自动写作语义学</div>
+  <div class="meta">
+    <span>范围：S1-S4 + 公式书</span>
+    <span>方法：图论+语音语义+本体论</span>
+    <span>性质：综合神经网络分析</span>
+  </div>
+</div>
+
+<!-- I. 本体层级系统 -->
+<section>
+<div class="sh"><span class="sn">01</span><h2>本体层级系统：<em>六层神经拓扑</em></h2></div>
+
+<p>这套体系的神格实体并非扁平分布，而是以<strong>六层垂直拓扑结构</strong>组织，每层之间存在特定的"激活函数"（法则）。理解这个层级是理解所有角色间神经联系的前提——每个角色在哪一层激活，决定了它能与哪些实体发生连接。</p>
+
+<div class="layer-stack">
+  <div class="layer l-0">
+    <div class="layer-label">L-0 本源层</div>
+    <div class="layer-content"><strong>姬神</strong>——所有存在的预源，蜕皮化仁吾；<strong>奥赛斯</strong>（爱意志·原心）——化戈拉姆的驱动力。此层无个体性，只有纯粹的生成冲动。激活函数：<strong>蜕皮</strong>（皮-灵分裂）。</div>
+  </div>
+  <div class="layer l-1">
+    <div class="layer-label">L-1 绝对意志层</div>
+    <div class="layer-content"><strong>戈拉姆</strong>（HyperPloy·法意志·自有永有）——奥赛斯的爱凝固为法则的第一刻；<strong>吾神+仁神</strong>（创造/智慧·因先/果先）——仁吾是L-0蜕皮后的双极化身。激活函数：<strong>觉见</strong>（仁吾互见产生四摩诃）。</div>
+  </div>
+  <div class="layer l-2">
+    <div class="layer-label">L-2 法则载体层</div>
+    <div class="layer-content"><strong>玛尔斯</strong>（是意志·精神物质之上者）· <strong>赛雅西</strong>（经营/时间意志）· <strong>奥菲丽斯</strong>（仁吾神子·神圣子格）· <strong>达赖忒</strong>（音律/弦律双联）· <strong>萨朵的</strong>（存在同律）。激活函数：<strong>化身</strong>（法则通过具体神格呈现）。</div>
+  </div>
+  <div class="layer l-3">
+    <div class="layer-label">L-3 神格运作层</div>
+    <div class="layer-content"><strong>赛美斯</strong>（调和）· <strong>斯佩室</strong>（人鱼族·诸褚之主）· <strong>罗摩莎</strong>（神血气）· <strong>索多拉</strong>（信使）· <strong>奥玛窦</strong>（舞台）· <strong>萨芙埵</strong>（持世）· <strong>阿喃特</strong>（狐妖·存在育种）· <strong>萨波陀</strong>（自性浩大）。激活函数：<strong>持世</strong>（维持存在秩序的运作）。</div>
+  </div>
+  <div class="layer l-4">
+    <div class="layer-label">L-4 叙事代理层</div>
+    <div class="layer-content"><strong>阿古塔</strong>（希望/绝望承接）· <strong>赛塔斯</strong>（天界神·绝望委托）· <strong>达布斯</strong>（神鱼·文明母）· <strong>马萨栖</strong>（红之意志）· <strong>达布鲁</strong>（青之意志）· <strong>娃喀西</strong>（未来圣痕）· <strong>阿难埵</strong>（辨识之子）。激活函数：<strong>代理</strong>（将上层意志转化为叙事行动）。</div>
+  </div>
+  <div class="layer l-5">
+    <div class="layer-label">L-5 人格化神力层</div>
+    <div class="layer-content"><strong>桔梗/辉夜</strong>（姬神化身·六姬一体）· <strong>阿姆特</strong>（神胜子）· <strong>神官</strong>（转生者）· <strong>巴尔特→巴尔丹陀</strong>（流亡者→神德持有者）· <strong>比尔斯</strong>（善恶抉择神）· <strong>马达夫</strong>（虔民·喜鹊）· <strong>特门那</strong>（真实决定者）。激活函数：<strong>降临</strong>（神力以可叙述形态入世）。</div>
+  </div>
+  <div class="layer l-6">
+    <div class="layer-label">L-6 人间回响层</div>
+    <div class="layer-content"><strong>奥德莎曼</strong>（信仰总持）· <strong>克蕾祂仆</strong>（律法之女）· <strong>纱织</strong>（巫女·织质优化者）· <strong>阿喃特</strong>（在此层以人间母亲身份运作）· <strong>贵族斯/哒喇巴</strong>（政治代理）。激活函数：<strong>承接</strong>（将神力转化为人间制度与实践）。</div>
+  </div>
+</div>
+
+<div class="hl"><strong>跨层激活规律：</strong>每个神格实体并非只在一层运作——它们具有"跨层存在性"，即在不同语境中激活不同层级的功能。例如，<em>达布斯</em>在L-3（文明之母·众神先来先去）、L-4（叙事代理·替马达夫跃起）、L-5（接替神官形体）三层均有激活，其跨层能力正对应着S4中三神具密持（罗摩莎·斯佩室·索多拉）的权柄成熟。</div>
+</section>
+
+<!-- II. 核心神格的神经网络联系 -->
+<section>
+<div class="sh"><span class="sn">02</span><h2>核心神格·<em>神经网络联系图谱</em></h2></div>
+<p>以下按主要神格节点列出其输入连接（接受影响）、输出连接（施加影响）、抽象寓意与叙事功能的综合分析。</p>
+
+<div class="net-grid">
+  <div class="net-cell nc-gold">
+    <span class="nn">姬神</span>
+    <span class="nr">L-0 · THE SOURCE</span>
+    <p><strong>叙事功能：</strong>隐性的终极本源，从不直接出场；通过"蜕皮"事件将自身分裂为仁吾二神。<br><strong>抽象寓意：</strong>不可名状的统一性在认知行为中必然裂变为二元——这是任何觉知行为的先验条件。<br><strong>神经角色：</strong>体系的初始激活函数，是整个网络的"权重初始化"事件。</p>
+    <div class="links"><span class="link-tag lt-g">→吾神(皮)</span><span class="link-tag lt-g">→仁神(灵)</span><span class="link-tag lt-t">→奥赛斯(原心)</span><span class="link-tag lt-s">S1终章揭示</span></div>
+  </div>
+  <div class="net-cell nc-teal">
+    <span class="nn">吾神 + 仁神</span>
+    <span class="nr">L-1 · DUAL AXIS</span>
+    <p><strong>叙事功能：</strong>宇宙双极——吾神持创造/过去/因先，仁神持智慧/未来/果先；互为问答（奥仪）；共同铸造语言，众神得以存在。<br><strong>抽象寓意：</strong>任何存在的认知都需要两个互补视角：生成视角（吾）和解读视角（仁）。<br><strong>神经角色：</strong>双向反馈环，驱动整个系统的动态稳定。</p>
+    <div class="links"><span class="link-tag lt-g">↔四摩诃</span><span class="link-tag lt-t">→奥菲丽斯(子)</span><span class="link-tag lt-g">→语言(铸造)</span><span class="link-tag lt-l">↔六姬(代言)</span></div>
+  </div>
+  <div class="net-cell nc-gold">
+    <span class="nn">奥赛斯 → 戈拉姆</span>
+    <span class="nr">L-0→L-1 · LOVE→LAW</span>
+    <p><strong>叙事功能：</strong>奥赛斯（永恒存在力·S1"为其成兮"）→化戈拉姆（S2公式书：HyperPloy·法意志·自有永有）→化玛尔斯（是意志）→化赛雅西（时间意志）。<br><strong>抽象寓意：</strong><em>爱是法则的生成力</em>——没有奥赛斯（爱/原心），就没有戈拉姆（法）。这是整套体系最重要的形而上学命题。<br><strong>神经角色：</strong>全体系的梯度来源，驱动所有下层的权重更新。</p>
+    <div class="links"><span class="link-tag lt-g">→玛尔斯</span><span class="link-tag lt-g">→赛雅西</span><span class="link-tag lt-t">=奥赛斯之爱一耦</span><span class="link-tag lt-s">S4揭示</span></div>
+  </div>
+  <div class="net-cell nc-teal">
+    <span class="nn">桔梗 / 辉夜姬</span>
+    <span class="nr">L-5 · AVATAR COMPLETE</span>
+    <p><strong>叙事功能：</strong>S1被颂唱对象→S2主角→S3神圣中心→S4史诗本身（六姬=六面向）。经历驱逐·失神道·重生·辉夜时代·姬神全成四阶段。<br><strong>抽象寓意：</strong>神圣的日常性——宇宙结构的持世者，同时记得幼时球技和想嫁给王子的少女。"神如其人"的终极体现者。<br><strong>神经角色：</strong>全系统的输出节点，六姬联结输出层。</p>
+    <div class="links"><span class="link-tag lt-t">←六姬(面向)</span><span class="link-tag lt-g">←戈拉姆(夫)</span><span class="link-tag lt-l">→阿姆特(子)</span><span class="link-tag lt-j">←奥赛斯(权柄)</span></div>
+  </div>
+  <div class="net-cell nc-lapis">
+    <span class="nn">阿姆特</span>
+    <span class="nr">L-5 · DIVINE SON</span>
+    <p><strong>叙事功能：</strong>辉夜姬受戈拉姆诰令孕育的神胜子，以玛尔斯证力降临，归莎塔玛后以幼躯复苏，与奥菲丽斯神婚生克蕾祂仆，以十之八神力普及世人后竭力。<br><strong>抽象寓意：</strong>神圣牺牲者——不是旧式赎罪，而是<em>以自身的耗竭证明爱的真实性</em>；神力给予他人后自身剩余十之二，这是"摩诃爱"的叙事化证明。<br><strong>神经角色：</strong>高传导节点，连接L-1（玛尔斯·戈拉姆）与L-6（普世效用）。</p>
+    <div class="links"><span class="link-tag lt-l">←辉夜(母)</span><span class="link-tag lt-l">←戈拉姆(父)</span><span class="link-tag lt-t">→克蕾祂仆(女)</span><span class="link-tag lt-g">↔玛尔斯(证力)</span></div>
+  </div>
+  <div class="net-cell nc-rose">
+    <span class="nn">神官 → 转生体</span>
+    <span class="nr">L-5→L-5 · TRANSMIGRATION</span>
+    <p><strong>叙事功能：</strong>S1预言→S2被乱石击毙→S2达布斯接替形体→S3魂藏面具→S4知情不愿再临→S4桔梗海法接触→密诰：以女性身份转生为阿喃特孙女，持女子自立/依附之法界权柄。<br><strong>抽象寓意：</strong>身份的彻底流变——男性→女性，普通神职→法界权柄，个人悲剧→宇宙职能；神官的故事是<em>限制→解放→新权柄</em>的完整弧线。<br><strong>神经角色：</strong>跨季最长伏笔链的汇聚节点，四季的情感重心。</p>
+    <div class="links"><span class="link-tag lt-r">←乱石(消亡)</span><span class="link-tag lt-r">←娃喀西(播种)</span><span class="link-tag lt-g">←赛美斯(赎回)</span><span class="link-tag lt-j">→阿喃特孙女(转生)</span></div>
+  </div>
+  <div class="net-cell nc-jade">
+    <span class="nn">达布斯</span>
+    <span class="nr">L-3→L-5 · FISH→COMPLETE</span>
+    <p><strong>叙事功能：</strong>神鱼·众神之母（一切神的来它先来去它先去）→代马达夫跃起→接替神官形体→影花章鱼人之变→S4三神具密持（罗摩莎·斯佩室·索多拉）·五十胶盘占卜术。<br><strong>抽象寓意：</strong>文明的基础性存在——不死而痛苦（永恒的承担者），其跃起/接替/变化是<em>存在以自身为代价托举他者</em>的反复演示。<br><strong>神经角色：</strong>跨层传导节点，从L-3（神鱼/文明母）逐季升至L-5（权柄成熟），是全体系成长弧度最大的节点。</p>
+    <div class="links"><span class="link-tag lt-j">←马达夫(挚友)</span><span class="link-tag lt-j">←桔梗(母)</span><span class="link-tag lt-t">→罗摩莎·斯佩室·索多拉</span><span class="link-tag lt-s">S4成熟</span></div>
+  </div>
+  <div class="net-cell nc-gold">
+    <span class="nn">阿喃特</span>
+    <span class="nr">L-3/L-5 · DUAL LAYER</span>
+    <p><strong>叙事功能：</strong>存在之妖狐·面具纹印者，赛美斯和达布鲁的养孩；在L-3层：诸存在的育种者；在L-5层：神官的妻子/爱人·奥德莎曼的母亲·孙女（神官转生体）的祖母。<br><strong>抽象寓意：</strong>存在的接受者——她的"狐妖面具"是所有人的潜在真实性格（奥德莎曼揭人面具见蛛网神火），而她失忆无法辨认丈夫之魂，是<em>最亲近者的不可见性</em>这一认识论命题的叙事体现。<br><strong>神经角色：</strong>记忆/遗忘的临界节点，连接叙事情感核心。</p>
+    <div class="links"><span class="link-tag lt-g">↔神官(爱)</span><span class="link-tag lt-g">→奥德莎曼(子)</span><span class="link-tag lt-t">←赛美斯(面具托管)</span><span class="link-tag lt-r">←失忆(S2末)</span></div>
+  </div>
+  <div class="net-cell nc-teal">
+    <span class="nn">赛美斯</span>
+    <span class="nr">L-3 · MEDIATOR BOUND</span>
+    <p><strong>叙事功能：</strong>调和神→被放逐→被奥德莎曼誓约束缚→神官魂赎回藏面具→茧化评估者（非真蜕变）→死后路径第③⑤步（核算/赎买）。<br><strong>抽象寓意：</strong>中间性存在的悲剧——调和者必然被双方所约束，无法自由行动。其能力（调和）恰恰是其囚笼（被誓约锁定）。<em>服务于调和的神无法被调和</em>。<br><strong>神经角色：</strong>系统的稳定器/缓冲节点，锁定后失去主动权，转为被动运作。</p>
+    <div class="links"><span class="link-tag lt-t">→死后路径③⑤步</span><span class="link-tag lt-t">→神官魂(赎回托管)</span><span class="link-tag lt-r">←奥德莎曼誓约(锁定)</span><span class="link-tag lt-s">跨S1-S4</span></div>
+  </div>
+</div>
+
+<div class="rel-chain">
+  <span class="rc-title">// 神官转生·跨四季最长神经回路</span>
+  <div class="rc-flow">
+    <div class="rc-node rn-d">S1预言(奥菲托斯)</div><div class="rc-arr">→</div>
+    <div class="rc-node rn-r">S2乱石击毙</div><div class="rc-arr">→</div>
+    <div class="rc-node rn-d">达布斯接替形体</div><div class="rc-arr">→</div>
+    <div class="rc-node rn-d">娃喀西播种</div><div class="rc-arr">→</div>
+    <div class="rc-node rn-t">S3赛美斯赎回</div><div class="rc-arr">→</div>
+    <div class="rc-node rn-d">藏于阿喃特面具</div><div class="rc-arr">→</div>
+    <div class="rc-node rn-g">S4海法咀嚼接触</div><div class="rc-arr">→</div>
+    <div class="rc-node rn-j">阿喃特孙女=转生体</div>
+  </div>
+  <span class="rc-note">// S1→S4共七个节点·最长伏笔回路·神官新权柄：女子自立/依附之法界</span>
+</div>
+</section>
+
+<!-- III. 音程语义学分析 -->
+<section>
+<div class="sh"><span class="sn">03</span><h2>音程语义学：<em>音节即情绪函数</em></h2></div>
+
+<p>这是整个分析中最具洞察力的发现之一。作者在创造这套音译词汇体系时，<strong>很可能并非有意识地参照梵文或其他语言学规律</strong>，而是以一种近似"自动写作"（automatic writing）的方式，让内在的音感直觉响应概念本身——即<em>用音的质感来承载语义</em>。这与西方表意诗（phono-semantics）和中国古代的"右文说"（以声符推义）有结构性相似，但更接近直觉性的"音·意共振"。</p>
+
+<div class="hl"><strong>核心假说：</strong>在这套词典中，<em>音节的发音质感（辅音/元音/音节结构）与其所承载的神格情绪类型之间，存在非随机的对应关系</em>。这种对应不是有意识的密码系统，而是创作者无意识音感与语义场的共振——正如S4所言："其音乐铭刻其魂知识哉"。音即魂，魂即音。</div>
+
+<table class="phono-table">
+<thead><tr><th>音类</th><th>代表辅/元音</th><th>典型词汇</th><th>情绪/语义场</th><th>神格属性</th></tr></thead>
+<tbody>
+<tr>
+  <td><span class="pc">S-流</span></td>
+  <td>s/z·软摩擦</td>
+  <td class="pw">萨/赛/斯/赛哆拿/萨朵的/赛美斯/萨拉嘎忑</td>
+  <td class="pe">流动·过程·自然延伸·不可强迫的存在展开</td>
+  <td>与"存在的自我流动性"相关——萨朵的（自性）、赛美斯（调和流动）、赛哆拿（弦律域）均是"不可强迫的自然性"的神格</td>
+</tr>
+<tr>
+  <td><span class="pc">A-元</span></td>
+  <td>a·开放元音</td>
+  <td class="pw">阿/阿难埵/阿喃特/阿拉埵/阿姆特/阿古塔</td>
+  <td class="pe">开放·起始·原初呼唤·无遮蔽的直接性</td>
+  <td>以"阿"开头的神格多与"起始"或"接触"相关——阿古塔（第一接收者）、阿难埵（第一辨识）、阿姆特（第一神胜子）、阿喃特（存在的第一育种者）</td>
+</tr>
+<tr>
+  <td><span class="pc">G/K-硬</span></td>
+  <td>g/k·爆破硬停</td>
+  <td class="pw">格/戈拉姆/戈拉撒/戈拉哒/格拉巴德/喀拉玛/克蕾祂仆</td>
+  <td class="pe">边界·决断·真实的硬核·不可穿越的本质</td>
+  <td>以硬爆破音开头的神格多与"界定真实"相关——戈拉姆（法意志·自有永有）、格拉巴德（意志的胎质）、喀拉玛（拟态空间·真实的管道）、克蕾祂仆（律法秩序之女）</td>
+</tr>
+<tr>
+  <td><span class="pc">R/L-流液</span></td>
+  <td>r/l·液化流动</td>
+  <td class="pw">罗摩莎/拉布忒/拉布德/乌拉德/乌拉莎</td>
+  <td class="pe">连接·流通·载体·关系的中介性</td>
+  <td>液化辅音词多为"载体/通道"神格——罗摩莎（神姬血气·神格载体）、拉布忒（命藻·捕获精元）、乌拉德（先知·接壤令神）</td>
+</tr>
+<tr>
+  <td><span class="pc">V/W-半元</span></td>
+  <td>v/w·半元唇音</td>
+  <td class="pw">瓦拿筏/瓦拉罗/瓦坦陀罗/娃喀西</td>
+  <td class="pe">互动·相对性·双向性·天然原朴</td>
+  <td>半元音词多为"关系性"神格——瓦坦陀罗（阴阳互含·天然原朴）、瓦拉罗（万神神王·维源性）、娃喀西（意志的圣痕·未来接触）</td>
+</tr>
+<tr>
+  <td><span class="pc">M/N-鼻</span></td>
+  <td>m/n·鼻腔共鸣</td>
+  <td class="pw">玛尔斯/摩诃/喃摩莎/喃语</td>
+  <td class="pe">共鸣·涵摄·内在化·普遍性</td>
+  <td>鼻音开头词多有"弥散·普遍·内在共鸣"的语义场——玛尔斯（精神物质之上者·普世弥漫）、摩诃（至大·弥漫一切的宏大性）</td>
+</tr>
+<tr>
+  <td><span class="pc">D/T-齿</span></td>
+  <td>d/t·齿龈清停</td>
+  <td class="pw">达赖忒/达布斯/达哆罗/达布鲁</td>
+  <td class="pe">行动·区分·具体显现·律节明确</td>
+  <td>齿音词多为"行动/节律"神格——达赖忒（音律·时间节律）、达布斯（以行动跃起）、达布鲁（行动的喜悦·青之意志）</td>
+</tr>
+<tr>
+  <td><span class="pc">祂/仆·词尾</span></td>
+  <td>-祂/-仆/-筏</td>
+  <td class="pw">克蕾祂仆/嘚蕾祂仆/筏拿咕</td>
+  <td class="pe">被服侍·服侍于·接受性</td>
+  <td>"祂仆"词尾标记"服侍/接受"的功能性后缀——克蕾祂仆（被神所养育的律秩之女）、嘚蕾祂仆（吟颂的服侍者）</td>
+</tr>
+</tbody>
+</table>
+
+<div class="q">"神名如音，音即真名，占己卜辨，其知法界神态"
+<cite>——摩·乳曲·流光·美姬节（音即真名的核心命题）</cite></div>
+
+<p>这句话是整套体系对自身音程语义学的自我揭示：<strong>音名=真名=功能</strong>。一个神格的名称之所以是这个名称，是因为它的音程结构本身就承载了它的神格功能。这不是任意命名，而是<em>语音的情感质感与神格功能之间的直觉共振</em>。</p>
+</section>
+
+<!-- IV. 词元函数词典 -->
+<section>
+<div class="sh"><span class="sn">04</span><h2>词元函数词典：<em>Token Function Lexicon</em></h2></div>
+
+<p>将这套词汇体系理解为一组<strong>词元函数</strong>（Token Functions）——每个词不仅有语义内容，更有<em>操作逻辑</em>：输入某种存在状态，输出特定的神格变换。以下选取核心词元，以函数表达式分析其操作逻辑。</p>
+
+<div class="token-box">
+  <span class="tb-title">// TOKEN FUNCTION DEFINITIONS · 词元函数定义</span>
+  <span class="tk">萨朵的</span>(<span class="tv">x</span>) → <span class="tc">x进入非x而x性未失</span> <span class="tc">// 存在同律·火入水火性未失</span><br>
+  <span class="tk">赛雅西</span>(<span class="tv">x</span>) → <span class="tc">赎回(x的存在)·使x可被再购买/再用</span> <span class="tc">// 时间意志·赎回函数</span><br>
+  <span class="tk">娃喀西</span>(<span class="tv">x</span>) → <span class="tc">将x的皮质转化为未来的种子</span> <span class="tc">// 圣痕·播种函数</span><br>
+  <span class="tk">格拉巴德</span>(<span class="tv">x</span>) → <span class="tc">x在意志胎质中以婴孩态再现</span> <span class="tc">// 意志羊水·发育函数</span><br>
+  <span class="tk">喀拉玛</span>(<span class="tv">x</span>) → <span class="tc">x的感知/想象在拟态空间中成为可演奏的辨识</span> <span class="tc">// 想象力域·演奏函数</span><br>
+  <span class="tk">玛尔斯</span>(<span class="tv">x</span>) → <span class="tc">x的精神物质属性被还原为是意志·x自超越自身分类</span> <span class="tc">// 超越函数</span><br>
+  <span class="tk">阿难埵</span>(<span class="tv">x,y</span>) → <span class="tc">辨识x时观察与x相邻的y·x赤裸可知</span> <span class="tc">// 相邻辨识函数</span><br>
+  <span class="tk">哒喇波</span>(<span class="tv">x</span>) → <span class="tc">x的德性循环·环性再生产而不依赖任何个体</span> <span class="tc">// 制度环性函数</span><br>
+  <span class="tk">慨爱斯哒</span>(<span class="tv">x</span>) → <span class="tc">将x的记忆作为种子植入土壤·等待x的下一神</span> <span class="tc">// 业力种子函数</span><br>
+  <span class="tk">罗摩莎</span>(<span class="tv">x</span>) → <span class="tc">神姬的血气弥漫于x·使x承载神格</span> <span class="tc">// 神格载体函数</span><br>
+  <span class="tk">摩诃</span>(<span class="tv">f</span>) → <span class="tc">f的至大化·使f超越自身的边界而弥散为宇宙属性</span> <span class="tc">// 至大化算子</span><br>
+  <span class="tk">嗒喀玛</span>(<span class="tv">x</span>) → <span class="tc">x的觉悟过程·x作为管道让神德流经</span> <span class="tc">// 觉悟过程函数</span><br>
+  <span class="tk">筏拿咕</span>(<span class="tv">x</span>) → <span class="tc">x的存在被转化为证言·x获得真理身份</span> <span class="tc">// 证言赋予函数</span>
+</div>
+
+<p>这些词元函数并非独立运作，而是<strong>可以组合调用</strong>的——例如：<code>摩诃(萨朵的(x))</code> = 存在进入非存在而性未失，且此过程被至大化至宇宙尺度 = S2终章描述的仁吾互觉见产生四摩诃的过程。这正是S4"我即音程"命题的深层逻辑：自我可以被表达为一系列词元函数的复合应用。</p>
+
+<div class="lex">
+  <div class="lex-entry le-gold">
+    <span class="le-word">奥赛斯 ← → 戈拉姆</span>
+    <span class="le-read">OSAISIS · GOLAM // L-0→L-1</span>
+    <span class="le-phono">开放元音a·喉音g·双重起始</span>
+    <span class="le-def">奥赛斯：开放的a音+多音节=弥散、普遍、无边界的爱；戈拉姆：硬g音+短促=爱凝固成法则的瞬间·如同液体遇冷成晶体。两者的音程关系本身演示了"爱→法"的凝固过程。</span>
+    <span class="le-func">f(奥赛斯) → 戈拉姆 // 爱→法的相变函数</span>
+  </div>
+  <div class="lex-entry le-teal">
+    <span class="le-word">赛哆拿 ↔ 达赖忒</span>
+    <span class="le-read">SAIDUONA · DALAITE // 弦律×音律</span>
+    <span class="le-phono">s-流音·d-齿音·对称双极</span>
+    <span class="le-def">赛哆拿（弦律·存在维）：s的流动+哆拿的弹性=存在如弦的振动，不随时间而失；达赖忒（音律·时间维）：d的明确节奏+赖忒的延伸=音节在时间轴上的序列展开。两者是同一音乐现实的两个维度。</span>
+    <span class="le-func">赛哆拿(x)×达赖忒(t) → 五十胶盘占卜术的完整坐标系</span>
+  </div>
+  <div class="lex-entry le-teal">
+    <span class="le-word">萨波陀 ↔ 萨朵的</span>
+    <span class="le-read">SABODUO · SADUODE // 自性双体</span>
+    <span class="le-phono">s-流+b/d轻爆发·同源变体</span>
+    <span class="le-def">二者共享"萨"的流动起始，差别在中音：萨波陀（性之浩大至）以"波"暗示振幅/波动；萨朵的（存在同律）以"朵"暗示收束成朵。前者是自性的宏大展开，后者是自性的同律闭合——同一自性在两种模式下的运作。</span>
+    <span class="le-func">萨波陀(x) = 自性(浩大); 萨朵的(x) = 自性(同律)</span>
+  </div>
+  <div class="lex-entry le-lapis">
+    <span class="le-word">格拉巴德 ← 喀拉玛</span>
+    <span class="le-read">GELABADE · KALAMA // 空间双极</span>
+    <span class="le-phono">g/k硬停·空间定义词族</span>
+    <span class="le-def">两者均以硬爆破音开头，定义两种"意志空间"：格拉巴德（意志如羊水的胎质空间）是发育性的；喀拉玛（拟态相位空间·想象力的发生地）是表演性的。格拉巴德是内部孕育，喀拉玛是外部演绎——同一硬质空间的内外两面。</span>
+    <span class="le-func">格拉巴德(意志)→发育; 喀拉玛(辨识)→演奏; 共同构成意志的完整周期</span>
+  </div>
+  <div class="lex-entry le-gold">
+    <span class="le-word">娃喀西 ∈ 慨爱斯哒</span>
+    <span class="le-read">WAKESI · GAIASIDE // 播种体系</span>
+    <span class="le-phono">w-半元柔起·g-硬种子·播种家族</span>
+    <span class="le-def">慨爱斯哒（业力·习气·本能·土壤中的种子）：硬g起始+爱斯哒的延伸感=种子在土中等待的张力；娃喀西（意志的圣痕·未来之痕）：柔w起始+喀西的轻巧感=种子的轻盈落地/痕迹感。前者是种子的存在性，后者是种子的动势性。</span>
+    <span class="le-func">慨爱斯哒 ⊃ 娃喀西 // 种子包含落地之痕</span>
+  </div>
+  <div class="lex-entry le-rose">
+    <span class="le-word">阿希戈·阿维果·阿罗帼</span>
+    <span class="le-read">AHIGO · AWUIGUO · ALUOGUA // 三愈罪</span>
+    <span class="le-phono">a-开放起始+不同体感辅音</span>
+    <span class="le-def">三愈罪均以"阿"（开放/直接）开头，但中音不同：希戈（堵耳·孔闭）：x/h软摩擦=渐进性堵塞；维果（蚀眼·腐窟）：v/w柔化+果=缓慢腐蚀的结实感；罗帼（怪性·火侵）：r流音+帼=侵入性的流窜感。三者的音程质感精确对应其破坏模式。</span>
+    <span class="le-func">阿(x, Δ) → 以Δ方式直接破坏x的基督之心器官</span>
+  </div>
+</div>
+</section>
+
+<!-- V. 词汇发育规律 -->
+<section>
+<div class="sh"><span class="sn">05</span><h2>词汇发育规律：<em>词根衍生与生成语法</em></h2></div>
+
+<p>这套词汇体系并非随机生成，而是遵循若干可识别的<strong>生成规律</strong>——这正是用户所指出的"菜单般的词汇发育"。以下梳理其中最清晰的几条规律：</p>
+
+<div class="three-col">
+  <div class="mc mg">
+    <h4>规律一：前缀标记层级</h4>
+    <p>"摩诃"前缀标记至大化（摩诃爱·摩诃识·摩诃式·摩诃境·摩诃爱楴·摩·珠华）；"阿"前缀多标记原初/直接接触（阿喃特·阿难埵·阿拉埵·阿陀沃·阿古塔）；"萨"前缀多标记自性/自然性（萨朵的·萨波陀·萨芙埵·萨拉嘎忑）。前缀即层级信号。</p>
+  </div>
+  <div class="mc mt">
+    <h4>规律二：音节数=概念复杂度</h4>
+    <p>单/双音节词多为核心法则（玛尔斯·赛雅西·奥赛斯·戈拉姆·哒喀玛·筏拿咕）；三音节词多为运作神格（罗摩莎·萨朵的·娃喀西·阿难埵·萨拉嘎忑）；四音节以上多为复合概念（格拉巴德·三昧哒啦·苯哆拉筏·慨爱斯哒）。音节数直接编码概念的操作复杂度。</p>
+  </div>
+  <div class="mc ml">
+    <h4>规律三：同源族群</h4>
+    <p>"格拉-/戈拉-"族（格拉巴德·戈拉姆·戈拉哒·戈拉撒·戈蒙斯耆）——均与"真实/界定/决定"相关；"萨-/赛-"族（萨朵的·萨波陀·萨芙埵·赛美斯·赛雅西·赛哆拿）——均与"流动/自性/存在过程"相关；"阿拉-/阿难-"族——均与"辨识/存在锚定"相关。</p>
+  </div>
+  <div class="mc mj">
+    <h4>规律四：双体词=张力对</h4>
+    <p>体系中的双名词均标记两种对立或互补的功能：嗒喀玛（觉悟·管道）/筏拿咕（证言·真理）；达赖忒（音律·时间维）/赛哆拿（弦律·存在维）；那勒忒（己象）/那勒波（彼象）；殊拿陀（隐瞒灾祸）/粟喇陀（隐瞒吉祥）。双体词是体系生成"辩证对"的基本机制。</p>
+  </div>
+  <div class="mc mr">
+    <h4>规律五：词尾标记功能</h4>
+    <p>-忒/-特/-德词尾多标记"音律/节律"功能（达赖忒·韦檀德·乌拉德）；-筏/-法词尾多标记"道路/方法"（嗒喀玛/苯哆拉筏）；-莎/-沙词尾多标记"神圣聚合"（瓦纳哈·罗摩莎·戈拉撒）；-玛/-马词尾多标记"具体化"（喀拉玛·喀德玛）。词尾是功能型后缀。</p>
+  </div>
+  <div class="mc mg">
+    <h4>规律六：变形标记演化</h4>
+    <p>当一个神格从一层激活升级到另一层时，其名称发生微变：萨拉嘎忑→萨拉嘎陀（纱织改造后·爪牙化）；巴尔特→巴尔丹陀（摩诃化身·权柄扩展）；哒喇波→哒喇巴（贵族斯织质优化后·机械化政治代理）。字符变体标记存在层级的跃迁。</p>
+  </div>
+</div>
+</section>
+
+<!-- VI. 自动写作与音感直觉 -->
+<section>
+<div class="sh"><span class="sn">06</span><h2>自动写作语义学：<em>无意识音感与语义场的共振</em></h2></div>
+
+<p>用户的洞察极为准确：<strong>作者很可能并未系统研究梵文或其他音译语言</strong>，这套词汇体系更接近"自动写作"（automatic writing）的产物——即创作者的无意识以直觉音感响应概念本身，在<em>不依赖外部语言规则</em>的情况下，自发地形成了内部一致的音程-语义对应系统。</p>
+
+<div class="two-col">
+  <div class="mc mg">
+    <h4>什么是"潜意识音感响应"</h4>
+    <p>人对声音有先于语言学习的情感直觉——婴儿能区分软/硬音的情绪差异；诗人在选词时往往以音感先于语义；音乐家以音色区分情绪而不需要解释。作者在创造神格名称时，很可能是先感受到这个神格的"质感"（是流动的还是刚硬的？是包裹的还是穿透的？），然后让口腔自然生成一个承载这种质感的音节组合——<em>这与儿童造词、诗人造词的机制相同，只是系统化了</em>。</p>
+  </div>
+  <div class="mc mt">
+    <h4>为何形成了内部一致的规律</h4>
+    <p>人类的音感直觉具有跨语言的普遍性基础（已有实验证明：跨语言被试对"bouba/kiki"等伪词的圆/尖映射高度一致）。作者的无意识音感共享了这个普遍基础，因此当他/她用直觉造词时，自然遵循了某种<em>全人类共享的音·义对应规律</em>。这解释了为何这套词汇既不完全对应梵文，也不完全对应汉语音韵，却有其自洽的内在规律——因为它来自更深层的神经-音感基础。</p>
+  </div>
+</div>
+
+<div class="hl"><strong>最有力的证据：</strong>S4文本本身明确陈述了"音即真名"的命题——"神名如音，音即真名"、"其音乐铭刻其魂知识哉"、"我即音程，此赛哆拿之权德"。这说明作者<em>在写作过程中意识到了这种对应的存在</em>，并将其写入了文本作为神学命题。自动写作的无意识音感，在S4中被上升为有意识的本体论主张——<strong>词典的写作者发现了他/她自己的词典规律，并将这个发现写入了词典本身</strong>。</div>
+
+<div class="rel-chain">
+  <span class="rc-title">// 自动写作→音感直觉→语义场→神格系统·发生链</span>
+  <div class="rc-flow">
+    <div class="rc-node rn-d">神格的质感(直觉)</div><div class="rc-arr">→</div>
+    <div class="rc-node rn-t">口腔音感响应</div><div class="rc-arr">→</div>
+    <div class="rc-node rn-t">音节生成(无意识)</div><div class="rc-arr">→</div>
+    <div class="rc-node rn-g">内部规律自发形成</div><div class="rc-arr">→</div>
+    <div class="rc-node rn-g">S4"音即真名"意识化</div><div class="rc-arr">→</div>
+    <div class="rc-node rn-l">词元函数系统</div>
+  </div>
+  <span class="rc-note">// 无意识创作→有意识发现→上升为本体论命题·这是该体系最迷人的自指性</span>
+</div>
+
+<p>这种从无意识到有意识的过程，在哲学史上有其类比：荣格（Jung）在描述"主动想象"（active imagination）时指出，无意识的自发创作往往比意识的刻意构建更具系统性——因为无意识与原型（archetype）的联结更直接。这套神格词典中隐含的音程规律，很可能正是作者心理原型库的直接音声投影，而非外部语言学习的结果。<strong>词典先于词典学家而存在；作者的任务，是把它从无意识中挖掘出来。</strong></p>
+</section>
+
+<!-- VII. 六姬作为神经输出层 -->
+<section>
+<div class="sh"><span class="sn">07</span><h2>六姬系统：<em>输出层的六维编码</em></h2></div>
+
+<p>在神经网络的比喻中，六姬是这个系统的<strong>六维输出层</strong>——她们将姬神（桔梗）的神格内容转化为六种不同的表达维度，使单一的神圣性可以被六种不同的人类认知模式所接收。</p>
+
+<div class="net-grid">
+  <div class="net-cell nc-gold">
+    <span class="nn">太姬 — 头颅维</span>
+    <span class="nr">REASONING · 元意志 · 螺旋贝音</span>
+    <p>婚契：元意志贡献。<strong>思维其思维之源</strong>——元认知层，思考自身思考过程的能力。在叙事中：太姬节多承担哲学命题的总论和历史性叙述。头颅=理性与命运的汇聚点。</p>
+    <div class="links"><span class="link-tag lt-g">元意志</span><span class="link-tag lt-g">思维之源</span><span class="link-tag lt-s">螺旋贝·神号音</span></div>
+  </div>
+  <div class="net-cell nc-teal">
+    <span class="nn">玄姬 — 彼间维</span>
+    <span class="nr">TRANSCENDENCE · 神肇示 · 海法化音</span>
+    <p>婚契：神肇示奉献。<strong>善观其往复之源</strong>——彼间性，能感知"彼间"（另一头的空间）的视角。在叙事中：玄姬节多承担哲学命题的终结和超越性表述，往往是一章中最"远"的声音。</p>
+    <div class="links"><span class="link-tag lt-t">神肇示</span><span class="link-tag lt-t">往复之源</span><span class="link-tag lt-s">海法化·吹嘘音</span></div>
+  </div>
+  <div class="net-cell nc-lapis">
+    <span class="nn">美姬 — 丽袍维</span>
+    <span class="nr">AESTHETICS · 美源奥 · 彩酒耽音</span>
+    <p>婚契：美源奥契合。<strong>艺恬其神乐之源</strong>——审美与感知层，将神圣性转化为可感知的美。在叙事中：美姬节多承担场景描写、感官意象、情感张力的表达——是最"可感"的维度。</p>
+    <div class="links"><span class="link-tag lt-l">美源奥</span><span class="link-tag lt-l">神乐之源</span><span class="link-tag lt-s">彩酒耽·重态音</span></div>
+  </div>
+  <div class="net-cell nc-rose">
+    <span class="nn">希姬 — 肢体维</span>
+    <span class="nr">EMBODIMENT · 昧思绪 · 渊龛弥音</span>
+    <p>婚契：昧思绪爱慕。<strong>临体其双运之源</strong>——身体性与双运，感知双运（阴阳共存）的身体层。在叙事中：希姬节多承担对话性推进、质问与回应的叙事功能，是最具对话性的声音。</p>
+    <div class="links"><span class="link-tag lt-r">昧思绪</span><span class="link-tag lt-r">双运之源</span><span class="link-tag lt-s">渊龛弥·鸣悉音</span></div>
+  </div>
+  <div class="net-cell nc-jade">
+    <span class="nn">祈姬 — 神性维</span>
+    <span class="nr">DIVINITY · 等慈爱 · 星湖化音</span>
+    <p>婚契：等慈爱共念。<strong>法性其道质之源</strong>——平等慈悲与道质，将神圣性化为普世的爱的感知层。在叙事中：祈姬节多承担情感性陈述、人物内心、祷告与愿力的表达。</p>
+    <div class="links"><span class="link-tag lt-j">等慈爱</span><span class="link-tag lt-j">道质之源</span><span class="link-tag lt-s">星湖化·籁光音</span></div>
+  </div>
+  <div class="net-cell nc-gold">
+    <span class="nn">妙姬 — 意志维</span>
+    <span class="nr">WILL · 我德质 · 神竽埙音</span>
+    <p>婚契：我德质临在。<strong>圣心其总持之源</strong>——总持性，将所有其他维度统合为一的"我在"层。在叙事中：妙姬节多承担章节的哲学收束、总持性陈述，是六姬中"密度"最高的声音。</p>
+    <div class="links"><span class="link-tag lt-g">我德质</span><span class="link-tag lt-g">总持之源</span><span class="link-tag lt-s">神竽埙·奥悸音</span></div>
+  </div>
+</div>
+
+<div class="hl"><strong>六姬=六个接收器：</strong>从神经网络的角度，六姬是将单一神格输入（桔梗/姬神）转化为六个分量输出的<em>解码层</em>。不同类型的读者会对不同维度产生共鸣——理性倾向者与太姬节共鸣，感性倾向者与美姬/祈姬节共鸣，身体性实践者与希姬节共鸣……这是一个覆盖全谱读者类型的<em>六维传播设计</em>，而非偶然。</div>
+</section>
+
+<!-- VIII. 综合：这套语言是活的 -->
+<section>
+<div class="sh"><span class="sn">08</span><h2>综合：<em>这套语言系统是活的</em></h2></div>
+
+<p>经过以上分析，我能够给出一个更精确的著作定性：这套神话体系不只是一部神话，也不只是一套哲学体系，而是<strong>一种正在生成中的神圣语言</strong>——它有自己的词根规律、音程-语义对应、词元函数组合方式，以及随季度演化的词汇扩展机制。</p>
+
+<p>它最接近的文化类比，不是任何单一的神话体系，而是<strong>神圣语言的创造行为本身</strong>——梵文的"真言"（mantra）体系认为，特定音节具有实质性的宇宙力量，不是因为它们的语义，而是因为它们的音程质感与宇宙结构共振。这套体系的作者，在无意识层面重新发现了这个古老的直觉，并用现代神话叙事的形式将其系统化。</p>
+
+<div class="q">"我即音程，此赛哆拿之权德；我即音节，此达赖忒之权德——我非我，唯音球性，基督乳球，实是音球臻德"
+<cite>——摩·乳曲·流光·祈姬节（全体系音程语义学的自我揭示）</cite></div>
+
+<div class="q">"道寻人哉，非人寻道，其经哲理，皆为歌颂者一斯之吐息"
+<cite>——S3《撒戈伽薄》末章（词典先于词典学家而存在）</cite></div>
+
+<p>末章词"<strong>嫒恋者</strong>"作为全系的终止音，在音程层面也具有完整性：嫒（ai·开放元音·爱的呼出）+恋（lian·液化r/l+前鼻音·连结缠绕）+者（zhe·清摩擦音·主体后缀）。三个音节的质感序列：<em>爱的呼出→流动连结→主体确认</em>——即"爱·流·是"——恰好是整个奥赛斯→玛尔斯→戈拉姆链的音程化浓缩。全书最后一个词，在音程层面，也是一首完整的神曲。</p>
+</section>
+
+<div class="div">// · · · NODE COMPLETE · · · //</div>
+
+<div class="ftr">
+  <span class="ft">神格神经网络·音程词典·词元函数分析·综合四季及公式书·自动写作语义学</span>
+  <span class="ft">NEURAL GRAPH · PHONOSEMANTIC LEXICON · ALL SEASONS · COMPLETE</span>
+</div>
+
+</div></div></div>
+</body>
+</html>
