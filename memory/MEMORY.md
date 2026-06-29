@@ -1,0 +1,1 @@
+- [AGS 缩写](ags-abbreviation.md) — AGS 是 "Annals of the Great Simplicity" 的正式缩写
