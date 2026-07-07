@@ -1,3 +1,11 @@
+"""
+Optimal Time Delay (tau) via Average Mutual Information
+=========================================================
+AMI-based optimal delay selection (Fraser & Swinney, 1986).
+Finds the first local minimum of mutual information vs lag.
+Fallbacks: ACF 1/e crossing, then default tau=1.
+"""
+
 import numpy as np
 import pyEDM
 import warnings

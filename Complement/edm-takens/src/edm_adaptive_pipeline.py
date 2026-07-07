@@ -1,4 +1,16 @@
+"""
+EDM Adaptive Pipeline — tau → E → theta → CCM
+================================================
+Unified EDM workflow: optimal delay (tau) via AMI, embedding
+dimension (E) via cross-validated Simplex, nonlinearity detection
+via S-Map theta sweep, and CCM causality inference.
+Handles edge cases: binary data, small samples, non-stationarity.
+"""
+
 import pyEDM
+import numpy as np
+import pandas as pd
+import warnings
 import numpy as np
 import pandas as pd
 import warnings

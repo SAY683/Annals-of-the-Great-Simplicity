@@ -402,8 +402,8 @@ def run_pipeline(config: PipelineConfig = None,
 
     print(f"\n{'=' * 60}")
     print(f"  Pipeline complete.")
-    print(f"  Full report: python final_interpretation.py")
-    print(f"  Scored verification: python verify_algorithms.py")
+    print(f"  Full report: python src/final_interpretation.py")
+    print(f"  Scored verification: python src/verify_algorithms.py")
     print(f"{'=' * 60}")
 
     return {

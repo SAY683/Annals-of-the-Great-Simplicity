@@ -49,27 +49,42 @@ class SovereignHAVOK:
         poly_order: int = 3,
         window_length: int = 11,
         basis: str = "V",
+        truncation_method: str = "energy",
+        regression_method: str = "lstsq",
+        ridge_alpha: float = 0.01,
     ):
         """
         Parameters
         ----------
         q_delays : int
-            汉克尔矩阵的延迟列数 (嵌入维度)。建议根据 AMI 第一个极小值设定。
+            Hankel matrix delay columns (embedding dimension).
+            Should match AMI first minimum.
         dt : float
-            采样时间间隔。
+            Sampling time interval.
         energy_threshold : float
-            奇异值累积能量截断阈值 (默认 99.9%)。
+            Cumulative singular value energy threshold.
+            Used when truncation_method='energy'.
         poly_order : int
-            Savitzky-Golay 求导滤波器的多项式阶数。
+            Savitzky-Golay derivative filter polynomial order.
         window_length : int
-            Savitzky-Golay 求导滤波器的窗口长度 (必须为奇数)。
+            Savitzky-Golay derivative filter window length (must be odd).
         basis : str
-            回归基选择: "V" (右奇异向量, Brunton 原版) 或 "U" (左奇异向量, 时间模式)。
+            "V" (right singular vectors, Brunton canonical)
+            or "U" (left singular vectors, time-evolution modes).
+        truncation_method : str
+            "energy": cumulative energy >= threshold (default).
+            "gavish_donoho": Gavish & Donoho (2014) optimal hard threshold.
+            Threshold = 2.858 * median(singular_values) for unknown noise.
+        regression_method : str
+            "lstsq": ordinary least squares (default).
+            "ridge": ridge regression with L2 regularization.
+        ridge_alpha : float
+            Regularization strength for ridge regression (default 0.01).
         """
         if window_length % 2 == 0:
-            window_length -= 1  # auto-correct to odd
+            window_length -= 1
         if energy_threshold <= 0 or energy_threshold > 1:
-            raise ValueError("energy_threshold 必须在 (0, 1] 范围内")
+            raise ValueError("energy_threshold must be in (0, 1]")
 
         self.q = q_delays
         self.dt = dt
@@ -77,6 +92,9 @@ class SovereignHAVOK:
         self.poly_order = poly_order
         self.window_length = window_length
         self.basis = basis.upper()
+        self.truncation_method = truncation_method
+        self.regression_method = regression_method
+        self.ridge_alpha = ridge_alpha
 
         # ── 拟合后填充的内部状态 ──
         self.r_ = None              # 自动截断阶数
@@ -178,7 +196,14 @@ class SovereignHAVOK:
         if q_eff < 3:
             return max_r
         cumulative = np.cumsum(s ** 2) / np.sum(s ** 2)
-        r = int(np.searchsorted(cumulative, self.energy_threshold) + 1)
+        if self.truncation_method == "gavish_donoho":
+            # Gavish & Donoho (2014) optimal hard threshold
+            # For unknown noise: threshold = 2.858 * median(singular_values)
+            threshold = 2.858 * np.median(s)
+            r = int(np.sum(s > threshold))
+            r = max(3, min(r, max_r))
+        else:
+            r = int(np.searchsorted(cumulative, self.energy_threshold) + 1)
         # Floor: at least 3 modes total (2 linear + 1 forcing)
         # For very short q: use at most q_eff-1 (leave at least 1 for forcing)
         min_r = min(max(3, q_eff // 4), q_eff - 1)
@@ -253,7 +278,14 @@ class SovereignHAVOK:
         Theta = np.column_stack([v, self.forcing_])
 
         # Solve: Theta @ Xi = dv_dt  ->  Xi.shape = (r x r-1)
-        Xi, residuals, rank, s_lstsq = lstsq(Theta, dv_dt, rcond=None)
+        if self.regression_method == "ridge":
+            # Ridge regression (L2 regularization)
+            # Xi = (Theta^T @ Theta + alpha*I)^(-1) @ Theta^T @ dv_dt
+            n_features = Theta.shape[1]
+            I_reg = np.eye(n_features)
+            Xi = pinv(Theta.T @ Theta + self.ridge_alpha * I_reg) @ Theta.T @ dv_dt
+        else:
+            Xi, residuals, rank, s_lstsq = lstsq(Theta, dv_dt, rcond=None)
 
         # Xi = [A_part | B_part]^T, A_part:(r-1)x(r-1), B_part:(1)x(r-1)
         Xi_T = Xi.T  # (r-1, r)

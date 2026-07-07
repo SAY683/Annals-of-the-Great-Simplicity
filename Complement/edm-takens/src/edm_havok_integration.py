@@ -1,6 +1,16 @@
+"""
+EDM-Guided HAVOK Integration (Legacy)
+======================================
+Bridges EDM (pyEDM) and HAVOK: uses EDM's EmbedDimension to
+auto-select the Hankel embedding size q, then runs discrete-time
+HAVOK decomposition. Legacy module — prefer sovereign_havok.py
+for new work (continuous-time ODE, SG derivatives, adaptive SVD).
+"""
+
 import os
 os.environ['MPLBACKEND'] = 'Agg'
 os.environ['MPLCONFIGDIR'] = os.path.join(os.getcwd(), '.matplotlib_cache')
+
 import numpy as np
 import pyEDM
 import warnings
