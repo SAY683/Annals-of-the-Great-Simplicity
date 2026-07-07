@@ -101,7 +101,7 @@ edm-takens/                          ← Self-contained skill folder
 ├── DESIGN.md                        ← Design philosophy & business logic
 ├── requirements.txt                 ← Pip-freeze version manifest
 ├── secret_adoption_audit.md         ← Adoption/deferral status of all 7 secrets
-├── src/                             ← All Python source (14 modules)
+├── src/                             ← All Python source (16 modules)
 │   ├── __init__.py
 │   ├── _paths.py                    ← Portable path resolution
 │   ├── sovereign_havok.py           ← Core HAVOK engine
@@ -111,11 +111,15 @@ edm-takens/                          ← Self-contained skill folder
 │   ├── final_interpretation.py      ← Game data dynamical interpretation
 │   ├── multiview_svd_monitor.py     ← Secret 4 (Multiview) + Secret 5 (SVD monitor)
 │   ├── pipeline.py                  ← Unified pipeline runner logic
+│   ├── router.py                    ← Data routing engine: grade→target→auto-execute (6 scenarios)
 │   ├── environment_check.py         ← Dependency + file integrity validation
 │   ├── edm_tau_optimization.py      ← AMI-based optimal tau selection
 │   ├── edm_adaptive_pipeline.py     ← tau -> E -> theta -> CCM pipeline
-│   └── edm_havok_integration.py     ← EDM-guided HAVOK (discrete K, legacy)
+│   ├── sensitivity_config.py        ← Config capture + sensitivity scan (E+/-1)
+│   ├── surrogate_test.py            ← IAAFT surrogate data statistical testing
+│   └── edm_havok_integration.py     ← [DEPRECATED] 已废弃，不参与活跃管道。功能由 sovereign_havok.py + edm_adaptive_pipeline.py 完全覆盖，保留仅供历史参考。
 ├── tests/
+│   ├── __init__.py                  ← Test package marker
 │   └── test_havok.py                ← 9-class HAVOK algorithm test suite
 ├── examples/
 │   └── demo.py                      ← pyEDM reference demonstration
@@ -125,7 +129,8 @@ edm-takens/                          ← Self-contained skill folder
 └── references/
     ├── takens_embedding_reference.md ← Mathematical foundations
     ├── forbidden_rules_reference.md  ← Seven forbidden rules (full treatment)
-    └── edge_cases_reference.md       ← Data regime mitigations
+    ├── edge_cases_reference.md       ← Data regime mitigations
+    └── research-rigor.md             ← Research integrity: pre-registration, config artifact, sensitivity, controls
 ```
 
 ## Seven Enforced Secrets
@@ -231,12 +236,12 @@ Key insights from the broader nonlinear dynamics methodology ecosystem:
 | Gavish-Donoho SVD threshold | Gavish & Donoho (2014) | `SovereignHAVOK(truncation_method="gavish_donoho")` |
 | Ridge regression for HAVOK | Brunton/Kutz standard | `SovereignHAVOK(regression_method="ridge")` |
 | IAAFT surrogate testing | Theiler et al. (1992) | `src/surrogate_test.py` |
-| Sensitivity analysis (E+/-1) | Research rigor | `src/sensitivity_config.py` |
+| Sensitivity analysis (E+/-1) | Research rigor | `src/sensitivity_config.py` / `references/research-rigor.md` #5 |
 | CCM seasonal protection | Cobey & Baskerville (2016) | `ccm_with_convergence()` slope check |
 | Observable selection (Ashby, DPI) | Ashby (1956), Info Theory | Documented in Edge Cases |
-| Pre-registration + config artifact | Research rigor | `capture_config()` + `save_config()` |
+| Pre-registration + config artifact | Research rigor | `capture_config()` + `save_config()` / `references/research-rigor.md` #3-#4 |
 | Sliding window drift monitoring | EDM/HAVOK best practice | `SVDResidualMonitor` (Secret 5) |
-| Exploratory vs confirmatory labeling | Research rigor | `AnalysisConfig.analysis_type` field |
+| Exploratory vs confirmatory labeling | Research rigor | `AnalysisConfig.analysis_type` field / `references/research-rigor.md` #7 |
 | mrDMD for multi-scale systems | Kutz/Fu/Brunton (2016) | Not implemented (separate method) |
 
 ## References

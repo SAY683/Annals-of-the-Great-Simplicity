@@ -10,9 +10,9 @@ Incorporates all 4 reviewer improvements:
 Produces: a plain-language dynamical interpretation of the game data.
 """
 
-import os, sys, warnings
+import os, tempfile, sys, warnings
 os.environ['MPLBACKEND'] = 'Agg'
-os.environ['MPLCONFIGDIR'] = os.path.join(os.getcwd(), '.matplotlib_cache')
+os.environ['MPLCONFIGDIR'] = os.path.join(tempfile.gettempdir(), 'edm_takens_mpl')
 os.environ['OMP_NUM_THREADS'] = '1'; os.environ['MKL_NUM_THREADS'] = '1'
 
 import numpy as np

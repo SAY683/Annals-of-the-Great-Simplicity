@@ -14,9 +14,9 @@ Verification Framework:
 Each level produces an agreement score. Total possible: 100 points.
 """
 
-import os, sys, warnings
+import os, tempfile, sys, warnings
 os.environ['MPLBACKEND'] = 'Agg'
-os.environ['MPLCONFIGDIR'] = os.path.join(os.getcwd(), '.matplotlib_cache')
+os.environ['MPLCONFIGDIR'] = os.path.join(tempfile.gettempdir(), 'edm_takens_mpl')
 os.environ['OMP_NUM_THREADS'] = '1'
 os.environ['MKL_NUM_THREADS'] = '1'
 

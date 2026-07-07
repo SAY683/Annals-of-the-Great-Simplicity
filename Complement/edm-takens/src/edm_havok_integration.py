@@ -7,9 +7,9 @@ HAVOK decomposition. Legacy module — prefer sovereign_havok.py
 for new work (continuous-time ODE, SG derivatives, adaptive SVD).
 """
 
-import os
+import os, tempfile
 os.environ['MPLBACKEND'] = 'Agg'
-os.environ['MPLCONFIGDIR'] = os.path.join(os.getcwd(), '.matplotlib_cache')
+os.environ['MPLCONFIGDIR'] = os.path.join(tempfile.gettempdir(), 'edm_takens_mpl')
 
 import numpy as np
 import pyEDM

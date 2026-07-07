@@ -160,11 +160,20 @@ def validate_environment(skill_root: str = None) -> EnvReport:
 
     # Check file integrity within skill folder
     report.file_checks.append(check_file(
-        "Core HAVOK engine",
+        "Sovereign HAVOK engine",
         os.path.join(src_dir, "sovereign_havok.py")))
+    report.file_checks.append(check_file(
+        "Path resolver",
+        os.path.join(src_dir, "_paths.py")))
     report.file_checks.append(check_file(
         "Auditor firewall",
         os.path.join(src_dir, "edm_auditor.py")))
+    report.file_checks.append(check_file(
+        "Unified pipeline",
+        os.path.join(src_dir, "pipeline.py")))
+    report.file_checks.append(check_file(
+        "Data routing engine",
+        os.path.join(src_dir, "router.py")))
     report.file_checks.append(check_file(
         "Cross-validation",
         os.path.join(src_dir, "enhanced_cross_validate.py")))
@@ -172,11 +181,20 @@ def validate_environment(skill_root: str = None) -> EnvReport:
         "Verification suite",
         os.path.join(src_dir, "verify_algorithms.py")))
     report.file_checks.append(check_file(
+        "EDM adaptive pipeline",
+        os.path.join(src_dir, "edm_adaptive_pipeline.py")))
+    report.file_checks.append(check_file(
         "Multiview + SVD monitor",
         os.path.join(src_dir, "multiview_svd_monitor.py")))
     report.file_checks.append(check_file(
         "Game interpretation",
         os.path.join(src_dir, "final_interpretation.py")))
+    report.file_checks.append(check_file(
+        "Sensitivity + config capture",
+        os.path.join(src_dir, "sensitivity_config.py")))
+    report.file_checks.append(check_file(
+        "Surrogate data testing",
+        os.path.join(src_dir, "surrogate_test.py")))
     report.file_checks.append(check_file(
         "Tau optimizer",
         os.path.join(src_dir, "edm_tau_optimization.py")))
@@ -186,6 +204,9 @@ def validate_environment(skill_root: str = None) -> EnvReport:
     report.file_checks.append(check_file(
         "SKILL.md",
         os.path.join(skill_root, "SKILL.md")))
+    report.file_checks.append(check_file(
+        "DESIGN.md",
+        os.path.join(skill_root, "DESIGN.md")))
     report.file_checks.append(check_file(
         "requirements.txt",
         os.path.join(skill_root, "requirements.txt")))

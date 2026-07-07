@@ -2,7 +2,7 @@
 
 These three counter-intuitive rules were discovered through repeated failure
 in real nonlinear dynamics and causality analysis. They are not taught in
-standard textbooks â€?they are learned the hard way.
+standard textbooks â€” they are learned the hard way.
 
 ## Secret 1: Lyapunov Horizon
 
@@ -52,7 +52,7 @@ which fails because X (as cause) does NOT carry Y's dynamics.
 To test "rainfall (X) affects rabbit population (Y)":
 1. Reconstruct M_Y from Y (rabbit time series)
 2. Cross-map: use nearest neighbors in M_Y to estimate X (rainfall)
-3. Compute prediction skill rho(X|M_Y) â€?this measures causal strength X->Y
+3. Compute prediction skill rho(X|M_Y) â€” this measures causal strength X->Y
 4. Cross-convergence: rho must INCREASE with library size L
 
 See also: Sugihara et al., "Detecting Causality in Complex Ecosystems", Science 2012.
@@ -71,7 +71,7 @@ SVD of a square or tall matrix (p ~ q or p < q) produces numerically
 degraded spectra with false mode coupling.
 
 ### The Golden Ratio
-**p >= 10 * q** â€?the matrix must be extremely flat/wide.
+**p >= 10 * q** â€” the matrix must be extremely flat/wide.
 
 ### Why This Matters
 - When p/q is too small, the left and right singular vectors become
@@ -92,17 +92,17 @@ degraded spectra with false mode coupling.
 A smaller embedding dimension with a well-conditioned SVD is FAR better
 than a larger embedding with a numerically broken regression.
 
-## Secret 4: Multiview Embedding ¡ª Saving Short Data from Starvation
-### (My Feasibility Rating: HIGHEST ¡ª Strongly Recommended)
+## Secret 4: Multiview Embedding â€” Saving Short Data from Starvation
+### (My Feasibility Rating: HIGHEST â€” Strongly Recommended)
 
 Source: Sugihara et al., Science 2016. pyEDM implementation: pyEDM.Multiview()
 
-**The Problem** ¡ª When N < 100, single-variable delay embedding wastes precious data as delay padding. For N=60 and E=5, only ~40 embedding vectors remain. You are starving your own analysis.
+**The Problem** â€” When N < 100, single-variable delay embedding wastes precious data as delay padding. For N=60 and E=5, only ~40 embedding vectors remain. You are starving your own analysis.
 
-**The Solution** ¡ª Use SPATIAL diversity (multiple observed variables) instead of TEMPORAL delay. With K correlated variables, Multiview produces K-choose-E candidate models and selects the best by out-of-sample prediction skill.
+**The Solution** â€” Use SPATIAL diversity (multiple observed variables) instead of TEMPORAL delay. With K correlated variables, Multiview produces K-choose-E candidate models and selects the best by out-of-sample prediction skill.
 
-  V_delay(t) = [X(t), X(t-1), X(t-2), X(t-3)]          ¡ª 3 delays, 4D
-  V_multiview(t) = [X(t), Y(t), Z(t), X(t-1)]            ¡ª 3 variables + 1 delay
+  V_delay(t) = [X(t), X(t-1), X(t-2), X(t-3)]          â€” 3 delays, 4D
+  V_multiview(t) = [X(t), Y(t), Z(t), X(t-1)]            â€” 3 variables + 1 delay
 
 **When to use:**
 - Short data (N < 100) with multiple observed correlated variables
@@ -114,17 +114,17 @@ Source: Sugihara et al., Science 2016. pyEDM implementation: pyEDM.Multiview()
   pyEDM.Multiview(dataFrame=df, E=3, columns=['kills','damage','deaths'],
                   target='result', lib='1 25', pred='26 32')
 
-## Secret 5: SVD Reconstruction Residual ¡ª Attractor Deformation Alarm
-### (My Feasibility Rating: HIGH ¡ª Adopt with Caveats)
+## Secret 5: SVD Reconstruction Residual â€” Attractor Deformation Alarm
+### (My Feasibility Rating: HIGH â€” Adopt with Caveats)
 
-**The Concept** ¡ª Monitor the normalized truncated SVD reconstruction residual:
+**The Concept** â€” Monitor the normalized truncated SVD reconstruction residual:
   Residual = ||H - U_r * diag(Sigma_r) * V_r^T||_F / ||H||_F
 
-When the system undergoes a regime shift (attractor dissolving), the old SVD basis (U_r, V_r from original fit) cannot span the new dynamics ¡ª the residual jumps.
+When the system undergoes a regime shift (attractor dissolving), the old SVD basis (U_r, V_r from original fit) cannot span the new dynamics â€” the residual jumps.
 
-**Detection Rule** ¡ª Residual > 2.5x running_mean for 3 consecutive windows -> alarm
+**Detection Rule** â€” Residual > 2.5x running_mean for 3 consecutive windows -> alarm
 
-**Action** ¡ª Drop oldest 50% of Hankel data, re-fit SVD on remaining window
+**Action** â€” Drop oldest 50% of Hankel data, re-fit SVD on remaining window
 
 **My Caveats (critical for correct implementation):**
 1. The 50% drop is HEURISTIC. Better approach: use an F-test for structural break to find the optimal cutoff.
@@ -133,13 +133,13 @@ When the system undergoes a regime shift (attractor dissolving), the old SVD bas
 4. Not applicable when deformation evolves faster than the embedding window size.
 5. SovereignHAVOK users: add this to your fit() loop as an is_valid_ check.
 
-## Secret 6: CCM Arrow Trap ¡ª Code-Level Direction Enforcement
-### (Merged into Secret 2 ¡ª Enhancement, not new rule)
+## Secret 6: CCM Arrow Trap â€” Code-Level Direction Enforcement
+### (Merged into Secret 2 â€” Enhancement, not new rule)
 
 The CCM Victim Mirror Principle (Secret 2) is correct. This is an implementation
 note for automated pipelines:
 
-  pyEDM.CCM(columns='Y', target='X') ¡ª measures X's influence on Y
+  pyEDM.CCM(columns='Y', target='X') â€” measures X's influence on Y
   CONVERGING CCM(Y->X) with L + non-converging CCM(X->Y) -> X causes Y
   Both converge -> bidirectional coupling or common driver
   Neither converges -> no causal relationship
