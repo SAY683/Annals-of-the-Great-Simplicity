@@ -216,19 +216,29 @@ correlation — is fully integrated into Secret 2's implementation:
 
 | # | Secret | Adoption | Firewall | Blocks Execution? | Data Requirement |
 |---|--------|----------|----------|-------------------|------------------|
-| 1 | Lyapunov Horizon | 🔶 DEFERRED | WARN/FAIL | Only if violated | N >= 100 |
+| 1 | Lyapunov Horizon | 🔶 DEFERRED (N≥100) | WARN/FAIL | Only if violated | N >= 100 |
+|   |                    | 🆕 SURROGATE-LB   | Advisory  | No               | N >= 30 |
 | 2 | CCM Victim Mirror | ✅ ADOPTED | WARN | No (advisory) | N >= 30 |
+|   | (convergence)     | ✅ UPGRADED | WARN | total_rise+Spearman | Always |
 | 3 | Hankel Ratio | ✅ ADOPTED | FAIL (p/q<3) | Yes (critical) | Always active |
-| 4 | Multiview | ⚠️ PARTIAL | Advisory | Never | N < 100, K >= 2 |
+|   | (DRY unified)     | ✅ FIXED | shared classify_hankel_ratio() | | |
+| 4 | Multiview | ✅ ADOPTED | Advisory | Never | N < 100, K >= 2 |
+|   | (numpy fallback)  | ✅ ADDED | SVD-spatial embedding | | Always |
 | 5 | SVD Residual | ✅ ADOPTED | FAIL (>2.5x) | Yes (sustained) | N >= 50 per window |
 | 6 | Cross-Validation | ✅ ADOPTED | WARN | No (diagnostic) | Always active |
 | 7 | Arrow Trap | ✅ (merged) | WARN | No (advisory) | Always active |
+| - | Tau Selection     | 🆕 NEW | WARN/FAIL | Window > 50% N | Always active |
+| - | Config Artifact   | 🆕 NEW | Auto-save | No | Always active |
+| - | pyEDM Fallback    | 🆕 NEW | _edm_bridge | No | Always active |
+| - | HAVOK Eigenvalue  | 🆕 FIXED | discrete eig_d | No | Always active |
 
 ## Adoption Rates
 
 - **Fully Adopted**: 5/7 (Secrets 2, 3, 5, 6, 7)
-- **Partially Adopted**: 1/7 (Secret 4 — environment constraint)
-- **Deferred**: 1/7 (Secret 1 — data constraint, auto-activates at N>=100)
+- **Secret 4 Upgraded**: Multiview now has numpy SVD fallback (no longer pyEDM-dependent)
+- **Secret 1 Enhanced**: Surrogate-based lower bound for N<100
+- **New Guardians**: Tau selection audit, config artifact auto-save, pyEDM graceful fallback
+- **Bug Fixes**: HAVOK eigenvalue continuous→discrete, CCM convergence scale-invariant, Hankel DRY
 - **Rejected**: 0/7
 
 **Overall adoption**: 6/7 secrets have working code. The 1 deferred secret

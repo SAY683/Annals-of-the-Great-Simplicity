@@ -17,7 +17,7 @@ os.environ['OMP_NUM_THREADS'] = '1'; os.environ['MKL_NUM_THREADS'] = '1'
 
 import numpy as np
 import pandas as pd
-from scipy.stats import kurtosis as scipy_kurtosis, linregress
+from scipy.stats import kurtosis as scipy_kurtosis, linregress, spearmanr
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
@@ -61,28 +61,32 @@ def ccm_with_convergence(df, cause_var, effect_var, E):
             rhos = ccm[rho_col].values
             lib_sizes = ccm['LibSize'].values
 
-            # Convergence slope (linear fit of rho vs libSize)
+            # Convergence: use total rise (scale-invariant) + Spearman monotonicity
+            # Absolute slope depends on library size range and is not comparable
+            # across datasets of different lengths (N=32 vs N=5000).
             if len(rhos) >= 3:
-                slope, intercept, r_value, p_value, std_err = linregress(
-                    lib_sizes, rhos)
+                total_rise = float(rhos[-1] - rhos[0])
+                spear_rho, spear_p = spearmanr(lib_sizes, rhos)
                 final_rho = rhos[-1]
-                is_converging = slope > 0.001 and r_value > 0.7
+                is_converging = total_rise > 0.05 and spear_rho > 0.7 and spear_p < 0.1
             else:
-                slope = 0; r_value = 0; final_rho = rhos[-1] if len(rhos) > 0 else 0
+                total_rise = 0.0; spear_rho = 0.0; spear_p = 1.0
+                final_rho = rhos[-1] if len(rhos) > 0 else 0
                 is_converging = False
 
             results[direction] = {
                 'final_rho': final_rho,
-                'convergence_slope': slope,
-                'convergence_r2': r_value**2,
+                'total_rise': total_rise,
+                'spearman_rho': spear_rho,
+                'spearman_p': spear_p,
                 'is_converging': is_converging,
                 'lib_sizes': lib_sizes.tolist(),
                 'rhos': rhos.tolist(),
             }
         except Exception as e:
             results[direction] = {
-                'final_rho': None, 'convergence_slope': None,
-                'convergence_r2': None, 'is_converging': False,
+                'final_rho': None, 'total_rise': None,
+                'spearman_rho': None, 'is_converging': False,
                 'error': str(e)
             }
 
@@ -204,6 +208,162 @@ def estimate_lyapunov_robust(data, E, dt=1.0):
 
 
 # ================================================================
+# Surrogate-based Lyapunov Lower Bound (for N < 100)
+# ================================================================
+
+def estimate_lyapunov_lower_bound(data, E, dt=1.0, n_surrogates=19,
+                                   seed=42):
+    """Estimate a conservative lower bound on Lyapunov exponent.
+
+    When N < 100, the standard Rosenstein algorithm is unreliable for
+    point estimation of lambda_max. However, we CAN use IAAFT surrogate
+    data to establish a lower bound:
+
+      1. Generate IAAFT surrogates (same spectrum/distribution, no
+         nonlinear phase coupling → effectively linear null)
+      2. Compute divergence rate on each surrogate
+      3. If real data's divergence rate exceeds the 95th percentile
+         of surrogates, we have evidence of nonlinear exponential
+         divergence at a rate at least equal to the real estimate
+
+    This transforms "lambda_max is unreliable" into "the Lyapunov time
+    is AT MOST tau_L games" (conservative, useful bound).
+
+    Parameters
+    ----------
+    data : np.ndarray
+        Time series.
+    E : int
+        Embedding dimension.
+    dt : float
+        Sampling interval.
+    n_surrogates : int
+        Number of IAAFT surrogates (19 for p<0.05, 99 for p<0.01).
+    seed : int
+        Random seed.
+
+    Returns
+    -------
+    dict with: lambda_lower_bound, tau_L_upper_bound, surrogate_p95,
+               is_significant, n_surrogates, real_estimate, real_estimate_reliable
+    """
+    from surrogate_test import iaaft_surrogates
+
+    data = np.asarray(data, dtype=float).ravel()
+    n = len(data)
+    N = n - E + 1
+
+    if N < 20:
+        return {
+            'lambda_lower_bound': None,
+            'tau_L_upper_bound': None,
+            'surrogate_p95': None,
+            'is_significant': False,
+            'n_surrogates': 0,
+            'real_estimate': None,
+            'real_estimate_reliable': False,
+            'warning': f'Too few state-space points (N={N}) for any estimate'
+        }
+
+    # Get real data estimate
+    real_est = estimate_lyapunov_robust(data, E, dt)
+
+    # Simple divergence rate metric (doesn't require stable linear region)
+    def _divergence_rate_metric(d):
+        """Fast divergence metric: log of mean pairwise distance growth."""
+        d = np.asarray(d, dtype=float).ravel()
+        n_local = len(d)
+        N_local = n_local - E + 1
+        X = np.zeros((N_local, E))
+        for i in range(E):
+            X[:, i] = d[i:i + N_local]
+
+        # Track median neighbor distance over first few steps
+        grow_rates = []
+        n_pairs = min(30, N_local // 2)
+        for _ in range(10):  # bootstrap samples
+            idx = np.random.choice(N_local - 10, size=min(n_pairs, N_local - 10),
+                                   replace=False)
+            distances = []
+            for i in idx:
+                # Find nearest neighbor
+                dists = np.sum((X[:N_local - 5] - X[i]) ** 2, axis=1)
+                dists[max(0, i - 3):min(len(dists), i + 4)] = np.inf
+                j = np.argmin(dists)
+                if np.isinf(dists[j]):
+                    continue
+                d0 = np.sqrt(np.sum((X[i] - X[j]) ** 2))
+                # Growth after 5 steps
+                if i + 5 < N_local and j + 5 < N_local:
+                    d5 = np.sqrt(np.sum((X[i + 5] - X[j + 5]) ** 2))
+                    if d0 > 1e-12 and d5 > 1e-12:
+                        distances.append(np.log(d5 / d0) / (5 * dt))
+
+            if distances:
+                grow_rates.append(np.median(distances))
+
+        if grow_rates:
+            return max(0.001, np.median(grow_rates))
+        return 0.001
+
+    # Generate surrogates and compute metric
+    try:
+        surrs = iaaft_surrogates(data, n_surrogates=n_surrogates,
+                                 seed=seed, max_iter=20)
+        surrogate_rates = []
+        for s in range(len(surrs)):
+            rate = _divergence_rate_metric(surrs[s])
+            if not np.isnan(rate) and rate > 0:
+                surrogate_rates.append(rate)
+
+        if len(surrogate_rates) < 3:
+            return {
+                'lambda_lower_bound': real_est.get('lambda_max'),
+                'tau_L_upper_bound': real_est.get('lyapunov_time'),
+                'surrogate_p95': None,
+                'is_significant': False,
+                'n_surrogates': len(surrogate_rates),
+                'real_estimate': real_est.get('lambda_max'),
+                'real_estimate_reliable': real_est.get('reliable', False),
+                'warning': 'Surrogate generation failed — insufficient surrogates'
+            }
+
+        surrogate_p95 = float(np.percentile(surrogate_rates, 95))
+        real_rate = _divergence_rate_metric(data)
+
+        # Is real data's divergence significantly higher?
+        is_sig = real_rate > surrogate_p95
+        # Lower bound: max(real_rate, 0) — conservative
+        lb = max(real_rate, 0.001)
+        tau_ub = 1.0 / lb if lb > 0 else float('inf')
+
+        return {
+            'lambda_lower_bound': lb,
+            'tau_L_upper_bound': tau_ub,
+            'surrogate_p95': surrogate_p95,
+            'is_significant': is_sig,
+            'n_surrogates': len(surrogate_rates),
+            'real_estimate': real_est.get('lambda_max'),
+            'real_estimate_reliable': real_est.get('reliable', False),
+            'warning': None if is_sig else
+                'Divergence rate not significantly above linear null. '
+                'Cannot establish Lyapunov lower bound.'
+        }
+
+    except Exception as e:
+        return {
+            'lambda_lower_bound': real_est.get('lambda_max'),
+            'tau_L_upper_bound': real_est.get('lyapunov_time'),
+            'surrogate_p95': None,
+            'is_significant': False,
+            'n_surrogates': 0,
+            'real_estimate': real_est.get('lambda_max'),
+            'real_estimate_reliable': real_est.get('reliable', False),
+            'warning': f'Surrogate computation failed: {e}'
+        }
+
+
+# ================================================================
 # Comprehensive Game Data Interpretation
 # ================================================================
 
@@ -276,12 +436,18 @@ def interpret_game_data():
         forcing_energy = np.var(forcing) / (np.var(data) + 1e-10)
 
         # Koopman eigenvalues
-        evals = sh.eigenvalues_
-        growth = np.sort(np.abs(evals))[::-1]
+        evals_d = sh.eigenvalues_d_  # discrete-time for stability
+        growth = np.sort(np.abs(evals_d))[::-1]
         max_ev = growth[0] if len(growth) > 0 else 0
 
         # Lyapunov (with R^2 check — Improvement #1)
         lyap = estimate_lyapunov_robust(data, E_opt)
+
+        # If unreliable and N < 100, try surrogate-based lower bound
+        lyap_lower = None
+        if not lyap.get('reliable') and n < 100:
+            lyap_lower = estimate_lyapunov_lower_bound(data, E_opt,
+                                                       n_surrogates=19)
 
         # CCM (with convergence check — Improvement #2)
         ccm_result = None
@@ -296,7 +462,7 @@ def interpret_game_data():
         print(f"    EDM: E={E_opt}, Simplex_rho={rho_s:.3f}, "
               f"S-Map nonlinear={is_nl} (theta_max={smap.loc[smap['rho'].idxmax(), 'theta']:.1f})")
         print(f"    HAVOK: r={sh.r_}, R^2={sh.regression_r2_:.3f}, "
-              f"max|eig|={max_ev:.4f}")
+              f"max|eig_d|={max_ev:.4f}")
         print(f"    Forcing: kurtosis={sh.kurtosis_vr_:.3f}, "
               f"energy_ratio={forcing_energy:.1%}, "
               f"spikes={len(spike_idx)}")
@@ -309,6 +475,15 @@ def interpret_game_data():
                   f"tau_L={lyap['lyapunov_time']:.1f} games, "
                   f"3*tau_L={lyap['prediction_horizon_3x']:.1f} games "
                   f"(fit R^2={lyap['fit_r2']:.3f})")
+        elif lyap_lower and lyap_lower.get('is_significant'):
+            print(f"    Lyapunov: UNRELIABLE (R^2={lyap.get('fit_r2', 0):.3f} < 0.5)")
+            print(f"    Surrogate LB: lambda > {lyap_lower['lambda_lower_bound']:.4f}, "
+                  f"tau_L < {lyap_lower['tau_L_upper_bound']:.1f} games "
+                  f"(p={1/(lyap_lower['n_surrogates']+1):.3f})")
+        elif lyap_lower and not lyap_lower.get('is_significant'):
+            print(f"    Lyapunov: UNRELIABLE + not significant vs linear null")
+            print(f"    => Cannot distinguish from linear stochastic. "
+                  f"System may not be chaotic at this scale.")
         else:
             print(f"    Lyapunov: {lyap.get('reason', lyap.get('warning', 'N/A'))}")
 
@@ -333,7 +508,7 @@ def interpret_game_data():
             'expl_var': sh.explained_var_, 'hk_ratio': hk_ratio,
             'forcing_energy': forcing_energy,
             'spike_count': len(spike_idx), 'spike_idx': spike_idx,
-            'lyap': lyap, 'ccm': ccm_result,
+            'lyap': lyap, 'lyap_lower': lyap_lower, 'ccm': ccm_result,
         }
 
     # ── Phase 2: CCM Causality Report ──
@@ -355,15 +530,15 @@ def interpret_game_data():
         print(f"      Forward  (M_{effect_h} -> {cause_h}): "
               f"rho={fwd['final_rho']:+.3f}" if fwd['final_rho'] else
               f"      Forward: FAILED",
-              f", slope={fwd['convergence_slope']:+.4f}"
-              if fwd['convergence_slope'] else "",
+              f", rise={fwd['total_rise']:+.4f}"
+              if fwd.get('total_rise') is not None else "",
               f", converging={fwd['is_converging']}"
               if fwd.get('is_converging') is not None else "")
         print(f"      Reverse  (M_{cause_h} -> {effect_h}): "
               f"rho={rev['final_rho']:+.3f}" if rev['final_rho'] else
               f"      Reverse: FAILED",
-              f", slope={rev['convergence_slope']:+.4f}"
-              if rev['convergence_slope'] else "",
+              f", rise={rev['total_rise']:+.4f}"
+              if rev.get('total_rise') is not None else "",
               f", converging={rev['is_converging']}"
               if rev.get('is_converging') is not None else "")
         print(f"      => {ccm_r['verdict']}")
@@ -385,7 +560,7 @@ def interpret_game_data():
     for v in variables:
         ev = all_data[v]['max_ev']
         half_life = np.log(2) / (1 - ev + 1e-12) if ev < 1 else float('inf')
-        print(f"    {var_labels[v]:10s}: max|eig| = {ev:.4f}  "
+        print(f"    {var_labels[v]:10s}: max|eig_d| = {ev:.4f}  "
               f"(perturbation half-life: ~{half_life:.1f} games)")
 
     print(f"\n  INTERPRETATION: Your game dynamics form a STABLE ATTRACTOR.")
@@ -584,14 +759,14 @@ def _plot_interpretation(df, all_data):
             ax1.set_title(f'Forcing v_r (kurt={sh.kurtosis_vr_:+.2f})', fontsize=10)
             ax1.grid(True, alpha=0.2)
 
-            # Eigenvalue spectrum
+            # Koopman spectrum: continuous eigenvalues (Re(λ), Im(λ)) for spectral shape
             ax2 = fig.add_subplot(inner[1, 0])
-            evals = sh.eigenvalues_
-            ax2.scatter(np.real(evals), np.imag(evals), c=color, s=60, zorder=5)
+            evals_cont = sh.eigenvalues_  # continuous-time for spectral visualization
+            ax2.scatter(np.real(evals_cont), np.imag(evals_cont), c=color, s=60, zorder=5)
             theta = np.linspace(0, 2*np.pi, 100)
             ax2.plot(np.cos(theta), np.sin(theta), 'k--', alpha=0.3, linewidth=1)
             ax2.axhline(0, color='gray', alpha=0.2); ax2.axvline(0, color='gray', alpha=0.2)
-            ax2.set_title(f'Koopman spectrum (max|eig|={np.max(np.abs(evals)):.3f})',
+            ax2.set_title(f'Koopman spectrum (max|eig_d|={np.max(np.abs(sh.eigenvalues_d_)):.3f})',
                          fontsize=10)
             ax2.set_aspect('equal')
             ax2.grid(True, alpha=0.2)
@@ -605,7 +780,7 @@ def _plot_interpretation(df, all_data):
                 f"HAVOK R^2   = {d['havok_r2']:.3f}",
                 f"Expl var    = {d['expl_var']:.1%}",
                 f"Kurtosis    = {d['kurtosis']:+.3f}",
-                f"Max |eig|   = {d['max_ev']:.4f}",
+                f"Max |eig_d|  = {d['max_ev']:.4f}",
                 f"Spikes      = {d['spike_count']}",
                 f"SG window   = {min(11, max(5, (len(data)-d['E'])//4))}",
                 "",

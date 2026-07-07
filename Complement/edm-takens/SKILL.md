@@ -61,6 +61,16 @@ ccm_with_convergence(df, 'kills', 'result', E_opt)
 
 ## Pipeline Architecture
 
+**Design note — shared embedding dimension**: The pipeline uses a single
+embedding dimension (q for HAVOK, E for EDM) for cross-validation consistency.
+EDM's optimal E (from Simplex rho peak / FNN threshold) and HAVOK's optimal q
+(from Hankel ratio + energy cutoff) are optimized for different objectives and
+are NOT guaranteed to coincide mathematically. The shared dimension is a
+simplifying assumption that enables fair EDM-vs-HAVOK comparison. For exploratory
+analysis this is the correct default; for publication-grade results, consider
+running sensitivity scans at E±1 and reporting stability (see
+`sensitivity_config.py` and `references/research-rigor.md` #5).
+
 ```
  [Raw Data]
       |
@@ -68,6 +78,7 @@ ccm_with_convergence(df, 'kills', 'result', E_opt)
       |
  [Auditor Firewall] ─── src/edm_auditor.py (PRE-EXECUTION GATE)
       |                   Enforces all 7 secrets. Blocks invalid configs.
+      |                   NOW INCLUDES: tau selection validation.
  [tau Optimization] ─── src/edm_tau_optimization.py (AMI-based)
       |
  [E Optimization]  ─── pyEDM.EmbedDimension + FNN cross-check
@@ -86,7 +97,7 @@ ccm_with_convergence(df, 'kills', 'result', E_opt)
  [Cross-Validation] ── src/enhanced_cross_validate.py (3 safeguards)
       |                + src/verify_algorithms.py (5-level, 100-pt scored)
       |
- [CCM Causality]  ── ccm_with_convergence() with slope check
+ [CCM Causality]  ── ccm_with_convergence() with convergence slope check
       |              + Multiview if N<100 (src/multiview_svd_monitor.py)
       |              + SVD residual monitor for concept drift
       v
@@ -101,23 +112,32 @@ edm-takens/                          ← Self-contained skill folder
 ├── DESIGN.md                        ← Design philosophy & business logic
 ├── requirements.txt                 ← Pip-freeze version manifest
 ├── secret_adoption_audit.md         ← Adoption/deferral status of all 7 secrets
-├── src/                             ← All Python source (16 modules)
+├── src/                             ← All Python source (19 modules)
 │   ├── __init__.py
 │   ├── _paths.py                    ← Portable path resolution
+│   ├── _numpy_edm.py                ← [NEW] Pure numpy/scipy EDM: Simplex,
+│   │                                     S-Map, CCM, EmbedDim, Multiview
+│   ├── _edm_bridge.py               ← [NEW] Unified import: pyEDM with
+│   │                                     graceful numpy fallback
 │   ├── sovereign_havok.py           ← Core HAVOK engine
 │   ├── edm_auditor.py               ← Firewall: 7-secret pre-execution enforcement
+│   │                                     (includes tau audit, Hankel DRY fix)
 │   ├── enhanced_cross_validate.py   ← EDM-HAVOK cross-validation + 3 safeguards
 │   ├── verify_algorithms.py         ← 5-level scored verification (100 pts)
 │   ├── final_interpretation.py      ← Game data dynamical interpretation
+│   │                                     (includes Lyapunov lower bound for N<100)
 │   ├── multiview_svd_monitor.py     ← Secret 4 (Multiview) + Secret 5 (SVD monitor)
+│   │                                     (includes numpy fallback for Multiview)
 │   ├── pipeline.py                  ← Unified pipeline runner logic
-│   ├── router.py                    ← Data routing engine: grade→target→auto-execute (6 scenarios)
+│   │                                     (auto-saves config artifact)
+│   ├── router.py                    ← Data routing engine: grade→target→auto-execute
 │   ├── environment_check.py         ← Dependency + file integrity validation
 │   ├── edm_tau_optimization.py      ← AMI-based optimal tau selection
 │   ├── edm_adaptive_pipeline.py     ← tau -> E -> theta -> CCM pipeline
 │   ├── sensitivity_config.py        ← Config capture + sensitivity scan (E+/-1)
 │   ├── surrogate_test.py            ← IAAFT surrogate data statistical testing
-│   └── edm_havok_integration.py     ← [DEPRECATED] 已废弃，不参与活跃管道。功能由 sovereign_havok.py + edm_adaptive_pipeline.py 完全覆盖，保留仅供历史参考。
+│   └── edm_havok_integration.py     ← [DEPRECATED] 功能由 sovereign_havok.py +
+│                                         edm_adaptive_pipeline.py 完全覆盖
 ├── tests/
 │   ├── __init__.py                  ← Test package marker
 │   └── test_havok.py                ← 9-class HAVOK algorithm test suite
@@ -130,7 +150,8 @@ edm-takens/                          ← Self-contained skill folder
     ├── takens_embedding_reference.md ← Mathematical foundations
     ├── forbidden_rules_reference.md  ← Seven forbidden rules (full treatment)
     ├── edge_cases_reference.md       ← Data regime mitigations
-    └── research-rigor.md             ← Research integrity: pre-registration, config artifact, sensitivity, controls
+    └── research-rigor.md             ← Research integrity: pre-registration,
+                                         config artifact, sensitivity, controls
 ```
 
 ## Seven Enforced Secrets
@@ -139,6 +160,7 @@ edm-takens/                          ← Self-contained skill folder
 |---|--------|----------|----------|------------------|
 | 1 | Lyapunov Horizon | 🔶 DEFERRED | WARN/FAIL | N >= 100 |
 | 2 | CCM Victim Mirror + Arrow Trap | ✅ ADOPTED | WARN | N >= 30 |
+|   | (convergence slope enforced)    | ✅ UPGRADED | WARN | slope+Spearman |
 | 3 | Hankel Golden Ratio (p>=10q) | ✅ ADOPTED | FAIL (p/q<3) | Always active |
 | 4 | Multiview Embedding | ⚠️ PARTIAL | Advisory | N<100, K>=2 |
 | 5 | SVD Residual Monitor | ✅ ADOPTED | FAIL (>2.5x) | N>=50/window |
@@ -201,11 +223,15 @@ result = run_pipeline(config, auto_fix=True)
 | # | Improvement | File | Status |
 |---|------------|------|--------|
 | 1 | Lyapunov R^2 quality check | src/final_interpretation.py, src/edm_auditor.py | Done |
-| 2 | CCM convergence slope check | src/final_interpretation.py: ccm_with_convergence() | Done |
-| 3 | Hankel ratio audit | Already robust | Confirmed |
+| 2 | CCM convergence slope → total_rise + Spearman | src/final_interpretation.py: ccm_with_convergence() | Done |
+| 2b | CCM convergence audit unification | src/edm_auditor.py: audit_ccm_direction() | Done |
+| 3 | Hankel ratio DRY (shared classify_hankel_ratio) | src/edm_auditor.py, src/enhanced_cross_validate.py | Done |
 | 4 | SG window auto-cap for small data | src/sovereign_havok.py: _apply_sg_derivative() | Done |
 | 5 | Multiview integration | src/multiview_svd_monitor.py | Done (env-limited) |
 | 6 | SVD residual monitoring | src/multiview_svd_monitor.py: SVDResidualMonitor | Done |
+| 7 | HAVOK eigenvalue stability (continuous→discrete) | src/sovereign_havok.py: eigenvalues_d_ via expm(A*dt) | Done |
+| 8 | Tau selection audit (was dead parameter) | src/edm_auditor.py: audit_tau_selection() | Done |
+| 9 | q/E shared-dimension documented | SKILL.md | Done |
 
 ## Data Readiness Routing
 

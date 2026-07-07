@@ -96,19 +96,19 @@ class GroundTruthTests:
         # Criteria for sine:
         # - Near-Gaussian forcing (kurtosis near 0)
         # - High explained variance (>95%)
-        # - Stable eigenvalues (max |eig| near 1)
+        # - Stable eigenvalues (|λ_d| ≈ 1 for pure oscillation, < 2.0 safe)
         checks = []
         checks.append(("Kurtosis near 0", abs(sh.kurtosis_vr_) < 1.0))
         checks.append(("High expl variance", sh.explained_var_ > 0.95))
         checks.append(("Stable/dissipative eig",
-                       np.max(np.abs(sh.eigenvalues_)) < 2.0))
+                       np.max(np.abs(sh.eigenvalues_d_)) < 2.0))
 
         passed = sum(1 for _, ok in checks if ok)
         score = passed * 2
         self.score += score
 
         print(f"    kurt={sh.kurtosis_vr_:.3f}, expl_var={sh.explained_var_:.1%}, "
-              f"max|eig|={np.max(np.abs(sh.eigenvalues_)):.3f}")
+              f"max|eig_d|={np.max(np.abs(sh.eigenvalues_d_)):.3f}")
         for name, ok in checks:
             print(f"    {'[OK]' if ok else '[FAIL]'} {name}")
         print(f"    Score: {score}/6")
@@ -152,12 +152,12 @@ class GroundTruthTests:
         # Criteria for Lorenz:
         # - Heavy-tailed forcing (kurtosis > 1.5)
         # - Moderate-to-high explained variance (>90%)
-        # - At least one eigenvalue near/above 1
+        # - Near-critical discrete eigenvalues (|λ_d| > 0.95 for chaotic)
         checks = []
         checks.append(("Heavy-tailed kurtosis > 1.5", sh.kurtosis_vr_ > 1.5))
         checks.append(("Explained variance > 90%", sh.explained_var_ > 0.90))
         checks.append(("Divergent/near-critical eig",
-                       np.max(np.abs(sh.eigenvalues_)) > 0.95))
+                       np.max(np.abs(sh.eigenvalues_d_)) > 0.95))
 
         if edm_nonlinear is not None:
             checks.append(("EDM confirms nonlinear",
@@ -168,7 +168,7 @@ class GroundTruthTests:
         self.score += score
 
         print(f"    kurt={sh.kurtosis_vr_:.3f}, expl_var={sh.explained_var_:.1%}, "
-              f"max|eig|={np.max(np.abs(sh.eigenvalues_)):.3f}, r={sh.r_}")
+              f"max|eig_d|={np.max(np.abs(sh.eigenvalues_d_)):.3f}, r={sh.r_}")
         if edm_nonlinear is not None:
             print(f"    EDM nonlinear={edm_nonlinear}")
         for name, ok in checks:
@@ -231,17 +231,17 @@ class GroundTruthTests:
 
         # AR(1) criteria:
         # - Near-Gaussian kurtosis (linear stochastic)
-        # - Dissipative eigenvalues (|eig| < 1)
+        # - Dissipative discrete eigenvalues (|λ_d| < 1)
         # - Moderate explained variance (stochastic component can't be captured)
         checks = []
         checks.append(("Near-Gaussian kurtosis", abs(sh.kurtosis_vr_) < 2.0))
-        checks.append(("Dissipative", np.max(np.abs(sh.eigenvalues_)) < 1.0))
+        checks.append(("Dissipative", np.max(np.abs(sh.eigenvalues_d_)) < 1.0))
 
         passed = sum(1 for _, ok in checks if ok)
         score = passed * 2
         self.score += score
 
-        print(f"    kurt={sh.kurtosis_vr_:.3f}, max|eig|={np.max(np.abs(sh.eigenvalues_)):.3f}")
+        print(f"    kurt={sh.kurtosis_vr_:.3f}, max|eig_d|={np.max(np.abs(sh.eigenvalues_d_)):.3f}")
         for name, ok in checks:
             print(f"    {'[OK]' if ok else '[FAIL]'} {name}")
         print(f"    Score: {score}/4")
@@ -265,11 +265,11 @@ class GroundTruthTests:
         # But we fit dv/dt = A*v + B*v_r in normalized/SVD space, so eigenvalues
         # won't directly match. Instead check:
         # - Low kurtosis (no intermittent forcing)
-        # - Stable eigenvalues (system converges)
+        # - Stable discrete eigenvalues (|λ_d| < 1 for convergent system)
         checks = []
         checks.append(("Low kurtosis", abs(sh.kurtosis_vr_) < 1.5))
         checks.append(("Stable/dissipative eigs",
-                      np.max(np.abs(sh.eigenvalues_)) < 1.0))
+                      np.max(np.abs(sh.eigenvalues_d_)) < 1.0))
         checks.append(("High expl variance (linear = simple structure)",
                       sh.explained_var_ > 0.85))
 
@@ -277,7 +277,7 @@ class GroundTruthTests:
         score = passed * 2
         self.score += score
 
-        print(f"    kurt={sh.kurtosis_vr_:.3f}, max|eig|={np.max(np.abs(sh.eigenvalues_)):.3f}, "
+        print(f"    kurt={sh.kurtosis_vr_:.3f}, max|eig_d|={np.max(np.abs(sh.eigenvalues_d_)):.3f}, "
               f"expl_var={sh.explained_var_:.1%}")
         for name, ok in checks:
             print(f"    {'[OK]' if ok else '[FAIL]'} {name}")
@@ -591,9 +591,9 @@ class InternalConsistencyTests:
         # Similar kurtosis
         checks.append(("Similar kurtosis",
                       abs(sh_v.kurtosis_vr_ - sh_u.kurtosis_vr_) < 0.3))
-        # Similar eigenvalues
-        ev_v = np.sort(np.abs(sh_v.eigenvalues_))
-        ev_u = np.sort(np.abs(sh_u.eigenvalues_))
+        # Similar eigenvalues (discrete-time for stability comparison)
+        ev_v = np.sort(np.abs(sh_v.eigenvalues_d_))
+        ev_u = np.sort(np.abs(sh_u.eigenvalues_d_))
         checks.append(("Similar eigenvalues",
                       len(ev_v) == len(ev_u) and
                       np.max(np.abs(ev_v - ev_u)) < 0.1))
@@ -785,7 +785,7 @@ class GameDataVerification:
                 'edm_nl': is_nl, 'havok_kurt': sh.kurtosis_vr_,
                 'havok_r': sh.r_, 'havok_expl_var': sh.explained_var_,
                 'havok_r2': sh.regression_r2_,
-                'max_eig': np.max(np.abs(sh.eigenvalues_)),
+                'max_eig': np.max(np.abs(sh.eigenvalues_d_)),
                 'hankel_ratio': ratio,
             })
 

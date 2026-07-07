@@ -25,6 +25,9 @@ try:
 except Exception:
     _PYEDM = False
 
+# Pure numpy Multiview fallback (SVD-based spatial embedding)
+from _numpy_edm import Multiview as _np_Multiview
+
 
 def run_multiview_analysis(df, columns, target, lib, pred, E_max=5):
     """
@@ -78,44 +81,70 @@ def run_multiview_analysis(df, columns, target, lib, pred, E_max=5):
             results['single_var'][col] = {'method': 'Simplex', 'rho': None, 'error': str(e)}
 
     # Multiview: use all columns jointly
+    mv_ok = False
     try:
-        mv = pyEDM.Multiview(
-            dataFrame=df, lib=lib, pred=pred,
-            E=E_max, Tp=1,
-            columns=columns, target=target,
-            showPlot=False)
-        if hasattr(mv, 'columns'):
-            # Multiview returns a DataFrame with multiple candidate models
-            best_rho = -1
-            best_cols = None
-            best_E = None
-            mv_models = []
-            for _, row in mv.iterrows():
-                rho = row.get('rho', row.get('Predictions', None))
-                if rho is not None:
-                    cols_used = row.get('columns', row.get('embedding', ''))
-                    mv_models.append({
-                        'columns': str(cols_used),
-                        'E': row.get('E', '?'),
-                        'rho': float(rho) if rho is not None else None
-                    })
-                    if rho is not None and rho > best_rho:
-                        best_rho = float(rho)
-                        best_cols = str(cols_used)
-                        best_E = row.get('E', '?')
-            results['multiview'] = {
-                'models': mv_models,
-                'best_rho': best_rho,
-                'best_columns': best_cols,
-                'best_E': best_E,
-            }
-        else:
-            results['multiview'] = {
-                'raw': str(mv),
-                'note': 'Multiview returned non-DataFrame result'
-            }
+        if _PYEDM:
+            mv = pyEDM.Multiview(
+                dataFrame=df, lib=lib, pred=pred,
+                E=E_max, Tp=1,
+                columns=columns, target=target,
+                showPlot=False)
+            if hasattr(mv, 'columns'):
+                # Multiview returns a DataFrame with multiple candidate models
+                best_rho = -1
+                best_cols = None
+                best_E = None
+                mv_models = []
+                for _, row in mv.iterrows():
+                    rho = row.get('rho', row.get('Predictions', None))
+                    if rho is not None:
+                        cols_used = row.get('columns', row.get('embedding', ''))
+                        mv_models.append({
+                            'columns': str(cols_used),
+                            'E': row.get('E', '?'),
+                            'rho': float(rho) if rho is not None else None
+                        })
+                        if rho is not None and rho > best_rho:
+                            best_rho = float(rho)
+                            best_cols = str(cols_used)
+                            best_E = row.get('E', '?')
+                results['multiview'] = {
+                    'models': mv_models,
+                    'best_rho': best_rho,
+                    'best_columns': best_cols,
+                    'best_E': best_E,
+                    'backend': 'pyEDM',
+                }
+                mv_ok = True
+            else:
+                results['multiview'] = {
+                    'raw': str(mv),
+                    'note': 'Multiview returned non-DataFrame result'
+                }
+        if not mv_ok:
+            # Fall back to numpy SVD-based Multiview
+            raise ImportError("pyEDM.Multiview not available")
     except Exception as e:
-        results['multiview']['error'] = str(e)
+        # numpy fallback
+        try:
+            arr = df[columns + [target]].values.astype(float)
+            tgt_idx = len(columns)
+            mv_np = _np_Multiview(arr, target_col=tgt_idx, E=E_max,
+                                  lib=lib, pred=pred)
+            results['multiview'] = {
+                'models': [{
+                    'columns': str(columns),
+                    'E': E_max,
+                    'rho': mv_np['rho'],
+                }],
+                'best_rho': mv_np['rho'],
+                'best_columns': str(columns),
+                'best_E': E_max,
+                'backend': 'numpy-SVD',
+                'fallback_reason': str(e),
+            }
+        except Exception as e2:
+            results['multiview']['error'] = f"pyEDM: {e}; numpy: {e2}"
 
     # Comparison
     best_single = max(

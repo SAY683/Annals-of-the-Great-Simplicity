@@ -23,6 +23,7 @@ import numpy as np
 from numpy.linalg import svd, pinv, eig, lstsq
 from scipy.signal import savgol_filter
 from scipy.stats import kurtosis as scipy_kurtosis
+from scipy.linalg import expm
 import warnings
 
 # ──────────────────────────────────────────────────────────────
@@ -295,11 +296,32 @@ class SovereignHAVOK:
         # 8. Discrete-time Koopman operator (first-order Euler)
         self.K_d_ = np.eye(self.r_ - 1) + self.dt * self.A_
 
+        # 8b. Exact discrete-time evolution via matrix exponential
+        # v(t+dt) = exp(A*dt)·v(t) + G·v_r  where G = ∫₀ᵈᵗ exp(A*(dt-s))·B ds
+        # Construct augmented matrix [[A*dt, B*dt], [0, 0]] and exponentiate
+        # to get both F=exp(A*dt) and G in one call (handles singular A correctly)
+        n_aug = self.r_
+        M_aug = np.zeros((n_aug, n_aug))
+        M_aug[:self.r_-1, :self.r_-1] = self.A_ * self.dt
+        M_aug[:self.r_-1, self.r_-1] = self.B_.ravel() * self.dt
+        expM_aug = expm(M_aug)
+        self.F_ = expM_aug[:self.r_-1, :self.r_-1]  # exact discrete transition
+        self.G_ = expM_aug[:self.r_-1, self.r_-1]   # forcing response per unit v_r
+
         # 9. Forcing kurtosis diagnostic
         self.kurtosis_vr_ = self._compute_kurtosis(self.forcing_)
 
         # 10. Koopman eigenvalue spectrum
+        # Continuous-time eigenvalues (A matrix): dv/dt = A·v + B·v_r
+        # Stability criterion: Re(λ) < 0 (stable), Re(λ) > 0 (unstable)
         self.eigenvalues_ = eig(self.A_)[0]
+
+        # Discrete-time eigenvalues (matrix exponential of A*dt):
+        # Stability criterion: |λ_d| < 1 (stable), |λ_d| > 1 (unstable)
+        # Uses proper matrix exponential instead of first-order Euler
+        # to avoid truncation error at large dt.
+        K_d_proper = expm(self.A_ * self.dt)
+        self.eigenvalues_d_ = eig(K_d_proper)[0]
 
         # 11. Regression quality
         dv_pred = Theta @ Xi
@@ -316,14 +338,20 @@ class SovereignHAVOK:
         self, current_v: np.ndarray, current_vr: float
     ) -> np.ndarray:
         """
-        基于当前状态 v 和外部强迫量 v_r，一步预测。
+        One-step prediction using exact discrete-time evolution.
 
-        dv/dt = A·v + B·v_r  →  v(t+dt) = v(t) + dt * (A·v + B·v_r)
+        Solves dv/dt = A·v + B·v_r EXACTLY via matrix exponential:
+          v(t+dt) = exp(A·dt)·v(t) + G·v_r
+        where G = ∫ exp(A·(dt-s))·B ds is precomputed in fit().
+
+        This replaces the first-order Euler approximation used previously,
+        which accumulated significant truncation error at dt≥1 (game data).
 
         Parameters
         ----------
         current_v : np.ndarray, shape (r-1,)
-        current_force : float
+        current_vr : float
+            Forcing term value (assumed constant over [t, t+dt]).
 
         Returns
         -------
@@ -332,24 +360,28 @@ class SovereignHAVOK:
         if not self.is_valid_:
             raise RuntimeError("请先调用 fit()")
         v_col = np.asarray(current_v, dtype=float).reshape(-1, 1)
-        dv = self.A_ @ v_col + self.B_ * current_vr
-        next_v = v_col + dv * self.dt
+        # v(t+dt) = F·v(t) + G·v_r  (exact for piecewise-constant v_r)
+        next_v = self.F_ @ v_col + self.G_.reshape(-1, 1) * current_vr
         return next_v.ravel()
 
     def predict_n_steps(
         self, v0: np.ndarray, vr_sequence: np.ndarray, n_steps: int
     ) -> np.ndarray:
         """
-        多步前向预测。
+        Multi-step forward prediction using exact discrete evolution.
+
+        Each step uses the matrix exponential F = exp(A·dt) with the
+        precomputed forcing response G. No truncation error accumulation
+        from Euler integration.
 
         Parameters
         ----------
         v0 : np.ndarray, shape (r-1,)
-            初始状态。
+            Initial state.
         vr_sequence : np.ndarray, shape (n_steps,)
-            未来强制项序列 (需要外部估计或假设为0)。
+            Future forcing sequence (external estimate; 0 where unknown).
         n_steps : int
-            预测步数。
+            Number of prediction steps.
 
         Returns
         -------
@@ -357,11 +389,11 @@ class SovereignHAVOK:
         """
         trajectory = np.zeros((n_steps + 1, self.r_ - 1))
         trajectory[0] = v0
-        v_current = v0.copy()
+        v_current = np.asarray(v0, dtype=float).reshape(-1, 1)
         for t in range(n_steps):
             vr = vr_sequence[t] if t < len(vr_sequence) else 0.0
-            v_current = self.predict_next_state(v_current, vr)
-            trajectory[t + 1] = v_current
+            v_current = self.F_ @ v_current + self.G_.reshape(-1, 1) * vr
+            trajectory[t + 1] = v_current.ravel()
         return trajectory
 
     # ── 诊断 ──────────────────────────────────────────────
@@ -373,7 +405,10 @@ class SovereignHAVOK:
         if not self.is_valid_:
             return {"error": "Model not fitted"}
 
-        growth_rates = np.abs(self.eigenvalues_)
+        # Stability from discrete-time eigenvalues (|λ_d| vs 1)
+        # Continuous eigenvalues of A are used for spectral analysis only;
+        # stability thresholds (1.05, 0.90) apply to discrete-time |λ_d|.
+        growth_rates = np.abs(self.eigenvalues_d_)
         max_growth = float(np.max(growth_rates))
         min_growth = float(np.min(growth_rates))
 
@@ -406,8 +441,8 @@ class SovereignHAVOK:
             "kurtosis_vr": f"{self.kurtosis_vr_:.4f}",
             "forcing_type": forcing_type,
             "stability": stability,
-            "max_eigenvalue": f"{max_growth:.4f}",
-            "min_eigenvalue": f"{min_growth:.4f}",
+            "max_eigenvalue_d": f"{max_growth:.4f}",      # discrete-time |λ_d|
+            "min_eigenvalue_d": f"{min_growth:.4f}",
             "spike_count": len(spike_indices),
             "spike_positions": spike_indices.tolist(),
             "basis": self.basis,
@@ -434,8 +469,8 @@ class SovereignHAVOK:
             f"  Kurtosis (v_r)       : {d['kurtosis_vr']}",
             f"  Forcing type         : {d['forcing_type']}",
             "",
-            f"  Max eigenvalue mag   : {d['max_eigenvalue']}",
-            f"  Min eigenvalue mag   : {d['min_eigenvalue']}",
+            f"  Max |eig_d|          : {d['max_eigenvalue_d']}",
+            f"  Min |eig_d|          : {d['min_eigenvalue_d']}",
             f"  Stability            : {d['stability']}",
             "",
             f"  Spike count          : {d['spike_count']}",

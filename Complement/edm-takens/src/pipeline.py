@@ -70,12 +70,17 @@ def sniff_environment() -> Dict:
             report['packages'][pkg] = 'NOT INSTALLED'
             report['compatibility']['issues'].append(f'{pkg} not installed')
 
-    # pyEDM internal version
+    # pyEDM internal version + fallback status
     try:
         import pyEDM
         report['packages']['pyEDM_full'] = pyEDM.__version__
+        report['edm_backend'] = 'pyEDM'
     except Exception:
-        pass
+        report['packages']['pyEDM_full'] = 'NOT INSTALLED (using numpy fallback)'
+        report['edm_backend'] = 'numpy_fallback'
+        report['compatibility']['warnings'].append(
+            'pyEDM not installed. Using pure numpy/scipy EDM fallback. '
+            'All core algorithms functional. Install pyEDM for C++ performance.')
 
     # Platform quirks
     if os.name == 'nt':  # Windows
@@ -288,11 +293,11 @@ def run_pipeline(config: PipelineConfig = None,
     # ── Layer 2: Auto-Correction ──
     # Auto-detect E if not specified
     if config.q is None:
-        import pyEDM
+        from _edm_bridge import EmbedDimension
         lib = f'1 {n - 7}'
         pred = f'{n - 6} {n}'
-        rho_E = pyEDM.EmbedDimension(
-            dataFrame=df, lib=lib, pred=pred, maxE=config.max_E, Tp=1,
+        rho_E = EmbedDimension(
+            data=df, lib=lib, pred=pred, maxE=config.max_E, Tp=1,
             columns=config.target_col, target=config.target_col,
             showPlot=False, numProcess=1)
         config.q = int(rho_E.loc[rho_E['rho'].idxmax(), 'E'])
@@ -309,7 +314,8 @@ def run_pipeline(config: PipelineConfig = None,
     # ── Auditor check ──
     from edm_auditor import audit_pipeline
     audit = audit_pipeline(
-        n=n, E=config.q, target_col=config.target_col,
+        n=n, E=config.q, tau=config.tau,
+        target_col=config.target_col,
         columns=config.columns, is_binary=config.is_binary,
     )
     audit.print_report()
@@ -341,7 +347,7 @@ def run_pipeline(config: PipelineConfig = None,
     print(f"    Explained variance:  {sh.explained_var_:.1%}")
     print(f"    Regression R^2:      {sh.regression_r2_:.4f}")
     print(f"    Kurtosis (v_r):      {sh.kurtosis_vr_:.3f}")
-    print(f"    Max |eigenvalue|:    {np.max(np.abs(sh.eigenvalues_)):.4f}")
+    print(f"    Max |eigenvalue_d|:    {np.max(np.abs(sh.eigenvalues_d_)):.4f}")
 
     # Forcing type
     k = sh.kurtosis_vr_
@@ -357,8 +363,8 @@ def run_pipeline(config: PipelineConfig = None,
         ftype = "Sub-Gaussian (platykurtic): bounded/constrained dynamics"
     print(f"    Forcing type:        {ftype}")
 
-    # Stability
-    max_ev = np.max(np.abs(sh.eigenvalues_))
+    # Stability — use discrete-time eigenvalues (|λ_d| vs 1)
+    max_ev = np.max(np.abs(sh.eigenvalues_d_))
     if max_ev > 1.05:
         stab = "DIVERGENT (unstable modes exist)"
     elif max_ev > 0.9:
@@ -385,16 +391,26 @@ def run_pipeline(config: PipelineConfig = None,
 
     # Quick CCM check
     try:
-        import pyEDM
+        from _edm_bridge import CCM, EDM_AVAILABLE
         print(f"\n  [CCM Quick Check (Victim Mirror)]")
         for cause in ['kills', 'damage', 'deaths']:
-            ccm = pyEDM.CCM(
-                dataFrame=df, E=config.q, Tp=0,
-                columns='result', target=cause,
-                libSizes=f'5 {n-2} 5', sample=min(30, n),
-                showPlot=False)
-            col = [c for c in ccm.columns if c != 'LibSize'][0]
-            rho = float(ccm.iloc[-1][col])
+            if EDM_AVAILABLE:
+                ccm = CCM(
+                    data=df, E=config.q, Tp=0,
+                    columns='result', target=cause,
+                    libSizes=f'5 {n-2} 5', sample=min(30, n),
+                    showPlot=False)
+                col = [c for c in ccm.columns if c != 'LibSize'][0]
+                rho = float(ccm.iloc[-1][col])
+            else:
+                # Numpy fallback CCM
+                cause_arr = df[cause].values.astype(float)
+                effect_arr = df['result'].values.astype(float)
+                ccm_result = CCM(data=np.column_stack([cause_arr, effect_arr]),
+                                columns='result', target=cause,
+                                E=config.q, libSizes=f'5 {n-2} 5', sample=min(30, n))
+                ccm_col = [c for c in ccm.columns if c != 'LibSize'][0]
+                rho = float(ccm[ccm_col].iloc[-1])
             direction = f"{cause} -> result" if rho > 0.2 else "weak/no signal"
             print(f"    M_result -> {cause}: rho={rho:+.3f} ({direction})")
     except Exception as e:
@@ -404,6 +420,25 @@ def run_pipeline(config: PipelineConfig = None,
     print(f"  Pipeline complete.")
     print(f"  Full report: python src/final_interpretation.py")
     print(f"  Scored verification: python src/verify_algorithms.py")
+
+    # ── Layer 4: Config artifact (auto-saved for reproducibility) ──
+    os.makedirs('results', exist_ok=True)
+    try:
+        from sensitivity_config import capture_config, save_config
+        cfg = capture_config(
+            data=df[config.target_col].values,
+            E=config.q, tau=config.tau,
+            q=config.q,
+            analysis_type="exploratory",
+            target_col=config.target_col,
+            columns=config.columns,
+            data_path=config.data_path,
+        )
+        config_path = save_config(cfg,
+            f"results/config_{int(__import__('time').time())}.json")
+        print(f"  Config saved: {config_path}")
+    except Exception as e:
+        print(f"  Config save skipped: {e}")
     print(f"{'=' * 60}")
 
     return {

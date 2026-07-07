@@ -98,13 +98,22 @@ class Auditor:
                  lyap_lambda: float = None, havok_r: int = None,
                  p_steps: int = None,
                  ccm_forward_rho: float = None,
+                 ccm_forward_total_rise: float = None,
+                 ccm_forward_spearman_rho: float = None,
                  ccm_reverse_rho: float = None,
+                 ccm_reverse_total_rise: float = None,
+                 ccm_reverse_spearman_rho: float = None,
                  svd_residual: float = None,
                  svd_baseline: float = None,
                  edm_nonlinear: bool = None,
                  havok_kurtosis: float = None):
         """
         Parameters can be passed individually or derived from existing analysis.
+
+        CCM convergence parameters (Secret 2/7 upgrade):
+          ccm_forward_total_rise: total rise in rho across library sizes
+          ccm_forward_spearman_rho: Spearman rank correlation (monotonicity)
+          (same for reverse)
         """
         self.data = data
         self.df = df
@@ -123,7 +132,11 @@ class Auditor:
         self.p_steps = p_steps or (self.n - self.q + 1 if self.n and self.q else None)
         self.p = self.p_steps
         self.ccm_forward_rho = ccm_forward_rho
+        self.ccm_forward_total_rise = ccm_forward_total_rise
+        self.ccm_forward_spearman_rho = ccm_forward_spearman_rho
         self.ccm_reverse_rho = ccm_reverse_rho
+        self.ccm_reverse_total_rise = ccm_reverse_total_rise
+        self.ccm_reverse_spearman_rho = ccm_reverse_spearman_rho
         self.svd_residual = svd_residual
         self.svd_baseline = svd_baseline
         self.edm_nonlinear = edm_nonlinear
@@ -186,7 +199,14 @@ class Auditor:
     # ── Secret 2: CCM Victim Mirror + Arrow Trap ────────────
 
     def audit_ccm_direction(self) -> AuditFinding:
-        """Verify CCM causal direction follows Victim Mirror Principle."""
+        """Verify CCM causal direction follows Victim Mirror Principle.
+
+        Uses BOTH static final rho AND convergence metrics (total rise,
+        Spearman rank correlation) — MUST agree with ccm_with_convergence()
+        in final_interpretation.py. The convergence check prevents false
+        positives where rho is high but never actually converges with
+        increasing library size.
+        """
         if self.ccm_forward_rho is None or self.ccm_reverse_rho is None:
             return AuditFinding(
                 "CCM Direction Check", "Secret 2: CCM Victim Mirror",
@@ -197,6 +217,16 @@ class Auditor:
         rev = self.ccm_reverse_rho
         delta = fwd - rev
 
+        # Convergence checks (only if convergence metrics provided)
+        fwd_converges = True  # default: no convergence data → assume OK
+        rev_converges = True
+        if self.ccm_forward_total_rise is not None and self.ccm_forward_spearman_rho is not None:
+            fwd_converges = (self.ccm_forward_total_rise > 0.05
+                           and self.ccm_forward_spearman_rho > 0.7)
+        if self.ccm_reverse_total_rise is not None and self.ccm_reverse_spearman_rho is not None:
+            rev_converges = (self.ccm_reverse_total_rise > 0.05
+                           and self.ccm_reverse_spearman_rho > 0.7)
+
         if fwd < 0.15 and rev < 0.15:
             return AuditFinding(
                 "CCM Direction Check", "Secret 2: CCM Victim Mirror",
@@ -206,20 +236,43 @@ class Auditor:
                 details={"forward": fwd, "reverse": rev}
             )
         elif fwd > 0.3 and delta > 0.1:
+            if not fwd_converges:
+                return AuditFinding(
+                    "CCM Direction Check", "Secret 2: CCM Victim Mirror",
+                    "WARN",
+                    f"Forward rho high (fwd={fwd:.3f}) but NOT converging. "
+                    f"Possible false positive — rho may be spurious.",
+                    "Run CCM with full library size sweep. "
+                    "High rho without convergence is suspicious.",
+                    details={"forward": fwd, "reverse": rev, "delta": delta,
+                             "fwd_converges": fwd_converges}
+                )
             return AuditFinding(
                 "CCM Direction Check", "Secret 2: CCM Victim Mirror",
                 "PASS",
                 f"Forward convergent (fwd={fwd:.3f} > rev={rev:.3f}, "
                 f"delta={delta:+.3f}). Causal direction confirmed.",
-                details={"forward": fwd, "reverse": rev, "delta": delta}
+                details={"forward": fwd, "reverse": rev, "delta": delta,
+                         "fwd_converges": fwd_converges}
             )
         elif rev > 0.3 and delta < -0.1:
+            if not rev_converges:
+                return AuditFinding(
+                    "CCM Direction Check", "Secret 2: CCM Victim Mirror",
+                    "WARN",
+                    f"Reverse rho high (rev={rev:.3f}) but NOT converging. "
+                    f"Possible false positive.",
+                    "Run CCM with full library size sweep.",
+                    details={"forward": fwd, "reverse": rev, "delta": delta,
+                             "rev_converges": rev_converges}
+                )
             return AuditFinding(
                 "CCM Direction Check", "Secret 2: CCM Victim Mirror",
                 "PASS",
                 f"Reverse convergent (rev={rev:.3f} > fwd={fwd:.3f}, "
                 f"delta={delta:+.3f}). Causal direction confirmed (reverse).",
-                details={"forward": fwd, "reverse": rev, "delta": delta}
+                details={"forward": fwd, "reverse": rev, "delta": delta,
+                         "rev_converges": rev_converges}
             )
         else:
             return AuditFinding(
@@ -234,54 +287,51 @@ class Auditor:
     # ── Secret 3: Hankel Golden Aspect Ratio ────────────────
 
     def audit_hankel_aspect_ratio(self) -> AuditFinding:
-        """Check HAVOK Hankel matrix p/q ratio for SVD stability."""
+        """Check HAVOK Hankel matrix p/q ratio for SVD stability.
+
+        Delegates to shared classify_hankel_ratio() for tier thresholds.
+        """
         if self.q is None or self.n is None:
             return AuditFinding(
                 "Hankel Aspect Ratio Check", "Secret 3: Hankel Golden Ratio",
                 "SKIP", "Missing q or n",
             )
 
-        q = self.q
-        n = self.n
-        p = n - q + 1
-        ratio = p / q
+        status, ratio, p, q_recommended = classify_hankel_ratio(self.n, self.q)
 
-        if ratio >= 10:
+        if status == 'GOOD':
             return AuditFinding(
                 "Hankel Aspect Ratio Check", "Secret 3: Hankel Golden Ratio",
                 "PASS",
                 f"p/q = {ratio:.1f} >= 10. SVD numerically stable.",
-                details={"p": p, "q": q, "ratio": ratio}
+                details={"p": p, "q": self.q, "ratio": ratio}
             )
-        elif ratio >= 5:
-            q_max = max(2, (n + 1) // 11)
+        elif status == 'MARGINAL':
             return AuditFinding(
                 "Hankel Aspect Ratio Check", "Secret 3: Hankel Golden Ratio",
                 "WARN",
                 f"p/q = {ratio:.1f} in [5, 10). Marginal SVD quality.",
-                f"Reduce q to <= {q_max} for p/q >= 10. "
-                f"Current q={q} may cause mild numerical stiffness.",
-                details={"p": p, "q": q, "ratio": ratio, "q_recommended": q_max}
+                f"Reduce q to <= {q_recommended} for p/q >= 10. "
+                f"Current q={self.q} may cause mild numerical stiffness.",
+                details={"p": p, "q": self.q, "ratio": ratio, "q_recommended": q_recommended}
             )
-        elif ratio >= 3:
-            q_max = max(2, (n + 1) // 11)
+        elif status == 'DEGRADED':
             return AuditFinding(
                 "Hankel Aspect Ratio Check", "Secret 3: Hankel Golden Ratio",
                 "FAIL",
                 f"p/q = {ratio:.1f} < 5. SVD significantly degraded!",
-                f"CRITICAL: reduce q to <= {q_max}. "
+                f"CRITICAL: reduce q to <= {q_recommended}. "
                 f"A-matrix eigenvalues will have spurious rigidity.",
-                details={"p": p, "q": q, "ratio": ratio, "q_recommended": q_max}
+                details={"p": p, "q": self.q, "ratio": ratio, "q_recommended": q_recommended}
             )
-        else:
-            q_max = max(2, (n + 1) // 11)
+        else:  # BROKEN
             return AuditFinding(
                 "Hankel Aspect Ratio Check", "Secret 3: Hankel Golden Ratio",
                 "FAIL",
                 f"p/q = {ratio:.1f} < 3. SVD is NUMERICALLY BROKEN!",
-                f"STOP. Reduce q to <= {q_max} immediately. "
+                f"STOP. Reduce q to <= {q_recommended} immediately. "
                 f"Results with this configuration are garbage.",
-                details={"p": p, "q": q, "ratio": ratio, "q_recommended": q_max}
+                details={"p": p, "q": self.q, "ratio": ratio, "q_recommended": q_recommended}
             )
 
     # ── Secret 4: Multiview Embedding ───────────────────────
@@ -461,6 +511,69 @@ class Auditor:
                               f"Reduce E to <= {max_safe_E} or accept sparse coverage.",
                               details={"E": self.E, "max_safe_E": max_safe_E})
 
+    # ── Tau Selection Audit ─────────────────────────────────
+
+    def audit_tau_selection(self) -> AuditFinding:
+        """Validate time delay tau selection.
+
+        Checks:
+          - tau is specified (not None)
+          - tau == 1 without AMI evidence (may be unoptimized default)
+          - tau * (E-1) does not exceed reasonable fraction of data length
+            (too large a delay window makes embedding vectors nearly independent)
+        """
+        if self.tau is None:
+            return AuditFinding(
+                "Tau Selection Check", "Time Delay Validation",
+                "SKIP", "Tau not specified — cannot audit delay selection",
+                "Run edm_tau_optimization.optimal_tau() to compute AMI-based tau."
+            )
+
+        issues = []
+
+        # tau == 1 is commonly the unoptimized default
+        if self.tau == 1:
+            issues.append(
+                "tau=1 may be an unoptimized default. "
+                "AMI-based optimization (edm_tau_optimization.optimal_tau) "
+                "is recommended for nonlinear systems.")
+
+        # Embedding window too large relative to data
+        if self.E is not None and self.n is not None:
+            window_span = self.tau * (self.E - 1)
+            window_fraction = window_span / max(self.n, 1)
+            if window_fraction > 0.5:
+                issues.append(
+                    f"Embedding window span (tau * (E-1) = {window_span}) "
+                    f"covers {window_fraction:.0%} of data length ({self.n}). "
+                    f"Embedding vectors may approach statistical independence. "
+                    f"Reduce tau or E."
+                )
+            elif window_fraction > 0.3:
+                issues.append(
+                    f"Embedding window span ({window_span}) covers "
+                    f"{window_fraction:.0%} of data. Marginal — monitor.")
+            elif window_span <= 0:
+                issues.append("tau * (E-1) <= 0 — check tau and E values.")
+
+        if not issues:
+            return AuditFinding(
+                "Tau Selection Check", "Time Delay Validation",
+                "PASS",
+                f"tau={self.tau}, E={self.E}, "
+                f"window_span={self.tau * (self.E - 1) if self.E else 'N/A'}"
+            )
+        else:
+            # If any issue mentions window fraction > 0.5 → FAIL
+            # Otherwise → WARN
+            status = "FAIL" if any("0.5" in i for i in issues) else "WARN"
+            return AuditFinding(
+                "Tau Selection Check", "Time Delay Validation",
+                status, "; ".join(issues),
+                "Compute tau via AMI (edm_tau_optimization.optimal_tau) "
+                "and ensure tau * (E-1) << N."
+            )
+
     # ── Full Audit ─────────────────────────────────────────
 
     def run_full_audit(self) -> AuditReport:
@@ -470,6 +583,7 @@ class Auditor:
         # Always run data quality and embedding check
         report.add(self.audit_data_quality())
         report.add(self.audit_embedding_dimension())
+        report.add(self.audit_tau_selection())
 
         # Secret 1: Lyapunov Horizon
         report.add(self.audit_lyapunov_horizon())
@@ -500,6 +614,8 @@ class Auditor:
 def audit_pipeline(df=None, data=None, n=None, q=None, E=None,
                    tau=None, pred_horizon=None, lyap_lambda=None,
                    havok_r=None, ccm_forward=None, ccm_reverse=None,
+                   ccm_forward_total_rise=None, ccm_forward_spearman_rho=None,
+                   ccm_reverse_total_rise=None, ccm_reverse_spearman_rho=None,
                    svd_residual=None, svd_baseline=None,
                    edm_nonlinear=None, havok_kurtosis=None,
                    target_col=None, columns=None, is_binary=False):
@@ -507,18 +623,62 @@ def audit_pipeline(df=None, data=None, n=None, q=None, E=None,
     One-shot audit of an EDM+HAVOK pipeline configuration.
 
     Returns AuditReport. Call report.print_report() for readable output.
+
+    CCM convergence parameters (added for Secret 2/7 upgrade):
+      ccm_forward_total_rise, ccm_forward_spearman_rho,
+      ccm_reverse_total_rise, ccm_reverse_spearman_rho
+      — required for convergence-based CCM validation.
     """
     auditor = Auditor(
         data=data, df=df, n=n, q=q or E, E=E or q, tau=tau,
         pred_horizon=pred_horizon, lyap_lambda=lyap_lambda,
         havok_r=havok_r, ccm_forward_rho=ccm_forward,
+        ccm_forward_total_rise=ccm_forward_total_rise,
+        ccm_forward_spearman_rho=ccm_forward_spearman_rho,
         ccm_reverse_rho=ccm_reverse,
+        ccm_reverse_total_rise=ccm_reverse_total_rise,
+        ccm_reverse_spearman_rho=ccm_reverse_spearman_rho,
         svd_residual=svd_residual, svd_baseline=svd_baseline,
         edm_nonlinear=edm_nonlinear, havok_kurtosis=havok_kurtosis,
         target_col=target_col, columns=columns or [],
         is_binary=is_binary,
     )
     return auditor.run_full_audit()
+
+
+# ================================================================
+# Shared utility: Hankel aspect ratio tier classification
+# Used by both edm_auditor.py and enhanced_cross_validate.py
+# to ensure consistent thresholds across all audit layers.
+# ================================================================
+
+def classify_hankel_ratio(n: int, q: int):
+    """
+    Classify Hankel matrix aspect ratio p/q for SVD numerical stability.
+
+    Returns (status, ratio, p, q_recommended) where status is one of:
+      'GOOD'       — p/q >= 10, numerically stable
+      'MARGINAL'   — 5 <= p/q < 10, may see stiffness
+      'DEGRADED'   — 3 <= p/q < 5, A-matrix eigenvalues degraded
+      'BROKEN'     — p/q < 3, SVD numerically broken
+
+    Recommendation: q_recommended = max(2, (n+1)//11) ensures p/q >= 10.
+    This is the single source of truth for Hankel ratio thresholds.
+    """
+    p = n - q + 1
+    ratio = p / q
+    q_recommended = max(2, (n + 1) // 11)
+
+    if ratio >= 10:
+        status = 'GOOD'
+    elif ratio >= 5:
+        status = 'MARGINAL'
+    elif ratio >= 3:
+        status = 'DEGRADED'
+    else:
+        status = 'BROKEN'
+
+    return status, ratio, p, q_recommended
 
 
 # ================================================================
@@ -555,6 +715,51 @@ if __name__ == '__main__':
     r2b = a2b.audit_ccm_direction()
     assert r2b.status == "WARN", f"Expected WARN, got {r2b.status}"
     print(f"  [OK] CCM direction: WARN when both skills near zero")
+
+    # Secret 2: Should WARN when rho high but NOT converging
+    a2c = Auditor(ccm_forward_rho=0.45, ccm_reverse_rho=0.15,
+                  ccm_forward_total_rise=0.01, ccm_forward_spearman_rho=0.3)
+    r2c = a2c.audit_ccm_direction()
+    assert r2c.status == "WARN", f"Expected WARN for non-converging, got {r2c.status}"
+    print(f"  [OK] CCM direction: WARN when high rho but no convergence")
+
+    # Secret 2: Should PASS when rho high AND converging
+    a2d = Auditor(ccm_forward_rho=0.45, ccm_reverse_rho=0.15,
+                  ccm_forward_total_rise=0.12, ccm_forward_spearman_rho=0.85)
+    r2d = a2d.audit_ccm_direction()
+    assert r2d.status == "PASS", f"Expected PASS for converging, got {r2d.status}"
+    print(f"  [OK] CCM direction: PASS when high rho WITH convergence")
+
+    # Tau audit: SKIP when tau not provided
+    a_tau1 = Auditor(n=100, E=5)
+    r_tau1 = a_tau1.audit_tau_selection()
+    assert r_tau1.status == "SKIP", f"Expected SKIP, got {r_tau1.status}"
+    print(f"  [OK] Tau audit: SKIP when tau not specified")
+
+    # Tau audit: WARN when tau=1 (likely unoptimized default)
+    a_tau2 = Auditor(n=100, E=5, tau=1)
+    r_tau2 = a_tau2.audit_tau_selection()
+    assert r_tau2.status == "WARN", f"Expected WARN, got {r_tau2.status}"
+    print(f"  [OK] Tau audit: WARN when tau=1 (suspicious default)")
+
+    # Tau audit: PASS when tau is reasonable
+    a_tau3 = Auditor(n=100, E=4, tau=3)
+    r_tau3 = a_tau3.audit_tau_selection()
+    assert r_tau3.status == "PASS", f"Expected PASS, got {r_tau3.status}"
+    print(f"  [OK] Tau audit: PASS when tau * (E-1) << N")
+
+    # Tau audit: FAIL when embedding window too large
+    a_tau4 = Auditor(n=20, E=6, tau=3)  # window = 3*5 = 15, 15/20 = 75%
+    r_tau4 = a_tau4.audit_tau_selection()
+    assert r_tau4.status == "FAIL", f"Expected FAIL, got {r_tau4.status}"
+    print(f"  [OK] Tau audit: FAIL when embedding window > 50% of data")
+
+    # Shared Hankel classifier
+    status, ratio, p, q_rec = classify_hankel_ratio(100, 5)
+    assert status == 'GOOD', f"Expected GOOD, got {status}"
+    status2, _, _, _ = classify_hankel_ratio(100, 50)
+    assert status2 == 'BROKEN', f"Expected BROKEN, got {status2}"
+    print(f"  [OK] classify_hankel_ratio: shared function verified")
 
     # Secret 3: Should FAIL for p/q < 3
     a3 = Auditor(n=100, q=50)  # p = 51, ratio = 1.02

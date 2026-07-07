@@ -42,6 +42,7 @@ except Exception:
 
 from sovereign_havok import SovereignHAVOK
 from _paths import data_path
+from edm_auditor import classify_hankel_ratio
 
 
 # ============================================================
@@ -252,31 +253,25 @@ def check_hankel_aspect_ratio(n, q):
     """
     Check the Hankel matrix aspect ratio for SVD numerical stability.
 
-    H is (q x p) where p = n - q + 1.
-    The aspect ratio = p / q.
-
-    Rule of thumb: p >= 10*q for robust SVD. Below 5*q, numerical
-    stiffness and spurious coupling may appear in the A matrix.
-
-    Returns
-    -------
-    dict with: p, q, aspect_ratio, status, recommendation
+    Delegates to shared classify_hankel_ratio() from edm_auditor.py
+    to ensure consistent thresholds across all audit layers.
     """
-    p = n - q + 1
-    ratio = p / q
+    status, ratio, p, q_recommended = classify_hankel_ratio(n, q)
 
-    if ratio >= 10:
-        status = "GOOD"
+    status_map = {
+        'GOOD': 'GOOD',
+        'MARGINAL': 'WARNING',
+        'DEGRADED': 'CRITICAL',
+        'BROKEN': 'CRITICAL',
+    }
+
+    if status == 'GOOD':
         recommendation = None
-    elif ratio >= 5:
-        status = "WARNING"
-        q_recommended = max(2, (n + 1) // 11)
+    elif status == 'MARGINAL':
         recommendation = (f"Aspect ratio p/q={ratio:.1f} is marginal. "
                          f"Recommend q <= {q_recommended} (would give p/q >= 10). "
                          f"Current q={q} may cause mild numerical stiffness in SVD.")
     else:
-        status = "CRITICAL"
-        q_recommended = max(2, (n + 1) // 11)
         recommendation = (f"Aspect ratio p/q={ratio:.1f} is too low! "
                          f"q={q} should be reduced to <= {q_recommended} "
                          f"to avoid SVD degradation and spurious A-matrix rigidity. "
@@ -284,8 +279,8 @@ def check_hankel_aspect_ratio(n, q):
 
     return {
         'n': n, 'q': q, 'p': p, 'aspect_ratio': ratio,
-        'status': status, 'recommendation': recommendation,
-        'q_recommended_max': max(2, (n + 1) // 11)
+        'status': status_map[status], 'recommendation': recommendation,
+        'q_recommended_max': q_recommended
     }
 
 
@@ -571,8 +566,8 @@ def plot_enhanced_report(df, all_results, safeguards, output_path):
         lines.append(f"Rank r = {sh.r_}  |  R^2 = {sh.regression_r2_:.3f}")
         lines.append(f"Kurtosis = {sh.kurtosis_vr_:.3f}")
         lines.append(f"Expl. var = {sh.explained_var_:.1%}")
-        ev_max = np.max(np.abs(sh.eigenvalues_))
-        lines.append(f"Max |eig| = {ev_max:.3f}")
+        ev_max = np.max(np.abs(sh.eigenvalues_d_))
+        lines.append(f"Max |eig_d| = {ev_max:.3f}")
 
         # Safeguard status
         lines.append("")
@@ -713,10 +708,10 @@ def run_enhanced_validation(csv_path=data_path('game_log.csv'),
               f"kurtosis={hv.kurtosis_vr_:.3f}, expl_var={hv.explained_var_:.1%}")
 
         # Eigenvalue analysis
-        evals = hv.eigenvalues_
+        evals = hv.eigenvalues_d_  # discrete-time eigenvalues for stability
         growth = np.sort(np.abs(evals))[::-1]
         max_ev = growth[0]
-        print(f"  Koopman: max|eig|={max_ev:.4f} ", end='')
+        print(f"  Koopman: max|eig_d|={max_ev:.4f} ", end='')
         if max_ev > 1.05:
             print("(DIVERGENT)")
         elif max_ev < 0.9:
