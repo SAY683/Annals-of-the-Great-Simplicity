@@ -48,7 +48,14 @@ from _numpy_edm import (
     SMapPredictNonlinear as _np_SMapPredictNonlinear,
     CCM as _np_CCM,
     Multiview as _np_Multiview,
+    multiview_full as np_multiview_full,          # P7: full combinatorial scan
+    false_nearest_neighbors as np_fnn,            # P8: FNN E-selection
 )
+
+# Re-export the pure-numpy enhanced methods (no pyEDM equivalent needed).
+# These are always available regardless of pyEDM presence.
+multiview_full = np_multiview_full
+false_nearest_neighbors = np_fnn
 
 if not EDM_AVAILABLE:
     warnings.warn(

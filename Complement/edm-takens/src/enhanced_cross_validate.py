@@ -38,7 +38,16 @@ try:
     _PYEDM_AVAILABLE = True
 except Exception:
     _PYEDM_AVAILABLE = False
-    print("WARNING: pyEDM unavailable — CCM and some EDM functions will be skipped")
+    print("WARNING: pyEDM unavailable — using _edm_bridge numpy fallback for EDM calls")
+
+# Unified bridge: all EDM calls go through here (pyEDM with numpy fallback)
+from _edm_bridge import (
+    EmbedDimension as _bridge_EmbedDimension,
+    Simplex as _bridge_Simplex,
+    SMapPredictNonlinear as _bridge_SMapPredictNonlinear,
+    CCM as _bridge_CCM,
+    EDM_AVAILABLE as _BRIDGE_AVAILABLE,
+)
 
 from sovereign_havok import SovereignHAVOK
 from _paths import data_path
@@ -191,8 +200,8 @@ def verify_ccm_direction(df, cause_var, effect_var, E, lib_sizes='5 25 5'):
     # Build M_effect, predict cause
     # pyEDM: columns=effect_var, target=cause_var
     try:
-        ccm_forward = pyEDM.CCM(
-            dataFrame=df, E=E, Tp=0,
+        ccm_forward = _bridge_CCM(
+            data=df, E=E, Tp=0,
             columns=effect_var, target=cause_var,
             libSizes=lib_sizes, sample=min(50, n), showPlot=False
         )
@@ -205,8 +214,8 @@ def verify_ccm_direction(df, cause_var, effect_var, E, lib_sizes='5 25 5'):
     # Test: effect->cause (reverse direction)
     # Build M_cause, predict effect
     try:
-        ccm_reverse = pyEDM.CCM(
-            dataFrame=df, E=E, Tp=0,
+        ccm_reverse = _bridge_CCM(
+            data=df, E=E, Tp=0,
             columns=cause_var, target=effect_var,
             libSizes=lib_sizes, sample=min(50, n), showPlot=False
         )
@@ -292,8 +301,8 @@ def edm_pipeline_full(df, target_col, lib, pred, max_E=8):
     """Run EDM pipeline: EmbedDimension, Simplex, S-Map."""
     results = {}
 
-    rho_E = pyEDM.EmbedDimension(
-        dataFrame=df, lib=lib, pred=pred,
+    rho_E = _bridge_EmbedDimension(
+        data=df, lib=lib, pred=pred,
         maxE=max_E, Tp=1, columns=target_col, target=target_col,
         showPlot=False, numProcess=1)
     best_idx = rho_E['rho'].idxmax()
@@ -302,15 +311,15 @@ def edm_pipeline_full(df, target_col, lib, pred, max_E=8):
     results['rho_embed'] = rho_E.loc[best_idx, 'rho']
     results['rho_E_curve'] = rho_E
 
-    sx = pyEDM.Simplex(
-        dataFrame=df, lib=lib, pred=pred,
+    sx = _bridge_Simplex(
+        data=df, lib=lib, pred=pred,
         E=E_opt, Tp=1, columns=target_col, target=target_col,
         showPlot=False)
     results['rho_simplex'] = sx['Observations'].corr(sx['Predictions'])
     results['simplex'] = sx
 
-    smap = pyEDM.PredictNonlinear(
-        dataFrame=df, lib=lib, pred=pred,
+    smap = _bridge_SMapPredictNonlinear(
+        data=df, lib=lib, pred=pred,
         E=E_opt, columns=target_col, target=target_col,
         showPlot=False)
     rho_0 = smap.loc[smap['theta'] == smap['theta'].min(), 'rho'].values[0]

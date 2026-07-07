@@ -25,7 +25,8 @@ from matplotlib.gridspec import GridSpec
 plt.rcParams['axes.unicode_minus'] = False
 warnings.filterwarnings('ignore')
 
-import pyEDM
+from _edm_bridge import (CCM, EmbedDimension, Simplex,
+                          SMapPredictNonlinear, EDM_AVAILABLE)
 from sovereign_havok import SovereignHAVOK
 from _paths import data_path
 
@@ -52,8 +53,8 @@ def ccm_with_convergence(df, cause_var, effect_var, E):
         (cause_var, effect_var),   # M_cause -> effect (tests effect->cause)
     ]):
         try:
-            ccm = pyEDM.CCM(
-                dataFrame=df, E=E, Tp=0,
+            ccm = CCM(
+                data=df, E=E, Tp=0,
                 columns=col_var, target=tgt_var,
                 libSizes=f'5 {n-2} 3', sample=min(50, n),
                 showPlot=False)
@@ -367,6 +368,191 @@ def estimate_lyapunov_lower_bound(data, E, dt=1.0, n_surrogates=19,
 # Comprehensive Game Data Interpretation
 # ================================================================
 
+def interpret_data(df, target_col, columns, causality_pairs=None,
+                   output_path='results/dynamics_interpretation.png',
+                   label_map=None):
+    """
+    Domain-agnostic dynamical interpretation (P1: decoupled from game domain).
+
+    Runs EDM + SovereignHAVOK + CCM on an arbitrary multivariate time series
+    and produces a generic diagnostic report + visualization. This is the
+    reusable core; game-specific narration lives in ``interpret_game_data``.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Time series. Must contain ``target_col`` and all ``columns``.
+    target_col : str
+        Primary outcome variable (e.g. 'result').
+    columns : list of str
+        Variables to analyse individually (should include target_col).
+    causality_pairs : list of (cause, effect) tuples, optional
+        Pairs to test with CCM. If None, tests each non-target column -> target.
+    output_path : str
+        Where to save the visualization PNG.
+    label_map : dict, optional
+        Human-readable labels for variables (defaults to column names).
+
+    Returns
+    -------
+    all_data : dict
+        Per-variable diagnostics + CCM results, for downstream narration.
+    """
+    n = len(df)
+    lib = f'1 {n-7}'; pred = f'{n-6} {n}'
+    label_map = label_map or {c: c for c in columns}
+    if causality_pairs is None:
+        causality_pairs = [(c, target_col) for c in columns if c != target_col]
+
+    print("=" * 72)
+    print("  DYNAMICAL INTERPRETATION (domain-agnostic)")
+    print("  SovereignHAVOK + EDM + CCM with convergence")
+    print("=" * 72)
+    print(f"  N = {n}  |  target = {target_col}  |  variables = {columns}")
+    print()
+
+    all_data = {}
+
+    # ── Phase 1: per-variable dynamics ──
+    print("─" * 72)
+    print("  PHASE 1: Individual Variable Dynamics")
+    print("─" * 72)
+
+    for var in columns:
+        print(f"\n  [{label_map.get(var, var)}]")
+        data = df[var].values.astype(float)
+
+        rho_E = EmbedDimension(
+            data=df, lib=lib, pred=pred, maxE=8, Tp=1,
+            columns=var, target=var, showPlot=False, numProcess=1)
+        E_opt = int(rho_E.loc[rho_E['rho'].idxmax(), 'E'])
+
+        sx = Simplex(
+            data=df, lib=lib, pred=pred, E=E_opt, Tp=1,
+            columns=var, target=var, showPlot=False)
+        rho_s = sx['Observations'].corr(sx['Predictions'])
+
+        smap = SMapPredictNonlinear(
+            data=df, lib=lib, pred=pred, E=E_opt,
+            columns=var, target=var, showPlot=False, numProcess=1)
+        theta_min = smap['theta'].min()
+        rho_0_smap = smap.loc[smap['theta'] == theta_min, 'rho'].values[0]
+        rho_m = smap['rho'].max()
+        is_nl = (rho_m - rho_0_smap) >= 0.05
+
+        p_steps = n - E_opt + 1
+        wl_safe = min(11, max(5, p_steps // 4))
+        if wl_safe % 2 == 0: wl_safe -= 1
+
+        sh = SovereignHAVOK(
+            q_delays=E_opt, dt=1.0, energy_threshold=0.99,
+            window_length=wl_safe, poly_order=2, basis="V")
+        sh.fit(data)
+
+        hk_ratio = p_steps / E_opt
+        forcing = sh.forcing_
+        spike_th = 1.5 * np.std(forcing)
+        spike_idx = np.where(np.abs(forcing) > spike_th)[0]
+        forcing_energy = np.var(forcing) / (np.var(data) + 1e-10)
+        max_ev = float(np.max(np.abs(sh.eigenvalues_d_))) if len(sh.eigenvalues_d_) else 0.0
+
+        lyap = estimate_lyapunov_robust(data, E_opt)
+        lyap_lower = None
+        if not lyap.get('reliable') and n < 100:
+            lyap_lower = estimate_lyapunov_lower_bound(data, E_opt, n_surrogates=19)
+
+        ccm_result = None
+        if var == target_col:
+            ccm_result = {}
+            for cause, effect in causality_pairs:
+                if effect == target_col:
+                    ccm_result[f'{cause}->{effect}'] = ccm_with_convergence(
+                        df, cause, effect, E_opt)
+
+        print(f"    EDM: E={E_opt}, Simplex_rho={rho_s:.3f}, nonlinear={is_nl}")
+        print(f"    HAVOK: r={sh.r_}, R2={sh.regression_r2_:.3f}, "
+              f"kurt={sh.kurtosis_vr_:.3f}, max|eig_d|={max_ev:.4f}")
+        print(f"    Hankel: p/q={hk_ratio:.1f} "
+              f"{'[WARN<10]' if hk_ratio < 10 else '[OK]'}  |  spikes={len(spike_idx)}")
+        if lyap.get('reliable'):
+            print(f"    Lyapunov: tau_L={lyap['lyapunov_time']:.1f} "
+                  f"(R2={lyap['fit_r2']:.3f})")
+        elif lyap_lower and lyap_lower.get('is_significant'):
+            print(f"    Lyapunov: surrogate LB tau_L<{lyap_lower['tau_L_upper_bound']:.1f}")
+        else:
+            print(f"    Lyapunov: unreliable (N<100)")
+
+        all_data[var] = {
+            'E': E_opt, 'rho_s': rho_s, 'is_nl': is_nl,
+            'havok_r': sh.r_, 'havok_r2': sh.regression_r2_,
+            'kurtosis': sh.kurtosis_vr_, 'max_ev': max_ev,
+            'expl_var': sh.explained_var_, 'hk_ratio': hk_ratio,
+            'forcing_energy': forcing_energy,
+            'spike_count': len(spike_idx), 'spike_idx': spike_idx,
+            'lyap': lyap, 'lyap_lower': lyap_lower, 'ccm': ccm_result,
+            'sh': sh,
+        }
+
+    # ── Phase 2: CCM causality ──
+    print(f"\n{'─' * 72}")
+    print("  PHASE 2: Causal Structure (CCM with convergence)")
+    print("─" * 72)
+    E_ref = all_data[target_col]['E']
+    for cause, effect in causality_pairs:
+        ccm_r = ccm_with_convergence(df, cause, effect, E_ref)
+        print(f"    {cause} <-> {effect}: {ccm_r['verdict']}")
+
+    # ── Generic summary ──
+    print(f"\n{'=' * 72}")
+    print("  GENERIC DYNAMICAL SUMMARY")
+    print("=" * 72)
+    for var in columns:
+        d = all_data[var]
+        k = d['kurtosis']
+        k_type = ("heavy-tailed" if k > 1.5 else "near-Gaussian" if k < 0.5
+                  else "light-tailed")
+        print(f"    {label_map.get(var,var):12s}: rho={d['rho_s']:.3f}, "
+              f"kurt={k:+.3f} ({k_type}), max|eig_d|={d['max_ev']:.3f}")
+    hk_warns = [v for v in columns if all_data[v]['hk_ratio'] < 10]
+    if hk_warns:
+        print(f"  Hankel ratio warnings: {hk_warns} (consider smaller E or more data)")
+
+    # ── Visualization ──
+    os.makedirs(os.path.dirname(output_path) or '.', exist_ok=True)
+    _plot_generic(df, all_data, columns, label_map, output_path, target_col)
+    print(f"\n  Visualization saved: {output_path}")
+    print(f"{'=' * 72}")
+    return all_data
+
+
+def _plot_generic(df, all_data, variables, label_map, output_path, target_col):
+    """Generic visualization (domain-neutral)."""
+    colors = {v: plt.cm.tab10(i % 10) for i, v in enumerate(variables)}
+    n_vars = min(len(variables), 4)
+    fig, axes = plt.subplots(n_vars, 2, figsize=(14, 3 * n_vars), squeeze=False)
+    for row, var in enumerate(variables[:n_vars]):
+        d = all_data[var]
+        sh = d['sh']
+        data = df[var].values.astype(float)
+        color = colors[var]
+        ax0 = axes[row, 0]
+        ax0.plot(data, 'o-', color=color, markersize=4, linewidth=1.2)
+        ax0.set_title(f'{label_map.get(var,var)} (E={d["E"]}, rho={d["rho_s"]:.2f})',
+                     fontsize=10)
+        ax0.grid(True, alpha=0.2)
+        ax1 = axes[row, 1]
+        forcing = sh.forcing_
+        ax1.fill_between(np.arange(len(forcing)) + sh.q, forcing, alpha=0.2, color=color)
+        ax1.plot(np.arange(len(forcing)) + sh.q, forcing, 'o-', color=color, markersize=3)
+        ax1.axhline(0, color='gray', alpha=0.3)
+        ax1.set_title(f'Forcing (kurt={sh.kurtosis_vr_:+.2f}, r={sh.r_})', fontsize=10)
+        ax1.grid(True, alpha=0.2)
+    fig.suptitle('SovereignHAVOK Dynamical Interpretation (generic)', fontsize=12)
+    plt.tight_layout()
+    plt.savefig(output_path, dpi=150, bbox_inches='tight')
+    plt.close()
+
+
 def interpret_game_data():
     """Run full HAVOK analysis and produce plain-language interpretation."""
     df = pd.read_csv(data_path('game_log.csv'))
@@ -397,18 +583,18 @@ def interpret_game_data():
         data = df[var].values.astype(float)
 
         # EDM
-        rho_E = pyEDM.EmbedDimension(
-            dataFrame=df, lib=lib, pred=pred, maxE=8, Tp=1,
+        rho_E = EmbedDimension(
+            data=df, lib=lib, pred=pred, maxE=8, Tp=1,
             columns=var, target=var, showPlot=False, numProcess=1)
         E_opt = int(rho_E.loc[rho_E['rho'].idxmax(), 'E'])
 
-        sx = pyEDM.Simplex(
-            dataFrame=df, lib=lib, pred=pred, E=E_opt, Tp=1,
+        sx = Simplex(
+            data=df, lib=lib, pred=pred, E=E_opt, Tp=1,
             columns=var, target=var, showPlot=False)
         rho_s = sx['Observations'].corr(sx['Predictions'])
 
-        smap = pyEDM.PredictNonlinear(
-            dataFrame=df, lib=lib, pred=pred, E=E_opt,
+        smap = SMapPredictNonlinear(
+            data=df, lib=lib, pred=pred, E=E_opt,
             columns=var, target=var, showPlot=False, numProcess=1)
         theta_min = smap['theta'].min()
         rho_0_smap = smap.loc[smap['theta'] == theta_min, 'rho'].values[0]
@@ -850,6 +1036,7 @@ def _plot_interpretation(df, all_data):
                  'SG window cap, Hankel audit)',
                  fontsize=13, fontweight='bold', y=1.01)
     plt.tight_layout()
+    os.makedirs('results', exist_ok=True)
     plt.savefig('results/game_interpretation.png', dpi=150, bbox_inches='tight')
     plt.close()
     print("  Saved: results/game_interpretation.png")

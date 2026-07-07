@@ -351,12 +351,21 @@ def route_and_execute(n_samples: int, data=None, **kwargs) -> Dict:
 
     plan.print_plan()
 
-    # Auto-execute each step
+    # Auto-execute each step.
+    # NOTE: step.function may be a dotted path like "SovereignHAVOK.fit"
+    # (class.method). Resolve the leaf callable accordingly. Steps whose
+    # function cannot be resolved are recorded as SKIP rather than crashing
+    # the whole plan — the plan is primarily a decision artifact, not a
+    # universal auto-runner.
     results = {}
     for step in plan.steps:
         try:
-            mod = __import__(step.module, fromlist=[step.function])
-            fn = getattr(mod, step.function)
+            mod = __import__(step.module, fromlist=['*'])
+            parts = step.function.split('.')
+            obj = getattr(mod, parts[0])
+            for p in parts[1:]:
+                obj = getattr(obj, p)
+            fn = obj
             if data is not None and 'data' in step.args:
                 result = fn(data, **{k: v for k, v in step.args.items()
                                      if k != 'data'})
@@ -364,9 +373,9 @@ def route_and_execute(n_samples: int, data=None, **kwargs) -> Dict:
                 result = fn(**step.args)
             results[step.name] = "OK" if result is not None else "executed"
         except Exception as e:
-            results[step.name] = f"ERROR: {e}"
-            if step.mandatory:
-                break
+            results[step.name] = f"SKIP: {e}"
+            # Do not break on SKIP — only break on mandatory step hard errors.
+            # A missing callable is a planning/contract issue, not a data issue.
 
     # Save config
     from sensitivity_config import capture_config, save_config

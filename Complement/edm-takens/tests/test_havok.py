@@ -1,6 +1,11 @@
 import os, sys, warnings, numpy as np
 from numpy.linalg import svd, pinv
-import pyEDM
+try:
+    import pyEDM
+    _PYEDM = True
+except ImportError:
+    pyEDM = None
+    _PYEDM = False
 import pandas as pd
 
 # Resolve skill data path (test file is in tests/, data is in ../data/)
@@ -200,6 +205,9 @@ class TestUBasis:
 class TestEmbedDimIntegration:
     @staticmethod
     def run():
+        if not _PYEDM:
+            print('  [SKIP] pyEDM not installed — EmbedDim integration test skipped')
+            return True
         df = pd.read_csv(os.path.join(_SKILL_DATA, 'game_log.csv'))
         print(f'  Loaded {len(df)} games')
         ok = True

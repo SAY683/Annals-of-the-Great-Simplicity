@@ -117,8 +117,12 @@ padding." This is the single highest-impact secret for short time series.
 
 **Limitation**: pyEDM.Multiview() in the current environment (Python 3.13,
 pyEDM on Windows) has a multiprocessing issue with the `target` parameter.
-The wrapper code is correct and tested on the single-variable fallback path.
-When pyEDM is updated or run on Linux, Multiview activates automatically.
+The wrapper now routes through `_edm_bridge.Multiview`, which falls back to
+the pure-numpy SVD-spatial embedding when pyEDM is unavailable or raises.
+The full pyEDM candidate-model selection activates automatically on Linux or
+when pyEDM is updated; on Windows/Python 3.13 the numpy fallback path is used.
+Marked PARTIAL because the full Multiview candidate sweep remains env-limited,
+even though a working fallback is always reachable.
 
 **Firewall treatment**: Advisory only. Recommends Multiview when feasible
 but never blocks execution. The auditor SKIPs when < 2 columns available.
@@ -187,7 +191,7 @@ itself is a valuable diagnostic signal.
 
 **Adoption rationale**: Fully adopted. The cross-validation layer is the
 difference between two independent analyses and one coherent diagnosis.
-The 82/100 verification score on game data correctly reflects data limitations
+The 80/100 verification score on game data correctly reflects data limitations
 while confirming algorithmic soundness.
 
 **Firewall treatment**: WARN when EDM and HAVOK disagree on nonlinearity.
@@ -222,8 +226,8 @@ correlation — is fully integrated into Secret 2's implementation:
 |   | (convergence)     | ✅ UPGRADED | WARN | total_rise+Spearman | Always |
 | 3 | Hankel Ratio | ✅ ADOPTED | FAIL (p/q<3) | Yes (critical) | Always active |
 |   | (DRY unified)     | ✅ FIXED | shared classify_hankel_ratio() | | |
-| 4 | Multiview | ✅ ADOPTED | Advisory | Never | N < 100, K >= 2 |
-|   | (numpy fallback)  | ✅ ADDED | SVD-spatial embedding | | Always |
+| 4 | Multiview | ⚠️ PARTIAL | Advisory | Never | N < 100, K >= 2 |
+|   | (numpy fallback)  | ✅ REACHABLE | SVD-spatial embedding via _edm_bridge | | Always |
 | 5 | SVD Residual | ✅ ADOPTED | FAIL (>2.5x) | Yes (sustained) | N >= 50 per window |
 | 6 | Cross-Validation | ✅ ADOPTED | WARN | No (diagnostic) | Always active |
 | 7 | Arrow Trap | ✅ (merged) | WARN | No (advisory) | Always active |

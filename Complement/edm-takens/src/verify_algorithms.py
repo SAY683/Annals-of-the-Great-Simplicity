@@ -556,7 +556,8 @@ class InternalConsistencyTests:
         self.df = df
         self.results = {}
         self.score = 0
-        self.max_score = 16
+        # Sub-check maxima: basis_equivalence 8 + energy 4 + regression 4 + hankel 4 = 20
+        self.max_score = 20
 
     def run_all(self):
         print("\n" + "=" * 70)

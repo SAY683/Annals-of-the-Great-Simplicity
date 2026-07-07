@@ -81,7 +81,7 @@ running sensitivity scans at E±1 and reporting stability (see
       |                   NOW INCLUDES: tau selection validation.
  [tau Optimization] ─── src/edm_tau_optimization.py (AMI-based)
       |
- [E Optimization]  ─── pyEDM.EmbedDimension + FNN cross-check
+ [E Optimization]  ─── pyEDM.EmbedDimension (Simplex rho peak; FNN noted as future)
       |
  +----+----+
  |         |
@@ -110,9 +110,10 @@ running sensitivity scans at E±1 and reporting stability (see
 edm-takens/                          ← Self-contained skill folder
 ├── SKILL.md                         ← THIS FILE — master entry point
 ├── DESIGN.md                        ← Design philosophy & business logic
-├── requirements.txt                 ← Pip-freeze version manifest
+├── requirements.txt                 ← Lower-bound deps (portable)
+├── requirements-lock.txt            ← [NEW] Pinned manifest (reproducible)
 ├── secret_adoption_audit.md         ← Adoption/deferral status of all 7 secrets
-├── src/                             ← All Python source (19 modules)
+├── src/                             ← All Python source (17 modules)
 │   ├── __init__.py
 │   ├── _paths.py                    ← Portable path resolution
 │   ├── _numpy_edm.py                ← [NEW] Pure numpy/scipy EDM: Simplex,
@@ -136,22 +137,27 @@ edm-takens/                          ← Self-contained skill folder
 │   ├── edm_adaptive_pipeline.py     ← tau -> E -> theta -> CCM pipeline
 │   ├── sensitivity_config.py        ← Config capture + sensitivity scan (E+/-1)
 │   ├── surrogate_test.py            ← IAAFT surrogate data statistical testing
-│   └── edm_havok_integration.py     ← [DEPRECATED] 功能由 sovereign_havok.py +
-│                                         edm_adaptive_pipeline.py 完全覆盖
 ├── tests/
 │   ├── __init__.py                  ← Test package marker
-│   └── test_havok.py                ← 9-class HAVOK algorithm test suite
+│   ├── test_havok.py                ← 9-class HAVOK algorithm test suite (legacy)
+│   └── test_sovereign_havok.py      ← [NEW] SovereignHAVOK class unit tests (P3)
 ├── examples/
 │   └── demo.py                      ← pyEDM reference demonstration
 ├── data/
 │   ├── game_log.csv                 ← 32-game sample dataset
 │   └── template.csv                 ← Multivariate data template
-└── references/
-    ├── takens_embedding_reference.md ← Mathematical foundations
-    ├── forbidden_rules_reference.md  ← Seven forbidden rules (full treatment)
-    ├── edge_cases_reference.md       ← Data regime mitigations
-    └── research-rigor.md             ← Research integrity: pre-registration,
-                                         config artifact, sensitivity, controls
+├── references/                       ← Scientific methodology (paper-grounded)
+│   ├── takens_embedding_reference.md ← Mathematical foundations
+│   ├── forbidden_rules_reference.md  ← Seven forbidden rules (full treatment)
+│   ├── edge_cases_reference.md       ← Data regime mitigations
+│   └── research-rigor.md             ← Research integrity: pre-registration,
+│                                         config artifact, sensitivity, controls
+└── docs/                             ← [NEW] Engineering attachments (maintainable)
+    ├── CHANGELOG.md                  ← Evolution log (P11)
+    ├── thresholds_and_heuristics.md  ← All magic numbers documented (P9/P10)
+    ├── edm-takens_skill_audit.md     ← Full engineering audit report
+    ├── edm-takens_self_inspection_census.md ← Core algorithm vs-paper census
+    └── edm-takens_optimization_potentials.md ← Optimization potentials research
 ```
 
 ## Seven Enforced Secrets

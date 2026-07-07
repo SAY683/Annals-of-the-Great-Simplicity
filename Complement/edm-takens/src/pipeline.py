@@ -389,12 +389,13 @@ def run_pipeline(config: PipelineConfig = None,
                 print(f"    Game {gi+1:2d}: v_r={fs:+.3f} ({direction}), "
                       f"K/D={int(row['kills'])}/{int(row['deaths'])}, {res}")
 
-    # Quick CCM check
+    # Quick CCM check (collects rhos for post-computation audit feedback)
+    ccm_rhos = {}
     try:
         from _edm_bridge import CCM, EDM_AVAILABLE
         print(f"\n  [CCM Quick Check (Victim Mirror)]")
         for cause in ['kills', 'damage', 'deaths']:
-            if EDM_AVAILABLE:
+            try:
                 ccm = CCM(
                     data=df, E=config.q, Tp=0,
                     columns='result', target=cause,
@@ -402,19 +403,52 @@ def run_pipeline(config: PipelineConfig = None,
                     showPlot=False)
                 col = [c for c in ccm.columns if c != 'LibSize'][0]
                 rho = float(ccm.iloc[-1][col])
-            else:
-                # Numpy fallback CCM
-                cause_arr = df[cause].values.astype(float)
-                effect_arr = df['result'].values.astype(float)
-                ccm_result = CCM(data=np.column_stack([cause_arr, effect_arr]),
-                                columns='result', target=cause,
-                                E=config.q, libSizes=f'5 {n-2} 5', sample=min(30, n))
-                ccm_col = [c for c in ccm.columns if c != 'LibSize'][0]
-                rho = float(ccm[ccm_col].iloc[-1])
-            direction = f"{cause} -> result" if rho > 0.2 else "weak/no signal"
-            print(f"    M_result -> {cause}: rho={rho:+.3f} ({direction})")
+                ccm_rhos[cause] = rho
+            except Exception as ce:
+                rho = None
+                print(f"    {cause}: CCM failed ({ce})")
+            if rho is not None:
+                direction = f"{cause} -> result" if rho > 0.2 else "weak/no signal"
+                print(f"    M_result -> {cause}: rho={rho:+.3f} ({direction})")
     except Exception as e:
         print(f"    CCM unavailable: {e}")
+
+    # ── Post-computation audit feedback (Secrets 2 & 6) ──
+    # The pre-execution audit cannot inspect HAVOK kurtosis or CCM results
+    # because they do not exist yet. Feed them back now so the firewall can
+    # actually enforce cross-validation (Secret 6) and CCM direction (Secret 2).
+    try:
+        from edm_auditor import audit_pipeline as _post_audit
+        # Pick the strongest CCM pair for direction audit
+        if ccm_rhos:
+            best_cause = max(ccm_rhos, key=ccm_rhos.get)
+            fwd_rho = ccm_rhos[best_cause]
+            # reverse: M_cause -> result
+            rev_rho = 0.0
+            try:
+                from _edm_bridge import CCM as _CCM2
+                ccm_rev = _CCM2(
+                    data=df, E=config.q, Tp=0,
+                    columns=best_cause, target='result',
+                    libSizes=f'5 {n-2} 5', sample=min(30, n),
+                    showPlot=False)
+                rev_col = [c for c in ccm_rev.columns if c != 'LibSize'][0]
+                rev_rho = float(ccm_rev.iloc[-1][rev_col])
+            except Exception:
+                pass
+            post_audit = _post_audit(
+                n=n, E=config.q, tau=config.tau,
+                target_col=config.target_col, columns=config.columns,
+                is_binary=config.is_binary,
+                havok_kurtosis=sh.kurtosis_vr_,
+                ccm_forward=fwd_rho, ccm_reverse=rev_rho,
+            )
+            print(f"\n  [Post-Computation Audit Feedback]")
+            print(f"    HAVOK kurtosis fed back: {sh.kurtosis_vr_:+.3f}")
+            print(f"    CCM {best_cause}: fwd={fwd_rho:+.3f} rev={rev_rho:+.3f}")
+            post_audit.print_report()
+    except Exception as e:
+        print(f"    Post-audit skipped: {e}")
 
     print(f"\n{'=' * 60}")
     print(f"  Pipeline complete.")
@@ -425,6 +459,9 @@ def run_pipeline(config: PipelineConfig = None,
     os.makedirs('results', exist_ok=True)
     try:
         from sensitivity_config import capture_config, save_config
+        # P6: record audit verdict + findings summary for full provenance
+        audit_summary = (f"PASS:{audit.passed} WARN:{audit.warnings} "
+                         f"FAIL:{audit.failures}")
         cfg = capture_config(
             data=df[config.target_col].values,
             E=config.q, tau=config.tau,
@@ -433,6 +470,8 @@ def run_pipeline(config: PipelineConfig = None,
             target_col=config.target_col,
             columns=config.columns,
             data_path=config.data_path,
+            audit_verdict=audit.verdict,
+            audit_findings_summary=audit_summary,
         )
         config_path = save_config(cfg,
             f"results/config_{int(__import__('time').time())}.json")
@@ -447,6 +486,75 @@ def run_pipeline(config: PipelineConfig = None,
         'audit': audit,
         'havok': sh,
     }
+
+
+# ============================================================
+# P5: Unified full-analysis entry (chains all three stages)
+# ============================================================
+
+def run_full_analysis(config: 'PipelineConfig' = None,
+                      auto_fix: bool = False,
+                      skip_cross_validation: bool = False,
+                      skip_interpretation: bool = False):
+    """
+    Run the complete analysis chain per the SKILL.md flow diagram:
+
+      pipeline (env→audit→HAVOK→CCM→config)
+        → enhanced_cross_validate (EDM-HAVOK cross-validation + 3 safeguards)
+        → final_interpretation (dynamical interpretation + visualization)
+
+    Each stage is independently robust; this wrapper just sequences them so a
+    user gets the full SKILL.md flow in one call. Any stage failure is caught
+    and reported without aborting later stages that don't depend on it.
+
+    Returns dict with keys: pipeline_result, cross_validation, interpretation.
+    """
+    results = {'pipeline': None, 'cross_validation': None,
+               'interpretation': None}
+
+    # Stage 1: pipeline
+    print("\n" + "#" * 60)
+    print("#  STAGE 1/3: Pipeline (env + audit + HAVOK + CCM)")
+    print("#" * 60)
+    try:
+        results['pipeline'] = run_pipeline(config, auto_fix=auto_fix)
+    except Exception as e:
+        print(f"  Pipeline stage failed: {type(e).__name__}: {e}")
+        results['pipeline'] = {'error': str(e)}
+
+    # Stage 2: cross-validation
+    if not skip_cross_validation:
+        print("\n" + "#" * 60)
+        print("#  STAGE 2/3: Enhanced Cross-Validation (3 safeguards)")
+        print("#" * 60)
+        try:
+            from enhanced_cross_validate import run_enhanced_validation
+            csv = (config.data_path if config and config.data_path
+                   else data_path('game_log.csv'))
+            results['cross_validation'] = run_enhanced_validation(csv_path=csv)
+        except Exception as e:
+            print(f"  Cross-validation stage failed: {type(e).__name__}: {e}")
+            results['cross_validation'] = {'error': str(e)}
+
+    # Stage 3: interpretation
+    if not skip_interpretation:
+        print("\n" + "#" * 60)
+        print("#  STAGE 3/3: Dynamical Interpretation")
+        print("#" * 60)
+        try:
+            from final_interpretation import interpret_game_data
+            results['interpretation'] = interpret_game_data()
+        except Exception as e:
+            print(f"  Interpretation stage failed: {type(e).__name__}: {e}")
+            results['interpretation'] = {'error': str(e)}
+
+    print("\n" + "=" * 60)
+    print("  run_full_analysis complete.")
+    print(f"  pipeline: {'OK' if results['pipeline'] and 'error' not in (results['pipeline'] or {}) else 'ISSUE'}")
+    print(f"  cross-validation: {'OK' if results['cross_validation'] and 'error' not in (results['cross_validation'] or {}) else 'skipped/issue'}")
+    print(f"  interpretation: {'OK' if results['interpretation'] and 'error' not in (results['interpretation'] or {}) else 'skipped/issue'}")
+    print("=" * 60)
+    return results
 
 
 # ============================================================

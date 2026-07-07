@@ -310,6 +310,27 @@ def test_game_data():
             check(abs(sh.kurtosis_vr_) < 10, f"HAVOK {var}: kurtosis bounded")
 
 
+# ── Layer 6: End-to-End Interpretation (slow) ────────────
+
+def test_e2e_interpretation():
+    # Name contains 'slow' so --quick skips it. This guards against the
+    # class of regression that let the interpret_game_data NameError survive
+    # (P4): the main interpretation entry must actually run to completion.
+    if QUICK:
+        return  # truly skip slow e2e test in quick mode
+    with test("Layer 6: End-to-End Interpretation (slow)"):
+        import os as _os
+        from final_interpretation import interpret_game_data
+        _os.makedirs('results', exist_ok=True)
+        try:
+            interpret_game_data()
+            check(True, "interpret_game_data completed without error")
+            check(_os.path.exists('results/game_interpretation.png'),
+                  "visualization PNG produced")
+        except Exception as e:
+            check(False, f"interpret_game_data failed: {type(e).__name__}: {e}")
+
+
 # ── Main ──────────────────────────────────────────────────
 
 if __name__ == '__main__':
@@ -337,6 +358,7 @@ if __name__ == '__main__':
     test_cross_validation()
     test_secrets_4_5()
     test_game_data()
+    test_e2e_interpretation()
 
     ok = result()
     sys.exit(0 if ok else 1)

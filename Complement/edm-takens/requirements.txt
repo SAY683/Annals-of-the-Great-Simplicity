@@ -1,23 +1,11 @@
-# EDM-Takens Skill — Pinned Dependencies
-# Generated: pip freeze (Python 3.13, Windows 10)
-# All versions LOCKED for reproducible execution.
+# EDM-Takens Skill — Runtime Dependencies (lower bounds)
+# Use this for broad portability. For exact reproducible versions, see
+# requirements-lock.txt (the pinned manifest from the reference environment).
+#
 # Install: pip install -r requirements.txt
-contourpy==1.3.3
-cycler==0.12.1
-fonttools==4.63.0
-joblib==1.5.3
-kiwisolver==1.5.0
-matplotlib==3.11.0
-narwhals==2.23.0
-numpy==2.5.1
-packaging==26.2
-pandas==3.0.3
-pillow==12.3.0
-pyEDM==2.5.0
-pyparsing==3.3.2
-python-dateutil==2.9.0.post0
-scikit-learn==1.9.0
-scipy==1.18.0
-six==1.17.0
-threadpoolctl==3.6.0
-tzdata==2026.2
+numpy>=1.22
+scipy>=1.8
+pandas>=1.4
+matplotlib>=3.5
+pyEDM>=1.0          # optional but recommended for C++ fidelity; numpy fallback exists
+scikit-learn>=1.0   # optional, used by some pyEDM paths

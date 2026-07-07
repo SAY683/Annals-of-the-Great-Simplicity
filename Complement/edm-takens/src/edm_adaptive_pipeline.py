@@ -7,13 +7,13 @@ via S-Map theta sweep, and CCM causality inference.
 Handles edge cases: binary data, small samples, non-stationarity.
 """
 
-import pyEDM
 import numpy as np
 import pandas as pd
 import warnings
-import numpy as np
-import pandas as pd
-import warnings
+
+from _edm_bridge import (
+    EmbedDimension, Simplex, SMapPredictNonlinear, EDM_AVAILABLE
+)
 
 def run_adaptive_edm(df, target_col, lib=None, pred=None, max_E=10, is_binary=False):
     """Full EDM pipeline with edge-case diagnostics.
@@ -45,8 +45,8 @@ def run_adaptive_edm(df, target_col, lib=None, pred=None, max_E=10, is_binary=Fa
     
     # --- Phase 2: Embedding Dimension ---
     try:
-        rho_E = pyEDM.EmbedDimension(
-            dataFrame=df, lib=lib, pred=pred,
+        rho_E = EmbedDimension(
+            data=df, lib=lib, pred=pred,
             maxE=max_E, Tp=1, columns=target_col, target=target_col,
             showPlot=False, numProcess=1
         )
@@ -68,8 +68,8 @@ def run_adaptive_edm(df, target_col, lib=None, pred=None, max_E=10, is_binary=Fa
     
     # --- Phase 3: Simplex Prediction ---
     try:
-        sx = pyEDM.Simplex(
-            dataFrame=df, lib=lib, pred=pred,
+        sx = Simplex(
+            data=df, lib=lib, pred=pred,
             E=optimal_E, Tp=1, columns=target_col, target=target_col,
             showPlot=False
         )
@@ -89,8 +89,8 @@ def run_adaptive_edm(df, target_col, lib=None, pred=None, max_E=10, is_binary=Fa
     
     # --- Phase 4: S-Map Nonlinearity Diagnosis ---
     try:
-        smap = pyEDM.PredictNonlinear(
-            dataFrame=df, lib=lib, pred=pred,
+        smap = SMapPredictNonlinear(
+            data=df, lib=lib, pred=pred,
             E=optimal_E, columns=target_col, target=target_col,
             showPlot=False
         )
@@ -115,7 +115,11 @@ if __name__ == '__main__':
     import matplotlib
     matplotlib.use('Agg')
     import matplotlib.pyplot as plt
-    
+
+    if not EDM_AVAILABLE:
+        raise SystemExit("This demo requires pyEDM for sample data. "
+                         "Install pyEDM or supply your own DataFrame.")
+    import pyEDM
     # Demo: run on built-in data
     df = pyEDM.sampleData['block_3sp']
     n = len(df)

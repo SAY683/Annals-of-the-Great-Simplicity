@@ -199,6 +199,9 @@ def validate_environment(skill_root: str = None) -> EnvReport:
         "Tau optimizer",
         os.path.join(src_dir, "edm_tau_optimization.py")))
     report.file_checks.append(check_file(
+        "SovereignHAVOK class tests",
+        os.path.join(skill_root, "tests", "test_sovereign_havok.py")))
+    report.file_checks.append(check_file(
         "Game data",
         os.path.join(skill_root, "data", "game_log.csv")))
     report.file_checks.append(check_file(
@@ -210,6 +213,15 @@ def validate_environment(skill_root: str = None) -> EnvReport:
     report.file_checks.append(check_file(
         "requirements.txt",
         os.path.join(skill_root, "requirements.txt")))
+    report.file_checks.append(check_file(
+        "requirements-lock.txt",
+        os.path.join(skill_root, "requirements-lock.txt")))
+    report.file_checks.append(check_file(
+        "CHANGELOG (docs attachment)",
+        os.path.join(skill_root, "docs", "CHANGELOG.md")))
+    report.file_checks.append(check_file(
+        "Thresholds documentation (docs attachment)",
+        os.path.join(skill_root, "docs", "thresholds_and_heuristics.md")))
 
     # Determine readiness
     missing_required = any(

@@ -120,17 +120,25 @@ class AnalysisConfig:
     random_seed: int = 42
     notes: str = ""
 
+    # Audit provenance (P6: record firewall verdict for full traceability)
+    audit_verdict: str = ""              # PASS / WARN / FAIL / ""
+    audit_findings_summary: str = ""     # compact "PASS:x WARN:y FAIL:z"
+
 
 def capture_config(data, E=None, tau=None, theta=None,
                    q=None, r=None, lib="", pred="",
                    analysis_type="exploratory",
                    n_surrogates=99, notes="",
                    data_path="", target_col="",
-                   columns=None) -> AnalysisConfig:
+                   columns=None,
+                   audit_verdict="", audit_findings_summary="") -> AnalysisConfig:
     """
     Capture full analysis configuration including package versions.
 
     Call this BEFORE running analysis. Saves a timestamped artifact.
+    The optional audit_* fields (P6) record the firewall verdict so the
+    artifact captures not only what parameters were used but whether the
+    configuration passed the pre-/post-execution audit.
     """
     import numpy, scipy, pandas
 
@@ -148,6 +156,8 @@ def capture_config(data, E=None, tau=None, theta=None,
         random_seed=int(time.time()) % 10000,
         notes=notes,
         n_surrogates=n_surrogates,
+        audit_verdict=audit_verdict,
+        audit_findings_summary=audit_findings_summary,
         python_version=sys.version.split()[0],
         numpy_version=numpy.__version__,
         scipy_version=scipy.__version__,

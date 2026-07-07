@@ -7,7 +7,6 @@ Fallbacks: ACF 1/e crossing, then default tau=1.
 """
 
 import numpy as np
-import pyEDM
 import warnings
 
 def compute_ami(series, max_lag, bins=16):
@@ -113,7 +112,8 @@ if __name__ == '__main__':
     import matplotlib
     matplotlib.use('Agg')
     import matplotlib.pyplot as plt
-    
+
+    import pyEDM
     # Demo on pyEDM sample data
     df = pyEDM.sampleData['block_3sp']
     data = df['x_t'].values

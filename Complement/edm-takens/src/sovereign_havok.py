@@ -236,6 +236,21 @@ class SovereignHAVOK:
         data = np.asarray(data, dtype=float).ravel()
         n = len(data)
 
+        # 0. Input validation — prevent silent garbage results (P2 safeguard)
+        if not np.all(np.isfinite(data)):
+            raise ValueError(
+                "Data contains NaN or Inf. HAVOK SVD would produce all-NaN "
+                "diagnostics with is_valid_=True (silent garbage). Clean the "
+                "series before calling fit().")
+        if n < 3:
+            raise ValueError(f"Data length n={n} is too short (need >= 3).")
+        if np.std(data) < 1e-12:
+            warnings.warn(
+                "Near-constant data (std < 1e-12): SVD will be rank-1, "
+                "kurtosis/eigenvalue diagnostics are meaningless. "
+                "Fit proceeds but results should not be trusted.",
+                RuntimeWarning)
+
         # 1. Normalize
         self.mean_ = float(np.mean(data))
         self.std_ = float(np.std(data)) if np.std(data) > 1e-12 else 1.0

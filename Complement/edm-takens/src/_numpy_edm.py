@@ -48,76 +48,6 @@ def _build_delay_vectors(series, E, tau=1):
     return X
 
 
-def _simplex_predict_one(tree, X_lib, lib_indices, target_point, E, Tp,
-                         exclusion_radius=0):
-    """Predict one step ahead using simplex projection.
-
-    Parameters
-    ----------
-    tree : KDTree over library vectors
-    X_lib : full library array (for indexing)
-    lib_indices : indices of library vectors in the original time series
-    target_point : query vector, shape (E,)
-    E : embedding dimension
-    Tp : time-to-prediction (steps ahead)
-    exclusion_radius : exclude neighbors within this index distance
-
-    Returns
-    -------
-    prediction : float or None
-    """
-    k = min(E + 1, len(X_lib))
-    if k < 2:
-        return None
-
-    dists, idxs = tree.query(target_point, k=k)
-
-    # Ensure arrays
-    if k == 1:
-        dists, idxs = np.array([dists]), np.array([idxs])
-    dists = np.asarray(dists, dtype=float)
-    idxs = np.asarray(idxs, dtype=int)
-
-    # Exclude self and temporally close points
-    valid_mask = np.ones(len(idxs), dtype=bool)
-    for i, idx in enumerate(idxs):
-        if dists[i] < 1e-15:
-            valid_mask[i] = False
-    if exclusion_radius > 0:
-        # Can't easily exclude by time index without original indices
-        pass
-
-    valid_idx = np.where(valid_mask)[0]
-    if len(valid_idx) < 1:
-        valid_idx = np.arange(len(idxs))
-
-    dists = dists[valid_idx]
-    idxs = idxs[valid_idx]
-
-    # Weighting: w_i = exp(-d_i / d_min)
-    d_min = dists[0]
-    if d_min < 1e-15:
-        d_min = 1e-15
-
-    weights = np.exp(-dists / d_min)
-    weights = weights / (weights.sum() + 1e-15)
-
-    # Predict future values of neighbors
-    # lib_indices[idx] points to where this neighbor vector starts
-    future_vals = []
-    future_weights = []
-    for i, idx in enumerate(idxs):
-        lib_pos = lib_indices[idx]
-        future_pos = lib_pos + Tp + E - 1
-        if future_pos < len(lib_indices) + (E - 1) * 1 + Tp:
-            # Need the actual time series value at position
-            # lib_indices stores start positions, so value at lib_pos+E-1+Tp
-            future_vals.append(1.0)  # placeholder — we need the actual value
-            future_weights.append(weights[i])
-
-    return None  # will be replaced by correct implementation below
-
-
 def simplex_predict(series, E, lib, pred, tau=1, Tp=1):
     """Simplex projection prediction.
 
@@ -790,6 +720,234 @@ def Multiview(data_matrix, target_col=0, E=3, lib=None, pred=None, Tp=1):
         'n_pred': len(predictions),
         'n_components': E_eff,
         'method': 'SVD-spatial-multiview',
+    }
+
+
+# ═══════════════════════════════════════════════════════════════
+# Full Multiview candidate scan (Sugihara et al., 2016) — P7
+# Complements the SVD-spatial Multiview above with the proper
+# combinatorial candidate-model selection. K-choose-E variable
+# combinations, each scored by out-of-sample Simplex rho.
+# ═══════════════════════════════════════════════════════════════
+
+def multiview_full(data_matrix, target_col=0, E=3, lib=None, pred=None,
+                   Tp=1, max_combos=None):
+    """Full Multiview embedding via combinatorial candidate selection.
+
+    Sugihara et al. (Science, 2016): enumerate C(K-1, E) candidate models
+    (each a choice of E variables from the K-1 non-target columns), score
+    each by out-of-sample Simplex prediction skill on the target, and keep
+    the best. This is the spatial-diversity analogue of delay embedding and
+    is the highest-ROI method for short multivariate data (N < 100).
+
+    Parameters
+    ----------
+    data_matrix : np.ndarray, shape (n, K)
+    target_col : int
+        Index of the target variable to predict.
+    E : int
+        Number of variables per candidate model.
+    lib, pred : optional
+        Library / prediction ranges (1-based strings or tuples).
+    Tp : int
+        Time-to-prediction.
+    max_combos : int, optional
+        Cap on number of combinations to evaluate (for large K).
+
+    Returns
+    -------
+    dict with: rho, E, best_columns, n_combos, all_rhos, method
+    """
+    from itertools import combinations
+    data = np.asarray(data_matrix, dtype=float)
+    n, k = data.shape
+    if isinstance(target_col, str):
+        raise ValueError("target_col must be int index for multiview_full")
+    feat_cols = [c for c in range(k) if c != target_col]
+    if E > len(feat_cols):
+        E = len(feat_cols)
+    combos = list(combinations(feat_cols, E))
+    if max_combos and len(combos) > max_combos:
+        # subsample deterministically for reproducibility
+        rng = np.random.default_rng(42)
+        idx = rng.choice(len(combos), size=max_combos, replace=False)
+        combos = [combos[i] for i in sorted(idx)]
+
+    def _parse(r, default):
+        if r is None:
+            return default
+        if isinstance(r, str):
+            p = r.strip().split()
+            return int(p[0]) - 1, min(int(p[1]), n)
+        return int(r[0]) - 1, min(int(r[1]), n)
+
+    lib_s, lib_e = _parse(lib, (0, max(E + 2, n // 2)))
+    pred_s, pred_e = _parse(pred, (max(E + 2, n // 2), n))
+
+    best_rho = -1.0
+    best_cols = None
+    all_rhos = []
+
+    for cols in combos:
+        # build candidate state vectors from selected columns
+        sub = data[:, list(cols)]
+        # normalize
+        mu = sub[lib_s:lib_e].mean(axis=0)
+        sd = sub[lib_s:lib_e].std(axis=0) + 1e-12
+        sub_n = (sub - mu) / sd
+        X_lib = sub_n[lib_s:lib_e]
+        X_pred = sub_n[pred_s:pred_e]
+        if len(X_lib) < E + 2 or len(X_pred) < 1:
+            all_rhos.append(None)
+            continue
+        tree = KDTree(X_lib)
+        preds, obs = [], []
+        for i in range(len(X_pred)):
+            knn = min(E + 2, len(X_lib))
+            dists, idxs = tree.query(X_pred[i], k=knn)
+            dists = np.atleast_1d(dists); idxs = np.atleast_1d(idxs)
+            good = dists > 1e-15
+            if not good.any():
+                good = np.ones(len(dists), dtype=bool)
+            dists = dists[good][:E + 1]
+            idxs = idxs[good][:E + 1]
+            if len(dists) < 2:
+                continue
+            w = np.exp(-dists / max(dists[0], 1e-15))
+            w = w / w.sum()
+            future = []
+            for j, idx in enumerate(idxs):
+                pos = lib_s + idx + Tp
+                if pos < n:
+                    future.append(data[pos, target_col])
+            if len(future) < 2:
+                continue
+            w = w[:len(future)]; w = w / w.sum()
+            preds.append(np.dot(w, future))
+            opos = pred_s + i + Tp
+            if opos < n:
+                obs.append(data[opos, target_col])
+            else:
+                preds.pop()
+        if len(preds) > 2:
+            rho = float(pearsonr(preds, obs[:len(preds)])[0])
+        else:
+            rho = 0.0
+        if not np.isnan(rho):
+            all_rhos.append(rho)
+            if rho > best_rho:
+                best_rho = rho
+                best_cols = cols
+        else:
+            all_rhos.append(None)
+
+    return {
+        'rho': best_rho if best_rho > -1 else 0.0,
+        'E': E,
+        'best_columns': best_cols,
+        'n_combos': len(combos),
+        'all_rhos': all_rhos,
+        'method': 'sugihara_2016_combinatorial',
+    }
+
+
+# ═══════════════════════════════════════════════════════════════
+# False Nearest Neighbors (Kennel et al., 1992) — P8
+# Complementary E-selection to Simplex rho peak. The two methods agree
+# => higher confidence (echoes Secret 6 dual-validation spirit).
+# ═══════════════════════════════════════════════════════════════
+
+def false_nearest_neighbors(series, max_E=10, tau=1, rtol=15.0, atol=2.0):
+    """Compute False Nearest Neighbors fraction for each embedding dimension.
+
+    Kennel, Brown & Abarbanel (1992): a neighbor is "false" if it is close in
+    E dimensions solely because the trajectory has been projected down; adding
+    one more coordinate (E -> E+1) reveals the true separation. The optimal E
+    is the smallest one where the FNN fraction drops below a threshold.
+
+    Parameters
+    ----------
+    series : np.ndarray, 1D
+    max_E : int
+        Maximum embedding dimension to test.
+    tau : int
+        Time delay.
+    rtol : float
+        Relative tolerance (standard 15.0): a neighbor is false if the
+        increase in distance when adding the (E+1)-th coordinate exceeds
+        rtol * (distance in E dims).
+    atol : float
+        Absolute tolerance (standard 2.0 * std of data): guards against
+        near-zero distances.
+
+    Returns
+    -------
+    dict with: E_values, fnn_fraction, optimal_E (first E with fnn<0.01,
+               or argmin if none reach threshold)
+    """
+    from scipy.spatial import KDTree
+    series = np.asarray(series, dtype=float).ravel()
+    n = len(series)
+    sigma = np.std(series) + 1e-12
+
+    fnn_frac = []
+    E_values = list(range(1, min(max_E + 1, max(2, n // 5))))
+    std_atol = atol * sigma
+
+    for E in E_values:
+        stride = (E - 1) * tau
+        N = n - E * tau  # need E+1 coords available for the test
+        if N < E + 3:
+            fnn_frac.append(1.0)
+            continue
+        X = _build_delay_vectors(series, E, tau)
+        # corresponding (E+1)-th coordinate value for each vector
+        X_next = series[stride + tau:stride + tau + len(X)]
+        if len(X_next) < len(X):
+            X = X[:len(X_next)]
+        if len(X) < E + 2:
+            fnn_frac.append(1.0)
+            continue
+        tree = KDTree(X)
+        false_count = 0
+        total = 0
+        for i in range(len(X)):
+            # nearest neighbor excluding self (temporal)
+            k = min(E + 2, len(X))
+            dists, idxs = tree.query(X[i], k=k)
+            dists = np.atleast_1d(dists); idxs = np.atleast_1d(idxs)
+            # take nearest non-self
+            for j_idx, idx in enumerate(idxs):
+                if idx != i and dists[j_idx] > 1e-15:
+                    d_E = dists[j_idx]
+                    nn = idx
+                    break
+            else:
+                continue
+            # distance in E+1 dims: add the (E)-th delayed coordinate difference
+            d_E1 = np.sqrt(d_E ** 2 + (X_next[i] - X_next[nn]) ** 2)
+            if d_E < std_atol:
+                # near-zero base distance — flag as false if jump is large
+                if d_E1 > rtol * std_atol:
+                    false_count += 1
+            else:
+                if np.sqrt(d_E1 ** 2 - d_E ** 2) / d_E > rtol:
+                    false_count += 1
+            total += 1
+        fnn_frac.append(false_count / total if total > 0 else 1.0)
+
+    fnn_frac = np.array(fnn_frac)
+    # optimal E: first E with fnn < 1%
+    below = [E_values[i] for i, f in enumerate(fnn_frac) if f < 0.01]
+    optimal_E = below[0] if below else int(E_values[int(np.argmin(fnn_frac))])
+
+    return {
+        'E_values': E_values,
+        'fnn_fraction': fnn_frac.tolist(),
+        'optimal_E': optimal_E,
+        'method': 'kennel_1992',
+        'rtol': rtol,
+        'atol': atol,
     }
 
 
