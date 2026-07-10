@@ -1,149 +1,147 @@
-# edm-takens.skill 修正性对比报告
+# edm-takens.skill 演进对比报告
 
-## 1. 文件形态变化
-
-| 旧版本 | 新版本 | 说明 |
-|--------|--------|------|
-| `F:\攻略\研发测试\.skills\edm-takens\`（展开目录） | `F:\攻略\研发测试\edm-takens.skill`（单个二进制包） | 新版本是 ZIP 打包的 skill 分发包，文件大小约 177 KB，可用 `python -m zipfile -e edm-takens.skill .` 解压。 |
-
-新版本本质上是旧目录的 **打包 + Round 9 独立审计修复** 后的产物。
+> 追踪 Skill 从最初 7 条规则到当前 14 条规则完整实现 + 双案例 + 文献溯源体系的全部变更。
 
 ---
 
-## 2. 总体修正定位：Round 9 独立重审计
+## 1. 版本演变总览
 
-CHANGELOG 把这次更新命名为 **"Round 9 (independent audit + fix)"**，核心特点是：
-
-- 没有从之前的审计报告出发找问题，而是**直接执行每个模块的 `__main__` 自测**，现场发现 bug。
-- 其中两个 bug（tau 审计状态、Lorenz 代理数据检验）是模块自带自测本来就失败/边缘化的，但 `run_tests.py` 之前根本不跑这些自测，所以一直没暴露。
+| 阶段 | 规则 | 案例 | 文献 | 主要变化 |
+|------|------|------|------|---------|
+| **原始版** (7/7) | 7 条，无溯源 | 仅 `demo.py` | 核心 6 篇 | 基础 EDM/HAVOK/CCM 管线 |
+| **Round 9** (7/8) | 7 条，代码修复 | 无变化 | +端点匹配文献 | CCM 唯一真源、tau 审计修复、IAAFT 端点匹配 |
+| **工程审计** (7/8-9) | 7→14 条设计 | 无变化 | +33 篇论文 | `forbidden_rules_reference.md` 扩展至 14 条 + `[C][D][E]` 溯源标注 |
+| **案例落地** (7/9-10) | 14 条设计 | 音神 + 游戏数据 | 已完备 | `examples/yinshen/` + `examples/game_analysis/` 自包含案例 |
+| **AI 代码实现** (7/10) | 14 条实现 | 无变化 | 已完备 | S8-S14 代码落地、`ccm_batch_test`、`common_driver_disclaimer` |
+| **第二轮 AI 精修** (7/11) | 14 条实现 | 无变化 | 已完备 | Inf/NaN 边界防御、`analysis_type` 参数、S11 输出集成 |
+| **当前版本** | **14 条设计+实现** | **双案例** | **39 篇** | 全部合并完成 |
 
 ---
 
-## 3. 关键修正项（按重要性排序）
-
-### 3.1 CCM 因果判定逻辑统一（最重要）
-
-**问题性质**：同一套 CCM 因果测试在 `final_interpretation.py` 和 `enhanced_cross_validate.py` 里各自实现了一次，且规则不一致：
-
-- `ccm_with_convergence()`：要求 cross-map skill 必须收敛（total_rise > 0.05、Spearman rho > 0.7、p < 0.1）才给出因果结论。
-- `verify_ccm_direction()`：只看最大 library size 处的 rho，**不做收敛检查**，而且两者用的 library-size 范围不同（`'5 {n-2} 3'` vs `'5 25 5'`）。
-- 更糟的是 `pipeline.py` 事后审计只传了裸 rho，没传收敛指标；`edm_auditor` 默认把缺失收敛数据当成“已收敛”，导致高但非收敛的虚假 rho 能直接过防火墙。
-
-**修正**：
-- 新增 `src/ccm_causality.py`，作为**唯一的规范化收敛感知 CCM 测试实现**。
-- `final_interpretation.ccm_with_convergence()` 和 `enhanced_cross_validate.verify_ccm_direction()` 都变成它的薄包装。
-- `pipeline.py` 的事后审计现在显式传递 `total_rise`、`spearman_rho` 等收敛指标，防火墙真正生效。
-- 默认 library-size 范围统一为数据长度自适应的 `'5 {n-2} 3'`。
-
-**实际效果**：在示例 game_log.csv 上重新跑 `python src/pipeline.py`，现在会正确输出：
+## 2. 规则体系：7 → 14
 
 ```
-[!!] Secret 2: CCM Victim Mirror: ... Reverse rho high (rev=0.558) but NOT converging. Possible false positive
+原始 7 条:                              扩展为 14 条:
+S1 Lyapunov Horizon                    S1 Lyapunov Horizon
+S2 CCM Victim Mirror                   S2 CCM Victim Mirror
+S3 Hankel Golden Ratio                 S3 Hankel Golden Ratio
+S4 Multiview Embedding                 S4 Multiview Embedding
+S5 SVD Residual Monitor               S5 SVD Residual Monitor
+S6 EDM-HAVOK Cross-Validation          S6 EDM-HAVOK Cross-Validation
+S7 CCM Arrow Trap                      S7 CCM Arrow Trap
+                                       ─────────────────────
+                                       S8 Stationarity Gate
+                                       S9 Observation Genericity
+                                       S10 Seasonality Confound
+                                       S11 Common Driver Disclaimer
+                                       S12 Prediction Decay Profile
+                                       S13 Multiple Comparison Correction
+                                       S14 Nonlinear Sampling Adequacy
 ```
 
-而旧版本会把这条警告**静默吞掉**。
+每条规则现在标注了：
+- `[G]`/`[D]`/`[I]` 三性质分类（关卡/诊断/解释）
+- ★★★★/★★★/★★/★ 四档强度权重
+- `[C]`/`[D]`/`[E]` 三类数值溯源（规范值/推导值/工程启发值）
+- 按数据画像 (N, K, 二元, 分析目标) 的激活矩阵
 
 ---
 
-### 3.2 tau 审计 FAIL/WARN 状态判定 bug
+## 3. 核心架构演进
 
-**问题性质**：`edm_auditor.audit_tau_selection()` 用 `any("0.5" in i for i in issues)` 来判定是否该 FAIL。但实际渲染消息时用的是百分比（如 `"75%"`），永远不会出现 `"0.5"` 这个子串，所以超 50% 窗口的情况**永远被降级成 WARN**。
-
-**修正**：引入显式 `critical` 布尔标志，超 50% 窗口直接置 `critical=True`，再据此返回 FAIL。
-
-**暴露方式**：该模块自带的 `__main__` 自测本来就在断言 FAIL，但旧版本返回 WARN，自测失败——只是 `run_tests.py` 以前不跑这个自测。
-
----
-
-### 3.3 IAAFT 代理数据缺少端点匹配（endpoint matching）
-
-**问题性质**：`surrogate_test.iaaft_surrogates()` 在 FFT 相位随机化前没有端点匹配。FFT 默认信号周期性，真实非周期时间序列的首尾值差异会被当作“跳变”，相位随机化后变成宽带高频能量，污染 HAVOK 强迫项峰度。
-
-**影响**：在 1000 点 Lorenz-x 段上，代理数据的 HAVOK kurtosis 达到真实值的 3–5 倍（最高 16.5 vs 真实 3.4），导致本应是混沌的序列反而无法通过代理检验。
-
-**修正**：按 Theiler & Prichard (1996) 做端点匹配：先减去首尾连线的线性斜坡，FFT/IAAFT 后再加回斜坡。
-
-**附加修正**：
-- 显著性边界从 `p_value < 0.05` 改为 `p_value <= 0.05`，因为 n_surrogates=19 时最小可达 p 值恰好是 0.05，严格小于永远无法显著。
-- 自测的 n_surrogates 从 19 提升到 99，让检验有真实余量而非坐在边界上。
+| 维度 | 旧版 | 当前版 |
+|------|------|--------|
+| **防火墙层数** | 1 层 (auditor) | **3 层纵深防御** |
+| **CCM 因果判定** | 2 处独立实现，规则不一致 | `ccm_causality.py` 唯一真源 |
+| **HAVOK 稳定性** | 3 处硬编码阈值 | `classify_havok_stability()` 单一真源 |
+| **Hankel 比** | 2 处硬编码阈值 | `classify_hankel_ratio()` 共享函数 |
+| **规则激活** | 全部执行 | **按数据画像智能分流** |
+| **多重比较** | 无 | `ccm_batch_test()` + FDR/Bonferroni |
+| **公共驱动** | 无声明 | 所有 CCM 输出自动附带 (S11) |
+| **分析类型** | 硬编码 "exploratory" | `analysis_type` 参数化 (驱动 S13) |
 
 ---
 
-### 3.4 HAVOK 退化输入导致 explained_var_ 静默 NaN
+## 4. 关键 Bug 修复历程
 
-**问题性质**：输入几乎恒定时，归一化 Hankel 矩阵总能量接近 0，累积解释方差变成 `0/0 = NaN`，并静默传入下游报告和审计，导致 `explained_var_ > 0.7` 这类比较无意义失败。
+### Round 9 (独立重审计)
+| Bug | 影响 | 修复 |
+|-----|------|------|
+| CCM 判定逻辑重复+不一致 | 同一数据可能得到不同因果结论 | `ccm_causality.py` 唯一真源 |
+| tau 审计 FAIL 永远降级为 WARN | 超限嵌入窗口无法被拦截 | 显式 `critical` 布尔标志 |
+| IAAFT 缺少端点匹配 | 代理数据 kurtosis 虚高 3-5x | Theiler & Prichard (1996) 端点匹配 |
+| HAVOK 退化输入静默 NaN | `explained_var_` 成 NaN 传播 | 显式 0.0 + 警告 |
+| Logistic 基准退化初始值 | 混沌检测自测永远失败 | x0 0.5 → 0.2 |
 
-**修正**：在 `sovereign_havok.fit()` 和 `_auto_truncate()` 中检测总能量 < 1e-24 的退化情况，显式返回 `explained_var_ = 0.0`，配合已有的“近恒定输入”警告保持失败可诊断。
+### Round 10 (14 规则扩展)
+- `forbidden_rules_reference.md` 从 165 行 → 1128 行
+- `fourteen_rules_bibliography.md` (39 篇论文, 按规则索引)
+- 数值溯源体系 `[C][D][E]` 覆盖全部 63 个阈值
 
----
+### Round 11 (纯噪声收敛防御)
+| Bug | 影响 | 修复 |
+|-----|------|------|
+| CCM `is_converging` 被纯噪声满足 | 无信号的噪声对被标为"收敛" | `abs(final_rho) > strong_direction_rho` 加入收敛判定 |
 
-### 3.5 Logistic 映射基准测试使用退化初始值
-
-**问题性质**：`verify_algorithms._test_logistic()` 在 r=4.0 混沌分支用 `x0=0.5`。0.5 是 logistic 映射在 r=4 时的精确临界点：x₁=1.0，x₂=0.0，之后永远为 0。由于 0.5 和 1.0 在 float64 中可精确表示，这个“测度为零”的退化轨道被确定性地命中，整个序列变成常数 0。
-
-**修正**：改用 `x0=0.2`，这是混沌理论教材中避免此退化点的标准做法。
-
----
-
-### 3.6 HAVOK 稳定性分级在 3 处重复实现
-
-**问题性质**：`sovereign_havok.diagnose()`、`pipeline.py`、`enhanced_cross_validate.py` 都各自实现了 `|λ_d| > 1.05` / `< 0.90` 的分级逻辑。虽然当前一致，但未来改一个就会漂移。
-
-**修正**：在 `sovereign_havok.py` 新增 `classify_havok_stability()`，三处统一调用这个单一真源（和之前 `classify_hankel_ratio` 的 DRY 修复一致）。
-
----
-
-## 4. 新增文件
-
-| 文件 | 作用 |
-|------|------|
-| `src/ccm_causality.py` | 规范化收敛感知 CCM 测试，统一 `final_interpretation` 和 `enhanced_cross_validate` 的因果判定逻辑。 |
-| 隐式新增 | `sovereign_havok.classify_havok_stability()` 函数（虽然仍在同名模块内，但属于新增单一真源）。 |
+### Round 12 (边界防御)
+- Inf/NaN 过滤：S9 泛型性检查不再将 ±Inf 计为"合法唯一值"
+- `pipeline.py` 早期 NaN/Inf 拦截：在 Layer 2 计算之前就拒绝坏数据
 
 ---
 
-## 5. 测试与质量流程改进
+## 5. 案例体系
 
-### 5.1 `run_tests.py` 新增 Layer 7：模块自测子进程执行
+| 案例 | N | 数据类型 | 验证的关键规则 |
+|------|---|---------|-------------|
+| **游戏数据** | 32 | 连续+二元混合 | S3 Hankel 自动修正, S9 二元目标 |
+| **音神序列** | 120 | 类别整数编码 | S2 CCM-E 一致性, S6 EDM-HAVOK 分歧 |
 
-旧版本 `run_tests.py` 只跑自己实现的 Layers 1–6，从不执行各模块底部的 `if __name__ == '__main__':` 自测块。Round 9 发现的多个 bug 正是这些自测本来会抓到的：
-
-- `edm_auditor.py` 自测断言 tau FAIL 但得 WARN；
-- `surrogate_test.py` Lorenz 自测在 n=19 时无法达到 p<0.05；
-- `verify_algorithms.py` logistic 自测命中退化轨道。
-
-**修正**：`run_tests.py` 新增 `test_module_self_tests()`，用 subprocess 逐一运行每个模块的自测，并检查退出码。快速模式跑 11 个模块，完整模式再加 2 个慢模块。
+每个案例自包含：`run_analysis.py` + `README.md` + `data/` + `figures/`。
 
 ---
 
-## 6. 文档与元数据更新
+## 6. 文件结构变化
 
-- `SKILL.md` 在 "Reviewer Improvements" 表中新增条目 #10–#16，逐项说明上述修复。
-- `CHANGELOG.md` 新增 "2026-07-08 — Round 9" 章节，详细记录每个 bug 的发现路径、修复方式和验证结果。
-- `secret_adoption_audit.md` 和 `docs/thresholds_and_heuristics.md` 也有同步更新。
+```
+旧版:                                  当前版:
+edm-takens/                            edm-takens/
+├── data/game_log.csv                  ├── examples/
+├── examples/demo.py                   │   ├── game_analysis/    ← 自包含案例
+└── ...                                │   └── yinshen/          ← 自包含案例
+                                       ├── references/
+                                       │   ├── forbidden_rules_reference.md  (7→14条)
+                                       │   └── fourteen_rules_bibliography.md ← 新增
+                                       └── docs/
+                                           ├── edm-takens-skill-intro.md      ← 新增
+                                           └── edm-takens-skill-diff-report.md ← 本文件
+```
+
+核心源文件增量：
+- `edm_auditor.py`: +S8/S9/S10 实现 + Inf/NaN 过滤
+- `ccm_causality.py`: +S11/S13 + Round 11 纯噪声防御
+- `sovereign_havok.py`: +S14 采样充分性 + `edm_guided_havok`
+- `final_interpretation.py`: +HAVOK 集成 + S11 输出
+- `pipeline.py`: +`analysis_type` 参数 + 早期 NaN/Inf 拦截
 
 ---
 
-## 7. 对使用者的实际影响
+## 7. 使用建议
 
-| 场景 | 旧版本 | 新版本 |
-|------|--------|--------|
-| 运行 `python run_tests.py` | 可能通过，但隐藏了多个自测失败 | 会暴露各模块自测失败 |
-| 跑 sample game_log 的 CCM | 高反向 rho 可能直接过审 | 会提示“反向 rho 高但不收敛，可能是假阳性” |
-| 对非周期序列做 IAAFT 代理检验 | 代理 kurtosis 虚高，可能把真混沌判为不显著 | 端点匹配后更可靠 |
-| 输入近恒定数据 | explained_var_ 静默 NaN | 显式 0.0 + 警告 |
-| 引用 HAVOK 稳定性标签 | 三处可能漂移 | 统一调用，不会漂移 |
+```bash
+# 解包
+python -m zipfile -e edm-takens.skill .
 
----
+# 安装依赖
+cd edm-takens
+pip install -r requirements.txt
 
-## 8. 建议后续操作
+# 运行案例
+python examples/game_analysis/run_analysis.py   # 32 场游戏
+python examples/yinshen/run_analysis.py          # 120 音素序列
 
-1. 解压新版本并替换 `.skills\edm-takens\` 目录：
-   ```bash
-   python -m zipfile -e "F:\攻略\研发测试\edm-takens.skill" "F:\攻略\研发测试\.skills"
-   ```
-2. 运行完整测试验证：
-   ```bash
-   python run_tests.py
-   ```
-3. 如需保留旧版本，先重命名 `.skills\edm-takens` 为 `.skills\edm-takens-old` 再解压。
+# 通用管线
+python run_pipeline.py --data your_data.csv --target result --auto-fix
+
+# 完整测试
+python run_tests.py
+```
