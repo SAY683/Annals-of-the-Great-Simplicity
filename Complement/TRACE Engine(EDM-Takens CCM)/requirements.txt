@@ -1,0 +1,6 @@
+torch>=2.0
+transformers>=4.40
+sentencepiece>=0.2
+numpy>=1.26
+tokenizers>=0.19
+accelerate>=0.20

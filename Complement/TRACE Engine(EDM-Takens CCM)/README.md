@@ -4,6 +4,39 @@
 >
 > **领域专用 · 无需联网 · 即插即用**
 
+## 自洽 CLI — 一键因果分析
+
+```bash
+# 最简用法: 指定文本, 自动完成一切
+python trrace_cli.py --data my_text.txt
+
+# 指定精度 + 输出名
+python trrace_cli.py --data article.txt --preset standard --output my_report
+
+# 快速探索 (3-5 分钟)
+python trrace_cli.py --data text.txt --preset explore
+```
+
+**自洽逻辑**: 读取文本 → 检测类型 (论述/叙事) → 检测长度 → 选择模型 → 运行四合一线 → 三格式输出。
+
+### 输出
+
+| 文件 | 内容 |
+|------|------|
+| `{output}.md` | 因果分析报告 (Markdown) |
+| `{output}.json` | 结构化数据 (可程序化消费) |
+| `{output}_edges.csv` | 因果边列表 (导入 Gephi/NetworkX) |
+
+### 精度预设
+
+| preset | 时间 | 说明 |
+|--------|------|------|
+| explore | 3-5 min | 快速判断 |
+| light | 10-15 min | **默认推荐** |
+| standard | 20-30 min | 正式分析 |
+| heavy | 30-40 min | 高精度 |
+| full | 50+ min | 归档级 |
+
 ---
 
 ## 环境配置
