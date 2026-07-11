@@ -463,6 +463,7 @@ class TRACE2DoWhy:
         random_state: int = 42,
         max_edges_for_dowhy: int = 20,
         filter_mode: str = "top_n",
+        filter_percentile: float = 90,
     ):
         self.adj_matrix = np.asarray(adj_matrix)
         self.token_list = list(token_list)
@@ -473,9 +474,9 @@ class TRACE2DoWhy:
         self.rng = np.random.default_rng(random_state)
 
         # v3: 自适应过滤参数
-        self.max_edges_for_dowhy = 20  # DoWhy 在 >50 边的 DOT 图上极慢
-        self.filter_mode = "top_n"     # "top_n" | "percentile" | "threshold"
-        self.filter_percentile = 90    # 用于 "percentile" 模式
+        self.max_edges_for_dowhy = max_edges_for_dowhy
+        self.filter_mode = filter_mode
+        self.filter_percentile = filter_percentile
 
         # 管线状态
         self.concept_map: dict = {}
@@ -554,9 +555,30 @@ class TRACE2DoWhy:
         self.concept_names = unique_concepts
         self.concept_idx = concept_idx
 
+        # ── v6: UNK 率感知 + 阈值自适应建议 ──
+        unk_count = sum(1 for t in self.token_list if t in ('<unk>', '▁<unk>'))
+        unk_rate = unk_count / max(T, 1)
+        n_unique = len(set(self.token_list))
+        self.unk_rate = unk_rate
         self._log(f"Token {T} → Concept {C} "
                   f"(高频={len(high_freq)}, "
                   f"低频={sum(1 for i in range(T) if self.token_list[i] not in high_freq)})")
+
+        if unk_rate > 0.2:
+            self._log(f"⚠ UNK rate={unk_rate:.1%} (严重跨域). "
+                      f"强烈建议: 使用 Instant TRACE 训练专属模型. "
+                      f"当前 τ={self.threshold} 可能过高, 建议 τ≤0.05.")
+        elif unk_rate > 0.05:
+            self._log(f"⚠ UNK rate={unk_rate:.1%} (中度跨域). "
+                      f"建议: 降低阈值 τ≤0.1 以捕获弱信号.")
+        elif unk_rate > 0.01:
+            self._log(f"UNK rate={unk_rate:.1%} (正常).")
+
+        # 叙事文启发式: token 种类少 + 段落多 → 叙事文 → 建议低 τ
+        if n_unique < T * 0.15 and T > 500:
+            self._log(f"文本类型推测: 叙事文 (unique tokens={n_unique}/{T}={n_unique/T:.1%}). "
+                      f"建议 τ=0.05-0.15.")
+
         return concept_map
 
     # ── 步骤 1: 构建因果模型 ─────────────────────────────────────────

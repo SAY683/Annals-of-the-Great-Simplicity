@@ -137,3 +137,31 @@ def _is_valid_concept(name):
 | 小型 (500-2K) | 10-30 | 5-15 | ✓ | △ 模拟 | ✗ | ✓ |
 | 中型 (2K-10K) | 30-100 | 10-30 | ✓ | ✓ (top-8) | △ | ✓ |
 | 大型 (>10K) | >100 | >30 | ✓ | ✓ (top-15) | ✓ | ✓ |
+
+---
+
+## EC-8: 跨域模型 UNK 率稀释 ΔNLL
+
+**症状**: 使用领域 A 训练的模型分析领域 B 的文本时，ΔNLL 信号极弱，即使降低阈值也只能获得少量显著边。
+
+**触发条件**:
+- 跨域 TRACE（如 Shehui-LLaMA [古典中文] → 知乎文本 [现代白话]）
+- UNK rate > 5%
+
+**实测案例**: 知乎网友.txt (5932 chars, 叙事文)
+- Shehui-LLaMA (古典): UNK=11.7%, τ=0.05 → 10 edges, max ΔNLL=1.12
+- Instant TRACE (专域): UNK=0.1%,  τ=1.0  → 22 edges, max ΔNLL=6.24
+- **差距**: 30x ΔNLL 差异，边数 2.2x
+
+**机制**: UNK token 没有嵌入向量 → 自回归模型对 UNK 的预测是纯随机 → 掩码 UNK 对 NLL 几乎无影响 → ΔNLL 弱。
+
+**缓解**:
+- **首选**: 运行 Instant TRACE (`python TRACE/scripts/instant_trrace.py --data zhihu.txt`)
+  - 自动训练 BPE tokenizer + 微型 LLaMA → UNK=0%
+  - 时间: 5-10 min（轻量）或 80+ min（完整）
+- **次选**: 降低 τ 到 0.05-0.1（本次测试方案）
+  - 捕获弱信号，但噪声增加
+  - 配合 concept_min_freq=3 过滤噪声
+- **文本类型检测**: `aggregate_concepts()` 中已添加 UNK 率 + 叙事文自动检测，输出阈值建议
+
+**当前状态**: v6 已在 `aggregate_concepts()` 中添加自动 WARN + 阈值建议。
