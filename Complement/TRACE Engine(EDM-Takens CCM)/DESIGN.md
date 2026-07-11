@@ -1,8 +1,8 @@
 # TRACE Engine Skill — Design Philosophy & Business Logic
 
-## Architecture: Defense in Depth
+## Architecture: Defense in Depth (Six Layers)
 
-The Skill implements three concentric protection layers. Each layer catches
+The Skill implements six concentric protection layers. Each layer catches
 different classes of failure before they can produce garbage causal graphs.
 
 ```
@@ -12,38 +12,46 @@ different classes of failure before they can produce garbage causal graphs.
 │  - PyTorch + CUDA version, VRAM availability                │
 │  - transformers / sentencepiece / numpy deps                │
 │  - Model files present and loadable                         │
-│  - Generates pip-freeze version report                      │
 ├─────────────────────────────────────────────────────────────┤
 │  LAYER 2: Configuration Audit (Firewall)                    │  ← trace_plus.py
 │  "Is this TRACE request physically possible?"               │
-│  - Sequence length vs model max_pos (256 → auto-truncate)   │
+│  - Sequence length vs model max_pos → auto-truncate          │
 │  - VRAM budget (model + batch × seq_len × vocab)            │
 │  - Threshold validity (0 < τ < 20)                          │
-│  - Window size safety (w < max_pos)                         │
-│  - BLOCKS: seq_len > 10000 on 4GB GPU → segment first       │
 │  - AUTO-CORRECTS: max_batch reduced when VRAM low            │
-│  - WARNS: seq_len < 10, threshold extremes                  │
 ├─────────────────────────────────────────────────────────────┤
-│  LAYER 3: Cross-Validation                                  │  ← ccm_causality.py
+│  LAYER 3: CCM Cross-Validation                              │  ← ccm_causality.py
 │  "Do two independent methods agree?"                        │
 │  - TRACE (ΔNLL via LLM) vs CCM (cross-map via dynamics)     │
 │  - Both agree → HIGH CONFIDENCE                              │
 │  - One agrees, one not → MEDIUM CONFIDENCE (inspect)         │
-│  - Neither → LOW CONFIDENCE (likely spurious)                │
-│  - Ghost token baseline subtraction (control for syntax)     │
-│  - Percentile-based significance filtering                   │
+├─────────────────────────────────────────────────────────────┤
+│  LAYER 4: DoWhy Formal Causal Inference  ★NEW (v5)          │  ← counterfactual_bridge.py
+│  "Is the effect identifiable? Statistically robust?"       │
+│  - Model (DAG+SCM) → Identify (do-calculus)                 │
+│  - Estimate (ATE+95%CI) → Refute (3 refuters)               │
+├─────────────────────────────────────────────────────────────┤
+│  LAYER 5: Counterfactual Query Engine  ★NEW (v5)            │  ← PearlCounterfactual
+│  "What if X were different?"                                │
+│  - Abduction → Action → Prediction (Pearl 3-step)           │
+│  - Independent of DoWhy-GCM (pure numpy implementation)     │
+├─────────────────────────────────────────────────────────────┤
+│  LAYER 6: causallearn Independent Validation  ★NEW (v5)     │  ← CausalLearnValidator
+│  "Do constraint/score-based search algorithms agree?"       │
+│  - PC (constraint-based), GES (score-based), FCI (latent)   │
+│  - Cross-compare with TRACE edges                           │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-## Design Note: Four Instruments, Four Dimensions
+## Design Note: Six Instruments, Six Dimensions
 
-> **业务环节措辞说明**: 以下对四合一线四个算法组件的描述使用了物理测量仪器的
-> 比喻语言（探照灯/测谎仪/节拍器/X光机）。这不属于修辞膨胀——每个比喻精确
-> 对应了该算法在文本诊断中测量的物理维度，是整个 Skill 设计哲学的核心隐喻。
+> **业务环节措辞说明**: 以下对六合一线六个算法组件的描述使用了物理测量仪器的
+> 比喻语言（探照灯/测谎仪/节拍器/X光机/反事实镜/独立验证）。这不属于修辞膨胀——
+> 每个比喻精确对应了该算法在文本诊断中测量的物理维度，是整个 Skill 设计哲学的核心隐喻。
 
-The four-algorithm pipeline (TRACE + CCM + EDM + HAVOK) is not a redundant
-ensemble — each component measures a **distinct physical dimension** of the
-text, analogous to four independent scientific instruments:
+The six-algorithm pipeline (TRACE + CCM + EDM + HAVOK + DoWhy/Counterfactual + causallearn)
+is not a redundant ensemble — each component measures a **distinct physical dimension**
+of the text, analogous to six independent scientific instruments:
 
 | Algorithm | Instrument | Dimension Measured | Diagnostic Signal |
 |-----------|-----------|-------------------|-------------------|
@@ -51,19 +59,25 @@ text, analogous to four independent scientific instruments:
 | **CCM** | 测谎仪 (Lie Detector) | Nonlinear entanglement verification | Convergence slope; its *failure* is a critical signal: "no deep logic loops — do not search for nonlinear causality" |
 | **EDM** | 节拍器 (Metronome) | Temporal rigidity / structural skeleton | ρ predictability of discourse markers (e.g. "但是" ρ=0.99 → strong narrative structure) |
 | **HAVOK** | X光机 (X-ray) | Hidden singularities / forcing terms | Linear vs. nonlinear energy partition; identifies "mutation points" where the narrative trajectory bends |
+| **DoWhy** | 法槌 (Gavel) | Formal identifiability + refutation | ATE + 95%CI; 3-layer refutation; do-calculus guarantees the effect is estimable from observational data |
+| **Counterfactual** | 反事实镜 (Mirror) | What-if reasoning | ITE (Individual Treatment Effect); Pearl 3-step: Abduction → Action → Prediction |
+| **causallearn** | 第三人 (Third Witness) | Independent graph search verification | PC/FCI/GES edges; cross-comparison with TRACE |
 
 **Key design insight — composite diagnosis**: A single algorithm's output is
-a measurement; the *pattern across all four* is the diagnosis. Example:
+a measurement; the *pattern across all six* is the diagnosis. Example:
 
-- CCM fails + EDM ρ>0.9 + HAVOK linear>80% → **tightly-structured linear
+- CCM fails + EDM ρ>0.9 + HAVOK linear>80% + DoWhy refutes all → **tightly-structured linear
   narrative with identifiable turning points** (not an argumentative text)
-- CCM converges + EDM ρ moderate + HAVOK nonlinear>30% → **argumentative
-  text with recursive logical entanglement**
+- CCM converges + EDM ρ moderate + HAVOK nonlinear>30% + DoWhy passes refutation →
+  **argumentative text with recursive logical entanglement**
+- TRACE dense + CCM moderate + DoWhy identifies + Counterfactual ITE large →
+  **high-stakes argument where rhetorical structure has measurable causal force**
 
-The four-in-one system does not produce "wrong answers" — it produces a
+The six-in-one system does not produce "wrong answers" — it produces a
 **complete topological portrait** of the text. Each component's "failure"
 is as informative as its success. See `examples/zhihu_consensus/README.md`
-for a worked demonstration.
+for the four-instrument demonstration, and `examples/counterfactual_hybrid/DESIGN_FIVE_IN_ONE.md`
+for the full six-instrument architecture.
 
 ## Auto-Correction Philosophy
 
@@ -296,8 +310,20 @@ trace-engine/
 ├── SKILL.md                          ← Master entry point (architecture, training, integration)
 ├── DESIGN.md                         ← This file (philosophy, scenarios, edge cases)
 │
+├── examples/
+│   ├── zhihu_consensus/              ← 四合一线完整案例（叙事文）
+│   └── counterfactual_hybrid/        ← ★ 五合一 + DoWhy + Counterfactual
+│       ├── README.md                 ← DoWhy/反事实概念说明
+│       ├── DESIGN_FIVE_IN_ONE.md     ← 五合一工程设计文档
+│       ├── counterfactual_bridge.py  ← TRACE→DoWhy 桥接模块 (v2)
+│       ├── test_case.py              ← 10 项测试套件
+│       └── outputs/
+│           ├── counterfactual_report.md
+│           ├── causal_graph.png
+│           └── causal_graph.svg
+│
 ├── ../TRACE/                         ← Implementation (project root)
-│   ├── README.md                     ← Project overview
+│   ├── README.md
 │   ├── TRACE_MATH.md                 ← Mathematical foundations + engineering decisions
 │   ├── scripts/
 │   │   ├── trace.py                  ← Base TRACE engine (GPT-2/LLaMA, batch, long doc)
@@ -305,24 +331,25 @@ trace-engine/
 │   │   ├── train_shenji_llama.py     ← Epic domain LLaMA training
 │   │   ├── train_shehui_llama.py     ← Classical society LLaMA training
 │   │   ├── instant_trrace.py         ← Train-on-target pipeline
-│   │   ├── standalone_trrace.py      ← Shenji independent loader
-│   │   ├── qwen_infer.py             ← Qwen baseline comparison
-│   │   └── check_env.py              ← Environment validation
+│   │   ├── presets.py                ← Training preset system (v3)
+│   │   └── ...
 │   ├── models/                       ← Trained model registry
 │   └── outputs/                      ← Analysis reports
 │
 │   Portable copy:
 │   └── Complement/TRACE Engine(EDM-Takens CCM)/
-│       ├── README.md                 ← Portable package docs
+│       ├── README.md
 │       ├── trrace_loader.py          ← Unified loader (auto-detect LLaMA)
 │       ├── Shehui-LLaMA/             ← Classical Chinese society model (16M)
 │       └── Shenji-LLaMA/             ← Epic narrative model (42M)
 └──
     Integration with:
-    └── edm-takens/                    ← CCM cross-validation + HAVOK decomposition
-        ├── src/ccm_causality.py       ← Convergence-aware CCM test
-        ├── src/sovereign_havok.py     ← Koopman decomposition
-        └── src/edm_auditor.py         ← Firewall auditor (reference pattern)
+    ├── edm-takens/                    ← CCM cross-validation + HAVOK decomposition
+    │   ├── src/ccm_causality.py       ← Convergence-aware CCM test
+    │   └── src/sovereign_havok.py     ← Koopman decomposition
+    │
+    └── counterfactual_hybrid/         ← DoWhy + Pearl CF + causallearn (v5 new)
+        └── counterfactual_bridge.py   ← Six-layer bridge module
 ```
 
 ## Speed-Quality Tradeoff: Training Presets

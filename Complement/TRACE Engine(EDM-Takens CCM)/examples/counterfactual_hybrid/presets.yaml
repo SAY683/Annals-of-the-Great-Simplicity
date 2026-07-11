@@ -1,0 +1,109 @@
+# Counterfactual Sentai — 统一参数预设 (五合一云参数)
+# ============================================================
+# 对标 edm-takens references/thresholds_and_heuristics.md 的参数集中管理。
+#
+# 设计原则:
+#   - 每个参数有默认值、范围、文档说明
+#   - 预设按使用场景分组 (demo / standard / production / archival)
+#   - 支持 YAML 加载和 Python dict 访问
+#
+# 用法:
+#   from presets import load_presets
+#   p = load_presets("standard")
+#   bridge = TRACE2DoWhy(adj, tokens, **p.trace2dowhy)
+#   auditor = DoWhyAuditor(bridge, **p.auditor)
+
+# ═══════════════════════════════════════════════════════
+# TRACE → DoWhy 桥接参数
+# ═══════════════════════════════════════════════════════
+trace2dowhy:
+  threshold: 0.5           # ΔNLL 因果边显著性阈值 {0.1-5.0}
+  concept_min_freq: 2      # Token 最小出现次数 → 概念节点 {1-10}
+  max_edges_for_dowhy: 8   # DoWhy DOT 图最大边数 {3-50}
+  filter_mode: "topn"      # 边过滤模式 {topn, percentile, adaptive}
+  filter_percentile: 85    # percentile 模式的百分位 {50-99}
+  random_state: 42         # 随机种子
+
+# ═══════════════════════════════════════════════════════
+# DoWhy 因果推断参数
+# ═══════════════════════════════════════════════════════
+dowhy:
+  estimation_method: "backdoor.linear_regression"  # 估计方法
+  refutation_deviation_threshold: 0.3  # 反驳偏差阈值 (30%) {0.1-0.5}
+  confidence_level: 0.95              # 置信水平 {0.8-0.99}
+
+# ═══════════════════════════════════════════════════════
+# Pearl 反事实推理参数
+# ═══════════════════════════════════════════════════════
+counterfactual:
+  treatment_value: 1.0     # 默认处理值
+  control_value: 0.0       # 默认对照值
+  scan_top_n: 5            # 批量扫描边数 {1-20}
+  sem_regularization: null # SEM 正则化 {null, "ridge", "lasso"}
+  sem_alpha: 0.01          # 正则化强度 {0.001-1.0}
+
+# ═══════════════════════════════════════════════════════
+# 审计防火墙参数
+# ═══════════════════════════════════════════════════════
+auditor:
+  strict_mode: false       # true: FAIL → 阻断管线; false: FAIL → WARN
+  min_n_per_v_ratio: 5.0   # N/V 最小比值 (R3 规则) {2-10}
+
+# ═══════════════════════════════════════════════════════
+# 可视化参数
+# ═══════════════════════════════════════════════════════
+visualization:
+  dpi: 150                 # 输出分辨率 {72-300}
+  format: "png"            # 输出格式 {png, pdf, svg}
+  show_confidence: true    # 是否显示置信区间
+  cjk_font: "SimHei"       # 中文字体
+
+# ═══════════════════════════════════════════════════════
+# 预设场景
+# ═══════════════════════════════════════════════════════
+presets:
+  demo:                    # 模拟数据演示 (零依赖)
+    trace2dowhy:
+      threshold: 0.5
+      concept_min_freq: 2
+      max_edges_for_dowhy: 8
+
+  standard:                # 标准五合一分析
+    trace2dowhy:
+      threshold: 0.3
+      concept_min_freq: 3
+      max_edges_for_dowhy: 8
+    counterfactual:
+      scan_top_n: 5
+
+  deep:                    # 深度因果分析
+    trace2dowhy:
+      threshold: 0.2
+      concept_min_freq: 2
+      max_edges_for_dowhy: 15
+      filter_mode: "percentile"
+      filter_percentile: 80
+    counterfactual:
+      scan_top_n: 10
+      sem_regularization: "ridge"
+    auditor:
+      strict_mode: true
+    visualization:
+      dpi: 300
+
+  archival:                # 归档级 (最高精度)
+    trace2dowhy:
+      threshold: 0.1
+      concept_min_freq: 1
+      max_edges_for_dowhy: 20
+      filter_mode: "adaptive"
+    counterfactual:
+      scan_top_n: 20
+      sem_regularization: "ridge"
+      sem_alpha: 0.001
+    auditor:
+      strict_mode: true
+      min_n_per_v_ratio: 10.0
+    visualization:
+      dpi: 300
+      format: "svg"

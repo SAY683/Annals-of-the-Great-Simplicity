@@ -1,8 +1,23 @@
-# TRACE Engine — 便携因果发现工具包
+# TRACE Engine — 便携因果发现工具包 v5
 
-> 基于自回归密度估计 (ΔNLL) + EDM-Takens CCM 交叉验证的因果发现引擎
+> 基于自回归密度估计 (ΔNLL) + EDM-Takens CCM 交叉验证 + DoWhy 反事实推理的五合一因果发现引擎
 >
-> **领域专用 · 无需联网 · 即插即用**
+> **领域专用 · 无需联网 · 即插即用 · 独立移植**
+
+## 五合一因果战队 (Counterfactual Sentai)
+
+```
+┌────────┬────────────┬──────────────┬──────────────────────────┐
+│ 战士    │ 称号        │ 武器          │ 必杀技                    │
+├────────┼────────────┼──────────────┼──────────────────────────┤
+│ TRACE  │ 🔴 拓扑先锋  │ 状态空间重构剑  │ 零噪·因果斩 (ΔNLL>8→发现)   │
+│ CCM    │ 🔵 流形力场  │ 交叉映射盾      │ 收敛·验证壁 (ρ<3%→震碎)     │
+│ EDM    │ 🟡 时序节拍器│ Simplex锁链    │ 套路·探测链 (ρ>0.9→揭露)    │
+│ HAVOK  │ ⚫ 混沌暗杀者│ 稀疏强迫匕首    │ 奇点·刺杀 (forcing>5→击破)  │
+│ DoWhy  │ 🟡 金·造物主│ do-calculus领域 │ 逻辑崩塌 (ITE≠0→确证)       │
+└────────┴────────────┴──────────────┴──────────────────────────┘
+合体: 五合一·因果拓扑画像  |  口号: "不是投票，是测绘"
+```
 
 ## 自洽 CLI — 一键因果分析
 
@@ -13,11 +28,13 @@ python trrace_cli.py --data my_text.txt
 # 指定精度 + 输出名
 python trrace_cli.py --data article.txt --preset standard --output my_report
 
-# 快速探索 (3-5 分钟)
-python trrace_cli.py --data text.txt --preset explore
-```
+# 五合一完整管线 (需要 DoWhy + causallearn)
+cd examples/counterfactual_hybrid
+PYTHONIOENCODING=utf-8 python test_case.py
 
-**自洽逻辑**: 读取文本 → 检测类型 (论述/叙事) → 检测长度 → 选择模型 → 运行四合一线 → 三格式输出。
+# 真实 TRACE 数据五合一管线
+PYTHONIOENCODING=utf-8 python run_real_pipeline.py
+```
 
 ### 输出
 
@@ -26,22 +43,13 @@ python trrace_cli.py --data text.txt --preset explore
 | `{output}.md` | 因果分析报告 (Markdown) |
 | `{output}.json` | 结构化数据 (可程序化消费) |
 | `{output}_edges.csv` | 因果边列表 (导入 Gephi/NetworkX) |
-
-### 精度预设
-
-| preset | 时间 | 说明 |
-|--------|------|------|
-| explore | 3-5 min | 快速判断 |
-| light | 10-15 min | **默认推荐** |
-| standard | 20-30 min | 正式分析 |
-| heavy | 30-40 min | 高精度 |
-| full | 50+ min | 归档级 |
+| `enhanced_dashboard.png` | 四面板因果诊断仪表板 (需五合一模式) |
 
 ---
 
 ## 环境配置
 
-### 最低要求
+### 最低要求 (核心 TRACE)
 
 | 组件 | 版本 | 说明 |
 |------|------|------|
@@ -51,16 +59,20 @@ python trrace_cli.py --data text.txt --preset explore
 | SentencePiece | >= 0.2 | BPE 分词器 |
 | NumPy | >= 2.0 | |
 
-### 安装
+### 因果推断扩展 (推荐 — 启用五合一 Layer 4-6)
 
 ```bash
-pip install torch transformers sentencepiece numpy
+pip install dowhy networkx pandas statsmodels scikit-learn -i https://pypi.tuna.tsinghua.edu.cn/simple
 ```
 
-GPU 推荐 (CUDA 12.x):
+### 独立验证 + 可视化 (可选)
+
 ```bash
-pip install torch --index-url https://download.pytorch.org/whl/cu121
+pip install causal-learn graphviz -i https://pypi.tuna.tsinghua.edu.cn/simple
 ```
+
+> **Graphviz 系统二进制**: Python 包之外还需系统级 `dot` 二进制。
+> Windows: https://graphviz.org/download/ → 安装后重启终端。验证: `dot -V`
 
 ### 硬件
 
@@ -76,70 +88,86 @@ pip install torch --index-url https://download.pytorch.org/whl/cu121
 ```
 TRACE Engine(EDM-Takens CCM)/
 │
-├── README.md                  ← 本文件
-├── trrace_loader.py           ← 统一加载器 (自动适配 LLaMA)
+├── README.md                       ← 本文件
+├── SKILL.md                        ← Skill 主入口 (六层防御 + 六维诊断)
+├── DESIGN.md                       ← 设计哲学 + 业务场景 + 边界情况
+├── trrace_loader.py                ← 统一加载器 (自动适配 LLaMA)
+├── trrace_cli.py                   ← 自洽 CLI (一键分析)
+├── presets.py                      ← 训练预设系统
 │
-├── Shehui-LLaMA/              ← 社会/哲学因果模型
+├── examples/
+│   ├── zhihu_consensus/            ← 四合一线案例 (叙事文)
+│   │   └── README.md
+│   │
+│   └── counterfactual_hybrid/      ← ★ 五合一 + DoWhy + Counterfactual
+│       ├── README.md               ← DoWhy/反事实概念说明
+│       ├── DESIGN_FIVE_IN_ONE.md   ← 五合一工程设计 (600行)
+│       ├── counterfactual_bridge.py← TRACE→DoWhy 桥接模块 (v2, 850行)
+│       ├── dowhy_auditor.py        ← 9-rule 审计防火墙
+│       ├── enhanced_viz.py         ← 4-面板增强仪表板
+│       ├── test_case.py            ← 10-项测试套件
+│       ├── run_real_pipeline.py    ← 真实数据一键管线
+│       └── references/
+│           ├── forbidden_rules.md  ← 9 条禁则 + 采纳追踪
+│           └── edge_cases.md       ← 7 个文档化边界情况
+│
+├── Shehui-LLaMA/                   ← 社会/哲学因果模型
 │   ├── MODEL_REFERENCE.md
 │   ├── model.safetensors      (63 MB)
 │   ├── config.json
 │   ├── spm.model / spm.vocab
 │   └── ...
 │
-└── Shenji-LLaMA/              ← 神纪史诗因果模型
-    ├── MODEL_REFERENCE.md
-    ├── model.safetensors      (169 MB)
-    ├── config.json
-    ├── spm.model / spm.vocab
-    └── ...
+├── Shenji-LLaMA/                   ← 神纪史诗因果模型
+│   ├── MODEL_REFERENCE.md
+│   ├── model.safetensors      (169 MB)
+│   ├── config.json
+│   ├── spm.model / spm.vocab
+│   └── ...
+│
+└── references/
+    ├── forbidden_rules_reference.md ← EDM-Takens 14 禁则
+    ├── edge_cases_reference.md      ← 数据体制缓解策略
+    └── research-rigor.md            ← 研究严谨性指南
 ```
 
 ---
 
 ## 快速使用
 
-### 代码调用
+### TRACE 基础调用
 
 ```python
 from trrace_loader import load_model, trace
 
-# 加载模型 (自动检测 LLaMA 架构)
 model, sp, info = load_model("Shehui-LLaMA")
-print(f"Loaded: {info['params']/1e6:.0f}M params, {info['vocab']} vocab")
-
-# 运行 TRACE
 result = trace(model, sp, "你的文本内容...", threshold=0.5)
-print(f"Found {len(result['edges'])} causal edges in {result['elapsed']:.1f}s")
-
-# 查看因果对
-for (i,j), s in sorted(result['edges'].items(), key=lambda x: x[1], reverse=True)[:10]:
-    c = result['tokens'][i].replace('▁','')
-    e = result['tokens'][j].replace('▁','')
-    print(f"  [{c}] -> [{e}]  ({s:.3f})")
+# result['edges']: {(i,j): ΔNLL, ...}
+# result['tokens']: ["token1", "token2", ...]
 ```
 
-### 命令行
+### 五合一编程 API
 
-```bash
-python trrace_loader.py                    # 列出可用模型
-python -c "
-from trrace_loader import *
-model, sp, _ = load_model('Shehui-LLaMA')
-r = trace(model, sp, '你的文本')
-for (i,j),s in r['edges'].items(): print(r['tokens'][i],'->',r['tokens'][j],s)
-"
+```python
+import sys
+sys.path.insert(0, 'examples/counterfactual_hybrid')
+from counterfactual_bridge import quick_analysis
+from dowhy_auditor import DoWhyAuditor
+from enhanced_viz import render_dashboard
+
+# 一键管线
+bridge = quick_analysis(adj_matrix, token_list, threshold=0.5)
+
+# 审计防火墙 (9 条 Forbidden Rules — 对标 edm-takens 14 Secrets)
+auditor = DoWhyAuditor(bridge)
+report = auditor.audit('full')
+report.print_report()
+if report.verdict == 'FAIL':
+    raise SystemExit("Fix before trusting results")
+
+# 增强仪表板
+render_dashboard(bridge, 'outputs/dashboard.png')
 ```
-
----
-
-## 模型选择指南
-
-| 场景 | 推荐模型 | 原因 |
-|------|---------|------|
-| 古典中文/社会哲学/易经 | **Shehui-LLaMA** | 训练数据匹配, 15.7M, 极低 loss=0.01 |
-| 神纪史诗/神话/叙事 | **Shenji-LLaMA** | 专属领域, 42.1M, 更高精度 |
-| 通用现代文本 | **专区模型** | 用目标文本训练 2 分钟即可获得完美词表 |
-| 最高精度 (任意文本) | **Qwen2.5-1.5B** | 通用, 但速度仅 4 pairs/s |
 
 ---
 
@@ -147,16 +175,20 @@ for (i,j),s in r['edges'].items(): print(r['tokens'][i],'->',r['tokens'][j],s)
 
 ```
 TRACE (Temporal Reconstruction via Autoregressive Causal Estimation)
+  1. 自回归模型 = 条件密度估计器 P(x_t | x_{<t})
+  2. 掩码干预: 将 history 中的 xi 替换为 <mask>
+  3. 因果强度 = NLL_masked - NLL_normal
 
-1. 自回归模型 = 条件密度估计器 P(x_t | x_{<t})
-2. 掩码干预: 将 history 中的 xi 替换为 <mask>
-3. 因果强度 = NLL_masked - NLL_normal
+CCM (Convergent Cross Mapping)
+  4. 从 Y 的历史重建 X 的状态 (交叉映射)
+  5. 重建精度随样本量收敛 → X causes Y
 
-ΔNLL > 0 → xi 是 xj 的原因 (掩码后预测变差)
-ΔNLL ≈ 0 → 无关
+DoWhy + Counterfactual (Pearl do-calculus)
+  6. Model → Identify → Estimate → Refute
+  7. Abduction → Action → Prediction (反事实三步)
 ```
 
-详见项目 `TRACE/TRACE_MATH.md`
+详见: `SKILL.md`, `DESIGN.md`, `DESIGN_FIVE_IN_ONE.md`
 
 ---
 
@@ -164,8 +196,11 @@ TRACE (Temporal Reconstruction via Autoregressive Causal Estimation)
 
 1. **领域锁定**: 模型只在训练数据领域有效, 跨域需重新训练
 2. **序列长度**: 训练窗口 256 tokens, 长文本需分段分析
-3. **训练数据**: 11-42M 模型需要 30K+ chars 训练数据才能充分收敛
-4. **即时应变**: 对陌生文本可 2 分钟训练临时模型, 但 ΔNLL 信号弱 (需 50+ epochs)
+3. **DoWhy 图规模**: 精简图模式限制 top-8 边 (可调), 101+ 概念时自动降级
+4. **SEM 稳定性**: N < 5×V 时 Pearl 反事实系数有波动 (R3 规则 WARN)
+5. **causallearn**: 小样本 (N<200) 时返回 0 边 — 这证明了 TRACE 的不可替代性
+
+---
 
 ## 维护
 
@@ -175,4 +210,4 @@ TRACE (Temporal Reconstruction via Autoregressive Causal Estimation)
 
 ---
 
-*最后更新: 2026-07-10*
+*最后更新: 2026-07-11 | TRACE Engine v5 (Five-in-One)*

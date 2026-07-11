@@ -3,10 +3,12 @@ name: trace-engine
 description: >
   TRACE causal discovery engine — train a miniature autoregressive model
   on target-domain text, then run masked-intervention ΔNLL to recover
-  causal graphs from single token sequences. Includes LLaMA/GPT-2 training
-  pipeline, CCM cross-validation bridge, auditor firewall, and portable
-  model packaging. Domain-specific (not general-purpose). Integrates with
-  EDM-Takens HAVOK for nonlinear forcing decomposition of causal matrices.
+  causal graphs from single token sequences. Five-in-One heterogeneous
+  defense architecture: TRACE (探照灯) + CCM (测谎仪) + EDM (节拍器) +
+  HAVOK (X光机) + DoWhy/Counterfactual (第五维反事实推理). Includes
+  LLaMA/GPT-2 training pipeline, CCM cross-validation bridge, auditor
+  firewall, causallearn PC/GES validation, Graphviz DAG visualization,
+  and portable model packaging.
 ---
 
 # TRACE Engine Skill
@@ -280,6 +282,116 @@ TRACE/
 - CCM: Sugihara et al., "Detecting Causality in Complex Ecosystems", Science 2012
 - HAVOK: Brunton et al., "Chaos as an Intermittently Forced Linear System", Nature Comms 2017
 - EDM-Takens skill: `.skills/edm-takens/SKILL.md`
+- DoWhy: Sharma & Kiciman, "DoWhy: An End-to-End Library for Causal Inference", arXiv:2011.04216
+- Counterfactuals: Pearl, "Causality: Models, Reasoning, and Inference", Cambridge 2009
+
+## Five-in-One Architecture (五合一异质性防御)
+
+TRACE Engine v5 实现了六层防御 + 六个独立诊断维度:
+
+```
+Layer 1: Environment Validation     → PyTorch, CUDA, VRAM
+Layer 2: Configuration Firewall     → seq_len, threshold, VRAM budget
+Layer 3: CCM Cross-Validation       → TRACE vs CCM convergence
+Layer 4: DoWhy do-calculus          → Model → Identify → Estimate → Refute
+Layer 5: Pearl Counterfactual       → Abduction → Action → Prediction
+Layer 6: causallearn PC/FCI/GES     → 独立图搜索算法验证
+```
+
+### 六维诊断矩阵（因果战队 / Counterfactual Sentai）
+
+| # | 代号 | 战士 | Instrument | Algorithm | Measurement | Best For |
+|---|------|------|-----------|-----------|-------------|----------|
+| 1 | 🔴 红 | 拓扑先锋 | 探照灯 | TRACE ΔNLL | Token 级因果边 | 任何文本 |
+| 2 | 🔵 蓝 | 流形力场 | 测谎仪 | CCM | 非线性纠缠验证 | 论证文 (>3 次重复) |
+| 3 | 🟡 黄 | 时序节拍器 | 套路探测器 | EDM ρ | 时间结构骨架 | 叙事文 |
+| 4 | ⚫ 黑 | 混沌暗杀者 | X光机 | HAVOK | 隐藏驱动力 | 因果矩阵 > 50×50 |
+| 5 | 🟡 金 | 反事实造物主 | 思想实验引擎 | DoWhy+Pearl CF | 可识别性+反事实 | 论证文 (有向路径) |
+| 6 | ⬜ 银 | 独立验证者 | 第三人 | PC/FCI/GES | 统计因果发现 | 大数据 (N >> V) |
+
+**核心设计原则**: 每个组件测量不同的物理维度。组件的"失败"也是一个诊断信号。
+六战士合体 = **因果拓扑画像 (Complete Topological Portrait)**。
+"不是投票，是测绘。"
+
+### 运行五合一管线
+
+```bash
+# 完整测试套件 (模拟数据, 10 项)
+cd f:/攻略/研发测试
+PYTHONIOENCODING=utf-8 python .skills/trace-engine/examples/counterfactual_hybrid/test_case.py
+
+# 真实 TRACE 数据管线 (需要已训练的 Shehui-LLaMA 模型)
+PYTHONIOENCODING=utf-8 python .skills/trace-engine/examples/counterfactual_hybrid/run_real_pipeline.py
+```
+
+### 生产级编程 API
+
+```python
+import sys
+sys.path.insert(0, '.skills/trace-engine/examples/counterfactual_hybrid')
+
+from counterfactual_bridge import TRACE2DoWhy, quick_analysis
+from dowhy_auditor import DoWhyAuditor
+from enhanced_viz import render_dashboard
+
+# 一键管线
+bridge = quick_analysis(adj_matrix, token_list, threshold=0.5)
+
+# 审计防火墙 (9 条 Forbidden Rules)
+auditor = DoWhyAuditor(bridge)
+audit_report = auditor.audit('full')
+audit_report.print_report()
+if audit_report.verdict == 'FAIL':
+    raise SystemExit("Fix configuration before trusting results")
+
+# 增强仪表板
+render_dashboard(bridge, 'outputs/dashboard.png')
+
+# 综合报告
+print(bridge.report())
+```
+# 完整测试
+cd f:/攻略/研发测试
+PYTHONIOENCODING=utf-8 python .skills/trace-engine/examples/counterfactual_hybrid/test_case.py
+
+# 编程 API
+from counterfactual_bridge import TRACE2DoWhy
+bridge = TRACE2DoWhy(adj_matrix, token_list)
+bridge.build_model()
+bridge.identify(treatment="算法推荐", outcome="信息茧房")
+bridge.estimate()
+bridge.refute()
+bridge.counterfactual_scan(n_top_edges=5)
+bridge.causallearn_validate()
+bridge.visualize("causal_graph")
+print(bridge.report())
+```
+
+详见: `examples/counterfactual_hybrid/DESIGN_FIVE_IN_ONE.md`
+
+## Environment Dependencies
+
+### 核心 (必需)
+```
+torch>=2.0, transformers>=4.40, sentencepiece>=0.2, numpy>=1.24
+```
+
+### 因果推断扩展 (推荐)
+```bash
+pip install dowhy networkx pandas statsmodels scikit-learn -i https://pypi.tuna.tsinghua.edu.cn/simple
+```
+
+### 独立验证 + 可视化 (可选)
+```bash
+pip install causal-learn graphviz -i https://pypi.tuna.tsinghua.edu.cn/simple
+```
+
+### Graphviz 系统二进制
+```bash
+# Windows: 下载 https://graphviz.org/download/
+# 安装后 PATH 已通过 ~/.bashrc 自动配置
+dot -V  # 验证
+```
 
 ## Sampling Optimization for TRACE Training
 
