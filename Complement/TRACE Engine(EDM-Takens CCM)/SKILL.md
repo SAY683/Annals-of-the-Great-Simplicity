@@ -16,12 +16,24 @@ with EDM-Takens CCM cross-validation and HAVOK decomposition.
 
 ## Quick Start
 
+### CLI (一键分析)
+
+```bash
+# 最简: 指定文本, 自动完成一切
+python trrace_cli.py --data my_text.txt
+
+# 指定精度 + 输出名
+python trrace_cli.py --data article.txt --preset standard --output my_report
+```
+
+### Code API
+
 ```python
 # 1. Train a domain model (target text = training data)
 #    Run: python TRACE/scripts/train_shenji_llama.py
 #    Output: TRACE/models/<name>/  (portable, ~63-169 MB)
 
-# 2. Run TRACE causal discovery
+# 2. Load + run TRACE (portable — works from any directory)
 from trrace_loader import load_model, trace
 model, sp, info = load_model("Shehui-LLaMA")
 result = trace(model, sp, "你的文本...", threshold=0.5)
