@@ -4,7 +4,7 @@ TRACE → DoWhy Counterfactual Bridge v2
 将 TRACE 引擎的因果发现结果桥接到 DoWhy 的正式因果推断框架。
 v2 新增: DoWhy 0.14 兼容 + causallearn (PC/FCI/GES) + Graphviz 可视化。
 
-五合一架构:
+六合一架构:
   Layer 1-2: TRACE Auditor (环境+配置)     ← trace_plus.py
   Layer 3:   CCM Cross-Validation          ← ccm_causality.py
   Layer 4:   DoWhy 识别 + 三层反驳          ← 本模块
@@ -910,7 +910,7 @@ class TRACE2DoWhy:
         使用 causallearn 的 PC 和 GES 算法进行独立因果发现，
         并与 TRACE 的结果交叉验证。
 
-        这是五合一架构中的第六验证维度:
+        这是六合一架构中的第六验证维度:
         - TRACE (探照灯): token 级因果发现
         - CCM (测谎仪): 非线性交叉映射
         - EDM (节拍器): 时间结构骨架
@@ -1042,7 +1042,7 @@ class TRACE2DoWhy:
     # ── 综合报告 ─────────────────────────────────────────────────────
 
     def report(self) -> str:
-        """生成 Markdown 格式的五合一（+六维）诊断报告"""
+        """生成 Markdown 格式的六合一（+六维）诊断报告"""
         n_edges = len(self.significant_edges)
         n_concepts = len(self.concept_names)
         n_refuted = sum(
@@ -1252,7 +1252,7 @@ def from_trace_output(trace_result: dict, threshold: float = 0.5,
 
 
 def quick_analysis(adj_matrix, token_list, threshold=0.5):
-    """一键运行完整的五合一管线并返回 bridge"""
+    """一键运行完整的六合一管线并返回 bridge"""
     bridge = TRACE2DoWhy(adj_matrix, token_list, threshold=threshold)
     bridge.build_model()
     bridge.identify()

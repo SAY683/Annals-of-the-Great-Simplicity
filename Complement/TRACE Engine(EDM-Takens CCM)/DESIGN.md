@@ -26,17 +26,17 @@ different classes of failure before they can produce garbage causal graphs.
 │  - Both agree → HIGH CONFIDENCE                              │
 │  - One agrees, one not → MEDIUM CONFIDENCE (inspect)         │
 ├─────────────────────────────────────────────────────────────┤
-│  LAYER 4: DoWhy Formal Causal Inference  ★NEW (v5)          │  ← counterfactual_bridge.py
+│  LAYER 4: DoWhy Formal Causal Inference  ★NEW (v6)          │  ← counterfactual_bridge.py
 │  "Is the effect identifiable? Statistically robust?"       │
 │  - Model (DAG+SCM) → Identify (do-calculus)                 │
 │  - Estimate (ATE+95%CI) → Refute (3 refuters)               │
 ├─────────────────────────────────────────────────────────────┤
-│  LAYER 5: Counterfactual Query Engine  ★NEW (v5)            │  ← PearlCounterfactual
+│  LAYER 5: Counterfactual Query Engine  ★NEW (v6)            │  ← PearlCounterfactual
 │  "What if X were different?"                                │
 │  - Abduction → Action → Prediction (Pearl 3-step)           │
 │  - Independent of DoWhy-GCM (pure numpy implementation)     │
 ├─────────────────────────────────────────────────────────────┤
-│  LAYER 6: causallearn Independent Validation  ★NEW (v5)     │  ← CausalLearnValidator
+│  LAYER 6: causallearn Independent Validation  ★NEW (v6)     │  ← CausalLearnValidator
 │  "Do constraint/score-based search algorithms agree?"       │
 │  - PC (constraint-based), GES (score-based), FCI (latent)   │
 │  - Cross-compare with TRACE edges                           │
@@ -312,9 +312,9 @@ trace-engine/
 │
 ├── examples/
 │   ├── zhihu_consensus/              ← 四合一线完整案例（叙事文）
-│   └── counterfactual_hybrid/        ← ★ 五合一 + DoWhy + Counterfactual
+│   └── counterfactual_hybrid/        ← ★ 六合一 + DoWhy + Counterfactual
 │       ├── README.md                 ← DoWhy/反事实概念说明
-│       ├── DESIGN_FIVE_IN_ONE.md     ← 五合一工程设计文档
+│       ├── DESIGN_FIVE_IN_ONE.md     ← 六合一工程设计文档
 │       ├── counterfactual_bridge.py  ← TRACE→DoWhy 桥接模块 (v2)
 │       ├── test_case.py              ← 10 项测试套件
 │       └── outputs/
@@ -348,7 +348,7 @@ trace-engine/
     │   ├── src/ccm_causality.py       ← Convergence-aware CCM test
     │   └── src/sovereign_havok.py     ← Koopman decomposition
     │
-    └── counterfactual_hybrid/         ← DoWhy + Pearl CF + causallearn (v5 new)
+    └── counterfactual_hybrid/         ← DoWhy + Pearl CF + causallearn (v6 new)
         └── counterfactual_bridge.py   ← Six-layer bridge module
 ```
 

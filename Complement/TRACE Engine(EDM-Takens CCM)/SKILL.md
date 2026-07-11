@@ -3,12 +3,10 @@ name: trace-engine
 description: >
   TRACE causal discovery engine — train a miniature autoregressive model
   on target-domain text, then run masked-intervention ΔNLL to recover
-  causal graphs from single token sequences. Five-in-One heterogeneous
-  defense architecture: TRACE (探照灯) + CCM (测谎仪) + EDM (节拍器) +
-  HAVOK (X光机) + DoWhy/Counterfactual (第五维反事实推理). Includes
-  LLaMA/GPT-2 training pipeline, CCM cross-validation bridge, auditor
-  firewall, causallearn PC/GES validation, Graphviz DAG visualization,
-  and portable model packaging.
+  causal graphs from single token sequences. Six-in-One heterogeneous
+  defense architecture: TRACE (🔴拓扑先锋) + CCM (🔵流形力场) + EDM (🟡节拍器) +
+  HAVOK (⚫混沌暗杀者) + DoWhy/Counterfactual (🟡反事实造物主) + causallearn (⬜独立验证者).
+  因果战队 (Counterfactual Sentai) — 六战士合体 = 因果拓扑画像.
 ---
 
 # TRACE Engine Skill
@@ -285,9 +283,9 @@ TRACE/
 - DoWhy: Sharma & Kiciman, "DoWhy: An End-to-End Library for Causal Inference", arXiv:2011.04216
 - Counterfactuals: Pearl, "Causality: Models, Reasoning, and Inference", Cambridge 2009
 
-## Five-in-One Architecture (五合一异质性防御)
+## Six-in-One Architecture (六合一异质性防御 · 因果战队 Counterfactual Sentai)
 
-TRACE Engine v5 实现了六层防御 + 六个独立诊断维度:
+TRACE Engine v6 实现了六层防御 + 六个独立诊断维度:
 
 ```
 Layer 1: Environment Validation     → PyTorch, CUDA, VRAM
@@ -313,7 +311,7 @@ Layer 6: causallearn PC/FCI/GES     → 独立图搜索算法验证
 六战士合体 = **因果拓扑画像 (Complete Topological Portrait)**。
 "不是投票，是测绘。"
 
-### 运行五合一管线
+### 运行六合一管线
 
 ```bash
 # 完整测试套件 (模拟数据, 10 项)

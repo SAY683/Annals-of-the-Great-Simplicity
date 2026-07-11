@@ -1,8 +1,8 @@
 """
-Real-Data Five-in-One Pipeline
+Real-Data Six-in-One Pipeline
 ===============================
 使用已训练的 Shehui-LLaMA 模型，在真实 TRACE Skill 案例文本上
-运行完整的五合一管线（TRACE → DoWhy → Counterfactual → Auditor → Viz）。
+运行完整的六合一管线（TRACE → DoWhy → Counterfactual → Auditor → Viz）。
 
 输入: TRACE Skill 案例文本 (自动检测)
 模型: Shehui-LLaMA (15.7M, 8L/320d, vocab=4000, loss=0.01)
@@ -66,7 +66,7 @@ def log(msg):
 
 def main():
     print("=" * 60)
-    print("  Real-Data Five-in-One Pipeline")
+    print("  Real-Data Six-in-One Pipeline")
     print(f"  Model: Shehui-LLaMA  |  Text: {TEXT_FILE.name}")
     print("=" * 60)
 

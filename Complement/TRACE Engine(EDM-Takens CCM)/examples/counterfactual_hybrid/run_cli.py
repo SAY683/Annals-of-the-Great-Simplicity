@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-因果战队 CLI — 五合一管线统一入口
+因果战队 CLI — 六合一管线统一入口
 ===================================
-Counterfactual Sentai — Five-in-One Pipeline CLI
+Counterfactual Sentai — Six-in-One Pipeline CLI
 
 对标 edm-takens/examples/*/run_analysis.py 的自洽设计：
 - 自动检测 graphviz 并配置 PATH
@@ -294,7 +294,7 @@ COMMANDS = {
 
 def main():
     if len(sys.argv) < 2 or sys.argv[1] not in COMMANDS:
-        print("因果战队 CLI — 五合一管线统一入口")
+        print("因果战队 CLI — 六合一管线统一入口")
         print(f"\n用法: python run_cli.py <command>\n")
         for name, (_, desc) in COMMANDS.items():
             print(f"  {name:8s}  {desc}")

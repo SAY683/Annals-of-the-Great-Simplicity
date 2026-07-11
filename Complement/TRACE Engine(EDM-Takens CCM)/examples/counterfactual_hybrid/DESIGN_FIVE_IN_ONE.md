@@ -1,8 +1,10 @@
-# Five-in-One Causal Discovery Architecture — Engineering Design
+# Six-in-One Causal Discovery Architecture — Engineering Design
 
-> TRACE + CCM + EDM + HAVOK + DoWhy/Counterfactual
+> TRACE + CCM + EDM + HAVOK + DoWhy/Counterfactual + causallearn
 >
-> 五合一异质性因果发现架构：从 token 级因果发现到 Pearl 反事实推理的完整管线
+> 六合一异质性因果发现架构：从 token 级因果发现到 Pearl 反事实推理的完整管线
+>
+> **因果战队 (Counterfactual Sentai)**: 六战士合体 = 因果拓扑画像
 
 ---
 
@@ -58,7 +60,7 @@
         └───────────────────────────────┼───────────────────────────────┘
                                         │
                          ┌──────────────┴───────────────────┐
-                         │  OUTPUT: 五合一综合诊断报告        │
+                         │  OUTPUT: 六合一综合诊断报告        │
                          │  + DAG 可视化 (graphviz)          │
                          └──────────────────────────────────┘
 ```
@@ -168,7 +170,7 @@ TRACE sparse + CCM fails + EDM ρ intermediate + HAVOK linear>70%
 
 **依赖**: `dowhy>=0.14`, `networkx`, `statsmodels`, `scikit-learn`, `pandas`
 
-### 4.1 DoWhy 在五合一中的角色
+### 4.1 DoWhy 在六合一中的角色
 
 DoWhy 填补了 TRACE 四合一线无法回答的问题：
 
@@ -325,7 +327,7 @@ ITE = +0.25
 
 这是 DoWhy 的正常行为——do-calculus 需要 treatment 到 outcome 之间存在有向路径。桥梁代码已修复：默认 treatment/outcome 使用最强边的 source/target。
 
-### 7.3 DoWhy 对五合一的价值定位
+### 7.3 DoWhy 对六合一的价值定位
 
 | 场景 | DoWhy 贡献 |
 |------|-----------|
@@ -347,7 +349,7 @@ ITE = +0.25
 | `sentencepiece` | ≥0.2 | BPE tokenizer | ✓ |
 | `numpy` | ≥1.24 | 矩阵运算 | ✓ |
 
-### 8.2 因果推断扩展（五合一 Layer 4-6）
+### 8.2 因果推断扩展（六合一 Layer 4-6）
 
 | 包 | 版本 | 用途 | 必需？ |
 |---|------|------|:---:|
@@ -394,9 +396,9 @@ pip install causal-learn graphviz -i https://pypi.tuna.tsinghua.edu.cn/simple
 │   ├── zhihu_consensus/               ← 四合一线完整案例（叙事文）
 │   │   └── README.md
 │   │
-│   └── counterfactual_hybrid/         ← ★ 五合一 + DoWhy + Counterfactual
+│   └── counterfactual_hybrid/         ← ★ 六合一 + DoWhy + Counterfactual
 │       ├── README.md                  ← DoWhy/反事实概念说明
-│       ├── DESIGN_FIVE_IN_ONE.md      ← 本文件 — 五合一工程设计
+│       ├── DESIGN_FIVE_IN_ONE.md      ← 本文件 — 六合一工程设计
 │       ├── counterfactual_bridge.py   ← TRACE→DoWhy 桥接模块 (v2)
 │       ├── test_case.py               ← 10 项测试套件
 │       └── outputs/
@@ -431,4 +433,4 @@ pip install causal-learn graphviz -i https://pypi.tuna.tsinghua.edu.cn/simple
 
 ---
 
-*文档日期: 2026-07-11 | TRACE Engine v5 (Five-in-One)*
+*文档日期: 2026-07-11 | TRACE Engine v6 (Six-in-One)*

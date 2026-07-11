@@ -1,4 +1,4 @@
-# Counterfactual Sentai — 统一参数预设 (五合一云参数)
+# Counterfactual Sentai — 统一参数预设 (六合一云参数)
 # ============================================================
 # 对标 edm-takens references/thresholds_and_heuristics.md 的参数集中管理。
 #
@@ -68,7 +68,7 @@ presets:
       concept_min_freq: 2
       max_edges_for_dowhy: 8
 
-  standard:                # 标准五合一分析
+  standard:                # 标准六合一分析
     trace2dowhy:
       threshold: 0.3
       concept_min_freq: 3

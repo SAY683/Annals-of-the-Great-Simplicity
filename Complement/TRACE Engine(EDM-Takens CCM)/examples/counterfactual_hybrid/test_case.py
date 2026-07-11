@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-TRACE + DoWhy + Counterfactual 五合一混合策略 — 测试案例 v2
+TRACE + DoWhy + Counterfactual 六合一混合策略 — 测试案例 v2
 =============================================================
 v2 升级:
   - 真实 DoWhy 0.14 do-calculus（非模拟）
@@ -244,7 +244,7 @@ def test_5_scan(bridge):
 
 def test_6_comparison():
     """仅 TRACE vs TRACE+DoWhy 诊断差异"""
-    banner("测试 6: 五合一诊断维度对比")
+    banner("测试 6: 六合一诊断维度对比")
     print("""
   ┌──────────────────┬────────────────────┬──────────────────────┐
   │ 仅 TRACE          │ +DoWhy (第四维)     │ +Counterfactual (第五维) │
@@ -368,7 +368,7 @@ def test_10_edge_cases(bridge):
 
 def main():
     print("=" * 60)
-    print("  TRACE + DoWhy + Counterfactual 五合一混合策略")
+    print("  TRACE + DoWhy + Counterfactual 六合一混合策略")
     print("  v2 — 真实 do-calculus + causallearn + Graphviz")
     print("=" * 60)
 
@@ -401,7 +401,7 @@ def main():
     print("=" * 60)
 
     print(f"""
-五合一架构核心价值:
+六合一架构核心价值:
 
   Layer 1-2 (TRACE Auditor):  环境+配置验证        ← trace_plus.py
   Layer 3   (CCM):             非线性交叉映射验证     ← ccm_causality.py
