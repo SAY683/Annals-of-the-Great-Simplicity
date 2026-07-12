@@ -387,6 +387,9 @@ pip install causal-learn graphviz -i https://pypi.tuna.tsinghua.edu.cn/simple
 
 ## 9. 文件清单
 
+> 完整禁则: [references/forbidden_rules.md](references/forbidden_rules.md) (9 条规则, 层级映射, EDM-Takens 交叉引用)
+> 边界情况: [references/edge_cases.md](references/edge_cases.md) (8 个文档化边界 + 数据体制速查)
+
 ```
 .skills/trace-engine/
 ├── SKILL.md                           ← 主入口（训练、集成、预设）
@@ -399,12 +402,30 @@ pip install causal-learn graphviz -i https://pypi.tuna.tsinghua.edu.cn/simple
 │   └── counterfactual_hybrid/         ← ★ 六合一 + DoWhy + Counterfactual
 │       ├── README.md                  ← DoWhy/反事实概念说明
 │       ├── DESIGN_FIVE_IN_ONE.md      ← 本文件 — 六合一工程设计
-│       ├── counterfactual_bridge.py   ← TRACE→DoWhy 桥接模块 (v2)
-│       ├── test_case.py               ← 10 项测试套件
+│       ├── counterfactual_bridge.py   ← TRACE→DoWhy 桥接模块 (v2, 1291行)
+│       ├── dowhy_auditor.py           ← 9-rule 审计防火墙 (426行)
+│       ├── enhanced_viz.py            ← 四面板仪表板 (428行)
+│       ├── six_panel_viz.py           ← 六面板仪表板 (312行)
+│       ├── six_warriors.py            ← 六战士编排器 (545行)
+│       ├── run_cli.py                 ← CLI 统一入口 (320行)
+│       ├── run_real_pipeline.py       ← 真实数据管线 (278行)
+│       ├── test_case.py               ← 10 项测试套件 (421行)
+│       ├── _paths.py                  ← 便携路径解析 (120行)
+│       ├── _logging.py                ← 统一日志系统 (77行)
+│       ├── presets.py                 ← 预设加载器 (119行)
+│       ├── presets.yaml               ← 统一参数预设 (109行)
+│       ├── references/
+│       │   ├── forbidden_rules.md     ← 9 条禁则 + 采纳追踪 + 层级映射
+│       │   └── edge_cases.md          ← 8 个文档化边界情况
 │       └── outputs/
-│           ├── counterfactual_report.md  ← 综合诊断报告
-│           ├── causal_graph.png          ← DAG 可视化
-│           └── causal_graph.svg          ← DAG SVG 版
+│           ├── demo/                  ← 模拟数据演示
+│           ├── real/                  ← 真实数据图谱套件
+│           │   ├── six_panel_dashboard.png
+│           │   ├── trace_dnl.png … causallearn_compare.png
+│           │   └── report.md
+│           ├── zhihu/                 ← 知乎跨域案例
+│           ├── cache/                 ← TRACE 中间矩阵
+│           └── logs/                  ← 运行时日志
 │
 └── ../TRACE/                          ← 实现（项目根）
     ├── scripts/

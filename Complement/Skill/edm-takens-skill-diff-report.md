@@ -14,7 +14,7 @@
 | **案例落地** (7/9-10) | 14 条设计 | 音神 + 游戏数据 | 已完备 | `examples/yinshen/` + `examples/game_analysis/` 自包含案例 |
 | **AI 代码实现** (7/10) | 14 条实现 | 无变化 | 已完备 | S8-S14 代码落地、`ccm_batch_test`、`common_driver_disclaimer` |
 | **第二轮 AI 精修** (7/11) | 14 条实现 | 无变化 | 已完备 | Inf/NaN 边界防御、`analysis_type` 参数、S11 输出集成 |
-| **当前版本** | **14 条设计+实现** | **双案例** | **39 篇** | 全部合并完成 |
+| **当前版本** (7/12) | **14 条设计+实现** | **双案例** | **39 篇** | + FDR 方向资格修复 (Round 13) |
 
 ---
 
@@ -86,6 +86,11 @@ S7 CCM Arrow Trap                      S7 CCM Arrow Trap
 ### Round 12 (边界防御)
 - Inf/NaN 过滤：S9 泛型性检查不再将 ±Inf 计为"合法唯一值"
 - `pipeline.py` 早期 NaN/Inf 拦截：在 Layer 2 计算之前就拒绝坏数据
+
+### Round 13 (FDR 方向资格 bug — 7/12 其它AI 来源)
+| Bug | 影响 | 修复 |
+|-----|------|------|
+| `_benjamini_hochberg()` 只检查 `abs(final_rho)` 就接受 p 值，未检查方向是否真正收敛 | 发散方向的 p 值（负 Spearman 确认不收敛）被纳入 FDR 排名，挤占收敛方向的校正名额 | 准入门槛增加 `is_converging` 三条件：total_rise > 0.05、spearman_rho > 0.7、final_rho > strong_direction_rho。附带合成 fixture 回归测试 |
 
 ---
 

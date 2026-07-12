@@ -497,6 +497,8 @@ class TRACE2DoWhy:
         self.pearl_cf: PearlCounterfactual = None
         self.cl_validator: CausalLearnValidator = None
         self.cl_comparison: dict = {}
+        self.bpe_type: str = "unknown"           # v6: BPE 类型检测
+        self.unk_rate: float = 0.0               # v6: UNK 率
 
         # 诊断日志
         self.log: list[str] = []
@@ -553,6 +555,18 @@ class TRACE2DoWhy:
 
         self.concept_map = concept_map
         self.concept_names = unique_concepts
+        # ── v6: BPE 类型检测 ──
+        valid_tokens = [t for t in self.token_list if t not in ('<unk>', '▁<unk>', '<s>', '</s>') and not t.startswith('▁')]
+        n_single_char = sum(1 for t in valid_tokens if len(t.strip()) == 1)
+        single_ratio = n_single_char / max(len(valid_tokens), 1)
+        if single_ratio > 0.6:
+            self.bpe_type = "character"
+            self._log(f"BPE类型: 字级 (single-char ratio={single_ratio:.0%}). "
+                      f"概念将以单字为主. 建议: Instant TRACE 训练词级 BPE.")
+        else:
+            self.bpe_type = "word"
+        # ── end BPE detection ──
+
         self.concept_idx = concept_idx
 
         # ── v6: UNK 率感知 + 阈值自适应建议 ──
@@ -610,20 +624,30 @@ class TRACE2DoWhy:
         # 真实 TRACE 数据可能有数千条边，DoWhy 无法处理。
         # 策略: 过滤 BPE 碎片 + top-N 最强边
         _bpe_fragments = {'<unk>', '<s>', '</s>', '<pad>', '<mask>', '▁'}
+        _cn_stop_chars = set('的了是在和也就都还会要把能被到着过所而为'
+                            '之以其于及与此但若虽因故既且或非')
+        _punct_set = set('，。、；：？！""''（）【】《》…—·,.;:?!“”‘’「」')
+        for _c in [0x201C,0x201D,0x2018,0x2019,0x300C,0x300D,0xFF08,0xFF09,
+                   0x0028,0x0029,0x005B,0x005D,0x007B,0x007D]:
+            _punct_set.add(chr(_c))
+
         def _is_valid_concept(name: str) -> bool:
-            """检查概念名是否适合进入 DOT 图（DoWhy 对特殊字符敏感）"""
-            if not name or len(name) <= 1:
+            """检查概念名是否适合进入 DOT 图（兼容字级和词级 BPE）"""
+            if not name or name in _bpe_fragments:
                 return False
-            if name in _bpe_fragments:
-                return False
-            # 过滤纯标点、空白、BPE 前缀
             if name.startswith('▁'):
                 return False
-            # 过滤含引号/特殊字符的 token（BPE 碎片）
-            if any(c in name for c in ['"', "'", '"', '"', ',', '.', ':', ';', '(', ')', '[', ']']):
+            stripped = name.strip()
+            if not stripped:
                 return False
-            # 过滤纯空白/控制字符
-            if name.strip() == '':
+            # 纯标点
+            if all(ch in _punct_set for ch in stripped):
+                return False
+            # 纯数字
+            if stripped.isdigit():
+                return False
+            # 字级 BPE: 单字虚词过滤
+            if len(stripped) == 1 and stripped in _cn_stop_chars:
                 return False
             if name == '<other>':
                 return False
@@ -679,7 +703,14 @@ class TRACE2DoWhy:
         name_to_idx = {n: i for i, n in enumerate(self.concept_names)}
         self.pearl_cf = PearlCounterfactual(self.sem_coeff, name_to_idx, self.rng)
 
-        # 构建模型
+        # 构建模型 — v6: 概念规模自适应降级
+        DOT_NODES = len(dot_nodes)
+        if not self.simulation and DOT_NODES > 50:
+            self.simulation = True
+            self._log(f"⚠ 概念节点过多 ({DOT_NODES} > 50), DoWhy do-calculus 极慢 → 自动降级为模拟模式")
+        elif not self.simulation and DOT_NODES > 30:
+            self._log(f"⚠ 概念节点较多 ({DOT_NODES} > 30), DoWhy 可能较慢. 建议降低 max_edges_for_dowhy.")
+
         if self.simulation:
             self.model = SimulationModel(
                 graph_edges=[(e[0], e[1]) for e in edges_filtered],

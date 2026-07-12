@@ -212,6 +212,14 @@ def cmd_demo():
 
 def cmd_real():
     """运行真实 TRACE 数据管线"""
+    import json, numpy as np
+    from _logging import setup_logging, log_env_info
+    from _paths import resolve_paths
+
+    paths = resolve_paths()
+    logger = setup_logging(paths.outputs_dir / "logs", "sentai_real")
+    log_env_info(logger)
+
     print("═" * 50)
     print("  因果战队 · 真实 TRACE 数据管线")
     print("═" * 50)
@@ -232,43 +240,60 @@ def cmd_real():
     sys.path.insert(0, str(SKILL_DIR))
     from counterfactual_bridge import TRACE2DoWhy, DoWhy14Adapter
     from dowhy_auditor import DoWhyAuditor
-    from enhanced_viz import render_dashboard
+    from six_warriors import assemble_all_six, render_six_panel_report
+    from six_panel_viz import render_chart_suite
+    from collections import Counter
 
     adj = np.load(str(adj_cache))
     tokens = json.loads(tokens_cache.read_text(encoding='utf-8'))
 
-    print(f"\n[1/4] TRACE → DoWhy 桥接...")
+    print(f"\n[1/5] TRACE → DoWhy 桥接...")
+    logger.info(f"TRACE→DoWhy: threshold={0.3}, min_freq={3}, max_edges={8}")
     bridge = TRACE2DoWhy(adj, tokens, threshold=0.3, concept_min_freq=3, max_edges_for_dowhy=8)
     bridge.aggregate_concepts()
     bridge.build_model()
     bridge.identify()
+    logger.info(f"Concepts: {len(bridge.concept_names)}, Edges: {len(bridge.significant_edges)}, Mode: {bridge.mode_name}")
     print(f"  Tokens: {len(tokens)} → Concepts: {len(bridge.concept_names)} → Edges: {len(bridge.significant_edges)}")
     print(f"  Mode: {bridge.mode_name}")
     for i, e in enumerate(bridge.significant_edges[:6]):
         print(f"    {i+1}. {e[0]:12s} → {e[1]:12s}  ΔNLL={e[2]:.3f}")
 
-    print(f"\n[2/4] 效应估计 + 反驳 + 反事实...")
+    print(f"\n[2/5] 效应估计 + 反驳...")
     bridge.estimate()
     bridge.refute()
-    bridge.counterfactual_scan(n_top_edges=min(5, len(bridge.significant_edges)))
     est = bridge.estimate_result
     ci = DoWhy14Adapter.get_confidence_interval(est)
+    logger.info(f"ATE={est.value:.4f}, CI=[{ci[0]:.4f},{ci[1]:.4f}]")
     print(f"  {bridge.treatment} → {bridge.outcome}")
     print(f"  ATE={est.value:.4f}  95%CI=[{ci[0]:.4f},{ci[1]:.4f}]")
 
-    print(f"\n[3/4] 审计防火墙...")
+    print(f"\n[3/5] 六战士合体...")
+    cards = assemble_all_six(adj, tokens, bridge=bridge)
+    logger.info(f"Six warriors: {', '.join(f'{k}={c.status}' for k,c in cards.items())}")
+    for key, card in cards.items():
+        icon = f'[{card.status.upper()}]'
+        print(f"  {card.color} {card.warrior_id:12s} {icon:14s} {card.verdict}")
+    bridge.counterfactual_scan(n_top_edges=min(5, len(bridge.significant_edges)))
+
+    print(f"\n[4/5] 审计防火墙...")
     auditor = DoWhyAuditor(bridge)
     audit = auditor.audit('full')
+    logger.info(f"Auditor: {audit.verdict} (P={audit.n_pass}, W={audit.n_warn}, F={audit.n_fail})")
     print(f"  Verdict: {audit.verdict} (PASS={audit.n_pass}, WARN={audit.n_warn}, FAIL={audit.n_fail})")
 
-    print(f"\n[4/4] 生成输出...")
-    dash_path = render_dashboard(bridge, str(REAL_DIR / "dashboard.png"), dpi=150)
-    print(f"  仪表板: {dash_path}")
-    report = bridge.report()
+    print(f"\n[5/5] 生成多云化图谱套件...")
+    charts = render_chart_suite(bridge, cards, str(REAL_DIR), dpi=150)
+    logger.info(f"Generated {len(charts)} chart files")
+    for p in charts:
+        print(f"  {p}")
+        logger.debug(f"  Chart: {p}")
+    report = render_six_panel_report(cards) + "\n\n" + bridge.report()
     (REAL_DIR / "report.md").write_text(report, encoding='utf-8')
-    print(f"  报告: {REAL_DIR / 'report.md'} ({len(report)} chars)")
+    logger.info(f"Report: {REAL_DIR / 'report.md'} ({len(report)} chars)")
 
     print(f"\n✅ 完成 — 输出在 {REAL_DIR}")
+    print(f"   日志: {paths.outputs_dir / 'logs'}/{logger.handlers[0].baseFilename if logger.handlers else 'N/A'}")
 
 
 def cmd_clean():

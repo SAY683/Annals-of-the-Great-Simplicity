@@ -100,7 +100,8 @@ class ProjectPaths:
         # 确保输出目录存在
         outputs_dir = bridge_dir / "outputs"
         cache_dir = outputs_dir / "cache"
-        for d in [outputs_dir, cache_dir,
+        logs_dir = outputs_dir / "logs"
+        for d in [outputs_dir, cache_dir, logs_dir,
                   outputs_dir / "demo", outputs_dir / "real"]:
             d.mkdir(parents=True, exist_ok=True)
 
