@@ -6,18 +6,22 @@
   <title>TRACE Engine // Causal Inference Terminal</title>
   <style>
     :root {
-      --bg: #0b0c10;
-      --panel: #111318;
-      --panel-2: #161a21;
-      --panel-3: #1c212b;
-      --text: #c5c6c7;
-      --muted: #6f7888;
+      /* 昭和/平成特摄科技 + 极客暗色主题 */
+      --bg: #08090d;
+      --panel: #0e1016;
+      --panel-2: #14171f;
+      --panel-3: #1b1f2a;
+      --text: #d8dce6;
+      --muted: #6e7787;
       --accent: #66fcf1;
       --accent-dim: #45a29e;
+      --accent-tokusatsu: #ff9f43;
+      --accent-tokusatsu-dim: #c77d30;
       --success: #03c988;
       --warn: #f2c94c;
       --fail: #ff4d4d;
       --border: #2a2f3a;
+      --grid: rgba(102, 252, 241, 0.04);
       --font-mono: "JetBrains Mono", "Fira Code", "Consolas", "SF Mono", monospace;
       --font-ui: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif;
       /* 基础字号：在 1280px 视口约 18px，大屏 22px，小屏 16px，整体可读性优先 */
@@ -31,7 +35,11 @@
       margin: 0;
       padding: 0;
       font-family: var(--font-ui);
-      background: var(--bg);
+      background:
+        var(--bg),
+        linear-gradient(var(--grid) 1px, transparent 1px),
+        linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+      background-size: 100% 100%, 24px 24px, 24px 24px;
       color: var(--text);
       line-height: 1.6;
       min-height: 100vh;
@@ -42,25 +50,28 @@
       font-size: calc(1rem * var(--ui-scale));
     }
 
-    /* 扫描线 */
+    /* 扫描线 + 网格 */
     body::before {
       content: "";
       position: fixed;
       inset: 0;
       pointer-events: none;
-      background: repeating-linear-gradient(
-        0deg,
-        rgba(0, 0, 0, 0) 0px,
-        rgba(0, 0, 0, 0) 1px,
-        rgba(0, 255, 255, 0.02) 2px,
-        rgba(0, 255, 255, 0.02) 3px
-      );
+      background:
+        repeating-linear-gradient(
+          0deg,
+          rgba(0, 0, 0, 0) 0px,
+          rgba(0, 0, 0, 0) 1px,
+          rgba(0, 255, 255, 0.02) 2px,
+          rgba(0, 255, 255, 0.02) 3px
+        );
       z-index: 9999;
     }
 
     header {
-      background: var(--panel);
-      border-bottom: 1px solid var(--border);
+      background:
+        linear-gradient(180deg, rgba(255,159,67,0.04), transparent 40%),
+        var(--panel);
+      border-bottom: 2px solid var(--border);
       padding: clamp(0.9rem, 2.2vw, 1.6rem) clamp(1rem, 3vw, 2rem);
       display: flex;
       align-items: center;
@@ -76,9 +87,31 @@
       bottom: 0;
       left: 0;
       width: 100%;
-      height: 1px;
-      background: linear-gradient(90deg, transparent, var(--accent), transparent);
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--accent-tokusatsu), var(--accent), transparent);
       animation: scan 4s linear infinite;
+    }
+
+    header::before {
+      content: "WARNING: CAUSAL INFERENCE SYSTEM // 因果推断特装型";
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      padding: 0.15rem 0.6rem;
+      font-family: var(--font-mono);
+      font-size: 0.58rem;
+      letter-spacing: 0.12em;
+      color: var(--bg);
+      background: repeating-linear-gradient(
+        45deg,
+        var(--accent-tokusatsu),
+        var(--accent-tokusatsu) 10px,
+        #000 10px,
+        #000 20px
+      );
+      opacity: 0.85;
+      pointer-events: none;
     }
 
     @keyframes scan {
@@ -87,35 +120,44 @@
     }
 
     .logo {
-      width: clamp(40px, 4.5vw, 54px);
-      height: clamp(40px, 4.5vw, 54px);
-      border: 2px solid var(--accent);
-      border-radius: 8px;
+      width: clamp(44px, 5vw, 60px);
+      height: clamp(44px, 5vw, 60px);
+      border: 2px solid var(--accent-tokusatsu);
+      border-radius: 10px 4px 10px 4px;
       display: grid;
       place-items: center;
       font-family: var(--font-mono);
-      font-weight: 700;
-      font-size: clamp(1.2rem, 2.2vw, 1.7rem);
-      color: var(--accent);
-      text-shadow: 0 0 8px rgba(102, 252, 241, 0.4);
+      font-weight: 800;
+      font-size: clamp(1.3rem, 2.4vw, 1.9rem);
+      color: var(--accent-tokusatsu);
+      text-shadow: 0 0 10px rgba(255, 159, 67, 0.45);
+      background: rgba(255, 159, 67, 0.06);
+      box-shadow: 0 0 18px rgba(255, 159, 67, 0.1), inset 0 0 12px rgba(255, 159, 67, 0.05);
       flex-shrink: 0;
+      margin-top: 0.6rem;
     }
 
-    .brand { flex: 1 1 200px; min-width: 0; }
+    .brand { flex: 1 1 200px; min-width: 0; margin-top: 0.6rem; }
     .brand h1 {
       margin: 0;
-      font-size: clamp(1.05rem, 2.6vw, 1.55rem);
-      letter-spacing: 0.5px;
+      font-size: clamp(1.1rem, 2.8vw, 1.65rem);
+      letter-spacing: 0.08em;
       color: #fff;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+      text-shadow: 0 0 14px rgba(255, 159, 67, 0.25);
+    }
+    .brand h1 span {
+      color: var(--accent-tokusatsu);
+      font-weight: 800;
     }
     .brand p {
-      margin: 0.1rem 0 0;
+      margin: 0.15rem 0 0;
       color: var(--muted);
       font-size: clamp(0.72rem, 1.3vw, 0.88rem);
       font-family: var(--font-mono);
+      letter-spacing: 0.04em;
     }
 
     .header-controls {
@@ -186,13 +228,27 @@
       border-radius: 10px;
       overflow: hidden;
       margin-bottom: clamp(1rem, 2.2vw, 1.6rem);
+      box-shadow: 0 4px 24px rgba(0,0,0,0.35);
+      position: relative;
     }
     .panel:last-child { margin-bottom: 0; }
+    .panel::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 4px;
+      height: 100%;
+      background: linear-gradient(180deg, var(--accent-tokusatsu), var(--accent));
+      opacity: 0.6;
+    }
 
     .panel-header {
-      background: var(--panel-2);
+      background:
+        linear-gradient(90deg, rgba(255,159,67,0.05), transparent 30%),
+        var(--panel-2);
       border-bottom: 1px solid var(--border);
-      padding: 0.75rem 1rem;
+      padding: 0.75rem 1rem 0.75rem 1.3rem;
       font-family: var(--font-mono);
       font-size: clamp(0.74rem, 1.15vw, 0.88rem);
       color: var(--accent);
@@ -278,25 +334,76 @@
 
     .mode-toggle {
       display: inline-flex;
-      border: 1px solid var(--border);
-      border-radius: 6px;
+      border: 2px solid var(--border);
+      border-radius: 999px;
       overflow: hidden;
       font-family: var(--font-mono);
       font-size: clamp(0.72rem, 1.05vw, 0.82rem);
+      background: var(--panel-2);
+      box-shadow: inset 0 0 10px rgba(0,0,0,0.4);
+      padding: 3px;
     }
     .mode-toggle label {
       margin: 0;
-      padding: 0.5rem 0.8rem;
+      padding: 0.45rem 0.9rem;
       cursor: pointer;
       color: var(--muted);
-      background: var(--bg);
-      transition: all 0.15s;
+      background: transparent;
+      border-radius: 999px;
+      transition: all 0.2s;
+      letter-spacing: 0.04em;
     }
     .mode-toggle input { display: none; }
     .mode-toggle input:checked + label {
-      background: rgba(102, 252, 241, 0.12);
-      color: var(--accent);
+      background: linear-gradient(135deg, var(--accent-tokusatsu), var(--accent));
+      color: var(--bg);
+      font-weight: 700;
+      box-shadow: 0 0 12px rgba(255, 159, 67, 0.35);
     }
+
+    /* SUPER 模式模型选择器 — 变身器风格 */
+    .model-device {
+      display: flex;
+      align-items: center;
+      gap: 0.7rem;
+      padding: 0.55rem 0.85rem;
+      background: linear-gradient(135deg, rgba(255,159,67,0.08), rgba(102,252,241,0.04));
+      border: 1px solid var(--accent-tokusatsu);
+      border-radius: 8px;
+      margin-bottom: 1rem;
+      box-shadow: 0 0 14px rgba(255, 159, 67, 0.08);
+    }
+    .model-device .k {
+      font-family: var(--font-mono);
+      font-size: clamp(0.72rem, 1.05vw, 0.82rem);
+      color: var(--accent-tokusatsu);
+      letter-spacing: 0.04em;
+    }
+    .model-device select {
+      flex: 1;
+      min-width: 160px;
+      background: var(--bg);
+      border: 1px solid var(--accent-tokusatsu);
+      color: var(--text);
+      border-radius: 6px;
+      padding: 0.35rem 0.6rem;
+      font-family: var(--font-mono);
+      font-size: clamp(0.78rem, 1.1vw, 0.9rem);
+      outline: none;
+    }
+    .model-device select:focus {
+      box-shadow: 0 0 0 2px rgba(255, 159, 67, 0.2);
+    }
+    .model-badge {
+      font-size: 0.62rem;
+      padding: 0.12rem 0.4rem;
+      border-radius: 4px;
+      text-transform: uppercase;
+      font-family: var(--font-mono);
+      font-weight: 700;
+    }
+    .model-badge.speed { color: var(--success); background: rgba(3, 201, 136, 0.1); border: 1px solid rgba(3, 201, 136, 0.3); }
+    .model-badge.egg { color: var(--accent-tokusatsu); background: rgba(255, 159, 67, 0.1); border: 1px solid rgba(255, 159, 67, 0.3); }
 
     .progress-wrap { margin-top: 1rem; display: none; }
     .progress-bar {
@@ -603,7 +710,7 @@
   <header>
     <div class="logo">T</div>
     <div class="brand">
-      <h1>TRACE Engine // Causal Inference Terminal</h1>
+      <h1>TRACE <span>ENGINE</span> // Causal Inference Terminal</h1>
       <p>TRACE + DoWhy + Counterfactual · Six-Warrior Web Interface</p>
     </div>
     <div class="header-controls">
@@ -622,16 +729,27 @@
       <section class="panel">
         <div class="panel-header">
           <span>$ input_payload.txt</span>
-          <div class="mode-toggle" title="Light: 快速因果推断；Deep: 完整六战士深度分析（含 causallearn PC/GES，更慢）">
+          <div class="mode-toggle" title="Light: 快速 jieba 概念图；Deep: 完整六战士（jieba）；Super: LLaMA TRACE 模型驱动">
             <input type="radio" name="mode" id="modeLight" value="light" checked>
             <label for="modeLight">LIGHT</label>
             <input type="radio" name="mode" id="modeDeep" value="deep">
             <label for="modeDeep">DEEP</label>
+            <input type="radio" name="mode" id="modeSuper" value="super">
+            <label for="modeSuper">SUPER</label>
           </div>
         </div>
         <div class="panel-body">
           <div class="mode-note" id="modeNote">
             <strong>LIGHT 模式：</strong>仅执行 TRACE + DoWhy 核心因果推断（识别、估计、反驳、反事实扫描），约 1–3 秒完成。此模式跳过 causallearn、完整 CCM/EDM/HAVOK 深度诊断，因此“快”是设计行为，不是缺陷。
+          </div>
+
+          <div class="model-device" id="superModelWrap" style="display:none;">
+            <span class="k" title="SUPER 模式使用哪个训练好的 LLaMA 模型执行 token-level TRACE">// CORE_DRIVER</span>
+            <select id="superModelSelect">
+              <option value="shehui-llama">Shehui-LLaMA TYPE-S</option>
+              <option value="shenji-llama">Shenji-LLaMA TYPE-X [EGG]</option>
+            </select>
+            <span id="modelBadge" class="model-badge speed">SPEED</span>
           </div>
 
           <label for="textInput">TEXT INPUT</label>
@@ -697,8 +815,14 @@
           <h3 class="section-title">// EXECUTION PROFILE</h3>
           <div id="execProfile"></div>
 
+          <h3 class="section-title">// ENVIRONMENT & BRIDGE HEALTH</h3>
+          <div id="envDiagnostics"></div>
+
           <h3 class="section-title">// DATA & MODEL DIAGNOSTICS</h3>
           <div id="dataDiagnostics"></div>
+
+          <h3 class="section-title">// ALGORITHM SUFFICIENCY</h3>
+          <div id="sufficiencyPanel"></div>
 
           <h3 class="section-title">// IDENTIFIABILITY & ESTIMATION BACKEND</h3>
           <div id="identifiabilityPanel"></div>
@@ -803,16 +927,17 @@
     let BRIDGE_SCHEMA = null;
 
     const PRESETS_OVERRIDES = {
-      default: {},
-      sensitive: { threshold: 0.3, window_size: 6, max_concepts: 16, concept_min_freq: 2 },
-      broad: { threshold: 0.8, window_size: 12, max_concepts: 24, concept_min_freq: 1 },
-      deep: { threshold: 0.5, window_size: 8, max_concepts: 24, concept_min_freq: 1 },
+      default: { threshold: 0.5, window_size: 8, max_segments: 4, min_valid_tokens: 10 },
+      sensitive: { threshold: 0.3, window_size: 6, max_concepts: 16, concept_min_freq: 2, max_segments: 3, min_valid_tokens: 8 },
+      broad: { threshold: 0.8, window_size: 12, max_concepts: 24, max_segments: 6, min_valid_tokens: 12 },
+      deep: { threshold: 0.2, window_size: 8, max_concepts: 24, max_edges_for_dowhy: 15, filter_mode: 'percentile', filter_percentile: 80, max_segments: 4, min_valid_tokens: 10 },
     };
 
-    // 兜底 Schema（当 /api/config 不可用时使用）
+    // 兜底 Schema（当 /api/config 不可用时使用），与 server.js fallback 保持一致
     const FALLBACK_SCHEMA = {
       threshold: { type: 'number', min: 0, max: 10, default: 0.5, description: '因果边显著性阈值' },
-      window_size: { type: 'integer', min: 2, max: 128, default: 8, description: '滑动窗口大小' },
+      window_size: { type: 'integer', min: 2, max: 256, default: 64, description: 'TRACE 滑动窗口大小' },
+      max_segments: { type: 'integer', min: 1, max: 16, default: 4, description: 'LLaMA TRACE 最大分段数' },
       max_concepts: { type: 'integer', min: 1, max: 128, default: 12, description: '最大概念数' },
       concept_min_freq: { type: 'integer', min: 1, max: 1000, default: 1, description: '概念最小出现频次' },
       min_valid_tokens: { type: 'integer', min: 1, max: 10000, default: 10, description: '最小有效 token 数' },
@@ -878,11 +1003,34 @@
           BRIDGE_SCHEMA = FALLBACK_SCHEMA;
           log('warn', '/api/config 未返回 Schema，使用兜底配置');
         }
+        // 根据服务端探测结果动态填充 LLaMA 模型选项
+        if (data.success && data.llamaModels && Array.isArray(data.llamaModels.available)) {
+          populateModelSelect(data.llamaModels.available, data.llamaModels.default);
+        }
       } catch (err) {
         BRIDGE_SCHEMA = FALLBACK_SCHEMA;
         log('warn', '加载参数 Schema 失败: ' + err.message);
       }
       renderParams(BRIDGE_SCHEMA);
+    }
+
+    function populateModelSelect(models, defaultId) {
+      if (!superModelSelect) return;
+      // 探测失败时保留兜底选项，避免 SUPER 模式无模型可选
+      if (!models || models.length === 0) {
+        updateModelBadge();
+        return;
+      }
+      superModelSelect.innerHTML = '';
+      models.forEach(m => {
+        const opt = document.createElement('option');
+        opt.value = m.id;
+        const isEgg = m.id.includes('shenji');
+        opt.textContent = `${m.name}${isEgg ? ' [EGG]' : ' [SPEED]'}`;
+        superModelSelect.appendChild(opt);
+      });
+      if (defaultId) superModelSelect.value = defaultId;
+      updateModelBadge();
     }
 
     let currentJobId = null;
@@ -909,13 +1057,35 @@
       } catch (_) { applyScale(DEFAULT_SCALE); }
     })();
 
+    const modelBadge = document.getElementById('modelBadge');
+    const superModelSelect = document.getElementById('superModelSelect');
+
+    function updateModelBadge() {
+      if (!modelBadge || !superModelSelect) return;
+      if (superModelSelect.value === 'shenji-llama') {
+        modelBadge.textContent = 'EGG / SLOW';
+        modelBadge.className = 'model-badge egg';
+      } else {
+        modelBadge.textContent = 'SPEED / FAST';
+        modelBadge.className = 'model-badge speed';
+      }
+    }
+    superModelSelect.addEventListener('change', updateModelBadge);
+
     // 模式说明联动
     modeRadios.forEach(r => r.addEventListener('change', () => {
       const mode = getMode();
+      const superWrap = document.getElementById('superModelWrap');
       if (mode === 'deep') {
-        modeNote.innerHTML = '<strong>DEEP 模式：</strong>执行完整六战士深度诊断（TRACE、CCM、EDM、HAVOK、DoWhy+CF、causallearn PC/GES）。包含大规模约束/评分搜索，预计耗时 10–60 秒或更长，取决于文本长度与概念数量。';
+        modeNote.innerHTML = '<strong>DEEP 模式：</strong>执行完整六战士深度诊断（TRACE、CCM、EDM、HAVOK、DoWhy+CF、causallearn PC/GES）。概念图由 jieba 构建，预计耗时 10–60 秒或更长。';
+        superWrap.style.display = 'none';
+      } else if (mode === 'super') {
+        modeNote.innerHTML = '<strong>SUPER 模式 // 特装型：</strong>启动 LLaMA 核心驱动，执行真正的 token-level TRACE 因果发现，再走完整六合一诊断。首次启动需加载模型（约 5–20 秒），分析耗时数十秒至数分钟。';
+        superWrap.style.display = 'flex';
+        updateModelBadge();
       } else {
         modeNote.innerHTML = '<strong>LIGHT 模式：</strong>仅执行 TRACE + DoWhy 核心因果推断（识别、估计、反驳、反事实扫描），约 1–3 秒完成。此模式跳过 causallearn、完整 CCM/EDM/HAVOK 深度诊断，因此“快”是设计行为，不是缺陷。';
+        superWrap.style.display = 'none';
       }
     }));
 
@@ -1005,15 +1175,6 @@
       return document.querySelector('input[name="mode"]:checked').value;
     }
 
-    function getConfig() {
-      return {
-        threshold: parseFloat(paramThreshold.value),
-        window_size: parseInt(paramWindow.value, 10),
-        max_concepts: parseInt(paramMaxConcepts.value, 10),
-        concept_min_freq: parseInt(paramMinFreq.value, 10),
-      };
-    }
-
     async function startAnalysis() {
       const text = textInput.value.trim();
       const file = fileInput.files[0];
@@ -1043,6 +1204,9 @@
       currentJobId = crypto.randomUUID();
       const mode = getMode();
       lastConfig = getConfig();
+      if (mode === 'super') {
+        lastConfig.model = document.getElementById('superModelSelect').value;
+      }
       setRunning(true);
       log('stage', `任务启动 [${currentJobId.slice(0, 8)}] 模式=${mode.toUpperCase()}`);
       const cfgSummary = Object.entries(lastConfig).map(([k, v]) => `${k}=${v}`).join(' ');
@@ -1312,6 +1476,7 @@
         { k: 'Concept Min Freq', v: r.concept_min_freq ?? 1 },
         { k: 'Max Concepts', v: r.max_concepts ?? 12 },
         { k: 'Analysis Mode', v: (r.analysis_mode || 'light').toUpperCase() },
+        { k: 'LLaMA Model', v: r.model ? r.model : 'N/A' },
         { k: 'Backend', v: r.backend ?? 'DoWhy' },
         { k: 'Simulation', v: r.simulation ? 'YES' : 'NO' },
         { k: 'Estimand Type', v: r.estimand_type ?? 'N/A' },
@@ -1344,6 +1509,29 @@
         execProfile.innerHTML = '<div style="color:var(--muted)">无执行时间数据</div>';
       }
 
+      // Environment & bridge health
+      const envDiagnostics = document.getElementById('envDiagnostics');
+      envDiagnostics.innerHTML = '';
+      const env = r.environment_diagnostics || {};
+      const envParams = [
+        { k: 'Python', v: env.python_version },
+        { k: 'PyTorch', v: env.torch_version },
+        { k: 'CUDA', v: env.cuda_available ? (env.cuda_device || 'YES') : 'NO' },
+        { k: 'VRAM Free', v: env.vram_free_mb != null ? `${env.vram_free_mb} MB` : 'N/A' },
+        { k: 'Model Dir Exists', v: env.model_dir_exists ? 'YES' : 'NO' },
+        { k: 'Bridge Modules', v: env.bridge_modules_ok ? 'OK' : 'FAIL' },
+        { k: 'Trace Root', v: env.trace_root },
+      ];
+      const envGrid = document.createElement('div');
+      envGrid.className = 'param-grid';
+      envParams.forEach(p => {
+        const div = document.createElement('div');
+        div.className = 'param';
+        div.innerHTML = `<span class="k">${p.k}</span><span class="v">${escapeHtml(String(p.v ?? 'N/A'))}</span>`;
+        envGrid.appendChild(div);
+      });
+      envDiagnostics.appendChild(envGrid);
+
       // Data & model diagnostics
       const dataDiagnostics = document.getElementById('dataDiagnostics');
       dataDiagnostics.innerHTML = '';
@@ -1354,6 +1542,26 @@
         return `<span class="kpi-pill"><span class="k">${k}:</span>${escapeHtml(String(display))}</span>`;
       }).join('');
       dataDiagnostics.innerHTML = `<div class="kpi-row">${kpiHtml || '<span class="kpi-pill">无诊断数据</span>'}</div>`;
+
+      // Algorithm sufficiency
+      const sufficiencyPanel = document.getElementById('sufficiencyPanel');
+      sufficiencyPanel.innerHTML = '';
+      const suff = r.algorithm_sufficiency || {};
+      const suffOk = suff.sufficient;
+      const suffBadge = suffOk
+        ? '<span class="badge pass">SUFFICIENT</span>'
+        : '<span class="badge warn">ADVISORY</span>';
+      const suffRecs = (suff.recommendations || []).map(rec => `<div class="warrior-finding">→ ${escapeHtml(rec)}</div>`).join('');
+      sufficiencyPanel.innerHTML = `
+        <div style="display:flex;align-items:center;gap:0.8rem;margin-bottom:0.5rem;">
+          <span style="font-family:var(--font-mono);color:var(--muted);">ALGORITHM SUFFICIENCY:</span>
+          ${suffBadge}
+          <span class="kpi-pill"><span class="k">tokens:</span>${suff.n_tokens ?? '-'}</span>
+          <span class="kpi-pill"><span class="k">concepts:</span>${suff.n_concepts ?? '-'}</span>
+          <span class="kpi-pill"><span class="k">edges:</span>${suff.n_edges ?? '-'}</span>
+        </div>
+        ${suffRecs}
+      `;
 
       // Identifiability & backend
       const identPanel = document.getElementById('identifiabilityPanel');

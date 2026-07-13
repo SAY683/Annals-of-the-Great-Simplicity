@@ -48,7 +48,7 @@ class ProjectPaths:
           3. <project_root>/TRACE/models/<name>
         若均不存在，返回首选位置并允许调用方自行处理缺失。
         """
-        normalized = name.strip().replace('_', '-')
+        normalized = name.strip().lower().replace('_', '-')
         candidates = [
             get_trace_models_dir() / normalized,
             self.trace_dir / normalized,           # 成品目录：模型直接放在 trace-engine/ 根下

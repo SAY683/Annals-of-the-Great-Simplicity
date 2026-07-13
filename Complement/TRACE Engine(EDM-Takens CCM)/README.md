@@ -12,6 +12,7 @@
 │   ├── health_check.py       # 引擎健康检查
 │   ├── examples/
 │   │   └── counterfactual_hybrid/  # 六战士因果分析核心
+│   ├── models/               # 训练好的 LLaMA 模型（SUPER 模式使用）
 │   ├── tests/test_skill.py   # 引擎自检测试
 │   └── date/                 # 训练/测试数据
 └── trace-engine-web/         # Node.js Web 服务
@@ -57,7 +58,17 @@ powershell -ExecutionPolicy Bypass -File start.ps1
 
 浏览器访问：http://localhost:3000
 
-### 3. 停止服务
+### 3. SUPER 模式（LLaMA 模型驱动）
+
+Web 界面提供三种分析模式：
+
+- **LIGHT**：jieba 概念图 + 简化流程（1–3 秒）
+- **DEEP**：jieba 概念图 + 完整六战士深度诊断（10–60 秒）
+- **SUPER**：调用 `trace-engine/models/shehui-llama` 执行真正的 token-level TRACE 因果发现，再走完整六合一诊断（首次需加载模型，分析耗时视文本长度而定）
+
+> SUPER 模式由常驻 LLaMA Worker 处理，单线程顺序执行。模型文件较大，首次同步时自动复制到 `trace-engine/models/`。
+
+### 4. 停止服务
 
 ```powershell
 cd "TRACE Engine(EDM-Takens CCM)\trace-engine-web"

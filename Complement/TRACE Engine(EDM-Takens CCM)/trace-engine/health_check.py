@@ -33,12 +33,34 @@ def check_python_deps():
 
 
 def check_models(root: Path):
+    """按项目实际布局探测 LLaMA 模型，兼容开发/层级成品/便携根三种目录结构。"""
     models = {}
+    # 优先使用 project_paths 解析（覆盖 TRACE_ROOT/models、trace-engine/models、便携根等）
+    sys.path.insert(0, str(root / 'examples' / 'counterfactual_hybrid'))
+    try:
+        from project_paths import resolve_paths
+        paths = resolve_paths()
+    except Exception:
+        paths = None
+
     for name in ['Shehui-LLaMA', 'Shenji-LLaMA']:
-        model_dir = root / name
+        candidates = []
+        if paths is not None:
+            candidates.append(paths.model_dir(name))
+        # 兼容历史布局：模型直接放在 trace-engine/ 根下
+        candidates.append(root / name)
+        # 兼容标准小写 models/ 子目录
+        candidates.append(root / 'models' / name.lower().replace('_', '-'))
+
+        found = None
+        for c in candidates:
+            if c.exists() and (c / 'model.safetensors').exists():
+                found = c
+                break
+        target = found if found else (candidates[0] if candidates else root / name)
         models[name] = {
-            'exists': model_dir.exists(),
-            'model_file': str(model_dir / 'model.safetensors'),
+            'exists': found is not None,
+            'model_file': str(target / 'model.safetensors'),
         }
     return models
 

@@ -96,6 +96,26 @@ class WarriorCard:
             lines.append(f"  判定: {self.verdict}")
         return "\n".join(lines)
 
+    def to_dict(self) -> dict:
+        """序列化为字典，供 Web / Worker 消费。"""
+        raw = self.raw
+        if hasattr(raw, 'tolist'):
+            raw = raw.tolist()
+        elif not isinstance(raw, (dict, list, tuple, str, int, float, bool, type(None))):
+            # 避免把 TRACE2DoWhy 等复杂对象直接序列化出去
+            raw = None
+        return {
+            "warrior_id": self.warrior_id,
+            "name": self.name,
+            "instrument": self.instrument,
+            "status": self.status,
+            "color": self.color,
+            "findings": self.findings,
+            "metrics": self.metrics,
+            "verdict": self.verdict,
+            "raw": raw,
+        }
+
 
 # ══════════════════════════════════════════════════════════════════════
 # 🔴 TRACE — 拓扑先锋

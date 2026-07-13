@@ -33,8 +33,9 @@ Get-WmiObject Win32_Process -Filter "name='node.exe'" | ForEach-Object {
 
 Get-WmiObject Win32_Process -Filter "name='python.exe'" | ForEach-Object {
     $cmd = $_.CommandLine
-    if ($cmd -and ($cmd -like '*py_bridge.py*')) {
-        Write-Host "正在结束 Python 桥接进程 PID=$($_.ProcessId)" -ForegroundColor Yellow
+    if ($cmd -and (($cmd -like '*py_bridge.py*') -or ($cmd -like '*llama_worker.py*'))) {
+        Write-Host "正在结束 Python 进程 PID=$($_.ProcessId)" -ForegroundColor Yellow
+        Stop-ProcessTree $_.ProcessId
         Stop-Process -Id $_.ProcessId -Force
         $pyKilled++
     }

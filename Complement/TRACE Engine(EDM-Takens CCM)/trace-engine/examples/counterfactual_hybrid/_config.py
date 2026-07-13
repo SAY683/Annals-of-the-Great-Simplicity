@@ -31,13 +31,22 @@ def _is_portable_trace_root(path: Path) -> bool:
     )
 
 
+def _is_nested_engine_trace_root(path: Path) -> bool:
+    """判断是否为层级目录布局：模型放在 path/trace-engine/models/ 下。"""
+    return (
+        (path / "trace-engine" / "models" / "shehui-llama" / "model.safetensors").exists()
+        or (path / "trace-engine" / "models" / "Shehui-LLaMA" / "model.safetensors").exists()
+    )
+
+
 def _find_trace_root(skill_dir: Path) -> Path | None:
     """
     从 Skill 目录向上探测 TRACE 项目根目录。
     识别特征（按优先级）:
       1. 工作副本: <project_root>/TRACE/README.md
       2. 工作副本: <project_root>/.skills/trace-engine/SKILL.md
-      3. 成品/便携副本: <dir>/Shehui-LLaMA/model.safetensors 等
+      3. 层级副本: <dir>/trace-engine/models/<model>/model.safetensors
+      4. 成品/便携副本: <dir>/Shehui-LLaMA/model.safetensors 等
     """
     current = skill_dir.resolve()
     for _ in range(10):
@@ -45,7 +54,11 @@ def _find_trace_root(skill_dir: Path) -> Path | None:
         if (current / "TRACE" / "README.md").exists():
             return current / "TRACE"
         if (current / ".skills" / "trace-engine" / "SKILL.md").exists():
-            return current / "TRACE"
+            # .skills 目录位于项目根下，真正的 TRACE 数据/模型目录在项目根/TRACE
+            return current.parent / "TRACE"
+        # 层级副本: trace-engine-web 与 trace-engine 处于同一父目录，模型在 trace-engine/models
+        if _is_nested_engine_trace_root(current):
+            return current / "trace-engine"
         # 成品/便携副本: 模型直接放在当前目录
         if _is_portable_trace_root(current):
             return current

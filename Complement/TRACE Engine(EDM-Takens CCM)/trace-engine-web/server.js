@@ -34,13 +34,67 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // 版本与构建信息（用于多云部署时的服务识别）
-const VERSION = process.env.TRACE_WEB_VERSION || '1.1.0';
+// 优先从 package.json 读取版本，保证 package.json / README / 运行时一致
+function loadPackageVersion() {
+  try {
+    const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, 'package.json'), 'utf-8'));
+    return pkg.version || '0.2.0';
+  } catch (_) {
+    return '0.2.0';
+  }
+}
+const VERSION = process.env.TRACE_WEB_VERSION || loadPackageVersion();
 const BUILD_INFO = {
   version: VERSION,
   node: process.version,
   platform: process.platform,
   startedAt: new Date().toISOString(),
 };
+
+// 通过 Python Skill 探测模型目录（兼容开发布局与层级成品布局）
+function probeLlamaModels() {
+  const models = [];
+  const skillDir = process.env.TRACE_ENGINE_SKILL_DIR
+    ? path.resolve(process.env.TRACE_ENGINE_SKILL_DIR)
+    : path.resolve(__dirname, '..', 'trace-engine', 'examples', 'counterfactual_hybrid');
+
+  const tmpFile = path.join(WORK_DIR, `_probe_models_${Date.now()}.py`);
+  const script = `import sys, json
+sys.path.insert(0, ${JSON.stringify(skillDir)})
+try:
+    from project_paths import resolve_paths
+    p = resolve_paths()
+    for name in ['shehui-llama', 'shenji-llama', 'Shehui-LLaMA', 'Shenji-LLaMA']:
+        d = p.model_dir(name)
+        if d.exists() and (d / 'model.safetensors').exists():
+            print(json.dumps({'id': name.lower(), 'name': name, 'path': str(d)}))
+except Exception as e:
+    print(json.dumps({'error': str(e)}))
+`;
+  try {
+    fs.writeFileSync(tmpFile, script, { encoding: 'utf-8' });
+    const result = require('child_process').execSync(
+      `${process.env.PYTHON_CMD || 'python'} "${tmpFile}"`,
+      { encoding: 'utf-8', timeout: 15000, env: { ...process.env, PYTHONIOENCODING: 'utf-8' } }
+    );
+    for (const line of result.trim().split(/\r?\n/)) {
+      if (!line.trim()) continue;
+      try {
+        const obj = JSON.parse(line);
+        if (obj.error) {
+          console.warn('[probeLlamaModels] Python probe error:', obj.error);
+          continue;
+        }
+        if (!models.some(m => m.id === obj.id)) models.push(obj);
+      } catch (e) { /* ignore */ }
+    }
+  } catch (err) {
+    console.warn('[probeLlamaModels] probe failed:', err.message);
+  } finally {
+    try { fs.unlinkSync(tmpFile); } catch (e) { /* ignore */ }
+  }
+  return models;
+}
 
 // 工作目录（可通过环境变量覆盖，便于容器化与沙箱外部署）
 const WORK_DIR = process.env.TRACE_WORK_DIR
@@ -69,6 +123,9 @@ function initWorkDir() {
 }
 initWorkDir();
 
+// 工作目录就绪后再探测模型（probe 需要写临时脚本）
+const PROBED_LLAMA_MODELS = probeLlamaModels();
+
 // 系统配置（可从环境变量覆盖）
 const CONFIG = {
   port: PORT,
@@ -93,6 +150,148 @@ const jobHistory = [];
 const resultCache = new Map();
 // 任务队列（用于并发控制）
 const jobQueue = [];
+
+// SUPER 模式常驻 LLaMA Worker
+let llamaWorker = null;
+let llamaWorkerReady = false;
+let llamaWorkerStarting = false;
+let llamaWorkerBusy = false;
+let llamaWorkerStartWaiters = [];
+let llamaWorkerJobWaiters = [];
+let llamaWorkerLogs = [];
+let currentLlamaHandler = null;
+const MAX_WORKER_LOGS = 200;
+
+function logWorker(line) {
+  llamaWorkerLogs.push({ time: new Date().toISOString(), line });
+  if (llamaWorkerLogs.length > MAX_WORKER_LOGS) llamaWorkerLogs.shift();
+}
+
+function getLlamaWorkerScript() {
+  return path.resolve(__dirname, 'llama_worker.py');
+}
+
+function dispatchLlamaMessage(obj) {
+  if (currentLlamaHandler) {
+    currentLlamaHandler(obj);
+  } else if (obj.type === 'log') {
+    logWorker(`[worker] ${obj.level}: ${obj.message}`);
+  } else {
+    logWorker(JSON.stringify(obj));
+  }
+}
+
+function spawnLlamaWorker() {
+  const script = getLlamaWorkerScript();
+  if (!fs.existsSync(script)) {
+    logToFile('warn', `llama_worker.py 不存在，SUPER 模式不可用: ${script}`);
+    return null;
+  }
+  logToFile('info', '正在启动 LLaMA Worker...');
+  // 不强制覆盖 TRACE_ROOT，让 llama_worker.py 内部的 _config.py 自动探测：
+  //   - 开发布局: 向上找到 <project_root>/TRACE
+  //   - 层级成品布局: 识别 trace-engine/models/<model>/model.safetensors
+  // 用户仍可通过环境变量 TRACE_ROOT 显式覆盖。
+  const worker = spawn(CONFIG.pythonCmd, [script], {
+    env: {
+      ...process.env,
+      PYTHONIOENCODING: 'utf-8',
+    },
+    stdio: ['pipe', 'pipe', 'pipe'],
+  });
+
+  let stdoutBuffer = '';
+  worker.stdout.on('data', (chunk) => {
+    stdoutBuffer += chunk.toString('utf-8');
+    const lines = stdoutBuffer.split('\n');
+    stdoutBuffer = lines.pop();
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      try {
+        const obj = JSON.parse(line);
+        dispatchLlamaMessage(obj);
+      } catch (err) {
+        logWorker(line);
+      }
+    }
+  });
+
+  worker.stderr.on('data', (chunk) => {
+    const lines = chunk.toString('utf-8').split('\n').filter(Boolean);
+    for (const line of lines) {
+      logWorker(line);
+    }
+  });
+
+  worker.on('close', (code) => {
+    logToFile('warn', `LLaMA Worker 退出 (code=${code})，清理状态`);
+    llamaWorker = null;
+    llamaWorkerReady = false;
+    llamaWorkerStarting = false;
+    llamaWorkerBusy = false;
+    currentLlamaHandler = null;
+  });
+
+  worker.on('error', (err) => {
+    logToFile('error', `LLaMA Worker 启动错误: ${err.message}`);
+    llamaWorker = null;
+    llamaWorkerReady = false;
+    llamaWorkerStarting = false;
+    llamaWorkerBusy = false;
+    currentLlamaHandler = null;
+  });
+
+  return worker;
+}
+
+function ensureLlamaWorker() {
+  return new Promise((resolve, reject) => {
+    if (llamaWorker && llamaWorkerReady) return resolve(llamaWorker);
+    if (llamaWorkerStarting) {
+      llamaWorkerStartWaiters.push({ resolve, reject });
+      return;
+    }
+    llamaWorkerStarting = true;
+    llamaWorker = spawnLlamaWorker();
+    if (!llamaWorker) {
+      llamaWorkerStarting = false;
+      return reject(new Error('LLaMA Worker 启动失败（llama_worker.py 不存在或环境缺失）'));
+    }
+    // 等待 Worker 就绪日志
+    const timer = setTimeout(() => {
+      llamaWorkerStarting = false;
+      reject(new Error('LLaMA Worker 启动超时'));
+    }, 120000);
+
+    const onData = (chunk) => {
+      const text = chunk.toString('utf-8');
+      if (text.includes('LLaMA Worker') && text.includes('等待任务')) {
+        clearTimeout(timer);
+        llamaWorker.stdout.off('data', onData);
+        llamaWorkerReady = true;
+        llamaWorkerStarting = false;
+        resolve(llamaWorker);
+        for (const waiter of llamaWorkerStartWaiters) waiter.resolve(llamaWorker);
+        llamaWorkerStartWaiters = [];
+      }
+    };
+    llamaWorker.stdout.on('data', onData);
+  });
+}
+
+function waitForLlamaWorkerIdle() {
+  return new Promise((resolve) => {
+    if (!llamaWorkerBusy) return resolve();
+    llamaWorkerJobWaiters.push(resolve);
+  });
+}
+
+function releaseLlamaWorker() {
+  llamaWorkerBusy = false;
+  currentLlamaHandler = null;
+  const next = llamaWorkerJobWaiters.shift();
+  if (next) next();
+}
 
 // 日志持久化 + 简单轮转
 function rotateLogIfNeeded() {
@@ -266,7 +465,8 @@ app.options('*', (_req, res) => res.sendStatus(204));
 function loadBridgeParamSchema() {
   const fallback = {
     threshold: { type: 'number', min: 0, max: 10, default: 0.5, description: '因果边显著性阈值' },
-    window_size: { type: 'integer', min: 2, max: 128, default: 8, description: '滑动窗口大小' },
+    window_size: { type: 'integer', min: 2, max: 256, default: 64, description: 'TRACE 滑动窗口大小' },
+    max_segments: { type: 'integer', min: 1, max: 16, default: 4, description: 'LLaMA TRACE 最大分段数' },
     max_concepts: { type: 'integer', min: 1, max: 128, default: 12, description: '最大概念数' },
     concept_min_freq: { type: 'integer', min: 1, max: 1000, default: 1, description: '概念最小出现频次' },
     min_valid_tokens: { type: 'integer', min: 1, max: 10000, default: 10, description: '最小有效 token 数' },
@@ -306,10 +506,19 @@ function validateAnalysisInput(text, mode, config) {
   if (text.length > CONFIG.maxTextLength) {
     return { ok: false, error: `文本长度超过限制 ${CONFIG.maxTextLength}`, code: 'TEXT_TOO_LONG' };
   }
-  if (!['light', 'deep'].includes(mode)) {
-    return { ok: false, error: 'mode 必须是 light 或 deep', code: 'INVALID_MODE' };
+  if (!['light', 'deep', 'super'].includes(mode)) {
+    return { ok: false, error: 'mode 必须是 light、deep 或 super', code: 'INVALID_MODE' };
   }
   if (config && typeof config === 'object') {
+    // SUPER 模式下 model 参数白名单校验
+    if (mode === 'super' && config.model !== undefined) {
+      const allowedModels = PROBED_LLAMA_MODELS.length > 0
+        ? PROBED_LLAMA_MODELS.map((m) => m.id)
+        : ['shehui-llama'];
+      if (!allowedModels.includes(config.model)) {
+        return { ok: false, error: `SUPER 模式不支持模型 ${config.model}，可用: ${allowedModels.join(', ')}`, code: 'INVALID_MODEL', field: 'model' };
+      }
+    }
     for (const [k, schema] of Object.entries(BRIDGE_PARAM_SCHEMA)) {
       if (config[k] === undefined) continue;
       const v = config[k];
@@ -538,6 +747,135 @@ function runPythonAnalysisStream(text, outputId, mode, bridgeConfig, res) {
   });
 }
 
+/**
+ * SUPER 模式：调用常驻 LLaMA Worker 执行真正的 TRACE 因果发现
+ */
+async function runSuperAnalysisStream(text, outputId, bridgeConfig, res) {
+  const outDir = path.join(OUTPUT_DIR, outputId);
+  const cfgObj = bridgeConfig ? (() => { try { return JSON.parse(bridgeConfig); } catch (_) { return null; } })() : null;
+
+  if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true });
+  recordJob(outputId, 'super', 'running', null, { text, config: bridgeConfig || '' });
+  logToFile('info', `启动 SUPER 分析 job=${outputId} text_len=${text.length}`);
+
+  let timeoutId = null;
+  let finished = false;
+  const cleanupTimeout = () => {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+      timeoutId = null;
+    }
+  };
+
+  const finish = (doneCode) => {
+    if (finished) return;
+    finished = true;
+    cleanupTimeout();
+    releaseLlamaWorker();
+    activeJobs.delete(outputId);
+    sendSSE(res, 'done', { code: doneCode });
+    res.end();
+    processJobQueue();
+  };
+
+  try {
+    const worker = await ensureLlamaWorker();
+    await waitForLlamaWorkerIdle();
+    llamaWorkerBusy = true;
+
+    timeoutId = setTimeout(() => {
+      logToFile('warn', `SUPER 分析超时 job=${outputId}，强制终止`);
+      sendSSE(res, 'error', { message: `SUPER 分析超时（>${CONFIG.jobTimeoutMs}ms），已强制终止。模型推理耗时较长，可尝试缩短文本或切换到 DEEP 模式。` });
+      recordJob(outputId, 'super', 'timeout');
+      finish(124);
+    }, CONFIG.jobTimeoutMs);
+
+    activeJobs.set(outputId, worker);
+
+    currentLlamaHandler = (obj) => {
+      if (obj.type === 'stage') {
+        sendSSE(res, 'stage', obj);
+      } else if (obj.type === 'log') {
+        sendSSE(res, 'log', obj);
+      } else if (obj.type === 'error') {
+        cleanupTimeout();
+        sendSSE(res, 'error', { message: obj.message });
+        recordJob(outputId, 'super', 'error', obj.message);
+        logToFile('error', `SUPER 错误 job=${outputId}: ${obj.message}`);
+        finish(-1);
+      } else if (obj.type === 'result') {
+        cleanupTimeout();
+        const payload = obj.payload || {};
+        try {
+          fs.writeFileSync(path.join(outDir, 'result.json'), JSON.stringify(payload, null, 2), 'utf-8');
+          const reportText = buildSuperReport(payload);
+          fs.writeFileSync(path.join(outDir, 'report.md'), reportText, 'utf-8');
+        } catch (err) {
+          logToFile('warn', `SUPER 结果持久化失败 job=${outputId}: ${err.message}`);
+        }
+        const resultData = {
+          id: outputId,
+          result: payload,
+          reportPath: `/api/report/${outputId}`,
+          resultPath: `/api/result/${outputId}`,
+        };
+        sendSSE(res, 'result', resultData);
+        resultCache.set(cacheKey(text, 'super', cfgObj), { id: outputId, timestamp: Date.now() });
+        while (resultCache.size > CONFIG.maxCacheEntries) {
+          const firstKey = resultCache.keys().next().value;
+          resultCache.delete(firstKey);
+        }
+        recordJob(outputId, 'super', 'completed');
+        logToFile('info', `SUPER 分析完成 job=${outputId}`);
+        finish(0);
+      }
+    };
+
+    worker.stdin.write(JSON.stringify({
+      id: outputId,
+      text,
+      model: cfgObj && cfgObj.model ? cfgObj.model : 'shehui-llama',
+      mode: 'super',
+      config: cfgObj || {},
+    }) + '\n', 'utf-8');
+  } catch (err) {
+    cleanupTimeout();
+    sendSSE(res, 'error', { message: err.message });
+    recordJob(outputId, 'super', 'error', err.message);
+    logToFile('error', `SUPER 启动失败 job=${outputId}: ${err.message}`);
+    finish(-1);
+  }
+}
+
+function buildSuperReport(payload) {
+  const lines = [];
+  lines.push('# TRACE SUPER 模式分析报告');
+  lines.push('');
+  lines.push(`**分析模型**: ${payload.model || 'shehui-llama'}`);
+  lines.push(`**概念数量**: ${(payload.concepts || []).length}`);
+  lines.push(`**显著因果边**: ${payload.n_significant_edges || 0}`);
+  lines.push(`**ATE**: ${payload.ate !== null ? payload.ate.toFixed(3) : 'N/A'}`);
+  lines.push(`**可识别性**: ${payload.identifiable ? '是' : '否'}`);
+  lines.push('');
+  lines.push('## 核心概念');
+  (payload.concepts || []).forEach((c) => lines.push(`- ${c}`));
+  lines.push('');
+  lines.push('## Top 因果边');
+  (payload.top_edges || []).forEach((e) => {
+    const s = typeof e.strength === 'number' ? e.strength.toFixed(3) : 'N/A';
+    lines.push(`- ${e.source || '?'} → ${e.target || '?'} (ΔNLL=${s})`);
+  });
+  lines.push('');
+  lines.push('## 审计结果');
+  if (payload.auditor) {
+    lines.push(`- 裁决: ${payload.auditor.verdict}`);
+    lines.push(`- PASS/WARN/FAIL: ${payload.auditor.n_pass}/${payload.auditor.n_warn}/${payload.auditor.n_fail}`);
+  } else {
+    lines.push('- 审计不可用');
+  }
+  return lines.join('\n');
+}
+
 
 
 // 任务队列处理
@@ -546,8 +884,12 @@ function processJobQueue() {
   if (activeJobs.size >= CONFIG.maxConcurrentJobs) return;
   const next = jobQueue.shift();
   if (!next) return;
-  logToFile('info', `从队列取出任务 job=${next.id}, 当前活跃=${activeJobs.size}`);
-  runPythonAnalysisStream(next.text, next.id, next.mode, next.bridgeConfig, next.res);
+  logToFile('info', `从队列取出任务 job=${next.id}, mode=${next.mode}, 当前活跃=${activeJobs.size}`);
+  if (next.mode === 'super') {
+    runSuperAnalysisStream(next.text, next.id, next.bridgeConfig, next.res);
+  } else {
+    runPythonAnalysisStream(next.text, next.id, next.mode, next.bridgeConfig, next.res);
+  }
 }
 
 // 解析桥接配置（query/body -> JSON 字符串）
@@ -563,7 +905,7 @@ function parseBridgeConfig(raw) {
 
 // SSE 流式分析入口（GET 兼容旧版/简单调用；POST 用于长文本避免 URL 长度限制）
 function handleAnalyzeStream(req, res) {
-  const id = req.query.id || req.body.id;
+  const id = req.query.id || req.body.id || crypto.randomUUID();
   const text = req.query.text || req.body.text;
   const mode = (req.query.mode || req.body.mode || 'light').toLowerCase();
   const bridgeConfig = parseBridgeConfig(req.query.config || req.body.config);
@@ -588,7 +930,11 @@ function handleAnalyzeStream(req, res) {
     return;
   }
 
-  runPythonAnalysisStream(text, id, mode, bridgeConfig, res);
+  if (mode === 'super') {
+    runSuperAnalysisStream(text, id, bridgeConfig, res);
+  } else {
+    runPythonAnalysisStream(text, id, mode, bridgeConfig, res);
+  }
 }
 
 app.get('/api/analyze-stream', handleAnalyzeStream);
@@ -692,6 +1038,9 @@ app.post('/api/analyze-text', async (req, res) => {
       reqLog(req, 'warn', `输入校验失败: ${validation.error} (${validation.code || ''})`);
       return res.status(400).json({ success: false, error: validation.error, code: validation.code, field: validation.field, traceId: req.traceId });
     }
+    if (mode === 'super') {
+      return res.status(400).json({ success: false, error: 'SUPER 模式请使用 /api/analyze-stream 流式接口', code: 'SUPER_REQUIRES_STREAM', traceId: req.traceId });
+    }
 
     // 缓存命中检查（缓存键包含 config，避免不同参数复用错误结果）
     const cacheK = cacheKey(text, mode, cfgObj);
@@ -734,6 +1083,10 @@ app.post('/api/analyze-file', upload.single('file'), async (req, res) => {
       fs.unlinkSync(req.file.path);
       reqLog(req, 'warn', `文件上传输入校验失败: ${validation.error}`);
       return res.status(400).json({ success: false, error: validation.error, code: validation.code, field: validation.field, traceId: req.traceId });
+    }
+    if (mode === 'super') {
+      fs.unlinkSync(req.file.path);
+      return res.status(400).json({ success: false, error: 'SUPER 模式请使用 /api/analyze-stream 流式接口', code: 'SUPER_REQUIRES_STREAM', traceId: req.traceId });
     }
     const id = uuidv4();
     const data = await runPythonAnalysisSync(text, id, mode, bridgeConfig);
@@ -813,10 +1166,30 @@ app.get('/api/health', (_req, res) => {
 
 // 配置信息
 app.get('/api/config', (_req, res) => {
+  const llamaScript = getLlamaWorkerScript();
+  const llamaAvailable = fs.existsSync(llamaScript);
+
   res.json({
     success: true,
     config: { ...CONFIG, skillDir: CONFIG.skillDir },
     bridgeParamSchema: BRIDGE_PARAM_SCHEMA,
+    modes: {
+      light: { label: 'LIGHT', description: '快速 jieba 概念图 + 简化流程' },
+      deep: { label: 'DEEP', description: '完整六战士 + 稳定性检查（jieba 概念图）' },
+      super: { label: 'SUPER', description: 'LLaMA TRACE 模型驱动 + 完整六合一（最慢最准）', available: llamaAvailable && PROBED_LLAMA_MODELS.length > 0 },
+    },
+    presets: ['default', 'sensitive', 'broad', 'deep'],
+    llamaModels: {
+      default: 'shehui-llama',
+      available: PROBED_LLAMA_MODELS,
+    },
+    llamaWorker: {
+      available: llamaAvailable,
+      script: llamaScript,
+      ready: llamaWorkerReady,
+      busy: llamaWorkerBusy,
+    },
+    buildInfo: BUILD_INFO,
   });
 });
 
@@ -841,14 +1214,24 @@ app.get('/api/version', (_req, res) => {
 });
 
 // 参数预设（便于前端一键切换业务场景）
+// 与 presets.yaml 中的 trace2dowhy + super 段对齐，便于多云参数穿透。
 app.get('/api/presets', (_req, res) => {
+  const base = {
+    threshold: 0.5,
+    window_size: 8,
+    max_concepts: 12,
+    concept_min_freq: 1,
+    max_edges_for_dowhy: 12,
+    filter_mode: 'topn',
+    filter_percentile: 85,
+  };
   res.json({
     success: true,
     presets: {
-      default: { threshold: 0.5, window_size: 8, max_concepts: 12, concept_min_freq: 1 },
-      sensitive: { threshold: 0.3, window_size: 6, max_concepts: 16, concept_min_freq: 2 },
-      broad: { threshold: 0.8, window_size: 12, max_concepts: 24, concept_min_freq: 1 },
-      deep: { threshold: 0.5, window_size: 8, max_concepts: 24, concept_min_freq: 1 },
+      default: { ...base, threshold: 0.5, window_size: 8, max_segments: 4, min_valid_tokens: 10 },
+      sensitive: { ...base, threshold: 0.3, window_size: 6, max_concepts: 16, concept_min_freq: 2, max_segments: 3, min_valid_tokens: 8 },
+      broad: { ...base, threshold: 0.8, window_size: 12, max_concepts: 24, max_segments: 6, min_valid_tokens: 12 },
+      deep: { ...base, threshold: 0.2, window_size: 8, max_concepts: 24, max_edges_for_dowhy: 15, filter_mode: 'percentile', filter_percentile: 80, max_segments: 4, min_valid_tokens: 10 },
     },
   });
 });
@@ -858,7 +1241,7 @@ app.get('/api/schema', (_req, res) => {
   res.json({
     success: true,
     schema: BRIDGE_PARAM_SCHEMA,
-    modes: ['light', 'deep'],
+    modes: ['light', 'deep', 'super'],
     presets: ['default', 'sensitive', 'broad', 'deep'],
   });
 });
@@ -912,6 +1295,10 @@ app.post('/api/retry/:id', async (req, res) => {
   }
   if (!old.text) {
     return res.status(400).json({ success: false, error: '历史记录中未保留原始文本，无法重试' });
+  }
+  // SUPER 模式依赖常驻 LLaMA Worker 与 SSE 流，同步重试无法承载模型加载与流式输出。
+  if (old.mode === 'super') {
+    return res.status(400).json({ success: false, error: 'SUPER 模式不支持同步重试，请在前端重新提交分析', code: 'SUPER_RETRY_NOT_SUPPORTED', originalId: id });
   }
   const newId = uuidv4();
   try {

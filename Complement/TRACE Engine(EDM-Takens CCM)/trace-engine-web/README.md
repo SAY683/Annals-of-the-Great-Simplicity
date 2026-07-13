@@ -55,6 +55,7 @@ npm start
 2. 选择分析模式：
    - **LIGHT**：快速因果推断（TRACE + DoWhy 核心流程，约 1–3 秒）
    - **DEEP**：完整六战士深度诊断（额外执行 CCM、EDM、HAVOK、causallearn PC/GES，预计 10–60 秒或更长）
+   - **SUPER**：LLaMA 模型驱动的真正 token-level TRACE 因果发现 + 完整六合一诊断。默认使用 **Shehui-LLaMA**，可切换彩蛋模型 **Shenji-LLaMA**。
 3. 点击 `> RUN_ANALYSIS`
 4. 右侧终端面板会实时显示分析阶段与日志
 5. 进度条同步展示当前阶段（分词 → 构图 → 识别 → 估计 → 反驳 → 反事实扫描 → [DEEP] 六战士诊断 → [DEEP] 稳定性分析 → 报告生成）
@@ -62,11 +63,13 @@ npm start
    - 核心指标（概念数、边数、ATE、95% CI、可识别性、反驳数、模式、耗时）
    - 质谱级因果参数网格
    - 执行时间剖面（各阶段毫秒级 breakdown）
-   - 数据与模型诊断（token 覆盖率、矩阵密度、BPE 类型、UNK 率、条件数、最大相关性等）
+   - **环境 & 桥接健康**（Python/PyTorch/CUDA/VRAM/模型目录/模块加载状态）
+   - 数据与模型诊断（token 数、分段数、UNK 率、vocab size、max position 等）
+   - **算法充分性研判**（基于输入长度、概念数、边数给出可操作建议）
    - 可识别性与估计后端详情
    - **概念词表与频率**（含 CCM 资格标记）
    - **邻接矩阵热力图**（可视化 TRACE 因果强度）
-   - **稳定性与鲁棒性分析**（bootstrap 边稳定性、置换 p-value、K-fold CV，DEEP 模式）
+   - **稳定性与鲁棒性分析**（bootstrap 边稳定性、置换 p-value、K-fold CV，DEEP/SUPER 模式）
    - Top 因果边、反事实扫描、反驳测试
    - 六战士诊断卡片（可展开 raw metrics）
 7. 可点击 `> OPEN_REPORT.md` 或 `> OPEN_RESULT.json` 查看详细报告
@@ -81,20 +84,30 @@ npm start
 │   Browser   │  <──────────────────────────────────>  │  NodeJS     │
 │  (index.html)     Server-Sent Events (SSE)           │  (server.js)│
 └─────────────┘                                       └──────┬──────┘
-                                                             │ spawn
+                                                             │ spawn / resident worker
                                                              ▼
-                                                    ┌─────────────────┐
-                                                    │  py_bridge.py   │
-                                                    │  (Python)       │
-                                                    └───────┬─────────┘
-                                                            │ import
-                                                            ▼
-                                                    ┌─────────────────┐
-                                                    │ trace-engine    │
-                                                    │ Skill modules   │
-                                                    │ (relative ref)  │
-                                                    └─────────────────┘
+                                          ┌─────────────────────────────────┐
+                                          │  py_bridge.py (LIGHT / DEEP)    │
+                                          │  llama_worker.py (SUPER)        │
+                                          └───────────────┬─────────────────┘
+                                                          │ import
+                                                          ▼
+                                          ┌─────────────────────────────────┐
+                                          │  trace-engine Skill modules     │
+                                          │  + Shehui/Shenji-LLaMA models   │
+                                          └─────────────────────────────────┘
 ```
+
+### SUPER 模式常驻 LLaMA Worker
+
+SUPER 模式使用独立的常驻 Python Worker [`llama_worker.py`](./llama_worker.py) 加载训练好的 LLaMA 模型：
+
+- **模型复用**：Worker 启动后缓存模型与 tokenizer，避免每次请求重复加载
+- **任务串行**：单 Worker 顺序处理 SUPER 任务，通过内存队列避免并发冲突
+- **路径自动探测**：支持开发布局（`TRACE/models/<name>`）与层级成品布局（`trace-engine/models/<name>`）
+- **运行诊断**：输出环境健康（Python/PyTorch/CUDA/VRAM/模型目录）、输入数据质控（token 数/UNK 率/分段数）、算法充分性研判
+- **模型切换**：默认 `Shehui-LLaMA`（快速），可选彩蛋 `Shenji-LLaMA`（慢但 loss 更低）
+- **接口限制**：SUPER 模式仅支持 `/api/analyze-stream` 流式接口；`/api/analyze-text`、`/api/analyze-file`、`/api/retry/:id` 等同步接口会返回 `SUPER_REQUIRES_STREAM`，请在前端重新提交分析。
 
 ### 后端端点
 
@@ -195,7 +208,8 @@ trace-engine-web/
 ├── stop_servers.bat       # stop_servers.ps1 的 CMD 包装
 ├── package.json           # NodeJS 依赖
 ├── server.js              # Express + SSE 服务端
-├── py_bridge.py           # Python 桥接脚本
+├── py_bridge.py           # Python 桥接脚本（LIGHT / DEEP）
+├── llama_worker.py        # 常驻 LLaMA Worker（SUPER）
 ├── sample_input.txt       # 示例输入文本
 ├── README.md              # 本文档
 ├── .gitignore             # 排除运行时产物
@@ -253,6 +267,8 @@ trace-engine-web/
 | `TRACE_MAX_CONCURRENT` | `2` | 最大并发分析任务数 |
 | `TRACE_JOB_TIMEOUT_MS` | `300000` | 单次分析超时时间（毫秒） |
 | `TRACE_BRIDGE_CONFIG` | `''` | 传给 Python 桥接器的 JSON 配置（阈值、窗口、最大概念数等） |
+| `TRACE_ROOT` | 自动探测 | 显式指定 TRACE 项目根目录（含 models/） |
+| `TRACE_ENGINE_SKILL_DIR` | `../trace-engine/examples/counterfactual_hybrid` | Skill 目录路径 |
 | `TRACE_CORS_ORIGIN` | `*` | CORS 允许来源（多云/跨域部署） |
 | `TRACE_WEB_VERSION` | `1.1.0` | 服务版本号（用于多云识别） |
 

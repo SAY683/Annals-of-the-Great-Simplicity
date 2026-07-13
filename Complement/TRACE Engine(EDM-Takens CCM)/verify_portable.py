@@ -13,6 +13,7 @@ TRACE Engine 便携目录独立运行审计脚本
     4. trace-engine-web 服务端可启动并接受健康检查
     5. 关键文件存在且无运行时产物污染
 """
+import json
 import os
 import shutil
 import socket
@@ -52,9 +53,16 @@ def check_no_runtime_artifacts(root: Path) -> dict:
     for pat in bad_patterns:
         for f in web_root.glob(pat):
             found.append(f.name)
+    # outputs/ / uploads/ 是正常运行时目录，仅在其包含非空内容时视为污染
     for name in ['outputs', 'uploads']:
-        if (web_root / name).exists():
-            found.append(name + '/')
+        p = web_root / name
+        if p.exists() and p.is_dir():
+            try:
+                children = list(p.iterdir())
+                if children:
+                    found.append(f'{name}/ ({len(children)} 项内容)')
+            except PermissionError:
+                found.append(f'{name}/ (无法读取)')
     if found:
         result['ok'] = False
         result['messages'].append(f'发现残留: {found}')
@@ -169,7 +177,10 @@ def check_web_health(root: Path) -> dict:
         return result
 
     port = find_free_port()
-    work_dir = Path(os.environ.get('TRACE_WORK_DIR', str(web / 'work')))
+    # 审计使用独立临时工作目录，避免污染成品/开发目录中的 work/outputs
+    work_dir = Path(os.environ.get('TRACE_WORK_DIR', str(Path(os.environ.get('TEMP', '/tmp')) / f'trace_verify_{port}')))
+    if work_dir.exists():
+        shutil.rmtree(work_dir, ignore_errors=True)
     work_dir.mkdir(parents=True, exist_ok=True)
     env = os.environ.copy()
     env['PORT'] = str(port)
@@ -184,6 +195,11 @@ def check_web_health(root: Path) -> dict:
         stderr=subprocess.PIPE,
         text=True,
     )
+
+    def fetch_json(path: str, timeout: int = 2):
+        with urllib.request.urlopen(f'http://127.0.0.1:{port}{path}', timeout=timeout) as resp:
+            return resp.status, json.loads(resp.read().decode('utf-8'))
+
     try:
         # 等待服务启动；Python 环境检查可能耗时较长，给予 30 秒
         last_error = ''
@@ -192,12 +208,32 @@ def check_web_health(root: Path) -> dict:
                 break
             try:
                 # 使用 127.0.0.1 避免某些环境下的 localhost 代理/relay 拦截
-                with urllib.request.urlopen(f'http://127.0.0.1:{port}/api/health', timeout=2) as resp:
-                    data = resp.read().decode('utf-8')
-                    if resp.status == 200:
-                        result['messages'].append(f'健康检查通过 (port={port})')
-                        result['messages'].append(data[:200])
-                        return result
+                status, data = fetch_json('/api/health')
+                if status == 200 and data.get('success'):
+                    result['messages'].append(f'健康检查通过 (port={port})')
+                    result['messages'].append(json.dumps(data, ensure_ascii=False)[:200])
+                    # 健康检查通过后继续校验 /api/config API 契约
+                    try:
+                        cstatus, cdata = fetch_json('/api/config')
+                        if cstatus == 200 and cdata.get('success'):
+                            modes = cdata.get('modes') or {}
+                            schema = cdata.get('bridgeParamSchema') or {}
+                            if 'super' not in modes:
+                                result['ok'] = False
+                                result['messages'].append('/api/config 未暴露 SUPER 模式')
+                            elif 'max_segments' not in schema:
+                                result['ok'] = False
+                                result['messages'].append('/api/config 的 bridgeParamSchema 缺少 max_segments')
+                            else:
+                                result['messages'].append('/api/config API 契约通过（含 SUPER 模式与 max_segments）')
+                                config_ok = True
+                        else:
+                            result['ok'] = False
+                            result['messages'].append(f'/api/config 返回异常: {cstatus}')
+                    except Exception as ce:
+                        result['ok'] = False
+                        result['messages'].append(f'/api/config 检查失败: {ce}')
+                    return result
             except Exception as e:
                 last_error = str(e)
                 time.sleep(0.5)
@@ -220,11 +256,34 @@ def check_web_health(root: Path) -> dict:
         if stderr or stdout:
             result['messages'].append('服务端输出:')
             result['messages'].append(stderr or stdout)
+        # 清理审计自动创建的临时工作目录
+        if 'TRACE_WORK_DIR' not in os.environ and 'trace_verify_' in str(work_dir):
+            try:
+                shutil.rmtree(work_dir, ignore_errors=True)
+            except Exception:
+                pass
     return result
 
 
+def find_product_root(start: Path) -> Path:
+    """从脚本位置向上探测包含 trace-engine 与 trace-engine-web 的根目录。
+
+    支持两种布局:
+      - 成品布局: <product>/trace-engine-web/work/verify_portable.py -> <product>
+      - 开发布局: <project>/.skills/trace-engine-web/work/verify_portable.py -> <project>/.skills
+    """
+    current = start.resolve()
+    for _ in range(6):
+        if (current / 'trace-engine').exists() and (current / 'trace-engine-web').exists():
+            return current
+        if current.parent == current:
+            break
+        current = current.parent
+    return start
+
+
 def main():
-    root = Path(__file__).resolve().parent
+    root = find_product_root(Path(__file__).resolve().parent)
     print('=' * 60)
     print('TRACE Engine 便携目录独立运行审计')
     print(f'目录: {root}')

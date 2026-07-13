@@ -95,9 +95,10 @@ def build_schema(skill_dir: Path) -> dict:
             'description': f'presets.yaml trace2dowhy.{key}',
         }
 
-    # 2. Web/桥接层特有参数（不在 presets.yaml 中）
+    # 2. Web/桥接层特有参数（部分在 presets.yaml super 段中定义）
     web_specific = {
-        'window_size': {'type': 'integer', 'min': 2, 'max': 128, 'default': 8, 'description': '滑动窗口大小'},
+        'window_size': {'type': 'integer', 'min': 2, 'max': 256, 'default': 64, 'description': 'TRACE 滑动窗口大小'},
+        'max_segments': {'type': 'integer', 'min': 1, 'max': 16, 'default': 4, 'description': 'LLaMA TRACE 最大分段数'},
         'max_concepts': {'type': 'integer', 'min': 1, 'max': 128, 'default': 12, 'description': '最大概念数'},
         'min_valid_tokens': {'type': 'integer', 'min': 1, 'max': 10000, 'default': 10, 'description': '最小有效 token 数'},
         'min_concepts': {'type': 'integer', 'min': 2, 'max': 128, 'default': 3, 'description': '最小概念数'},
