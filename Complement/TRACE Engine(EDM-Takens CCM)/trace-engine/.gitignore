@@ -1,0 +1,25 @@
+# Python 运行时产物
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+*.egg-info/
+
+# 运行时输出目录
+outputs/
+work/
+*.log
+
+# 模型文件（通常较大，不纳入版本控制）
+*.bin
+*.pt
+*.ckpt
+
+# 测试临时文件
+*_test_result.json
+*_result.json
+
+# 系统文件
+.DS_Store
+Thumbs.db

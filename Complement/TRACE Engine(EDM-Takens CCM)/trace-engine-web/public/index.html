@@ -1,0 +1,1480 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+  <title>TRACE Engine // Causal Inference Terminal</title>
+  <style>
+    :root {
+      --bg: #0b0c10;
+      --panel: #111318;
+      --panel-2: #161a21;
+      --panel-3: #1c212b;
+      --text: #c5c6c7;
+      --muted: #6f7888;
+      --accent: #66fcf1;
+      --accent-dim: #45a29e;
+      --success: #03c988;
+      --warn: #f2c94c;
+      --fail: #ff4d4d;
+      --border: #2a2f3a;
+      --font-mono: "JetBrains Mono", "Fira Code", "Consolas", "SF Mono", monospace;
+      --font-ui: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif;
+      /* 基础字号：在 1280px 视口约 18px，大屏 22px，小屏 16px，整体可读性优先 */
+      font-size: clamp(16px, 1.05vw + 9px, 22px);
+      --ui-scale: 1.05;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      font-family: var(--font-ui);
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+
+    /* 全局缩放控制：通过 CSS 变量让 JS 可以整体放大/缩小 UI */
+    body {
+      font-size: calc(1rem * var(--ui-scale));
+    }
+
+    /* 扫描线 */
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background: repeating-linear-gradient(
+        0deg,
+        rgba(0, 0, 0, 0) 0px,
+        rgba(0, 0, 0, 0) 1px,
+        rgba(0, 255, 255, 0.02) 2px,
+        rgba(0, 255, 255, 0.02) 3px
+      );
+      z-index: 9999;
+    }
+
+    header {
+      background: var(--panel);
+      border-bottom: 1px solid var(--border);
+      padding: clamp(0.9rem, 2.2vw, 1.6rem) clamp(1rem, 3vw, 2rem);
+      display: flex;
+      align-items: center;
+      gap: clamp(0.7rem, 1.6vw, 1.1rem);
+      position: relative;
+      overflow: hidden;
+      flex-wrap: wrap;
+    }
+
+    header::after {
+      content: "";
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--accent), transparent);
+      animation: scan 4s linear infinite;
+    }
+
+    @keyframes scan {
+      0% { transform: translateX(-100%); }
+      100% { transform: translateX(100%); }
+    }
+
+    .logo {
+      width: clamp(40px, 4.5vw, 54px);
+      height: clamp(40px, 4.5vw, 54px);
+      border: 2px solid var(--accent);
+      border-radius: 8px;
+      display: grid;
+      place-items: center;
+      font-family: var(--font-mono);
+      font-weight: 700;
+      font-size: clamp(1.2rem, 2.2vw, 1.7rem);
+      color: var(--accent);
+      text-shadow: 0 0 8px rgba(102, 252, 241, 0.4);
+      flex-shrink: 0;
+    }
+
+    .brand { flex: 1 1 200px; min-width: 0; }
+    .brand h1 {
+      margin: 0;
+      font-size: clamp(1.05rem, 2.6vw, 1.55rem);
+      letter-spacing: 0.5px;
+      color: #fff;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .brand p {
+      margin: 0.1rem 0 0;
+      color: var(--muted);
+      font-size: clamp(0.72rem, 1.3vw, 0.88rem);
+      font-family: var(--font-mono);
+    }
+
+    .header-controls {
+      display: flex;
+      align-items: center;
+      gap: clamp(0.6rem, 1.5vw, 1rem);
+      flex-shrink: 0;
+      flex-wrap: wrap;
+    }
+
+    .scale-control {
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
+      font-family: var(--font-mono);
+      font-size: clamp(0.72rem, 1.05vw, 0.82rem);
+      color: var(--muted);
+      background: var(--panel-2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.4rem 0.6rem;
+    }
+    .scale-control input[type=range] {
+      width: clamp(90px, 11vw, 130px);
+      accent-color: var(--accent);
+    }
+    .scale-control button {
+      padding: 0.25rem 0.45rem;
+      font-size: clamp(0.62rem, 0.95vw, 0.72rem);
+    }
+
+    .status-dot {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: clamp(0.68rem, 1.05vw, 0.82rem);
+      color: var(--muted);
+      font-family: var(--font-mono);
+      flex-shrink: 0;
+    }
+    .status-dot span {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--success);
+      box-shadow: 0 0 8px var(--success);
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+    main {
+      max-width: 1700px;
+      min-width: 320px;
+      margin: 0 auto;
+      padding: clamp(1rem, 2.2vw, 1.8rem);
+      display: grid;
+      grid-template-columns: minmax(0, 1.55fr) minmax(420px, 1fr);
+      gap: clamp(1rem, 2.2vw, 1.8rem);
+    }
+
+    @media (max-width: 1200px) {
+      main { grid-template-columns: 1fr; }
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+      margin-bottom: clamp(1rem, 2.2vw, 1.6rem);
+    }
+    .panel:last-child { margin-bottom: 0; }
+
+    .panel-header {
+      background: var(--panel-2);
+      border-bottom: 1px solid var(--border);
+      padding: 0.75rem 1rem;
+      font-family: var(--font-mono);
+      font-size: clamp(0.74rem, 1.15vw, 0.88rem);
+      color: var(--accent);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.6rem;
+      flex-wrap: wrap;
+    }
+    .panel-body { padding: clamp(0.9rem, 1.7vw, 1.25rem); }
+
+    label {
+      display: block;
+      font-size: clamp(0.78rem, 1.15vw, 0.88rem);
+      color: var(--muted);
+      margin-bottom: 0.5rem;
+      font-family: var(--font-mono);
+    }
+
+    textarea {
+      width: 100%;
+      min-height: clamp(180px, 24vh, 300px);
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      padding: 0.9rem;
+      font-family: var(--font-ui);
+      font-size: clamp(0.92rem, 1.3vw, 1.05rem);
+      resize: vertical;
+      outline: none;
+      line-height: 1.75;
+    }
+    textarea:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px rgba(102, 252, 241, 0.1);
+    }
+
+    input[type="file"] {
+      width: 100%;
+      padding: 0.65rem;
+      background: var(--bg);
+      border: 1px dashed var(--border);
+      border-radius: 6px;
+      color: var(--muted);
+      margin-bottom: 1rem;
+      font-size: clamp(0.82rem, 1.15vw, 0.92rem);
+    }
+
+    .actions {
+      display: flex;
+      gap: clamp(0.55rem, 1.3vw, 0.9rem);
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    button {
+      background: transparent;
+      border: 1px solid var(--accent);
+      color: var(--accent);
+      padding: clamp(0.5rem, 1.1vw, 0.7rem) clamp(0.9rem, 1.7vw, 1.3rem);
+      border-radius: 6px;
+      cursor: pointer;
+      font-family: var(--font-mono);
+      font-size: clamp(0.78rem, 1.15vw, 0.88rem);
+      transition: all 0.15s;
+      flex-shrink: 0;
+    }
+    button:hover:not(:disabled) {
+      background: rgba(102, 252, 241, 0.08);
+      box-shadow: 0 0 12px rgba(102, 252, 241, 0.15);
+    }
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      border-color: var(--muted);
+      color: var(--muted);
+    }
+    button.secondary { border-color: var(--muted); color: var(--muted); }
+    button.secondary:hover:not(:disabled) { background: rgba(111, 120, 136, 0.12); box-shadow: none; }
+    button.danger { border-color: var(--fail); color: var(--fail); display: none; }
+    button.danger:hover:not(:disabled) { background: rgba(255, 77, 77, 0.08); }
+
+    .mode-toggle {
+      display: inline-flex;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      overflow: hidden;
+      font-family: var(--font-mono);
+      font-size: clamp(0.72rem, 1.05vw, 0.82rem);
+    }
+    .mode-toggle label {
+      margin: 0;
+      padding: 0.5rem 0.8rem;
+      cursor: pointer;
+      color: var(--muted);
+      background: var(--bg);
+      transition: all 0.15s;
+    }
+    .mode-toggle input { display: none; }
+    .mode-toggle input:checked + label {
+      background: rgba(102, 252, 241, 0.12);
+      color: var(--accent);
+    }
+
+    .progress-wrap { margin-top: 1rem; display: none; }
+    .progress-bar {
+      height: 10px;
+      background: var(--bg);
+      border-radius: 5px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+    .progress-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, var(--accent-dim), var(--accent));
+      transition: width 0.3s ease;
+      box-shadow: 0 0 10px rgba(102, 252, 241, 0.3);
+    }
+    .progress-label {
+      font-family: var(--font-mono);
+      font-size: clamp(0.72rem, 1.05vw, 0.82rem);
+      color: var(--accent);
+      margin-top: 0.45rem;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .terminal {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      min-height: clamp(220px, 32vh, 440px);
+      max-height: clamp(360px, 48vh, 620px);
+      overflow-y: auto;
+      padding: 0.85rem;
+      font-family: var(--font-mono);
+      font-size: clamp(0.76rem, 1.05vw, 0.88rem);
+      line-height: 1.55;
+    }
+    .terminal-line { margin-bottom: 0.3rem; word-break: break-word; }
+    .terminal-line .ts { color: var(--muted); margin-right: 0.5rem; }
+    .terminal-line .level {
+      display: inline-block;
+      min-width: 56px;
+      text-align: center;
+      border-radius: 3px;
+      font-size: 0.72rem;
+      margin-right: 0.5rem;
+      padding: 0.06rem 0.25rem;
+      font-family: var(--font-mono);
+    }
+    .terminal-line .level.info { color: var(--accent); background: rgba(102, 252, 241, 0.08); }
+    .terminal-line .level.stage { color: #fff; background: var(--accent-dim); }
+    .terminal-line .level.error { color: #fff; background: var(--fail); }
+    .terminal-line .level.warn { color: var(--warn); background: rgba(242, 201, 76, 0.12); }
+    .terminal-line .level.stderr { color: var(--fail); background: rgba(255, 77, 77, 0.08); }
+
+    .metric-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: clamp(0.7rem, 1.4vw, 1rem);
+      margin-bottom: 1.2rem;
+    }
+    .metric {
+      background: var(--panel-2);
+      border: 1px solid var(--border);
+      padding: clamp(0.75rem, 1.3vw, 1.05rem);
+      border-radius: 8px;
+      text-align: center;
+    }
+    .metric .value { font-size: clamp(1.15rem, 2.1vw, 1.5rem); font-weight: 700; color: var(--accent); font-family: var(--font-mono); }
+    .metric .label { font-size: clamp(0.65rem, 0.95vw, 0.78rem); color: var(--muted); margin-top: 0.25rem; }
+
+    .param-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 0.65rem;
+      font-family: var(--font-mono);
+      font-size: clamp(0.78rem, 1.05vw, 0.88rem);
+    }
+    .param {
+      display: flex;
+      justify-content: space-between;
+      padding: 0.55rem 0.75rem;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 5px;
+    }
+    .param .k { color: var(--muted); }
+    .param .v { color: var(--text); text-align: right; max-width: 60%; word-break: break-word; }
+
+    .warrior-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: clamp(0.8rem, 1.6vw, 1.1rem);
+    }
+    .warrior-card {
+      background: var(--panel-2);
+      border: 1px solid var(--border);
+      border-left: 4px solid var(--accent);
+      border-radius: 8px;
+      padding: 0.95rem;
+    }
+    .warrior-card.deployed { border-left-color: var(--success); }
+    .warrior-card.fallback { border-left-color: var(--warn); }
+    .warrior-card.unavailable { border-left-color: var(--muted); }
+    .warrior-title {
+      font-family: var(--font-mono);
+      font-size: clamp(0.85rem, 1.25vw, 1rem);
+      color: #fff;
+      margin-bottom: 0.45rem;
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
+    }
+    .warrior-status {
+      font-size: 0.68rem;
+      padding: 0.12rem 0.4rem;
+      border-radius: 3px;
+      text-transform: uppercase;
+    }
+    .warrior-status.deployed { color: var(--success); background: rgba(3, 201, 136, 0.1); }
+    .warrior-status.fallback { color: var(--warn); background: rgba(242, 201, 76, 0.1); }
+    .warrior-status.unavailable { color: var(--muted); background: rgba(111, 120, 136, 0.15); }
+    .warrior-finding {
+      font-size: clamp(0.75rem, 1.05vw, 0.85rem);
+      color: var(--text);
+      margin: 0.28rem 0;
+      line-height: 1.55;
+    }
+    .warrior-metrics {
+      font-family: var(--font-mono);
+      font-size: clamp(0.68rem, 0.95vw, 0.78rem);
+      color: var(--muted);
+      margin-top: 0.45rem;
+    }
+    .warrior-verdict {
+      margin-top: 0.55rem;
+      font-size: clamp(0.74rem, 1.05vw, 0.85rem);
+      color: var(--accent);
+      font-family: var(--font-mono);
+    }
+
+    table { width: 100%; border-collapse: collapse; font-size: clamp(0.8rem, 1.05vw, 0.9rem); }
+    th, td { text-align: left; padding: 0.6rem 0.55rem; border-bottom: 1px solid var(--border); }
+    th { color: var(--muted); font-weight: 600; background: var(--panel-2); font-family: var(--font-ui); }
+    td { color: var(--text); font-family: var(--font-mono); }
+
+    .badge {
+      display: inline-block;
+      padding: 0.12rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      font-family: var(--font-mono);
+    }
+    .badge.pass { color: var(--success); background: rgba(3, 201, 136, 0.1); border: 1px solid rgba(3, 201, 136, 0.3); }
+    .badge.warn { color: var(--warn); background: rgba(242, 201, 76, 0.1); border: 1px solid rgba(242, 201, 76, 0.3); }
+    .badge.fail { color: var(--fail); background: rgba(255, 77, 77, 0.1); border: 1px solid rgba(255, 77, 77, 0.3); }
+
+    .links { display: flex; gap: 0.85rem; flex-wrap: wrap; }
+    .links a {
+      color: var(--accent);
+      text-decoration: none;
+      font-size: clamp(0.82rem, 1.15vw, 0.92rem);
+      border-bottom: 1px dashed var(--accent-dim);
+      padding-bottom: 0.1rem;
+    }
+    .links a:hover { border-bottom-style: solid; }
+
+    .section-title {
+      font-size: clamp(0.85rem, 1.25vw, 1rem);
+      color: var(--muted);
+      margin: 1.3rem 0 0.7rem;
+      font-family: var(--font-mono);
+    }
+    .section-title:first-child { margin-top: 0; }
+
+    .hidden { display: none !important; }
+
+    .toast {
+      margin-top: 1rem;
+      padding: 0.85rem 1rem;
+      border-radius: 6px;
+      font-size: clamp(0.85rem, 1.15vw, 0.95rem);
+      display: none;
+      border-left: 3px solid;
+    }
+    .toast.info { background: rgba(102, 252, 241, 0.08); border-color: var(--accent); color: var(--accent); }
+    .toast.error { background: rgba(255, 77, 77, 0.08); border-color: var(--fail); color: var(--fail); }
+    .toast.success { background: rgba(3, 201, 136, 0.08); border-color: var(--success); color: var(--success); }
+
+    /* 可折叠详情块 */
+    details {
+      background: var(--panel-2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      margin-bottom: 0.6rem;
+      overflow: hidden;
+    }
+    details > summary {
+      padding: 0.6rem 0.85rem;
+      cursor: pointer;
+      font-family: var(--font-mono);
+      font-size: clamp(0.76rem, 1.05vw, 0.86rem);
+      color: var(--accent);
+      background: var(--panel-3);
+      list-style: none;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    details > summary::after {
+      content: "▸";
+      color: var(--muted);
+    }
+    details[open] > summary::after { content: "▾"; }
+    details > div { padding: 0.75rem; }
+
+    .kpi-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .adj-matrix {
+      display: grid;
+      gap: 2px;
+      font-family: var(--font-mono);
+      font-size: clamp(0.62rem, 0.9vw, 0.76rem);
+      margin-top: 0.5rem;
+    }
+    .adj-cell {
+      aspect-ratio: 1;
+      display: grid;
+      place-items: center;
+      border-radius: 2px;
+      color: var(--text);
+      min-width: 26px;
+    }
+    .adj-label {
+      color: var(--muted);
+      font-size: clamp(0.58rem, 0.85vw, 0.7rem);
+      transform: rotate(-45deg);
+      white-space: nowrap;
+    }
+    .adj-legend {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      margin-top: 0.6rem;
+      font-family: var(--font-mono);
+      font-size: clamp(0.65rem, 0.9vw, 0.78rem);
+      color: var(--muted);
+    }
+    .adj-legend-bar {
+      width: clamp(80px, 12vw, 140px);
+      height: 8px;
+      border-radius: 4px;
+      background: linear-gradient(90deg, var(--panel-3), var(--accent-dim), var(--accent));
+    }
+
+    .stability-table td, .stability-table th { font-size: clamp(0.74rem, 1vw, 0.85rem); }
+
+    .empty-state {
+      color: var(--muted);
+      font-size: clamp(0.78rem, 1.05vw, 0.88rem);
+      padding: 0.5rem 0;
+    }
+    .kpi-pill {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 0.35rem 0.65rem;
+      font-family: var(--font-mono);
+      font-size: clamp(0.68rem, 0.95vw, 0.78rem);
+      color: var(--text);
+    }
+    .kpi-pill .k { color: var(--muted); margin-right: 0.35rem; }
+
+    .mode-note {
+      background: var(--panel-2);
+      border-left: 3px solid var(--warn);
+      padding: 0.65rem 0.9rem;
+      border-radius: 0 6px 6px 0;
+      font-size: clamp(0.75rem, 1.05vw, 0.85rem);
+      color: var(--text);
+      margin-bottom: 1rem;
+    }
+    .mode-note strong { color: var(--warn); }
+
+    @media (max-width: 680px) {
+      .actions { flex-direction: column; align-items: stretch; }
+      button { width: 100%; text-align: center; }
+      .mode-toggle { width: 100%; }
+      .mode-toggle label { flex: 1; text-align: center; }
+      .param-grid { grid-template-columns: 1fr; }
+      .warrior-grid { grid-template-columns: 1fr; }
+      .metric-grid { grid-template-columns: repeat(2, 1fr); }
+      .header-controls { width: 100%; justify-content: space-between; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="logo">T</div>
+    <div class="brand">
+      <h1>TRACE Engine // Causal Inference Terminal</h1>
+      <p>TRACE + DoWhy + Counterfactual · Six-Warrior Web Interface</p>
+    </div>
+    <div class="header-controls">
+      <div class="scale-control" title="调整整体 UI 缩放">
+        <span>SCALE</span>
+        <input type="range" id="uiScale" min="75" max="150" value="105" step="5">
+        <span id="uiScaleVal">105%</span>
+        <button id="resetScaleBtn" class="secondary" title="重置为默认 105%">RESET</button>
+      </div>
+      <div class="status-dot"><span></span>SYSTEM ONLINE</div>
+    </div>
+  </header>
+
+  <main>
+    <div class="left-col">
+      <section class="panel">
+        <div class="panel-header">
+          <span>$ input_payload.txt</span>
+          <div class="mode-toggle" title="Light: 快速因果推断；Deep: 完整六战士深度分析（含 causallearn PC/GES，更慢）">
+            <input type="radio" name="mode" id="modeLight" value="light" checked>
+            <label for="modeLight">LIGHT</label>
+            <input type="radio" name="mode" id="modeDeep" value="deep">
+            <label for="modeDeep">DEEP</label>
+          </div>
+        </div>
+        <div class="panel-body">
+          <div class="mode-note" id="modeNote">
+            <strong>LIGHT 模式：</strong>仅执行 TRACE + DoWhy 核心因果推断（识别、估计、反驳、反事实扫描），约 1–3 秒完成。此模式跳过 causallearn、完整 CCM/EDM/HAVOK 深度诊断，因此“快”是设计行为，不是缺陷。
+          </div>
+
+          <label for="textInput">TEXT INPUT</label>
+          <textarea id="textInput" placeholder="// 输入描述因果关系的文本，例如：&#10;算法推荐导致信息茧房，信息茧房加剧观点极化，观点极化侵蚀社会共识……"></textarea>
+
+          <label for="fileInput">OR UPLOAD FILE <span style="color:var(--muted);font-size:0.78rem;">(支持拖拽上传 · Ctrl+Enter 运行)</span></label>
+          <div id="dropZone" style="border:2px dashed var(--border);border-radius:6px;padding:1rem;text-align:center;color:var(--muted);margin-bottom:1rem;transition:border-color 0.2s,background 0.2s;">
+            <input type="file" id="fileInput" accept=".txt,.md,text/plain,text/markdown" style="display:none;">
+            <div id="dropText">点击选择或拖拽文本文件到此处</div>
+            <div id="fileName" style="color:var(--accent);margin-top:0.3rem;display:none;"></div>
+          </div>
+
+          <details style="margin-bottom:1rem;">
+            <summary>ADVANCED_PARAMETERS // 高级参数</summary>
+            <div class="param-grid" style="margin-top:0.5rem;">
+              <div class="param"><span class="k">Threshold</span><input type="number" id="paramThreshold" value="0.5" step="0.1" min="0" max="2" style="width:80px;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:0.25rem;"></div>
+              <div class="param"><span class="k">Window Size</span><input type="number" id="paramWindow" value="8" step="1" min="2" max="32" style="width:80px;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:0.25rem;"></div>
+              <div class="param"><span class="k">Max Concepts</span><input type="number" id="paramMaxConcepts" value="12" step="1" min="3" max="64" style="width:80px;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:0.25rem;"></div>
+              <div class="param"><span class="k">Min Freq</span><input type="number" id="paramMinFreq" value="1" step="1" min="1" max="20" style="width:80px;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:0.25rem;"></div>
+            </div>
+            <div style="margin-top:0.65rem;display:flex;gap:0.5rem;flex-wrap:wrap;align-items:center;">
+              <span style="color:var(--muted);font-family:var(--font-mono);font-size:0.72rem;">PRESETS:</span>
+              <button type="button" class="secondary preset-btn" data-preset="default" style="padding:0.3rem 0.55rem;font-size:0.72rem;">DEFAULT</button>
+              <button type="button" class="secondary preset-btn" data-preset="sensitive" style="padding:0.3rem 0.55rem;font-size:0.72rem;">SENSITIVE</button>
+              <button type="button" class="secondary preset-btn" data-preset="broad" style="padding:0.3rem 0.55rem;font-size:0.72rem;">BROAD</button>
+              <button type="button" class="secondary preset-btn" data-preset="deep" style="padding:0.3rem 0.55rem;font-size:0.72rem;">DEEP</button>
+            </div>
+          </details>
+
+          <div class="actions">
+            <button id="analyzeBtn">> RUN_ANALYSIS</button>
+            <button id="cancelBtn" class="danger">> ABORT</button>
+            <button id="loadSampleBtn" class="secondary">> LOAD_SAMPLE</button>
+            <button id="clearBtn" class="secondary">> CLEAR</button>
+          </div>
+
+          <div class="progress-wrap" id="progressWrap">
+            <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+            <div class="progress-label">
+              <span id="stageName">IDLE</span>
+              <span id="stagePercent">0%</span>
+            </div>
+          </div>
+
+          <div id="toast" class="toast"></div>
+        </div>
+      </section>
+
+      <section class="panel hidden" id="resultPanel">
+        <div class="panel-header">$ result_summary.json</div>
+        <div class="panel-body">
+          <div class="metric-grid">
+            <div class="metric"><div class="value" id="mConcepts">-</div><div class="label">CONCEPTS</div></div>
+            <div class="metric"><div class="value" id="mEdges">-</div><div class="label">EDGES</div></div>
+            <div class="metric"><div class="value" id="mATE">-</div><div class="label">ATE</div></div>
+            <div class="metric"><div class="value" id="mCI">-</div><div class="label">95% CI</div></div>
+            <div class="metric"><div class="value" id="mIdentifiable">-</div><div class="label">IDENTIFIABLE</div></div>
+            <div class="metric"><div class="value" id="mRefuted">-</div><div class="label">REFUTED</div></div>
+            <div class="metric"><div class="value" id="mMode">-</div><div class="label">MODE</div></div>
+            <div class="metric"><div class="value" id="mDuration">-</div><div class="label">DURATION</div></div>
+          </div>
+
+          <h3 class="section-title">// CAUSAL PARAMETERS (MASS-SPECTROMETRY)</h3>
+          <div class="param-grid" id="paramGrid"></div>
+
+          <h3 class="section-title">// EXECUTION PROFILE</h3>
+          <div id="execProfile"></div>
+
+          <h3 class="section-title">// DATA & MODEL DIAGNOSTICS</h3>
+          <div id="dataDiagnostics"></div>
+
+          <h3 class="section-title">// IDENTIFIABILITY & ESTIMATION BACKEND</h3>
+          <div id="identifiabilityPanel"></div>
+
+          <h3 class="section-title">// CONCEPT VOCABULARY & FREQUENCY</h3>
+          <table>
+            <thead><tr><th>CONCEPT</th><th>FREQ</th><th>RANK</th><th>CCM ELIGIBLE</th></tr></thead>
+            <tbody id="conceptFreqBody"></tbody>
+          </table>
+
+          <h3 class="section-title">// ADJACENCY MATRIX HEATMAP</h3>
+          <div id="adjMatrixWrap"></div>
+
+          <h3 class="section-title">// STABILITY & ROBUSTNESS</h3>
+          <div id="stabilityPanel"></div>
+
+          <h3 class="section-title">// TOP CAUSAL EDGES</h3>
+          <table>
+            <thead><tr><th>SOURCE</th><th>TARGET</th><th>STRENGTH</th><th>DIRECTION</th></tr></thead>
+            <tbody id="edgesBody"></tbody>
+          </table>
+
+          <h3 class="section-title">// COUNTERFACTUAL SCAN</h3>
+          <table>
+            <thead><tr><th>EDGE</th><th>ΔNLL</th><th>ITE</th><th>OBSERVED</th><th>COUNTERFACTUAL</th></tr></thead>
+            <tbody id="scanBody"></tbody>
+          </table>
+
+          <h3 class="section-title">// REFUTATION TESTS</h3>
+          <table>
+            <thead><tr><th>METHOD</th><th>ORIGINAL</th><th>NEW EFFECT</th><th>METRIC</th><th>VERDICT</th></tr></thead>
+            <tbody id="refuteBody"></tbody>
+          </table>
+
+          <h3 class="section-title">// SIX WARRIORS DIAGNOSIS</h3>
+          <div class="warrior-grid" id="warriorGrid"></div>
+
+          <div class="links" style="margin-top:1rem;">
+            <a id="reportLink" href="#" target="_blank">> OPEN_REPORT.md</a>
+            <a id="jsonLink" href="#" target="_blank">> OPEN_RESULT.json</a>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div class="right-col">
+      <section class="panel">
+        <div class="panel-header">$ realtime_log.stream</div>
+        <div class="panel-body" style="padding:0.55rem;">
+          <div class="terminal" id="terminal"></div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header" style="justify-content:space-between;">
+          <span>$ job_history.log</span>
+          <div style="display:flex;gap:0.45rem;">
+            <button id="exportJobsBtn" class="secondary" style="padding:0.35rem 0.6rem;font-size:0.72rem;">> EXPORT</button>
+            <button id="clearJobsBtn" class="secondary" style="padding:0.35rem 0.6rem;font-size:0.72rem;">> CLEAR</button>
+            <button id="refreshJobsBtn" class="secondary" style="padding:0.35rem 0.6rem;font-size:0.72rem;">> REFRESH</button>
+          </div>
+        </div>
+        <div class="panel-body" style="padding:0.55rem;">
+          <div class="terminal" id="jobHistoryTerminal" style="min-height:160px;max-height:260px;"></div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <script>
+    const sampleText = `算法推荐系统通过持续分析用户行为数据，精准推送用户感兴趣的内容。然而，这种个性化推送机制会在长期运行中导致信息茧房效应的形成。信息茧房使得用户长期只接触单一观点，从而加剧了观点极化的趋势。观点极化进一步侵蚀了社会共识的基础。当社会共识瓦解后，公共讨论空间也随之萎缩。公共讨论空间的萎缩又会削弱社会监督功能，社会监督功能的弱化反过来降低算法平台的问责压力。算法平台问责压力的降低，使得算法透明度改革难以推进。算法透明度改革的迟滞进一步固化信息茧房，从而形成一条完整的因果反馈回路。与此同时，用户行为数据的过度采集也引发了隐私风险，隐私风险的上升会削弱用户对平台的信任。用户信任的下降减少了数据共享意愿，数据共享意愿的降低又反过来损害推荐算法的精准度。推荐精准度的下降导致平台广告收入减少，广告收入的减少进一步压缩内容审核投入，内容审核投入的下降助长了虚假信息的传播，虚假信息的传播加剧了观点极化。`;
+
+    const analyzeBtn = document.getElementById('analyzeBtn');
+    const cancelBtn = document.getElementById('cancelBtn');
+    const loadSampleBtn = document.getElementById('loadSampleBtn');
+    const textInput = document.getElementById('textInput');
+    const fileInput = document.getElementById('fileInput');
+    const terminal = document.getElementById('terminal');
+    const progressWrap = document.getElementById('progressWrap');
+    const progressFill = document.getElementById('progressFill');
+    const stageName = document.getElementById('stageName');
+    const stagePercent = document.getElementById('stagePercent');
+    const toast = document.getElementById('toast');
+    const resultPanel = document.getElementById('resultPanel');
+    const modeRadios = document.querySelectorAll('input[name="mode"]');
+    const modeNote = document.getElementById('modeNote');
+    const uiScale = document.getElementById('uiScale');
+    const uiScaleVal = document.getElementById('uiScaleVal');
+    const resetScaleBtn = document.getElementById('resetScaleBtn');
+    const clearBtn = document.getElementById('clearBtn');
+    const refreshJobsBtn = document.getElementById('refreshJobsBtn');
+    const exportJobsBtn = document.getElementById('exportJobsBtn');
+    const clearJobsBtn = document.getElementById('clearJobsBtn');
+    const jobHistoryTerminal = document.getElementById('jobHistoryTerminal');
+    const paramThreshold = document.getElementById('paramThreshold');
+    const paramWindow = document.getElementById('paramWindow');
+    const paramMaxConcepts = document.getElementById('paramMaxConcepts');
+    const paramMinFreq = document.getElementById('paramMinFreq');
+    const dropZone = document.getElementById('dropZone');
+    const dropText = document.getElementById('dropText');
+    const fileName = document.getElementById('fileName');
+    const DEFAULT_SCALE = 105;
+
+    const PRESETS = {
+      default: { threshold: 0.5, window_size: 8, max_concepts: 12, concept_min_freq: 1 },
+      sensitive: { threshold: 0.3, window_size: 6, max_concepts: 16, concept_min_freq: 2 },
+      broad: { threshold: 0.8, window_size: 12, max_concepts: 24, concept_min_freq: 1 },
+      deep: { threshold: 0.5, window_size: 8, max_concepts: 24, concept_min_freq: 1 },
+    };
+
+    let currentJobId = null;
+    let streamAbort = null;
+    let lastConfig = null;
+
+    // UI 缩放控制
+    function applyScale(pct) {
+      document.documentElement.style.setProperty('--ui-scale', pct / 100);
+      uiScaleVal.textContent = pct + '%';
+      uiScale.value = pct;
+      try { localStorage.setItem('trace-ui-scale', String(pct)); } catch (_) {}
+    }
+    uiScale.addEventListener('input', () => applyScale(parseInt(uiScale.value, 10)));
+    resetScaleBtn.addEventListener('click', () => applyScale(DEFAULT_SCALE));
+    (function restoreScale() {
+      try {
+        const saved = localStorage.getItem('trace-ui-scale');
+        if (saved) {
+          applyScale(parseInt(saved, 10));
+        } else {
+          applyScale(DEFAULT_SCALE);
+        }
+      } catch (_) { applyScale(DEFAULT_SCALE); }
+    })();
+
+    // 模式说明联动
+    modeRadios.forEach(r => r.addEventListener('change', () => {
+      const mode = getMode();
+      if (mode === 'deep') {
+        modeNote.innerHTML = '<strong>DEEP 模式：</strong>执行完整六战士深度诊断（TRACE、CCM、EDM、HAVOK、DoWhy+CF、causallearn PC/GES）。包含大规模约束/评分搜索，预计耗时 10–60 秒或更长，取决于文本长度与概念数量。';
+      } else {
+        modeNote.innerHTML = '<strong>LIGHT 模式：</strong>仅执行 TRACE + DoWhy 核心因果推断（识别、估计、反驳、反事实扫描），约 1–3 秒完成。此模式跳过 causallearn、完整 CCM/EDM/HAVOK 深度诊断，因此“快”是设计行为，不是缺陷。';
+      }
+    }));
+
+    loadSampleBtn.addEventListener('click', () => {
+      textInput.value = sampleText;
+      log('info', '示例文本已加载');
+    });
+
+    clearBtn.addEventListener('click', () => {
+      textInput.value = '';
+      fileInput.value = '';
+      updateFileName();
+      resultPanel.classList.add('hidden');
+      terminal.innerHTML = '';
+      showToast('', '');
+      log('info', '输入与结果已清空');
+    });
+
+    refreshJobsBtn.addEventListener('click', loadJobHistory);
+    exportJobsBtn.addEventListener('click', exportJobs);
+    clearJobsBtn.addEventListener('click', clearJobs);
+
+    // 参数预设
+    document.querySelectorAll('.preset-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const p = PRESETS[btn.dataset.preset];
+        if (!p) return;
+        paramThreshold.value = p.threshold;
+        paramWindow.value = p.window_size;
+        paramMaxConcepts.value = p.max_concepts;
+        paramMinFreq.value = p.concept_min_freq;
+        log('info', `已加载参数预设: ${btn.dataset.preset.toUpperCase()}`);
+      });
+    });
+
+    // 拖拽上传
+    dropZone.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', () => updateFileName());
+    dropZone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropZone.style.borderColor = 'var(--accent)';
+      dropZone.style.background = 'rgba(102, 252, 241, 0.05)';
+    });
+    dropZone.addEventListener('dragleave', () => {
+      dropZone.style.borderColor = 'var(--border)';
+      dropZone.style.background = 'transparent';
+    });
+    dropZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropZone.style.borderColor = 'var(--border)';
+      dropZone.style.background = 'transparent';
+      const files = e.dataTransfer.files;
+      if (files.length > 0) {
+        fileInput.files = files;
+        updateFileName();
+        log('info', `已选择文件: ${files[0].name}`);
+      }
+    });
+    function updateFileName() {
+      const f = fileInput.files[0];
+      if (f) {
+        dropText.textContent = '文件已选择';
+        fileName.textContent = f.name;
+        fileName.style.display = 'block';
+      } else {
+        dropText.textContent = '点击选择或拖拽文本文件到此处';
+        fileName.textContent = '';
+        fileName.style.display = 'none';
+      }
+    }
+
+    // 键盘快捷键：Ctrl+Enter 运行分析
+    textInput.addEventListener('keydown', (e) => {
+      if (e.ctrlKey && e.key === 'Enter') {
+        e.preventDefault();
+        startAnalysis();
+      }
+    });
+
+    analyzeBtn.addEventListener('click', startAnalysis);
+    cancelBtn.addEventListener('click', cancelAnalysis);
+
+    function getMode() {
+      return document.querySelector('input[name="mode"]:checked').value;
+    }
+
+    function getConfig() {
+      return {
+        threshold: parseFloat(paramThreshold.value),
+        window_size: parseInt(paramWindow.value, 10),
+        max_concepts: parseInt(paramMaxConcepts.value, 10),
+        concept_min_freq: parseInt(paramMinFreq.value, 10),
+      };
+    }
+
+    async function startAnalysis() {
+      const text = textInput.value.trim();
+      const file = fileInput.files[0];
+
+      if (!text && !file) {
+        showToast('请输入文本或上传文件', 'error');
+        return;
+      }
+
+      let payloadText = text;
+      if (file) {
+        try {
+          payloadText = await file.text();
+        } catch (err) {
+          showToast('读取文件失败: ' + err.message, 'error');
+          return;
+        }
+      }
+
+      const validation = validateClientInput(payloadText);
+      if (!validation.ok) {
+        showToast(validation.error, 'error');
+        return;
+      }
+
+      resetUI();
+      currentJobId = crypto.randomUUID();
+      const mode = getMode();
+      lastConfig = getConfig();
+      setRunning(true);
+      log('stage', `任务启动 [${currentJobId.slice(0, 8)}] 模式=${mode.toUpperCase()}`);
+      log('info', `桥接参数: threshold=${lastConfig.threshold} window=${lastConfig.window_size} max_concepts=${lastConfig.max_concepts} min_freq=${lastConfig.concept_min_freq}`);
+
+      // 使用 POST + fetch + ReadableStream 消费 SSE，避免长文本 URL 超限
+      streamAbort = new AbortController();
+      try {
+        const response = await fetch('/api/analyze-stream', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: currentJobId, text: payloadText, mode, config: lastConfig }),
+          signal: streamAbort.signal,
+        });
+        if (!response.ok) {
+          const errData = await response.json().catch(() => ({}));
+          const code = errData.code ? `[${errData.code}] ` : '';
+          throw new Error(code + (errData.error || `HTTP ${response.status}`));
+        }
+        await readSSEStream(response.body);
+      } catch (err) {
+        if (err.name !== 'AbortError') {
+          log('error', err.message || '分析请求失败');
+          showToast(err.message || '分析请求失败', 'error');
+          setRunning(false);
+          loadJobHistory();
+        }
+      }
+    }
+
+    async function readSSEStream(body) {
+      const reader = body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const blocks = buffer.split('\n\n');
+        buffer = blocks.pop();
+        for (const block of blocks) {
+          const event = parseSSEBlock(block);
+          if (!event) continue;
+          dispatchSSEEvent(event);
+        }
+      }
+      if (buffer.trim()) {
+        const event = parseSSEBlock(buffer);
+        if (event) dispatchSSEEvent(event);
+      }
+    }
+
+    function parseSSEBlock(block) {
+      const lines = block.split('\n');
+      let event = 'message';
+      let data = '';
+      for (const line of lines) {
+        if (line.startsWith('event:')) event = line.slice(6).trim();
+        else if (line.startsWith('data:')) data += (data ? '\n' : '') + line.slice(5).trim();
+      }
+      return data ? { event, data } : null;
+    }
+
+    function dispatchSSEEvent({ event, data }) {
+      try {
+        const obj = JSON.parse(data);
+        if (event === 'stage') {
+          updateProgress(obj.stage, obj.progress ?? null);
+        } else if (event === 'log') {
+          log(obj.level, obj.message);
+        } else if (event === 'result') {
+          renderResult(obj);
+          showToast('分析完成', 'success');
+          setRunning(false);
+          loadJobHistory();
+        } else if (event === 'error') {
+          log('error', obj.message || 'SSE 错误');
+          showToast(obj.message || '分析失败', 'error');
+          setRunning(false);
+          loadJobHistory();
+        } else if (event === 'done') {
+          setRunning(false);
+          loadJobHistory();
+        }
+      } catch (err) {
+        log('raw', data);
+      }
+    }
+
+    function validateClientInput(text) {
+      if (!text || text.trim().length === 0) return { ok: false, error: '文本不能为空' };
+      if (text.length > 500000) return { ok: false, error: '文本长度超过 500000 字符限制' };
+      return { ok: true };
+    }
+
+    async function cancelAnalysis() {
+      if (!currentJobId) return;
+      if (streamAbort) streamAbort.abort();
+      try {
+        const res = await fetch(`/api/cancel/${currentJobId}`, { method: 'POST' });
+        const data = await res.json();
+        log('warn', data.message);
+        showToast(data.message, 'info');
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+      setRunning(false);
+    }
+
+    async function exportJobs() {
+      try {
+        const res = await fetch('/api/jobs/export');
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `trace_jobs_${new Date().toISOString().slice(0, 10)}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+        log('info', '任务历史已导出');
+      } catch (err) {
+        showToast('导出失败: ' + err.message, 'error');
+      }
+    }
+
+    async function clearJobs() {
+      if (!confirm('确定要清空任务历史吗？此操作不可恢复。')) return;
+      try {
+        const res = await fetch('/api/jobs/clear', { method: 'POST' });
+        const data = await res.json();
+        log('info', data.message);
+        loadJobHistory();
+      } catch (err) {
+        showToast('清空失败: ' + err.message, 'error');
+      }
+    }
+
+    function resetUI() {
+      terminal.innerHTML = '';
+      resultPanel.classList.add('hidden');
+      progressWrap.style.display = 'block';
+      updateProgress('INIT', 0);
+      showToast('', '');
+    }
+
+    function setRunning(running) {
+      analyzeBtn.disabled = running;
+      cancelBtn.style.display = running ? 'inline-block' : 'none';
+      modeRadios.forEach(r => r.disabled = running);
+    }
+
+    function updateProgress(stage, progress) {
+      stageName.textContent = stage.toUpperCase();
+      const pct = progress !== null ? Math.round(progress * 100) : 0;
+      progressFill.style.width = pct + '%';
+      stagePercent.textContent = pct + '%';
+    }
+
+    function log(level, message) {
+      const line = document.createElement('div');
+      line.className = 'terminal-line';
+      const ts = new Date().toLocaleTimeString('zh-CN', { hour12: false });
+      line.innerHTML = `<span class="ts">[${ts}]</span><span class="level ${level}">${level.toUpperCase()}</span><span>${escapeHtml(message)}</span>`;
+      terminal.appendChild(line);
+      terminal.scrollTop = terminal.scrollHeight;
+    }
+
+    function escapeHtml(str) {
+      return String(str).replace(/[&<>"']/g, (m) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[m]));
+    }
+
+    function showToast(msg, type) {
+      toast.textContent = msg;
+      toast.className = 'toast ' + (type || 'hidden');
+      toast.style.display = type ? 'block' : 'none';
+    }
+
+    async function loadJobHistory() {
+      try {
+        const res = await fetch('/api/jobs');
+        const data = await res.json();
+        if (!data.success) return;
+        jobHistoryTerminal.innerHTML = '';
+        const addLine = (html) => {
+          const div = document.createElement('div');
+          div.className = 'terminal-line';
+          div.innerHTML = html;
+          jobHistoryTerminal.appendChild(div);
+        };
+        if (data.active && data.active.length > 0) {
+          addLine(`ACTIVE: ${data.active.length} job(s)`);
+          data.active.forEach(id => addLine(`  ${id.slice(0, 8)}... running`));
+        }
+        if (data.history && data.history.length > 0) {
+          addLine(`HISTORY (last ${data.history.length}):`);
+          [...data.history].reverse().forEach(j => {
+            const ts = new Date(j.createdAt).toLocaleTimeString('zh-CN', { hour12: false });
+            const mode = (j.mode || 'light').toUpperCase();
+            const dur = j.durationMs != null ? ` ${(j.durationMs / 1000).toFixed(1)}s` : '';
+            const errMark = j.error ? ' ⚠' : '';
+            const retryable = ['error', 'timeout', 'cancelled'].includes(j.status);
+            const retryBtn = retryable
+              ? ` <a href="#" class="retry-link" data-id="${j.id}" style="color:var(--accent);text-decoration:none;">[RETRY]</a>`
+              : '';
+            addLine(`  [${ts}] ${j.id.slice(0, 8)}… ${mode} ${j.status}${dur}${errMark}${retryBtn}`);
+          });
+          jobHistoryTerminal.querySelectorAll('.retry-link').forEach(link => {
+            link.addEventListener('click', (e) => {
+              e.preventDefault();
+              retryJob(link.dataset.id);
+            });
+          });
+        } else {
+          addLine('NO HISTORY');
+        }
+        jobHistoryTerminal.scrollTop = jobHistoryTerminal.scrollHeight;
+      } catch (err) {
+        jobHistoryTerminal.innerHTML = `<div class="terminal-line">加载任务历史失败: ${escapeHtml(err.message)}</div>`;
+      }
+    }
+
+    async function retryJob(id) {
+      if (!confirm(`重试任务 ${id.slice(0, 8)}…？`)) return;
+      try {
+        log('info', `正在重试任务 ${id.slice(0, 8)}…`);
+        const res = await fetch(`/api/retry/${id}`, { method: 'POST' });
+        const data = await res.json();
+        if (data.success) {
+          log('info', `重试成功，新任务 ID: ${data.newId.slice(0, 8)}…`);
+          loadJobHistory();
+        } else {
+          showToast(data.error, 'error');
+        }
+      } catch (err) {
+        showToast('重试失败: ' + err.message, 'error');
+      }
+    }
+
+    function renderResult(data) {
+      const r = data.result;
+      resultPanel.classList.remove('hidden');
+
+      document.getElementById('mConcepts').textContent = r.concepts ? r.concepts.length : '-';
+      document.getElementById('mEdges').textContent = r.n_significant_edges ?? '-';
+      document.getElementById('mATE').textContent = r.ate != null ? r.ate.toFixed(4) : '-';
+      document.getElementById('mCI').textContent = r.confidence_interval
+        ? `[${r.confidence_interval[0].toFixed(2)}, ${r.confidence_interval[1].toFixed(2)}]`
+        : '-';
+      document.getElementById('mIdentifiable').textContent = r.identifiable ? 'YES' : 'NO';
+      document.getElementById('mIdentifiable').style.color = r.identifiable ? 'var(--success)' : 'var(--fail)';
+      document.getElementById('mRefuted').textContent = r.refutations
+        ? `${r.refutations.filter(x => x.refuted).length}/${r.refutations.length}`
+        : '-';
+      document.getElementById('mMode').textContent = (r.analysis_mode || 'light').toUpperCase();
+      document.getElementById('mDuration').textContent = r.execution_profile
+        ? `${(r.execution_profile.total_ms / 1000).toFixed(2)}s`
+        : '-';
+
+      // Parameters — 质谱级参数网格
+      const paramGrid = document.getElementById('paramGrid');
+      paramGrid.innerHTML = '';
+      const params = [
+        { k: 'Treatment', v: r.treatment },
+        { k: 'Outcome', v: r.outcome },
+        { k: 'Threshold', v: r.threshold ?? 0.5 },
+        { k: 'Window Size', v: r.window_size ?? 8 },
+        { k: 'Concept Min Freq', v: r.concept_min_freq ?? 1 },
+        { k: 'Max Concepts', v: r.max_concepts ?? 12 },
+        { k: 'Analysis Mode', v: (r.analysis_mode || 'light').toUpperCase() },
+        { k: 'Backend', v: r.backend ?? 'DoWhy' },
+        { k: 'Simulation', v: r.simulation ? 'YES' : 'NO' },
+        { k: 'Estimand Type', v: r.estimand_type ?? 'N/A' },
+        { k: 'N Samples', v: r.n_samples ?? '-' },
+        { k: 'Confidence Method', v: r.confidence_method ?? 'bootstrap' },
+      ];
+      params.forEach(p => {
+        const div = document.createElement('div');
+        div.className = 'param';
+        div.innerHTML = `<span class="k">${p.k}</span><span class="v">${escapeHtml(String(p.v))}</span>`;
+        paramGrid.appendChild(div);
+      });
+
+      // Execution profile
+      const execProfile = document.getElementById('execProfile');
+      execProfile.innerHTML = '';
+      if (r.execution_profile && r.execution_profile.stages) {
+        const table = document.createElement('table');
+        table.innerHTML = '<thead><tr><th>STAGE</th><th>MS</th><th>%</th></tr></thead>';
+        const tbody = document.createElement('tbody');
+        const total = r.execution_profile.total_ms || 1;
+        r.execution_profile.stages.forEach(s => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `<td>${s.stage}</td><td>${s.ms}</td><td>${((s.ms / total) * 100).toFixed(1)}%</td>`;
+          tbody.appendChild(tr);
+        });
+        table.appendChild(tbody);
+        execProfile.appendChild(table);
+      } else {
+        execProfile.innerHTML = '<div style="color:var(--muted)">无执行时间数据</div>';
+      }
+
+      // Data & model diagnostics
+      const dataDiagnostics = document.getElementById('dataDiagnostics');
+      dataDiagnostics.innerHTML = '';
+      const diag = r.data_diagnostics || {};
+      const kpiHtml = Object.entries(diag).map(([k, v]) => {
+        let display = v;
+        if (typeof v === 'number') display = Number.isInteger(v) ? v : v.toFixed(4);
+        return `<span class="kpi-pill"><span class="k">${k}:</span>${escapeHtml(String(display))}</span>`;
+      }).join('');
+      dataDiagnostics.innerHTML = `<div class="kpi-row">${kpiHtml || '<span class="kpi-pill">无诊断数据</span>'}</div>`;
+
+      // Identifiability & backend
+      const identPanel = document.getElementById('identifiabilityPanel');
+      identPanel.innerHTML = '';
+      const ident = r.identifiability || {};
+      const identParams = [
+        { k: 'Identifiable', v: ident.identifiable ?? r.identifiable },
+        { k: 'Estimand Type', v: ident.estimand_type ?? r.estimand_type ?? 'N/A' },
+        { k: 'Backdoor Paths', v: ident.backdoor_paths ?? 'N/A' },
+        { k: 'Adjustment Set', v: ident.adjustment_set ? ident.adjustment_set.join(', ') : 'N/A' },
+        { k: 'Backend Engine', v: r.backend ?? 'DoWhy' },
+        { k: 'DoWhy Available', v: r.dowhy_available ? 'YES' : 'NO' },
+        { k: 'CausalLearn Available', v: r.causallearn_available ? 'YES' : 'NO' },
+      ];
+      const identGrid = document.createElement('div');
+      identGrid.className = 'param-grid';
+      identParams.forEach(p => {
+        const div = document.createElement('div');
+        div.className = 'param';
+        div.innerHTML = `<span class="k">${p.k}</span><span class="v">${escapeHtml(String(p.v))}</span>`;
+        identGrid.appendChild(div);
+      });
+      identPanel.appendChild(identGrid);
+
+      // Concept vocabulary & frequency
+      const conceptFreqBody = document.getElementById('conceptFreqBody');
+      conceptFreqBody.innerHTML = '';
+      const freqMap = r.concept_frequencies || {};
+      const sortedConcepts = Object.entries(freqMap).sort((a, b) => b[1] - a[1]);
+      if (sortedConcepts.length === 0) {
+        conceptFreqBody.innerHTML = '<tr><td colspan="4" class="empty-state">无概念频率数据</td></tr>';
+      } else {
+        sortedConcepts.forEach(([concept, freq], idx) => {
+          const eligible = (r.ccm_eligible_concepts || []).includes(concept) ? 'YES' : 'NO';
+          const tr = document.createElement('tr');
+          tr.innerHTML = `<td>${escapeHtml(concept)}</td><td>${freq}</td><td>${idx + 1}</td><td>${eligible}</td>`;
+          conceptFreqBody.appendChild(tr);
+        });
+      }
+
+      // Adjacency matrix heatmap
+      const adjMatrixWrap = document.getElementById('adjMatrixWrap');
+      adjMatrixWrap.innerHTML = '';
+      const concepts = r.concepts || [];
+      const matrix = r.adjacency_matrix;
+      if (matrix && matrix.length > 0 && concepts.length > 0) {
+        const n = concepts.length;
+        const grid = document.createElement('div');
+        grid.className = 'adj-matrix';
+        grid.style.gridTemplateColumns = `repeat(${n + 1}, minmax(28px, 1fr))`;
+        const maxVal = Math.max(...matrix.flat().map(v => Math.abs(v)), 1e-9);
+        // header row
+        grid.appendChild(document.createElement('div'));
+        concepts.forEach(c => {
+          const label = document.createElement('div');
+          label.className = 'adj-label';
+          label.textContent = c.length > 4 ? c.slice(0, 3) + '…' : c;
+          label.title = c;
+          grid.appendChild(label);
+        });
+        matrix.forEach((row, i) => {
+          const rowLabel = document.createElement('div');
+          rowLabel.className = 'adj-label';
+          rowLabel.textContent = concepts[i].length > 4 ? concepts[i].slice(0, 3) + '…' : concepts[i];
+          rowLabel.title = concepts[i];
+          grid.appendChild(rowLabel);
+          row.forEach((v, j) => {
+            const cell = document.createElement('div');
+            cell.className = 'adj-cell';
+            const intensity = Math.min(Math.abs(v) / maxVal, 1);
+            cell.style.background = i === j ? 'var(--panel-3)'
+              : `rgba(102, 252, 241, ${0.08 + intensity * 0.72})`;
+            cell.style.color = intensity > 0.5 ? '#000' : 'var(--text)';
+            cell.title = `${concepts[i]} → ${concepts[j]}: ${Number(v).toFixed(2)}`;
+            cell.textContent = v !== 0 ? Number(v).toFixed(1) : '';
+            grid.appendChild(cell);
+          });
+        });
+        adjMatrixWrap.appendChild(grid);
+        const legend = document.createElement('div');
+        legend.className = 'adj-legend';
+        legend.innerHTML = `<span>0</span><div class="adj-legend-bar"></div><span>${maxVal.toFixed(1)}</span>`;
+        adjMatrixWrap.appendChild(legend);
+      } else {
+        adjMatrixWrap.innerHTML = '<div class="empty-state">无邻接矩阵数据</div>';
+      }
+
+      // Stability & robustness
+      const stabilityPanel = document.getElementById('stabilityPanel');
+      stabilityPanel.innerHTML = '';
+      const stability = r.stability_analysis || {};
+      if (Object.keys(stability).length === 0) {
+        stabilityPanel.innerHTML = '<div class="empty-state">LIGHT 模式未执行稳定性/排列检验。切换 DEEP 模式可获得 bootstrap 边稳定性、置换 p-value 等质谱级指标。</div>';
+      } else {
+        const stabParams = [
+          { k: 'Edge Stability Mean', v: stability.edge_stability_mean != null ? stability.edge_stability_mean.toFixed(4) : 'N/A' },
+          { k: 'Edge Stability Std', v: stability.edge_stability_std != null ? stability.edge_stability_std.toFixed(4) : 'N/A' },
+          { k: 'ATE Bootstrap Std', v: stability.ate_bootstrap_std != null ? stability.ate_bootstrap_std.toFixed(4) : 'N/A' },
+          { k: 'Permutation p-value', v: stability.permutation_p_value != null ? stability.permutation_p_value.toFixed(4) : 'N/A' },
+          { k: 'CV Folds', v: stability.cv_folds ?? 'N/A' },
+          { k: 'CV ATE Mean', v: stability.cv_ate_mean != null ? stability.cv_ate_mean.toFixed(4) : 'N/A' },
+          { k: 'CV ATE Std', v: stability.cv_ate_std != null ? stability.cv_ate_std.toFixed(4) : 'N/A' },
+        ];
+        const stabGrid = document.createElement('div');
+        stabGrid.className = 'param-grid';
+        stabParams.forEach(p => {
+          const div = document.createElement('div');
+          div.className = 'param';
+          div.innerHTML = `<span class="k">${p.k}</span><span class="v">${escapeHtml(String(p.v))}</span>`;
+          stabGrid.appendChild(div);
+        });
+        stabilityPanel.appendChild(stabGrid);
+        if (stability.edge_stability_per_edge) {
+          const t = document.createElement('table');
+          t.className = 'stability-table';
+          t.innerHTML = '<thead><tr><th>EDGE</th><th>STABILITY</th><th>VERDICT</th></tr></thead>';
+          const tb = document.createElement('tbody');
+          Object.entries(stability.edge_stability_per_edge).forEach(([edge, s]) => {
+            const verdict = s > 0.7 ? 'STABLE' : (s > 0.4 ? 'MODERATE' : 'FRAGILE');
+            const cls = s > 0.7 ? 'pass' : (s > 0.4 ? 'warn' : 'fail');
+            const tr = document.createElement('tr');
+            tr.innerHTML = `<td>${escapeHtml(edge)}</td><td>${s.toFixed(3)}</td><td><span class="badge ${cls}">${verdict}</span></td>`;
+            tb.appendChild(tr);
+          });
+          t.appendChild(tb);
+          stabilityPanel.appendChild(t);
+        }
+      }
+
+      // Top edges
+      const edgesBody = document.getElementById('edgesBody');
+      edgesBody.innerHTML = '';
+      (r.top_edges || []).forEach(e => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${e.source}</td><td>${e.target}</td><td>${e.strength.toFixed(3)}</td><td>${e.direction || '→'}</td>`;
+        edgesBody.appendChild(tr);
+      });
+
+      // Counterfactual scan
+      const scanBody = document.getElementById('scanBody');
+      scanBody.innerHTML = '';
+      (r.counterfactual_scan || []).forEach(s => {
+        const tr = document.createElement('tr');
+        const cls = s.ite > 0 ? 'pass' : (s.ite < 0 ? 'fail' : 'warn');
+        tr.innerHTML = `<td>${s.source} → ${s.target}</td><td>${s.trace_dnl.toFixed(3)}</td><td><span class="badge ${cls}">${s.ite >= 0 ? '+' : ''}${s.ite.toFixed(4)}</span></td><td>${s.observed.toFixed(4)}</td><td>${s.counterfactual.toFixed(4)}</td>`;
+        scanBody.appendChild(tr);
+      });
+
+      // Refutations
+      const refuteBody = document.getElementById('refuteBody');
+      refuteBody.innerHTML = '';
+      if (!r.refutations || r.refutations.length === 0) {
+        refuteBody.innerHTML = '<tr><td colspan="5" class="empty-state">LIGHT 模式跳过反驳测试。切换 DEEP 模式可获得随机共因 / 安慰剂处理 / 数据子集三套反驳检验。</td></tr>';
+      } else {
+      (r.refutations || []).forEach(ref => {
+        const tr = document.createElement('tr');
+        const cls = ref.refuted ? 'fail' : 'pass';
+        const metricStr = ref.display_metric != null
+          ? `${ref.display_label}=${ref.display_metric < 0.001 ? '<0.01%' : (ref.display_metric * 100).toFixed(2) + '%'}`
+          : '-';
+        tr.innerHTML = `<td>${ref.method}</td><td>${r.ate.toFixed(4)}</td><td>${ref.new_effect.toFixed(4)}</td><td>${metricStr}</td><td><span class="badge ${cls}">${ref.refuted ? 'REFUTED' : 'ROBUST'}</span></td>`;
+        refuteBody.appendChild(tr);
+      });
+      }
+
+      // Six warriors
+      const warriorGrid = document.getElementById('warriorGrid');
+      warriorGrid.innerHTML = '';
+      const warriors = r.six_warriors || {};
+      if (Object.keys(warriors).length === 0) {
+        warriorGrid.innerHTML = '<div class="empty-state">LIGHT 模式未执行六战士深度诊断。切换 DEEP 模式可获得 TRACE / CCM / EDM / HAVOK / DoWhy+CF / causallearn 的完整诊断。</div>';
+      } else {
+      Object.entries(warriors).forEach(([key, card]) => {
+        const div = document.createElement('div');
+        div.className = `warrior-card ${card.status}`;
+        const metrics = Object.entries(card.metrics || {}).map(([k, v]) => `${k}: ${v}`).join(' · ');
+        const findings = (card.findings || []).map(f => `<div class="warrior-finding">→ ${escapeHtml(f)}</div>`).join('');
+        const rawDetails = card.raw ? `<details><summary>raw metrics</summary><div style="font-family:var(--font-mono);font-size:0.72rem;color:var(--muted);white-space:pre-wrap;">${escapeHtml(JSON.stringify(card.raw, null, 2))}</div></details>` : '';
+        div.innerHTML = `
+          <div class="warrior-title">${card.warrior_id} · ${card.name} <span class="warrior-status ${card.status}">${card.status}</span></div>
+          <div class="warrior-metrics">${escapeHtml(metrics)}</div>
+          ${findings}
+          <div class="warrior-verdict">// ${escapeHtml(card.verdict || 'N/A')}</div>
+          ${rawDetails}
+        `;
+        warriorGrid.appendChild(div);
+      });
+      }
+
+      document.getElementById('reportLink').href = data.reportPath || '#';
+      document.getElementById('jsonLink').href = data.resultPath || '#';
+
+      // 自动滚动到结果区
+      resultPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    // 页面加载时拉取一次任务历史
+    loadJobHistory();
+  </script>
+</body>
+</html>
