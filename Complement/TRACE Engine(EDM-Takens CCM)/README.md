@@ -1,0 +1,93 @@
+# TRACE Engine (EDM-Takens CCM) — 便携成品目录
+
+本目录包含 `trace-engine`（因果推断引擎）与 `trace-engine-web`（Web 服务）两个子项目，已整理为可独立运行的成品结构。
+
+## 目录结构
+
+```
+.
+├── README.md                 # 本文件
+├── verify_portable.py        # 独立运行性审计脚本
+├── trace-engine/             # Python 因果推断引擎
+│   ├── health_check.py       # 引擎健康检查
+│   ├── examples/
+│   │   └── counterfactual_hybrid/  # 六战士因果分析核心
+│   ├── tests/test_skill.py   # 引擎自检测试
+│   └── date/                 # 训练/测试数据
+└── trace-engine-web/         # Node.js Web 服务
+    ├── start.ps1             # 启动脚本
+    ├── stop_servers.ps1      # 停止 stale 服务
+    ├── server.js             # HTTP + SSE 服务端
+    └── public/index.html     # 前端页面
+```
+
+## 环境要求
+
+- Python 3.11+（推荐 3.13）
+- Node.js 18+
+- 依赖包：见 `trace-engine/requirements.txt` 与 `trace-engine-web/package.json`
+
+## 快速开始
+
+### 1. 独立运行性审计（推荐首先执行）
+
+```powershell
+cd "TRACE Engine(EDM-Takens CCM)"
+python verify_portable.py
+```
+
+审计将检查：
+- 目录结构完整性
+- 无运行时产物污染
+- 引擎模块导入与健康状态
+- 引擎自检测试
+- Web 服务健康检查
+
+### 2. 启动 Web 服务
+
+```powershell
+cd "TRACE Engine(EDM-Takens CCM)\trace-engine-web"
+powershell -ExecutionPolicy Bypass -File start.ps1
+```
+
+服务将自动：
+- 检测并安装 npm 依赖（首次）
+- 探测可用端口（默认 3000-3020）
+- 选择可写工作目录（优先脚本目录，只读时回退到 `%TEMP%\trace-engine-web-work`）
+
+浏览器访问：http://localhost:3000
+
+### 3. 停止服务
+
+```powershell
+cd "TRACE Engine(EDM-Takens CCM)\trace-engine-web"
+powershell -ExecutionPolicy Bypass -File stop_servers.ps1
+```
+
+### 4. 仅运行引擎（命令行）
+
+```powershell
+cd "TRACE Engine(EDM-Takens CCM)\trace-engine\examples\counterfactual_hybrid"
+python run_cli.py --text "你的因果分析文本"
+```
+
+## 环境变量
+
+| 变量 | 说明 | 示例 |
+|---|---|---|
+| `TRACE_WORK_DIR` | 工作/输出目录 | `C:\trace-work` |
+| `TRACE_ENGINE_SKILL_DIR` | 引擎 Skill 路径 | `...\trace-engine\examples\counterfactual_hybrid` |
+| `TRACE_PYTHON_CMD` | Python 命令 | `python` 或 `python3` |
+| `PORT` | Web 服务端口 | `3000` |
+
+## 维护说明
+
+- 运行时产物（`outputs/`、`__pycache__/`、`*.log`）已被 `.gitignore` 排除
+- 同步源目录到本成品目录请使用源端的 `sync_product.py`
+- 遇到目录锁定时，运行 `trace-engine-web/stop_servers.ps1` 清理 stale 进程后再同步
+
+## 支持与故障排查
+
+- 服务启动失败：检查 `work/server.log` 与 `work/start.log`
+- Python 依赖缺失：运行 `pip install -r trace-engine/requirements.txt`
+- 端口冲突：脚本会自动尝试 3000-3020，或手动设置 `PORT` 环境变量

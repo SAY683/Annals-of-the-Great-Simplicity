@@ -262,15 +262,41 @@ app.use((_req, res, next) => {
 app.options('*', (_req, res) => res.sendStatus(204));
 
 // 桥接参数 Schema（用于校验、文档、前端表单生成）
-const BRIDGE_PARAM_SCHEMA = {
-  threshold: { type: 'number', min: 0, max: 10, default: 0.5, description: '因果边显著性阈值' },
-  window_size: { type: 'integer', min: 2, max: 128, default: 8, description: '滑动窗口大小' },
-  max_concepts: { type: 'integer', min: 1, max: 128, default: 12, description: '最大概念数' },
-  concept_min_freq: { type: 'integer', min: 1, max: 1000, default: 1, description: '概念最小出现频次' },
-  min_valid_tokens: { type: 'integer', min: 1, max: 10000, default: 10, description: '最小有效 token 数' },
-  min_concepts: { type: 'integer', min: 2, max: 128, default: 3, description: '最小概念数' },
-  max_edges_for_dowhy: { type: 'integer', min: 1, max: 100, default: 12, description: '传入 DoWhy 的最大边数' },
-};
+// 优先从 trace-engine/build_bridge_schema.py 读取，与 engine presets.yaml 保持统一。
+function loadBridgeParamSchema() {
+  const fallback = {
+    threshold: { type: 'number', min: 0, max: 10, default: 0.5, description: '因果边显著性阈值' },
+    window_size: { type: 'integer', min: 2, max: 128, default: 8, description: '滑动窗口大小' },
+    max_concepts: { type: 'integer', min: 1, max: 128, default: 12, description: '最大概念数' },
+    concept_min_freq: { type: 'integer', min: 1, max: 1000, default: 1, description: '概念最小出现频次' },
+    min_valid_tokens: { type: 'integer', min: 1, max: 10000, default: 10, description: '最小有效 token 数' },
+    min_concepts: { type: 'integer', min: 2, max: 128, default: 3, description: '最小概念数' },
+    max_edges_for_dowhy: { type: 'integer', min: 1, max: 100, default: 12, description: '传入 DoWhy 的最大边数' },
+  };
+  const schemaScript = path.resolve(CONFIG.skillDir, '..', '..', 'build_bridge_schema.py');
+  if (!fs.existsSync(schemaScript)) {
+    return fallback;
+  }
+  try {
+    const result = require('child_process').spawnSync(
+      CONFIG.pythonCmd,
+      [schemaScript, CONFIG.skillDir],
+      { encoding: 'utf-8', timeout: 15000, env: { ...process.env, PYTHONIOENCODING: 'utf-8' } }
+    );
+    if (result.status !== 0) {
+      logToFile('warn', `build_bridge_schema.py 失败: ${result.stderr || 'unknown'}`);
+      return fallback;
+    }
+    const schema = JSON.parse(result.stdout);
+    logToFile('info', `已从 presets.yaml 加载桥接参数 Schema，共 ${Object.keys(schema).length} 项`);
+    return schema;
+  } catch (err) {
+    logToFile('warn', `加载桥接参数 Schema 失败: ${err.message}`);
+    return fallback;
+  }
+}
+
+const BRIDGE_PARAM_SCHEMA = loadBridgeParamSchema();
 
 // 参数校验辅助
 function validateAnalysisInput(text, mode, config) {
@@ -790,6 +816,7 @@ app.get('/api/config', (_req, res) => {
   res.json({
     success: true,
     config: { ...CONFIG, skillDir: CONFIG.skillDir },
+    bridgeParamSchema: BRIDGE_PARAM_SCHEMA,
   });
 });
 
