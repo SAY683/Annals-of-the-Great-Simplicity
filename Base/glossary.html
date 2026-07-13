@@ -8,6 +8,28 @@
 </head>
 <body>
 
+<header class="site-header">
+    <a class="site-header-brand" href="index.html" aria-label="太易 · AGS 主页">
+        <img src="IMAGE/totem_icon.png" alt="" class="site-header-logo">
+        <span>太易 · AGS</span>
+    </a>
+    <button class="site-nav-toggle" aria-label="打开导航" aria-expanded="false" aria-controls="site-nav-panel" type="button">
+        <span></span>
+        <span></span>
+        <span></span>
+    </button>
+    <nav class="site-nav" id="site-nav-panel" aria-label="全站导航">
+        <ul class="site-nav-list">
+            <li><a href="index.html">主页</a></li>
+            <li><a href="glossary.html" aria-current="page">词典</a></li>
+            <li><a href="pdf-viewer.html">文献室</a></li>
+            <li><a href="daopan.html">道盘</a></li>
+            <li><a href="vts-wheel.html">VTS</a></li>
+            <li><a href="index.html#app-portal">门户</a></li>
+        </ul>
+    </nav>
+</header>
+
 <div class="container">
 
     <div class="totem-container">
@@ -28,26 +50,25 @@
         <!-- 心得体会内容将由 JS 动态加载于此 -->
     </div>
 
+    <section class="app-portal-section" id="tools-entrance" aria-labelledby="tools-entrance-title">
+        <h2 class="portal-section-title" id="tools-entrance-title">推演工具</h2>
+        <div class="portal-grid">
+            <article class="portal-card" id="daopan-entrance">
+                <div class="portal-card-icon" aria-hidden="true">☯️</div>
+                <h3 class="portal-card-title">道盘推演 <small>律令、神部与八门之阵</small></h3>
+                <p>步入道盘，布列四令，运转八门，召遣神将。此为一方心象沙盘，用以观照内在结构在不同律令下的流转与生克。</p>
+                <a class="portal-card-button" href="daopan.html">进入道盘</a>
+            </article>
+            <article class="portal-card" id="vts-wheel-entrance">
+                <div class="portal-card-icon" aria-hidden="true">⚙️</div>
+                <h3 class="portal-card-title">VTS 原型之轮 <small>内在结构之显化</small></h3>
+                <p>通过拖动荣格原型，构建并显化您独特的内在 VTS 结构。此为一种探索，一种映照，用以窥见心识的动态平衡。</p>
+                <a class="portal-card-button" href="vts-wheel.html">进入推演</a>
+            </article>
+        </div>
+    </section>
+
     <footer class="footer">
-        <!-- ADD THIS SECTION TO glossary.html -->
-    <section class="link-card-section" id="daopan-entrance">
-        <div class="link-card">
-            <div class="link-card-title">☯️ 道盘推演
-                <small>律令、神部与八门之阵</small>
-            </div>
-            <p>步入道盘，布列四令，运转八门，召遣神将。此为一方心象沙盘，用以观照内在结构在不同律令下的流转与生克。</p>
-            <a class="link-card-button" href="daopan.html">进入道盘</a>
-        </div>
-    </section>
-    <section class="link-card-section" id="vts-wheel-entrance">
-        <div class="link-card">
-            <div class="link-card-title">⚙️ VTS 原型之轮
-                <small>内在结构之显化</small>
-            </div>
-            <p>通过拖动荣格原型，构建并显化您独特的内在 VTS 结构。此为一种探索，一种映照，用以窥见心识的动态平衡。</p>
-            <a class="link-card-button" href="vts-wheel.html">进入推演</a>
-        </div>
-    </section>
         <p><a href="index.html">返回主页</a></p>
     </footer>
 

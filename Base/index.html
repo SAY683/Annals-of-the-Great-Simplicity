@@ -8,6 +8,40 @@
 </head>
 <body>
 
+<header class="site-header">
+    <a class="site-header-brand" href="index.html" aria-label="太易 · AGS 主页">
+        <img src="IMAGE/totem_icon.png" alt="" class="site-header-logo">
+        <span>太易 · AGS</span>
+    </a>
+    <button class="site-nav-toggle" aria-label="打开导航" aria-expanded="false" aria-controls="site-nav-panel" type="button">
+        <span></span>
+        <span></span>
+        <span></span>
+    </button>
+    <nav class="site-nav" id="site-nav-panel" aria-label="全站导航">
+        <ul class="site-nav-list">
+            <li><a href="index.html" aria-current="page">主页</a></li>
+            <li><a href="glossary.html">词典</a></li>
+            <li><a href="pdf-viewer.html">文献室</a></li>
+            <li><a href="daopan.html">道盘</a></li>
+            <li><a href="vts-wheel.html">VTS</a></li>
+            <li><a href="#app-portal">门户</a></li>
+        </ul>
+        <div class="site-nav-local">
+            <h3>本页目录</h3>
+            <ul>
+                <li><a href="#preface">前言</a></li>
+                <li><a href="#what-is-taiyi">太易</a></li>
+                <li><a href="#how-to-read">阅读</a></li>
+                <li><a href="#library-entrance">文献室</a></li>
+                <li><a href="#app-portal">门户</a></li>
+                <li><a href="#newsletter">订阅</a></li>
+                <li><a href="#discussion-salon">沙龙</a></li>
+            </ul>
+        </div>
+    </nav>
+</header>
+
 <!-- 悬浮微型目录 (最终版) -->
 <nav class="floating-directory">
     <ul>
@@ -16,6 +50,7 @@
         <li><a href="#how-to-read" data-title="阅读"></a></li>
         <li><a href="#glossary-entrance" data-title="词典"></a></li> 
         <li><a href="#library-entrance" data-title="文献室"></a></li>
+        <li><a href="#app-portal" data-title="门户"></a></li>
         <li><a href="#newsletter" data-title="订阅"></a></li>
         <li><a href="#discussion-salon" data-title="沙龙"></a></li>
     </ul>
@@ -108,21 +143,38 @@
     <h2>结语</h2>
     <p>现在，请允许我们一同期待，那些美好的、深邃的、甚至令人不安的体验，在这场心灵的探险中悄然发生。</p>
     
-    <section class="link-card-section" id="glossary-entrance">
-        <div class="link-card">
-            <div class="link-card-title">🔑 太易词典
-                <small>暨意札记</small>
-            </div>
-            <p>此间收录了“太易”理论中的核心符号、概念之钥，以及作者在求索路途中的思意札记与感悟。</p>
-            <a class="link-card-button" href="glossary.html">进入密室</a>
-        </div>
-    </section>
-    
-    <section class="pdf-link-section" id="library-entrance">
-        <div class="link-card">
-            <div class="link-card-title">📚 文献阅览室入口</div>
-            <p>这里收藏了本项目在 GitHub 上的部分 PDF 文档，您可以在其中在线阅读核心内容与研究资料。</p>
-            <a class="link-card-button" href="pdf-viewer.html" target="_blank">进入文献室</a>
+    <section class="app-portal-section" id="app-portal" aria-labelledby="app-portal-title">
+        <h2 class="portal-section-title" id="app-portal-title">应用门户</h2>
+        <div class="portal-section-desc">这里是太易体系的数字入口与辅助工具舱。</div>
+        <div class="portal-grid">
+            <article class="portal-card" id="glossary-entrance">
+                <div class="portal-card-icon" aria-hidden="true">🔑</div>
+                <h3 class="portal-card-title">太易词典 <small>暨意札记</small></h3>
+                <p>收录“太易”理论中的核心符号、概念之钥，以及作者在求索路途中的思意札记与感悟。</p>
+                <a class="portal-card-button" href="glossary.html">进入密室</a>
+            </article>
+
+            <article class="portal-card" id="library-entrance">
+                <div class="portal-card-icon" aria-hidden="true">📚</div>
+                <h3 class="portal-card-title">文献阅览室</h3>
+                <p>收藏本项目在 GitHub 上的部分 PDF 文档，可在线阅读核心内容与研究资料。</p>
+                <a class="portal-card-button" href="pdf-viewer.html" target="_blank">进入文献室</a>
+            </article>
+
+            <article class="portal-card portal-card-featured" data-app="trace-engine">
+                <div class="portal-card-icon portal-card-icon-mono" aria-hidden="true">T</div>
+                <h3 class="portal-card-title">TRACE Engine <small>Causal Inference Terminal</small></h3>
+                <p>Node.js 因果推断终端：文本上传 → TRACE + DoWhy + 六战士深度诊断。</p>
+                <div class="portal-card-meta">
+                    <span class="status-badge status-local" id="trace-status-badge">LOCAL</span>
+                    <span class="status-text" id="trace-status-text">需本地启动服务</span>
+                </div>
+                <div class="portal-card-actions">
+                    <a class="portal-card-button portal-card-button-primary" href="http://localhost:3000" target="_blank" rel="noopener noreferrer" id="trace-open-btn">打开终端</a>
+                    <button class="portal-card-button portal-card-button-secondary" id="trace-check-btn" type="button">检测服务</button>
+                </div>
+                <p class="portal-card-hint">本地运行：<code>npm start</code>（端口 3000）</p>
+            </article>
         </div>
     </section>
 
