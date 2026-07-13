@@ -646,11 +646,8 @@
 
           <details style="margin-bottom:1rem;">
             <summary>ADVANCED_PARAMETERS // 高级参数</summary>
-            <div class="param-grid" style="margin-top:0.5rem;">
-              <div class="param"><span class="k">Threshold</span><input type="number" id="paramThreshold" value="0.5" step="0.1" min="0" max="2" style="width:80px;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:0.25rem;"></div>
-              <div class="param"><span class="k">Window Size</span><input type="number" id="paramWindow" value="8" step="1" min="2" max="32" style="width:80px;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:0.25rem;"></div>
-              <div class="param"><span class="k">Max Concepts</span><input type="number" id="paramMaxConcepts" value="12" step="1" min="3" max="64" style="width:80px;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:0.25rem;"></div>
-              <div class="param"><span class="k">Min Freq</span><input type="number" id="paramMinFreq" value="1" step="1" min="1" max="20" style="width:80px;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:0.25rem;"></div>
+            <div class="param-grid" id="dynamicParams" style="margin-top:0.5rem;">
+              <div class="param"><span class="k">Loading schema...</span></div>
             </div>
             <div style="margin-top:0.65rem;display:flex;gap:0.5rem;flex-wrap:wrap;align-items:center;">
               <span style="color:var(--muted);font-family:var(--font-mono);font-size:0.72rem;">PRESETS:</span>
@@ -796,21 +793,97 @@
     const exportJobsBtn = document.getElementById('exportJobsBtn');
     const clearJobsBtn = document.getElementById('clearJobsBtn');
     const jobHistoryTerminal = document.getElementById('jobHistoryTerminal');
-    const paramThreshold = document.getElementById('paramThreshold');
-    const paramWindow = document.getElementById('paramWindow');
-    const paramMaxConcepts = document.getElementById('paramMaxConcepts');
-    const paramMinFreq = document.getElementById('paramMinFreq');
+    const dynamicParams = document.getElementById('dynamicParams');
     const dropZone = document.getElementById('dropZone');
     const dropText = document.getElementById('dropText');
     const fileName = document.getElementById('fileName');
     const DEFAULT_SCALE = 105;
 
-    const PRESETS = {
-      default: { threshold: 0.5, window_size: 8, max_concepts: 12, concept_min_freq: 1 },
+    // 动态参数 Schema，优先从 /api/config 加载
+    let BRIDGE_SCHEMA = null;
+
+    const PRESETS_OVERRIDES = {
+      default: {},
       sensitive: { threshold: 0.3, window_size: 6, max_concepts: 16, concept_min_freq: 2 },
       broad: { threshold: 0.8, window_size: 12, max_concepts: 24, concept_min_freq: 1 },
       deep: { threshold: 0.5, window_size: 8, max_concepts: 24, concept_min_freq: 1 },
     };
+
+    // 兜底 Schema（当 /api/config 不可用时使用）
+    const FALLBACK_SCHEMA = {
+      threshold: { type: 'number', min: 0, max: 10, default: 0.5, description: '因果边显著性阈值' },
+      window_size: { type: 'integer', min: 2, max: 128, default: 8, description: '滑动窗口大小' },
+      max_concepts: { type: 'integer', min: 1, max: 128, default: 12, description: '最大概念数' },
+      concept_min_freq: { type: 'integer', min: 1, max: 1000, default: 1, description: '概念最小出现频次' },
+      min_valid_tokens: { type: 'integer', min: 1, max: 10000, default: 10, description: '最小有效 token 数' },
+      min_concepts: { type: 'integer', min: 2, max: 128, default: 3, description: '最小概念数' },
+      max_edges_for_dowhy: { type: 'integer', min: 1, max: 100, default: 12, description: '传入 DoWhy 的最大边数' },
+    };
+
+    function formatParamLabel(key) {
+      return key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+    }
+
+    function renderParams(schema) {
+      dynamicParams.innerHTML = '';
+      const keys = Object.keys(schema);
+      if (keys.length === 0) {
+        dynamicParams.innerHTML = '<div class="param"><span class="k">No parameters</span></div>';
+        return;
+      }
+      keys.forEach(key => {
+        const meta = schema[key];
+        const div = document.createElement('div');
+        div.className = 'param';
+        const label = formatParamLabel(key);
+        const step = meta.type === 'integer' ? 1 : (meta.step || 0.1);
+        if (meta.type === 'string') {
+          div.innerHTML = `<span class="k" title="${escapeHtml(meta.description || '')}">${label}</span>
+            <input type="text" id="param-${key}" value="${escapeHtml(String(meta.default ?? ''))}" style="width:110px;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:0.25rem;">`;
+        } else {
+          div.innerHTML = `<span class="k" title="${escapeHtml(meta.description || '')}">${label}</span>
+            <input type="number" id="param-${key}" value="${meta.default ?? 0}" step="${step}" min="${meta.min ?? ''}" max="${meta.max ?? ''}" style="width:80px;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:0.25rem;">`;
+        }
+        dynamicParams.appendChild(div);
+      });
+    }
+
+    function getConfig() {
+      const schema = BRIDGE_SCHEMA || FALLBACK_SCHEMA;
+      const cfg = {};
+      Object.keys(schema).forEach(key => {
+        const meta = schema[key];
+        const el = document.getElementById(`param-${key}`);
+        if (!el) return;
+        let raw = el.value.trim();
+        if (meta.type === 'string') {
+          cfg[key] = raw;
+        } else if (meta.type === 'integer') {
+          cfg[key] = parseInt(raw, 10);
+        } else {
+          cfg[key] = parseFloat(raw);
+        }
+      });
+      return cfg;
+    }
+
+    async function loadBridgeSchema() {
+      try {
+        const res = await fetch('/api/config');
+        const data = await res.json();
+        if (data.success && data.bridgeParamSchema && Object.keys(data.bridgeParamSchema).length > 0) {
+          BRIDGE_SCHEMA = data.bridgeParamSchema;
+          log('info', `已加载动态参数 Schema (${Object.keys(BRIDGE_SCHEMA).length} 项)`);
+        } else {
+          BRIDGE_SCHEMA = FALLBACK_SCHEMA;
+          log('warn', '/api/config 未返回 Schema，使用兜底配置');
+        }
+      } catch (err) {
+        BRIDGE_SCHEMA = FALLBACK_SCHEMA;
+        log('warn', '加载参数 Schema 失败: ' + err.message);
+      }
+      renderParams(BRIDGE_SCHEMA);
+    }
 
     let currentJobId = null;
     let streamAbort = null;
@@ -865,15 +938,18 @@
     exportJobsBtn.addEventListener('click', exportJobs);
     clearJobsBtn.addEventListener('click', clearJobs);
 
-    // 参数预设
+    // 参数预设：基于当前 Schema 默认值，再叠加预设偏移
     document.querySelectorAll('.preset-btn').forEach(btn => {
       btn.addEventListener('click', () => {
-        const p = PRESETS[btn.dataset.preset];
-        if (!p) return;
-        paramThreshold.value = p.threshold;
-        paramWindow.value = p.window_size;
-        paramMaxConcepts.value = p.max_concepts;
-        paramMinFreq.value = p.concept_min_freq;
+        const schema = BRIDGE_SCHEMA || FALLBACK_SCHEMA;
+        const overrides = PRESETS_OVERRIDES[btn.dataset.preset] || {};
+        Object.keys(schema).forEach(key => {
+          const el = document.getElementById(`param-${key}`);
+          if (!el) return;
+          const meta = schema[key];
+          let value = overrides[key] !== undefined ? overrides[key] : meta.default;
+          el.value = value;
+        });
         log('info', `已加载参数预设: ${btn.dataset.preset.toUpperCase()}`);
       });
     });
@@ -969,7 +1045,8 @@
       lastConfig = getConfig();
       setRunning(true);
       log('stage', `任务启动 [${currentJobId.slice(0, 8)}] 模式=${mode.toUpperCase()}`);
-      log('info', `桥接参数: threshold=${lastConfig.threshold} window=${lastConfig.window_size} max_concepts=${lastConfig.max_concepts} min_freq=${lastConfig.concept_min_freq}`);
+      const cfgSummary = Object.entries(lastConfig).map(([k, v]) => `${k}=${v}`).join(' ');
+      log('info', `桥接参数: ${cfgSummary}`);
 
       // 使用 POST + fetch + ReadableStream 消费 SSE，避免长文本 URL 超限
       streamAbort = new AbortController();
@@ -1473,7 +1550,8 @@
       resultPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 
-    // 页面加载时拉取一次任务历史
+    // 页面加载时拉取参数 Schema 与任务历史
+    loadBridgeSchema();
     loadJobHistory();
   </script>
 </body>
