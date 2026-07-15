@@ -1,1 +1,2 @@
 *.safetensors
+.ms_upload_cache
