@@ -186,21 +186,15 @@
 
 ### 模型体系
 
-| 模型 | 方向 | HuggingFace | 魔搭（ModelScope） |
-| :--- | :--- | :--- | :--- |
-| **Shenji-LLaMA**（神机） | 神学/哲学文本生成与解析 | [🤗 HF](https://huggingface.co/SAY114514/TRACE-Engine-EDM-Takens-CCM-shenji-llama-470m) | [🧩 魔搭](https://modelscope.cn/models/say101/TRACE-Engine-EDM-Takens-CCM-shenji-llama-470m) |
-| **Shehui-LLaMA**（社会） | 社会/伦理文本理解 | [🤗 HF](https://huggingface.co/SAY114514/TRACE-Engine-EDM-Takens-CCM-shehui-llama-470m) | [🧩 魔搭](https://modelscope.cn/models/say101/TRACE-Engine-EDM-Takens-CCM-shehui-llama-470m) |
+| 模型 | 方向 | 魔搭（ModelScope） |
+| :--- | :--- | :--- |
+| **Shenji-LLaMA**（神机） | 神学/哲学文本生成与解析 | [🧩 魔搭](https://modelscope.cn/models/say101/TRACE-Engine-EDM-Takens-CCM-shenji-llama-470m) |
+| **Shehui-LLaMA**（社会） | 社会/伦理文本理解 | [🧩 魔搭](https://modelscope.cn/models/say101/TRACE-Engine-EDM-Takens-CCM-shehui-llama-470m) |
 
 ### 模型获取
 
-模型权重文件因超出 GitHub 文件大小限制（100MB），托管于 **HuggingFace** 与 **魔搭（ModelScope）**。本地测试目录 `trace-engine/models/` 中保留模型配置文件（`.json`、`.vocab`），权重文件可通过以下方式获取：
+模型权重文件因超出 GitHub 文件大小限制（100MB），托管于 **魔搭（ModelScope）**。本地测试目录 `trace-engine/models/` 中保留模型配置文件（`.json`、`.vocab`），权重文件可通过以下方式获取：
 
-**HuggingFace：**
-```bash
-git clone https://huggingface.co/SAY114514/TRACE-Engine-EDM-Takens-CCM-shenji-llama-470m
-```
-
-**魔搭（ModelScope）— 国内用户推荐：**
 ```bash
 # 安装魔搭 CLI
 pip install modelscope
@@ -213,7 +207,7 @@ modelscope download say101/TRACE-Engine-EDM-Takens-CCM-shenji-llama-470m
 # trace-engine/models/shehui-llama/
 ```
 
-> *魔搭为国内用户提供更快的下载速度，推荐中国大陆用户优先使用。*
+> *魔搭（ModelScope）提供稳定快速的国内下载。*
 
 ### TRACE 引擎（EDM-Takens CCM）
 
