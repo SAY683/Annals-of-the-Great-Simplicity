@@ -182,31 +182,33 @@
 
 ## 🤖 模型训练：神机与社会 — TRACE 引擎 (Model Training)
 
-本仓库 `Complement/` 目录下包含基于 **LLaMA** 架构微调训练的专用语言模型，作为体系在自然语言处理领域的实证探索。
+本仓库 `Complement/TRACE Engine(EDM-Takens CCM)/` 目录下包含基于 **LLaMA** 架构微调训练的专用语言模型，作为体系在自然语言处理领域的实证探索。
 
 ### 模型体系
 
-| 模型 | 方向 | 架构 |
-| :--- | :--- | :--- |
-| **Shenji-LLaMA**（神机） | 神学/哲学文本生成与解析 | LLaMA 微调 |
-| **Shehui-LLaMA**（社会） | 社会/伦理文本理解 | LLaMA 微调 |
+| 模型 | 方向 | 架构 | HuggingFace |
+| :--- | :--- | :--- | :--- |
+| **Shenji-LLaMA**（神机） | 神学/哲学文本生成与解析 | LLaMA 微调 | [🤗 模型仓库](https://huggingface.co/SAY114514/TRACE-Engine-EDM-Takens-CCM-shenji-llama-470m) |
+| **Shehui-LLaMA**（社会） | 社会/伦理文本理解 | LLaMA 微调 | [🤗 模型仓库](https://huggingface.co/SAY114514/TRACE-Engine-EDM-Takens-CCM-shehui-llama-470m) |
+
+### 模型获取
+
+模型权重文件因超出 GitHub 文件大小限制（100MB），托管于 **HuggingFace**。本地测试目录 `trace-engine/models/` 中保留模型配置文件（`.json`、`.vocab`），权重文件可通过以下方式获取：
+
+```bash
+# 克隆所需模型（以神机为例）
+git clone https://huggingface.co/SAY114514/TRACE-Engine-EDM-Takens-CCM-shenji-llama-470m
+
+# 将模型权重文件 (.safetensors) 放置于对应目录中：
+# trace-engine/models/shenji-llama/
+# trace-engine/models/shehui-llama/
+```
 
 ### TRACE 引擎（EDM-Takens CCM）
 
 以 **Takens 嵌入定理**与**收敛交叉映射（CCM）**为数学基础，构建自然语言处理与非线性时间序列分析之间的桥梁：
 
 > *TRACE Engine* 将文本序列映射至高维相空间，利用 EDM（经验动态建模）框架对语义演化路径进行非线性重构。
-
-### 文件存储说明
-
-模型权重文件（`.safetensors`）通过 **Git LFS** 管理，需安装 Git LFS 后方可拉取完整模型：
-
-```bash
-git lfs install
-git lfs pull
-```
-
-> *注：GitHub LFS 免费额度有限（1GB 存储 + 1GB 月带宽）。如遇拉取失败，请确认 LFS 额度余量。*
 
 ---
 *Last Updated: 2025*
