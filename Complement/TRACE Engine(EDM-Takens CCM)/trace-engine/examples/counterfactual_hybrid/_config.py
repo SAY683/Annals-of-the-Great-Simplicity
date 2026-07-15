@@ -49,7 +49,7 @@ def _find_trace_root(skill_dir: Path) -> Path | None:
       1. 工作副本: <project_root>/TRACE/README.md
       2. 工作副本: <project_root>/.skills/trace-engine/SKILL.md
       3. 层级副本: <dir>/trace-engine/models/<model>/model.safetensors
-      4. 成品/便携副本: <dir>/Shehui-LLaMA/model.safetensors 等
+      4. 成品/便携副本: <dir>/shehui-llama/model.safetensors 等（全小写目录名）
     """
     current = skill_dir.resolve()
     for _ in range(10):

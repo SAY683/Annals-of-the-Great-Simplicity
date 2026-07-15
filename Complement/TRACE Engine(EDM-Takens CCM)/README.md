@@ -1,4 +1,4 @@
-# TRACE Engine (EDM-Takens CCM) — 便携成品目录
+﻿# TRACE Engine (EDM-Takens CCM) — 便携成品目录
 
 本目录包含 `trace-engine`（因果推断引擎）与 `trace-engine-web`（Web 服务）两个子项目，已整理为可独立运行的成品结构。
 
@@ -107,4 +107,4 @@ python run_cli.py --text "你的因果分析文本"
 - Python 依赖缺失：运行 `pip install -r trace-engine/requirements.txt`
 - 端口冲突：脚本会自动尝试 3000-3020，或手动设置 `PORT` 环境变量
 - SUPER 模式加载模型慢/OOM：关闭其它占用显存的程序，或在环境变量中设置 `TRACE_MODEL_DTYPE=fp32` 强制 FP32；必要时缩短文本或减小 `window_size`/`max_segments`
-- Shehui-LLaMA 输出 0 条因果边：这是当前模型权重对 TRACE mask 干预不敏感导致，可尝试切换到 Shenji-LLaMA 或改用 DEEP 模式；代码与阈值本身无异常
+- Shehui-LLaMA 因果边稀少：使用 `llama` 预设（`threshold=0.01`）可检出非零因果边；若仍偏少可尝试切换到 Shenji-LLaMA 或改用 DEEP 模式

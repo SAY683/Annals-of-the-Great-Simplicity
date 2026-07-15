@@ -86,7 +86,9 @@
 | VRAM 预算 | AUTO-CORRECT | batch 太大 → 自动降级 |
 | 阈值有效性 | WARN | τ ≤ 0 或 τ > 20 → 警告 |
 
-### 预设系统 (v3)
+### 预设系统 (历史 v3，已被 presets.yaml 取代)
+
+> 以下表格基于历史 6M–34M 小模型，仅供旧模型参考。当前生产模型为 ~470M（36L/896d），预设见 `presets.yaml`（demo/standard/deep/archival/llama）。
 
 | Preset | Model | Vocab | Epochs | TRACE Speed | Window | Use Case |
 |--------|-------|-------|--------|-------------|--------|----------|

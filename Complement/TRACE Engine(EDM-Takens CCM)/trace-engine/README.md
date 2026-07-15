@@ -56,14 +56,14 @@ cd examples/counterfactual_hybrid
 python run_cli.py --text "..." --preset llama
 ```
 
-Key differences from the Qwen-oriented defaults:
+Key differences from the `standard` default preset:
 
-| Parameter | Qwen-oriented default | `llama` preset | Reason |
-|-----------|----------------------|----------------|--------|
-| `threshold` | 0.3–0.5 | **0.01** | V4 ΔNLL range is ~0–0.16 |
-| `window_size` | 8–64 | **128** | V4 was trained with seq_len=1024 |
+| Parameter | `standard` default | `llama` preset | Reason |
+|-----------|-------------------|----------------|--------|
+| `threshold` | 0.3 | **0.01** | V4 ΔNLL range is ~0–0.16 |
+| `window_size` | 64 | **128** | V4 was trained with seq_len=1024 |
 | `max_segments` | 4 | **3** | Limits runtime on consumer GPUs |
-| `concept_min_freq` | 2–3 | **1** | Domain tokens are sparse |
+| `concept_min_freq` | 3 | **1** | Domain tokens are sparse |
 | `classical_mode` | false | false (toggleable) | Keep `true` for Shenji classical Chinese |
 
 Use `classical_mode=true` when analysing Shenji-style classical Chinese texts so that function words such as 之/乎/者/也 are retained as concepts.
@@ -80,7 +80,7 @@ The `filter_mode` parameter controls how candidate causal edges are filtered bef
 
 VRAM budget: the 470M models need about **3.0GB+ free GPU memory**. The Web SUPER mode automatically attempts FP16 loading and falls back to FP32; set `TRACE_MODEL_DTYPE=fp32` to force FP32.
 
-> Known model issue: current Shehui-LLaMA weights appear insensitive to TRACE mask interventions and may report `0` non-zero causal edges even with `threshold=0.01`. Shenji-LLaMA usually returns edges under the same preset. This is a model-weight/training observation, not a code or threshold bug.
+> Both Shehui-LLaMA and Shenji-LLaMA (470M, trained 2026-07-14) respond to TRACE mask interventions. With the `llama` preset (`threshold=0.01`), Shehui-LLaMA typically yields 10+ non-zero causal edges on domain texts (verified 2026-07-15: 91 concepts, 12 edges, ATE=1.6777).
 
 ## Project Layout
 

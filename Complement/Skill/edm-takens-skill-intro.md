@@ -123,7 +123,7 @@ edm-takens/
 ├── references/                       ← 5 个方法论参考
 │   ├── forbidden_rules_reference.md  ← 14 规则 + 数值溯源
 │   └── fourteen_rules_bibliography.md← 39 篇论文目录
-└── docs/                             ← 7 个工程附件
+└── docs/                             ← 8 个工程附件
     ├── CHANGELOG.md
     └── thresholds_and_heuristics.md
 ```
@@ -148,7 +148,7 @@ edm-takens/
 ## 获取帮助
 
 - 设计哲学: `DESIGN.md`
-- 工程审计: `docs/edm-takens_skill_audit.md`
+- 工程审计: `docs/ALGORITHM_AUDIT.md`
 - 变更日志: `docs/CHANGELOG.md`
 - 阈值与启发式: `docs/thresholds_and_heuristics.md`
 - 案例: `examples/game_analysis/README.md` / `examples/yinshen/README.md`

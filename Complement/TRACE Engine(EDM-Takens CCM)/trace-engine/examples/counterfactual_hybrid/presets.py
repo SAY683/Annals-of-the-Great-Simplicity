@@ -94,7 +94,7 @@ def load_presets(preset: str = "standard") -> _DotDict:
     Parameters
     ----------
     preset : str
-        预设名: "demo", "standard", "deep", "archival"
+        预设名: "demo", "standard", "deep", "archival", "llama"
         也可以直接使用顶层键名: "trace2dowhy", "dowhy", "counterfactual", "auditor"
 
     Returns

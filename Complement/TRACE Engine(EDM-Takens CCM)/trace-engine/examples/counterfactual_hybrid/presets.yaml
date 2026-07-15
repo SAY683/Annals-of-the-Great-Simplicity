@@ -69,6 +69,12 @@ super:
 
 # ═══════════════════════════════════════════════════════
 # 预设场景
+# ============================================================
+# 注意: Web UI (trace-engine-web) 使用独立的预设名体系
+#   (default / sensitive / broad / deep / llama)
+# 这些 Web 预设在 server.js /api/presets 和 index.html
+# PRESETS_OVERRIDES 中定义，不在此文件中。
+# CLI 预设 (demo/standard/deep/archival/llama) 供 Python 直接调用。
 # ═══════════════════════════════════════════════════════
 presets:
   demo:                    # 模拟数据演示 (零依赖)
