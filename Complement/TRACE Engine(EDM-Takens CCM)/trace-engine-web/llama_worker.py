@@ -633,22 +633,25 @@ def run_super_job(job: dict):
         return
     timer.end()
 
-    # 1.2 模型规模感知：大模型（469M+）应用安全上限，同时尊重 llama 专项预设
+    # 1.2 模型规模感知：大模型（200M+）应用安全上限，轻量模型（如 shehui-llama 27M）不受限制
     n_params_m = sum(p.numel() for p in model.parameters()) / 1e6
     is_huge = n_params_m > 200
     log("info", f"模型规模: {n_params_m:.1f}M params, max_position={model.config.max_position_embeddings}")
     if is_huge:
+        # 470M 级模型（shenji-llama / shehui-llama-v4-archive）应用安全上限
         # FP16 量化后显存压力显著降低，允许 llama 预设的 window=128/max_segments=3
         safe_window = 128
         safe_segments = 3
         if config.get('window_size', 64) > safe_window:
             config = dict(config)
             config['window_size'] = safe_window
-            log("warn", f"检测到超大模型（{n_params_m:.0f}M），window_size 已限制为 {safe_window}。")
+            log("warn", f"检测到大模型（{n_params_m:.0f}M），window_size 已限制为 {safe_window}。")
         if config.get('max_segments', 4) > safe_segments:
             config = dict(config)
             config['max_segments'] = safe_segments
-            log("warn", f"超大模型下 max_segments 已限制为 {safe_segments}，以减少重复推理。")
+            log("warn", f"大模型下 max_segments 已限制为 {safe_segments}，以减少重复推理。")
+    else:
+        log("info", f"轻量模型（{n_params_m:.1f}M），不受 window_size/max_segments 安全限制。")
 
     # 1.5 输入数据质控 + 长度预检
     timer.begin("input_diagnostics")

@@ -199,7 +199,7 @@
 
 ## LLaMA 预设说明
 
-`llama` 预设专为 ~470M 参数的 Shehui-LLaMA / Shenji-LLaMA 过拟合领域模型设计。这类模型 ΔNLL 信号偏低（典型范围 0.000-0.160），需要专属阈值才能捕获中等以上因果边。
+`llama` 预设专为过拟合训练的 TRACE LLaMA 模型设计（shehui-llama 27M 轻量 / shenji-llama 469M / shehui-llama-v4-archive 470M 归档）。这类模型 ΔNLL 信号偏低（典型范围 0.000-0.160），需要专属阈值才能捕获中等以上因果边。
 
 ### 关键参数
 
@@ -213,7 +213,7 @@
 
 ### 适用场景
 
-- **模型**: Shehui-LLaMA (~470M，古典社会领域) / Shenji-LLaMA (~470M，史诗领域)
+- **模型**: Shehui-LLaMA (27M 轻量，古典社会领域) / Shenji-LLaMA (469M，史诗领域) / Shehui-LLaMA V4 Archive (470M 旧版归档)
 - **特点**: 过拟合训练导致 ΔNLL 绝对值小，但因果区分度依然存在
 - **古汉语分析**: 当分析先秦/文言文本时，将 `classical_mode` 切换为 `true`，保留文言虚词作为有效概念节点
 

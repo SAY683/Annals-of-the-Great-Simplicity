@@ -55,7 +55,12 @@ npm start
 2. 选择分析模式：
    - **LIGHT**：快速因果推断（TRACE + DoWhy 核心流程，约 1–3 秒）
    - **DEEP**：完整六战士深度诊断（额外执行 CCM、EDM、HAVOK、causallearn PC/GES，预计 10–60 秒或更长）
-   - **SUPER**：LLaMA 模型驱动的真正 token-level TRACE 因果发现 + 完整六合一诊断。默认使用 **shehui-llama**，可切换 **shenji-llama**。两者均为 ~470M 参数 / ~1.8GB safetensors 的大模型，推理速度较慢，适合研报级分析。分析前可在「参数预设」中选择 **LLAMA**（`threshold=0.01, window_size=128, max_segments=3`），或在高级参数中开启 `classical_mode=true` 以保留 Shenji 古文中的之/乎/者/也等虚词。
+   - **SUPER**：LLaMA 模型驱动的真正 token-level TRACE 因果发现 + 完整六合一诊断。三个可选模型：
+     - **shehui-llama**（默认，27M / 108MB，轻量高效，~800 pps，因果视野 256 tokens）
+     - **shenji-llama**（469M / 1.88GB，神学/史诗古文，~40 pps @ RTX 3050，因果视野 1024 tokens）
+     - **shehui-llama-v4-archive**（470M / 1.88GB，旧版归档，因果发现能力较弱）
+
+     轻量模型适合大规模文本快速刨析；470M 级模型适合研报级深度分析。分析前可在「参数预设」中选择 **LLAMA**（`threshold=0.01, window_size=128, max_segments=3`），或在高级参数中开启 `classical_mode=true` 以保留 Shenji 古文中的之/乎/者/也等虚词。
 3. 点击 `> RUN_ANALYSIS`
 4. 右侧终端面板会实时显示分析阶段与日志
 5. 进度条同步展示当前阶段（分词 → 构图 → 识别 → 估计 → 反驳 → 反事实扫描 → [DEEP] 六战士诊断 → [DEEP] 稳定性分析 → 报告生成）
@@ -106,7 +111,7 @@ SUPER 模式使用独立的常驻 Python Worker [`llama_worker.py`](./llama_work
 - **任务串行**：单 Worker 顺序处理 SUPER 任务，通过内存队列避免并发冲突
 - **路径自动探测**：支持开发布局（`TRACE/models/<name>`）与层级成品布局（`trace-engine/models/<name>`）
 - **运行诊断**：输出环境健康（Python/PyTorch/CUDA/VRAM/模型目录）、输入数据质控（token 数/UNK 率/分段数）、算法充分性研判
-- **模型切换**：默认 `shehui-llama`，可选 `shenji-llama`。两者规模相同（~470M / ~1.8GB），实际速率取决于 GPU 显存与算力；两个模型均对 TRACE mask 干预敏感，使用 `llama` 预设（`threshold=0.01`）可检出非零因果边。
+- **模型切换**：默认 `shehui-llama`（27M 轻量），可选 `shenji-llama`（469M）或 `shehui-llama-v4-archive`（470M 旧版归档）。轻量模型推理速度极快（~800 pps），470M 级模型速度较慢（~10-40 pps）但因果视野更广（1024 tokens）。使用 `llama` 预设（`threshold=0.01`）可检出非零因果边。
 - **接口限制**：SUPER 模式仅支持 `/api/analyze-stream` 流式接口；`/api/analyze-text`、`/api/analyze-file` 会返回 `SUPER_REQUIRES_STREAM`。`/api/retry/:id` 会返回 `SUPER_RETRY_NOT_SUPPORTED`，请在前端重新提交分析。
 
 ### 后端端点

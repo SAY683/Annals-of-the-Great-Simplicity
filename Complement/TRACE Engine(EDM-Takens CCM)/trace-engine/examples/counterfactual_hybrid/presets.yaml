@@ -123,7 +123,7 @@ presets:
       dpi: 300
       format: "svg"
 
-  llama:                    # TRACE LLaMA 过拟合专属模型 (Shenji V4 / Shehui V4)
+  llama:                    # TRACE LLaMA 过拟合专属模型 (Shehui 27M / Shenji 469M / Shehui-V4-Archive 470M)
     trace2dowhy:
       threshold: 0.01       # V4 过拟合模型 ΔNLL 在 0.000-0.160，0.01 捕获中等以上因果
       concept_min_freq: 1   # 领域文本 token 频率低，放宽

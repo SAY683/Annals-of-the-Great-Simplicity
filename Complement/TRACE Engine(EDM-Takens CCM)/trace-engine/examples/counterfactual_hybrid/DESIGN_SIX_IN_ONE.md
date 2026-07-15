@@ -88,7 +88,7 @@
 
 ### 预设系统 (历史 v3，已被 presets.yaml 取代)
 
-> 以下表格基于历史 6M–34M 小模型，仅供旧模型参考。当前生产模型为 ~470M（36L/896d），预设见 `presets.yaml`（demo/standard/deep/archival/llama）。
+> 以下表格基于历史 6M–34M 小模型，仅供旧模型参考。当前生产模型为 shehui-llama (27M 轻量) / shenji-llama (469M, 36L/896d) / shehui-llama-v4-archive (470M 归档)，预设见 `presets.yaml`（demo/standard/deep/archival/llama）。
 
 | Preset | Model | Vocab | Epochs | TRACE Speed | Window | Use Case |
 |--------|-------|-------|--------|-------------|--------|----------|

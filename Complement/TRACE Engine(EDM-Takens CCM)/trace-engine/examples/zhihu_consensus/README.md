@@ -97,7 +97,7 @@ examples/zhihu_consensus/
 ## 复现
 
 ```python
-# 1. Train-on-target（历史小模型，当前生产模型为 ~470M shehui-llama/shenji-llama）
+# 1. Train-on-target（历史小模型，当前生产模型为 shehui-llama 27M / shenji-llama 469M / shehui-llama-v4-archive 470M 归档）
 #    -> BPE on 知乎文本, LLaMA 8L/320d, 60 epochs, full augmentation
 #    -> UNK=0.1%, loss=0.092
 

@@ -64,13 +64,18 @@ Web 界面提供三种分析模式：
 
 - **LIGHT**：jieba 概念图 + 简化流程（1–3 秒）
 - **DEEP**：jieba 概念图 + 完整六战士深度诊断（10–60 秒）
-- **SUPER**：调用 `trace-engine/models/shehui-llama` 执行真正的 token-level TRACE 因果发现，再走完整六合一诊断（首次需加载模型，分析耗时视文本长度而定）
+- **SUPER**：调用 `trace-engine/models/` 下可选的三个 LLaMA 模型之一执行真正的 token-level TRACE 因果发现，再走完整六合一诊断（首次需加载模型，分析耗时视文本长度与模型规模而定）
 
 > SUPER 模式由常驻 LLaMA Worker 处理，单线程顺序执行。模型文件较大，首次同步时自动复制到 `trace-engine/models/`。
 >
-> 模型规格：Shehui-LLaMA 与 Shenji-LLaMA 均为约 **470M 参数 / ~1.8GB** 的 safetensors 模型。建议在 NVIDIA 显卡空闲显存 **≥3.0GB** 的设备上运行；Web 端会自动尝试 FP16 加载并在显存不足时给出提示。
+> 可选模型规格（三选一）：
+> - **shehui-llama**（默认，27M 参数 / ~108MB / max_position=256）：轻量高效，~800 pps，适合大规模文本快速刨析，建议显存 ≥1.5GB
+> - **shenji-llama**（469M 参数 / ~1.88GB / max_position=1024）：神学/史诗古文，~10-40 pps @ RTX 3050，建议显存 ≥3.0GB
+> - **shehui-llama-v4-archive**（470M 参数 / ~1.88GB / max_position=1024）：旧版归档，因果发现能力较弱，建议显存 ≥3.0GB
 >
-> 参数预设：Web 界面提供 **LLAMA** 预设（`threshold=0.01, window_size=128, max_segments=3`），专为 V4 过拟合模型设计。分析 Shenji 古文时可开启 `classical_mode=true`，保留 之/乎/者/也 等虚词。
+> Web 端会自动尝试 FP16 加载并在显存不足时给出提示。
+>
+> 参数预设：Web 界面提供 **LLAMA** 预设（`threshold=0.01, window_size=128, max_segments=3`），专为过拟合 TRACE LLaMA 模型设计。分析 Shenji 古文时可开启 `classical_mode=true`，保留 之/乎/者/也 等虚词。
 
 ### 4. 停止服务
 

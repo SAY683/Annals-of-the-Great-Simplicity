@@ -49,7 +49,11 @@ See [trace-engine-web/README.md](../trace-engine-web/README.md).
 
 ## Model-Specific Presets
 
-`examples/counterfactual_hybrid/presets.yaml` now includes a `llama` preset tuned for the over-fitted Shehui/Shenji-LLaMA V4 models (~470M params / ~1.8GB weights):
+`examples/counterfactual_hybrid/presets.yaml` now includes a `llama` preset tuned for the over-fitted TRACE LLaMA models. Three interchangeable models are supported:
+
+- **shehui-llama** — 27M params / ~108MB / max_position=256 (lightweight, fast)
+- **shenji-llama** — 469M params / ~1.88GB / max_position=1024 (classical/theology text)
+- **shehui-llama-v4-archive** — 470M params / ~1.88GB / max_position=1024 (legacy archive)
 
 ```bash
 cd examples/counterfactual_hybrid
@@ -78,9 +82,9 @@ The `filter_mode` parameter controls how candidate causal edges are filtered bef
 | `percentile` | Keep edges above the configured percentile |
 | `adaptive` | Auto-select: percentile for dense graphs (>30% density), top-N otherwise |
 
-VRAM budget: the 470M models need about **3.0GB+ free GPU memory**. The Web SUPER mode automatically attempts FP16 loading and falls back to FP32; set `TRACE_MODEL_DTYPE=fp32` to force FP32.
+VRAM budget: the 470M-class models (shenji-llama / shehui-llama-v4-archive) need about **3.0GB+ free GPU memory**; the lightweight shehui-llama (27M) needs only ~1.5GB. The Web SUPER mode automatically attempts FP16 loading and falls back to FP32; set `TRACE_MODEL_DTYPE=fp32` to force FP32.
 
-> Both Shehui-LLaMA and Shenji-LLaMA (470M, trained 2026-07-14) respond to TRACE mask interventions. With the `llama` preset (`threshold=0.01`), Shehui-LLaMA typically yields 10+ non-zero causal edges on domain texts (verified 2026-07-15: 91 concepts, 12 edges, ATE=1.6777).
+> Both Shenji-LLaMA (469M, trained 2026-07-14) and Shehui-LLaMA (27M lightweight retrain, 2026-07-15) respond to TRACE mask interventions. With the `llama` preset (`threshold=0.01`), the models yield non-zero causal edges on domain texts (verified 2026-07-15 on shenji-llama: 91 concepts, 12 edges, ATE=1.6777). The legacy shehui-llama-v4-archive shows sparse edges due to insensitivity to TRACE mask interventions; prefer shenji-llama or the lightweight shehui-llama for new analyses.
 
 ## Project Layout
 

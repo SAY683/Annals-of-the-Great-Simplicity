@@ -170,10 +170,10 @@ def _is_valid_concept(name):
 
 ## EC-9: LLaMA 过拟合模型的低 ΔNLL 体制 (llama 预设)
 
-**症状**: 使用 ~470M 参数的 Shehui-LLaMA / Shenji-LLaMA 过拟合领域模型时，ΔNLL 绝对值极低（典型范围 0.000-0.160），默认阈值（0.3-1.0）几乎捕获不到因果边。
+**症状**: 使用过拟合训练的 TRACE LLaMA 模型（Shehui-LLaMA 27M / Shenji-LLaMA 469M / Shehui-LLaMA V4 Archive 470M）时，ΔNLL 绝对值极低（典型范围 0.000-0.160），默认阈值（0.3-1.0）几乎捕获不到因果边。
 
 **触发条件**:
-- 使用 V4 过拟合训练的 ~470M 参数 LLaMA 模型（Shenji-LLaMA / Shehui-LLaMA）
+- 使用过拟合训练的 TRACE LLaMA 模型（Shenji-LLaMA 469M / Shehui-LLaMA 27M / Shehui-LLaMA V4 Archive 470M）
 - 模型在领域文本上 loss 极低（如 0.092），预测过于自信 → 掩码扰动带来的 ΔNLL 被压缩
 
 **机制**: 过拟合模型对训练分布的预测概率接近 1.0，掩码一个 token 后 NLL 的变化被softmax 的平缓区压缩，导致 ΔNLL 绝对值小。但因果区分度依然存在 —— 真因果边的 ΔNLL 仍显著高于伪因果边。
@@ -189,7 +189,7 @@ def _is_valid_concept(name):
 | `classical_mode` | false | 默认现代白话；古汉语分析可切换为 true（保留之/乎/者/也等虚词） |
 
 **适用场景**:
-- **模型**: Shehui-LLaMA (~470M，古典社会领域) / Shenji-LLaMA (~470M，史诗领域)
+- **模型**: Shehui-LLaMA (27M 轻量，古典社会领域) / Shenji-LLaMA (469M，史诗领域) / Shehui-LLaMA V4 Archive (470M 旧版归档)
 - **古汉语分析**: 当分析先秦/文言文本时，将 `classical_mode` 切换为 `true`，保留文言虚词作为有效概念节点
 
 **调用方式**:

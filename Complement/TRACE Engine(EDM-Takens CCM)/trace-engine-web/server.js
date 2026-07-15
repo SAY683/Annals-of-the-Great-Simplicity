@@ -822,11 +822,15 @@ async function runSuperAnalysisStream(text, outputId, bridgeConfig, res) {
 
   // SUPER 模式不再使用固定超时硬限制，改为实时速率/ETA + 用户主动停止
   const modelNameLower = (cfgObj?.model || 'shehui-llama').toLowerCase();
-  const isLargeModel = modelNameLower.includes('shenji') || modelNameLower.includes('shehui');
+  // 区分轻量模型（shehui-llama 27M）与重量级模型（shenji-llama / shehui-llama-v4-archive 470M）
+  const isLightModel = modelNameLower.includes('shehui') && !modelNameLower.includes('archive');
+  const isLargeModel = modelNameLower.includes('shenji') || modelNameLower.includes('archive');
   // 保留 24 小时安全兜底，防止进程彻底失控；正常流程依赖用户主动停止
   const superTimeoutMs = 24 * 60 * 60 * 1000;
   if (isLargeModel) {
-    sendSSE(res, 'log', { level: 'warn', message: '当前 SUPER 模式使用 470M 级 LLaMA 模型（Shehui/Shenji 均为 1.88GB 左右），推理速度较慢。界面会实时显示处理速率与预计剩余时间；如无法接受等待时长，可随时点击“停止计算”。LLaMA 预设会自动设置 window_size=128 / max_segments=3 以平衡显存与因果覆盖。' });
+    sendSSE(res, 'log', { level: 'warn', message: '当前 SUPER 模式使用 470M 级 LLaMA 模型（Shenji/Archive 均为 1.88GB 左右），推理速度较慢。界面会实时显示处理速率与预计剩余时间；如无法接受等待时长，可随时点击“停止计算”。LLaMA 预设会自动设置 window_size=128 / max_segments=3 以平衡显存与因果覆盖。' });
+  } else if (isLightModel) {
+    sendSSE(res, 'log', { level: 'info', message: '当前 SUPER 模式使用 Shehui-LLaMA（27M 轻量级，108MB），推理速度极快。因果视野 256 tokens，适合高密度因果文本的快速刨析。' });
   }
 
   let timeoutId = null;

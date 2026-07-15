@@ -1467,7 +1467,7 @@
         modeNote.innerHTML = '<strong>DEEP 模式：</strong>执行完整六战士深度诊断（TRACE、CCM、EDM、HAVOK、DoWhy+CF、causallearn PC/GES）。概念图由 jieba 构建，预计耗时 10–60 秒或更长。';
         superWrap.style.display = 'none';
       } else if (mode === 'super') {
-        modeNote.innerHTML = '<strong>SUPER 模式 // 特装型：</strong>启动 LLaMA 核心驱动，执行真正的 token-level TRACE 因果发现，再走完整六合一诊断。Shehui-LLaMA 与 Shenji-LLaMA 均为 470M/1.88GB 级大模型，首次加载较慢，分析耗时数分钟至数十分钟。界面会实时显示处理速率（pairs/s）与预计剩余时间；如无法接受等待时长，可随时点击 <strong>> ABORT</strong> 主动停止。超大模型会自动限制 window_size≤32 / max_segments≤2。';
+        modeNote.innerHTML = '<strong>SUPER 模式 // 特装型：</strong>启动 LLaMA 核心驱动，执行真正的 token-level TRACE 因果发现，再走完整六合一诊断。可在下方选择三个模型之一：Shehui-LLaMA（27M 轻量，~800 pps，显存 ≥1.5GB）、Shenji-LLaMA（469M，~10-40 pps，显存 ≥3.0GB）、Shehui-LLaMA V4 [ARCHIVE]（470M 旧版归档）。大模型首次加载较慢，分析耗时数分钟至数十分钟。界面会实时显示处理速率（pairs/s）与预计剩余时间；如无法接受等待时长，可随时点击 <strong>> ABORT</strong> 主动停止。470M 级模型会自动限制 window_size≤128 / max_segments≤3。';
         superWrap.style.display = 'flex';
         updateModelBadge();
       } else {
@@ -1603,10 +1603,23 @@
 
       // 前置警告：SUPER 模式大模型处理长文本极易超时，给用户明确预期
       if (mode === 'super' && lastConfig.model && payloadText.length > 200) {
-        const modelLabel = lastConfig.model.toLowerCase().includes('shenji') ? 'Shenji-LLaMA' : 'Shehui-LLaMA';
-        const msg = `${modelLabel} 为 470M/1.88GB 级大模型，当前文本 ${payloadText.length} 字符。SUPER 模式不再设置固定超时，界面会实时显示处理速率与预计剩余时间；如无法接受等待时长，可随时点击 > ABORT 主动停止。系统会自动限制 window_size≤32 / max_segments≤2。若预估时间过长，也可缩短文本或切换到 DEEP 模式。`;
-        log('warn', msg);
-        showToast(msg, 'warn');
+        const m = lastConfig.model.toLowerCase();
+        const isArchive = m.includes('archive');
+        const isShenji = m.includes('shenji');
+        const isLightShehui = m.includes('shehui') && !isArchive;
+        if (isShenji || isArchive) {
+          const modelLabel = isShenji ? 'Shenji-LLaMA' : 'Shehui-LLaMA V4 [ARCHIVE]';
+          const msg = `${modelLabel} 为 470M/1.88GB 级大模型，当前文本 ${payloadText.length} 字符。SUPER 模式不再设置固定超时，界面会实时显示处理速率与预计剩余时间；如无法接受等待时长，可随时点击 > ABORT 主动停止。系统会自动限制 window_size≤128 / max_segments≤3。若预估时间过长，也可缩短文本、切换到轻量 Shehui-LLaMA (27M) 或 DEEP 模式。`;
+          log('warn', msg);
+          showToast(msg, 'warn');
+        } else if (isLightShehui) {
+          // 27M 轻量模型速率极快，仅在超长文本时提示
+          if (payloadText.length > 5000) {
+            const msg = `Shehui-LLaMA (27M) 当前文本 ${payloadText.length} 字符，因果视野 256 tokens，长文本将分段处理。轻量模型推理速度极快，但仍可随时点击 > ABORT 主动停止。`;
+            log('info', msg);
+            showToast(msg, 'info');
+          }
+        }
       }
 
       log('stage', `任务启动 [${currentJobId.slice(0, 8)}] 模式=${mode.toUpperCase()}`);
