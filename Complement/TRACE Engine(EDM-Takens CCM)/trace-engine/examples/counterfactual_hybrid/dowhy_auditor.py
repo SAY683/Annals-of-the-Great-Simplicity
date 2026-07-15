@@ -393,7 +393,8 @@ class DoWhyAuditor:
 
     def _check_sparse_graph_sanity(self):
         bridge = self.bridge
-        V = len(bridge.concept_names)
+        # 排除 <other> 节点，避免密度被系统性低估
+        V = len([n for n in bridge.concept_names if n != '<other>'])
         E = len(bridge.significant_edges)
         max_edges = V * (V - 1)
         density = E / max_edges if max_edges > 0 else 0

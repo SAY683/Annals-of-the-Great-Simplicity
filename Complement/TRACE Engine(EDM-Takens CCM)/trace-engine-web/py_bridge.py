@@ -202,8 +202,8 @@ def main():
     threshold = config.get("threshold", 0.5)
     concept_min_freq = config.get("concept_min_freq", 1)
     max_concepts = config.get("max_concepts", 12)
-    if not (2 <= window_size <= 128):
-        _write_error(out_dir, f"window_size 必须在 [2, 128] 之间，当前为 {window_size}")
+    if not (2 <= window_size <= 256):
+        _write_error(out_dir, f"window_size 必须在 [2, 256] 之间，当前为 {window_size}")
         return
     if not (0 <= threshold <= 10):
         _write_error(out_dir, f"threshold 必须在 [0, 10] 之间，当前为 {threshold}")
@@ -369,7 +369,12 @@ def main():
     _stage("bridge", "正在调用 TRACE2DoWhy 桥接器...", 0.42)
     bridge = TRACE2DoWhy(adj, concept_names, threshold=threshold,
                          concept_min_freq=concept_min_freq, simulation=False,
-                         max_edges_for_dowhy=max_edges_for_dowhy)
+                         max_edges_for_dowhy=max_edges_for_dowhy,
+                         filter_mode=config.get("filter_mode", "topn"),
+                         filter_percentile=config.get("filter_percentile", 85),
+                         random_state=config.get("random_state", 42),
+                         classical_mode=config.get("classical_mode", False),
+                         max_concepts=max_concepts)
     bridge.build_model()
     _log("info", f"聚合后概念节点: {len(bridge.concept_names)}, 显著边: {len(bridge.significant_edges)}")
     timer.end("bridge")

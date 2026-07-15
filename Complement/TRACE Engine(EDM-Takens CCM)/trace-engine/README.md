@@ -68,6 +68,16 @@ Key differences from the Qwen-oriented defaults:
 
 Use `classical_mode=true` when analysing Shenji-style classical Chinese texts so that function words such as 之/乎/者/也 are retained as concepts.
 
+### Filter Modes
+
+The `filter_mode` parameter controls how candidate causal edges are filtered before entering DoWhy:
+
+| Mode | Behaviour |
+|------|-----------|
+| `topn` (default) | Keep the top-N strongest edges by ΔNLL |
+| `percentile` | Keep edges above the configured percentile |
+| `adaptive` | Auto-select: percentile for dense graphs (>30% density), top-N otherwise |
+
 VRAM budget: the 470M models need about **3.0GB+ free GPU memory**. The Web SUPER mode automatically attempts FP16 loading and falls back to FP32; set `TRACE_MODEL_DTYPE=fp32` to force FP32.
 
 > Known model issue: current Shehui-LLaMA weights appear insensitive to TRACE mask interventions and may report `0` non-zero causal edges even with `threshold=0.01`. Shenji-LLaMA usually returns edges under the same preset. This is a model-weight/training observation, not a code or threshold bug.

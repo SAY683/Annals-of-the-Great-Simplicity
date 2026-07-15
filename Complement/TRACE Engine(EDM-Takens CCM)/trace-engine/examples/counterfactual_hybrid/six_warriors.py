@@ -124,6 +124,12 @@ class WarriorCard:
 def _deploy_trace(adj_matrix, token_list) -> WarriorCard:
     card = WarriorCard("TRACE", "拓扑先锋", "探照灯", color="🔴")
     T = len(token_list)
+    if adj_matrix.size == 0:
+        card.status = "unavailable"
+        card.findings = ["邻接矩阵为空，无法分析"]
+        card.verdict = "EMPTY_MATRIX"
+        card.metrics = {"tokens": T, "edges": 0, "max_ΔNLL": "N/A", "UNK_rate": "N/A"}
+        return card
     n_edges = int((adj_matrix > 0).sum())
     max_dnl = float(adj_matrix.max())
     unk_count = sum(1 for t in token_list if is_unk_token(t))
@@ -506,8 +512,8 @@ def _deploy_causallearn(bridge) -> WarriorCard:
         pc_result = _pc_alg(sub_data, alpha=0.01)
         pc_edges = set()
         for e in pc_result.G.get_graph_edges():
-            ni = int(e.get_node1().get_name()[1:])
-            nj = int(e.get_node2().get_name()[1:])
+            ni = int(e.get_node1().get_index())
+            nj = int(e.get_node2().get_index())
             if ni < len(sub_names) and nj < len(sub_names):
                 pc_edges.add((sub_names[ni], sub_names[nj]))
 

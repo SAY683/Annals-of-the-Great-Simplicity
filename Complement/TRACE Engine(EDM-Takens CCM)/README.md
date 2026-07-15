@@ -79,7 +79,7 @@ cd "TRACE Engine(EDM-Takens CCM)\trace-engine-web"
 powershell -ExecutionPolicy Bypass -File stop_servers.ps1
 ```
 
-### 4. 仅运行引擎（命令行）
+### 5. 仅运行引擎（命令行）
 
 ```powershell
 cd "TRACE Engine(EDM-Takens CCM)\trace-engine\examples\counterfactual_hybrid"

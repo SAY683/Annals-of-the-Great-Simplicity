@@ -803,7 +803,7 @@ async function runSuperAnalysisStream(text, outputId, bridgeConfig, res) {
   // 保留 24 小时安全兜底，防止进程彻底失控；正常流程依赖用户主动停止
   const superTimeoutMs = 24 * 60 * 60 * 1000;
   if (isLargeModel) {
-    sendSSE(res, 'log', { level: 'warn', message: '当前 SUPER 模式使用 470M 级 LLaMA 模型（Shehui/Shenji 均为 1.88GB 左右），推理速度较慢。界面会实时显示处理速率与预计剩余时间；如无法接受等待时长，可随时点击“停止计算”。超大模型会自动限制 window_size≤32 / max_segments≤2 以控制显存与耗时。' });
+    sendSSE(res, 'log', { level: 'warn', message: '当前 SUPER 模式使用 470M 级 LLaMA 模型（Shehui/Shenji 均为 1.88GB 左右），推理速度较慢。界面会实时显示处理速率与预计剩余时间；如无法接受等待时长，可随时点击“停止计算”。LLaMA 预设会自动设置 window_size=128 / max_segments=3 以平衡显存与因果覆盖。' });
   }
 
   let timeoutId = null;

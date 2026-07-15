@@ -562,6 +562,10 @@ def _merge_llama_presets(model_name: str, config: dict) -> dict:
             'filter_mode': p.trace2dowhy.filter_mode,
             'filter_percentile': p.trace2dowhy.filter_percentile,
             'classical_mode': getattr(p.trace2dowhy, 'classical_mode', False),
+            'random_state': getattr(p.trace2dowhy, 'random_state', 42),
+            'max_concepts': getattr(p.trace2dowhy, 'max_concepts', 12),
+            'sem_regularization': getattr(p.counterfactual, 'sem_regularization', None),
+            'sem_alpha': getattr(p.counterfactual, 'sem_alpha', 0.01),
             'prune_min_freq': 1,
             'max_candidates_per_step': 64,
         }
@@ -700,6 +704,8 @@ def run_super_job(job: dict):
             random_state=config.get('random_state', 42),
             classical_mode=config.get('classical_mode', False),
             max_concepts=config.get('max_concepts', 12),
+            sem_regularization=config.get('sem_regularization'),
+            sem_alpha=config.get('sem_alpha', 0.01),
         )
         bridge.aggregate_concepts()
         bridge.build_model()

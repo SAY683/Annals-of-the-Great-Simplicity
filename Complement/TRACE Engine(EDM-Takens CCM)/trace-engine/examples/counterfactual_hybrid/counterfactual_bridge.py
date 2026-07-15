@@ -734,8 +734,19 @@ class TRACE2DoWhy:
                 threshold_val = np.percentile(
                     [e[2] for e in edges_filtered], self.filter_percentile)
                 edges_filtered = [e for e in edges_filtered if e[2] >= threshold_val]
-            # Default: top-N
-            edges_filtered = edges_filtered[:self.max_edges_for_dowhy]
+            elif self.filter_mode == "adaptive":
+                # adaptive: 根据图密度自动选择 percentile 或 top-N
+                density = n_total / max(C * (C - 1), 1)
+                if density > 0.3:
+                    threshold_val = np.percentile(
+                        [e[2] for e in edges_filtered], self.filter_percentile)
+                    edges_filtered = [e for e in edges_filtered if e[2] >= threshold_val]
+                    self._log(f"adaptive 模式: 图密度 {density:.1%} > 30%, 使用 percentile 过滤")
+                else:
+                    self._log(f"adaptive 模式: 图密度 {density:.1%} ≤ 30%, 使用 top-N 过滤")
+            else:
+                # Default: top-N
+                edges_filtered = edges_filtered[:self.max_edges_for_dowhy]
 
         if n_total > self.max_edges_for_dowhy:
             self._log(f"边过滤: {n_total} → {len(edges_filtered)} "
@@ -765,7 +776,7 @@ class TRACE2DoWhy:
         raw_data = data_df.values if hasattr(data_df, 'values') else np.asarray(data_df)
         # 构建二值邻接矩阵
         bin_adj = np.zeros((C, C))
-        for src, dst, _ in edges:
+        for src, dst, _ in edges_filtered:
             si = self.concept_idx.get(src)
             di = self.concept_idx.get(dst)
             if si is not None and di is not None:
