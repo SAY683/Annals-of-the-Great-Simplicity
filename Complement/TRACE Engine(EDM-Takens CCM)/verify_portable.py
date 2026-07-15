@@ -265,6 +265,45 @@ def check_web_health(root: Path) -> dict:
     return result
 
 
+def check_super_worker_imports(root: Path) -> dict:
+    """SUPER 模式冒烟测试：检查 llama_worker.py 的导入路径是否被遮蔽。
+
+    背景：便携目录中若存在 trace-engine/presets.py（旧版 v3 预设文件），
+    会遮蔽 examples/counterfactual_hybrid/presets.py（含 load_presets），
+    导致 llama_worker.py ImportError → SUPER 模式启动超时（120s）。
+    此检查在无需加载 torch/transformers 的情况下快速检测这一遮蔽风险。
+    """
+    result = {'name': 'SUPER 模式导入路径', 'ok': True, 'messages': []}
+    engine = root / 'trace-engine'
+    skill_dir = engine / 'examples' / 'counterfactual_hybrid'
+
+    # 检查是否存在会遮蔽 counterfactual_hybrid/ 下模块的根级 .py 文件
+    shading_files = ['presets.py', '_check_config.py']
+    for fname in shading_files:
+        root_file = engine / fname
+        skill_file = skill_dir / fname
+        if root_file.exists() and skill_file.exists():
+            result['ok'] = False
+            result['messages'].append(
+                f'遮蔽风险: trace-engine/{fname} 会遮蔽 '
+                f'trace-engine/examples/counterfactual_hybrid/{fname}')
+            result['messages'].append(
+                '这将导致 llama_worker.py ImportError → SUPER 模式启动超时')
+
+    # 检查 llama_worker.py 需要的关键模块是否存在于 counterfactual_hybrid/
+    required_modules = ['presets.py', 'counterfactual_bridge.py', 'six_warriors.py',
+                        'dowhy_auditor.py', 'project_paths.py']
+    for mod in required_modules:
+        if not (skill_dir / mod).exists():
+            result['ok'] = False
+            result['messages'].append(f'缺失: examples/counterfactual_hybrid/{mod}')
+
+    if result['ok']:
+        result['messages'].append('无遮蔽风险，SUPER 模块路径正确')
+
+    return result
+
+
 def find_product_root(start: Path) -> Path:
     """从脚本位置向上探测包含 trace-engine 与 trace-engine-web 的根目录。
 
@@ -295,6 +334,7 @@ def main():
         check_engine_health(root / 'trace-engine'),
         check_engine_imports(root / 'trace-engine'),
         check_engine_tests(root / 'trace-engine'),
+        check_super_worker_imports(root),
         check_web_health(root),
     ]
 

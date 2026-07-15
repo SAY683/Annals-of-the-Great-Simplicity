@@ -69,8 +69,10 @@ else:
 #   - 层级成品布局 -> <product>/trace-engine
 # 这样 dev 与 product 两种布局都能正确找到 models/ 目录。
 
-sys.path.insert(0, str(SKILL_DIR))
+# 先插入 TRACE_ENGINE_DIR，再插入 SKILL_DIR，确保 SKILL_DIR 优先级更高
+# （防止 trace-engine/ 根目录下的同名文件遮蔽 counterfactual_hybrid/ 下的模块）
 sys.path.insert(0, str(TRACE_ENGINE_DIR))
+sys.path.insert(0, str(SKILL_DIR))
 
 # 现在可以导入 skill 模块
 import numpy as np
