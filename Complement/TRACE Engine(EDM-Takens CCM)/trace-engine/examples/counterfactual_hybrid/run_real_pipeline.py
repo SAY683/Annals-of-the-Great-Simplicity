@@ -1,11 +1,14 @@
 """
 Real-Data Six-in-One Pipeline
 ===============================
-使用已训练的 shehui-llama / shenji-llama 模型，在真实 TRACE Skill 案例文本上
-运行完整的六合一管线（TRACE → DoWhy → Counterfactual → Auditor → Viz）。
+使用已训练的 shehui-llama / shenji-llama / shehui-llama-v4-archive 模型，在真实
+TRACE Skill 案例文本上运行完整的六合一管线（TRACE → DoWhy → Counterfactual → Auditor → Viz）。
 
 输入: TRACE Skill 案例文本 (自动检测)
-模型: ~470M params, 36L/896d, ~1.8GB safetensors, max_position_embeddings=1024
+模型:
+  - shehui-llama: 27M params, 10L/384d, ~108MB safetensors, max_position=256 (FAST)
+  - shenji-llama: 469M params, 36L/896d, ~1.8GB safetensors, max_position=1024
+  - shehui-llama-v4-archive: 470M params, 36L/896d, ~1.8GB safetensors, max_position=1024 (旧版归档)
 
 路径解析: 自动检测项目根目录（无需硬编码路径）
 """
@@ -63,13 +66,21 @@ def log(msg):
 
 
 def _check_vram_budget(n_params_m: float, device: torch.device):
-    """V4 模型 VRAM 预算检查：469M 参数在 FP32 下约需 3.5GB+，显存不足时给出警告。"""
+    """模型 VRAM 预算检查：根据参数量估算所需显存，不足时给出警告。
+
+    - 27M 级模型（shehui-llama）: ~1.5GB
+    - 470M 级模型（shenji-llama / shehui-llama-v4-archive）: ~3.0GB
+    """
     if device.type != "cuda":
         return
     try:
         free_gb = torch.cuda.mem_get_info()[0] / 1e9
-        # 469M 参数 FP32 ≈ 1.88GB 权重 + 激活/梯度/碎片 ≈ 3.0-3.5GB 安全余量
-        required_gb = 3.0 if n_params_m > 200 else 1.5
+        if n_params_m and n_params_m > 200:
+            required_gb = 3.0
+        elif n_params_m and n_params_m > 50:
+            required_gb = 2.0
+        else:
+            required_gb = 1.5
         if free_gb < required_gb:
             log(f"⚠ VRAM 预算紧张: 空闲 {free_gb:.1f}GB < 建议 {required_gb:.1f}GB")
             log("  建议: 关闭其它 GPU 程序、启用 FP16 量化（llama_worker.py 设置 TRACE_MODEL_DTYPE=fp16），或减少 window_size/max_segments")
@@ -104,9 +115,16 @@ def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # 加载前根据模型目录名估算规模，做 VRAM 预算检查
-    # shehui-llama / shenji-llama 当前均为 ~470M / ~1.8GB safetensors，统一按大模型处理
+    # shehui-llama (27M): ~1.5GB | shenji-llama / shehui-llama-v4-archive (470M): ~3.0GB
     model_name_lower = str(MODEL_DIR).lower()
-    estimated_params_m = 470.0 if ("shenji" in model_name_lower or "shehui" in model_name_lower) else 100.0
+    if "archive" in model_name_lower:
+        estimated_params_m = 470.0      # shehui-llama-v4-archive
+    elif "shenji" in model_name_lower:
+        estimated_params_m = 470.0      # shenji-llama
+    elif "shehui" in model_name_lower:
+        estimated_params_m = 27.0       # shehui-llama (27M 纯哲学版)
+    else:
+        estimated_params_m = 100.0      # 未知模型，保守估计
     _check_vram_budget(estimated_params_m, device)
 
     model = LlamaForCausalLM.from_pretrained(str(MODEL_DIR)).to(device).eval()

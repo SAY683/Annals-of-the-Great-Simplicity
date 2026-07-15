@@ -13,7 +13,7 @@ TRACE Engine Web — LLaMA Resident Worker
   {
     "id": "uuid",
     "text": "输入文本",
-    "model": "shehui-llama" | "shenji-llama",  // 默认 shehui-llama
+    "model": "shehui-llama" | "shenji-llama" | "shehui-llama-v4-archive",  // 默认 shehui-llama
     "mode": "super",
     "config": {...}  // 桥接参数
   }
@@ -139,13 +139,21 @@ def _estimate_trace_pairs(segments: List[List[int]], window: int) -> int:
 
 
 def _check_vram_budget(n_params_m: float, device: torch.device):
-    """V4 模型 VRAM 预算检查：469M 参数在 FP32 下约需 3.5GB+，显存不足时给出警告。"""
+    """模型 VRAM 预算检查：根据参数量估算所需显存，不足时给出警告。
+
+    - 27M 级模型（shehui-llama）: ~1.5GB（FP32 ~108MB 权重 + 激活）
+    - 470M 级模型（shenji-llama / shehui-llama-v4-archive）: ~3.0GB（FP32 ~1.88GB 权重 + 激活/碎片）
+    """
     if device.type != 'cuda':
         return
     try:
         free_gb = torch.cuda.mem_get_info()[0] / 1e9
-        # 469M 参数 FP32 ≈ 1.88GB 权重 + 激活/梯度/碎片 ≈ 3.0-3.5GB 安全余量
-        required_gb = 3.0 if n_params_m and n_params_m > 200 else 1.5
+        if n_params_m and n_params_m > 200:
+            required_gb = 3.0
+        elif n_params_m and n_params_m > 50:
+            required_gb = 2.0
+        else:
+            required_gb = 1.5
         if free_gb < required_gb:
             log('warn', f'VRAM 预算紧张: 空闲 {free_gb:.1f}GB < 建议 {required_gb:.1f}GB')
             log('warn', '建议: 关闭其它 GPU 程序、设置 TRACE_MODEL_DTYPE=fp16，或减少 window_size/max_segments')
@@ -159,17 +167,23 @@ def _estimate_trace_timeout_seconds(n_pairs: int, model_name: str, n_params_m: f
     """基于模型规模与观测吞吐，估算 TRACE 阶段所需秒数（保守值）。
 
     经验值（本地 RTX 3050 / 云端 RTX 5090 混合保守估计）:
-      - <= 50M params: ~300 pps
+      - <= 50M params (shehui-llama 27M): ~300 pps
       - <= 120M params: ~100 pps
-      - 大模型 469M+: ~10 pps（显存与算力瓶颈）
+      - 大模型 469M+ (shenji-llama / shehui-llama-v4-archive): ~10 pps（显存与算力瓶颈）
 
-    shehui-llama / shenji-llama 当前均为 ~470M / ~1.8GB 级模型，统一按大模型估算。
+    shehui-llama（27M 纯哲学版）为轻量模型，速率远高于 470M 级模型。
+    shehui-llama-v4-archive 与 shenji-llama 均为 ~470M 大模型。
     """
     params = n_params_m or 0
-    # 若未提供参数量，按模型名做保守兜底（shehui/shenji 都视为 470M）
+    # 若未提供参数量，按模型名做保守兜底
     name = (model_name or 'shehui-llama').lower()
-    if params == 0 and ('shehui' in name or 'shenji' in name):
-        params = 470.0
+    if params == 0:
+        if 'archive' in name:
+            params = 470.0       # shehui-llama-v4-archive: 旧版 470M
+        elif 'shenji' in name:
+            params = 470.0       # shenji-llama: 469M
+        elif 'shehui' in name:
+            params = 27.0        # shehui-llama: 27M 纯哲学版
 
     if params > 200:
         pps = 10
@@ -361,9 +375,17 @@ class ModelCache:
 
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-        # 加载前根据模型名估算 VRAM 预算（shehui/shenji 均为 ~470M / ~1.8GB，需要约 3.5GB+）
+        # 加载前根据模型名估算 VRAM 预算
+        # shehui-llama (27M): ~1.5GB | shenji-llama / shehui-llama-v4-archive (470M): ~3.0GB
         name_lower = model_name.lower()
-        estimated_params_m = 470.0 if ('shenji' in name_lower or 'shehui' in name_lower) else 100.0
+        if 'archive' in name_lower:
+            estimated_params_m = 470.0      # shehui-llama-v4-archive
+        elif 'shenji' in name_lower:
+            estimated_params_m = 470.0      # shenji-llama
+        elif 'shehui' in name_lower:
+            estimated_params_m = 27.0       # shehui-llama (27M 纯哲学版)
+        else:
+            estimated_params_m = 100.0      # 未知模型，保守估计
         _check_vram_budget(estimated_params_m, device)
 
         # 量化加载策略：默认优先 FP16（速度+显存双赢），失败自动回退 FP32
@@ -654,10 +676,11 @@ def run_super_job(job: dict):
     est_pairs = _estimate_trace_pairs(segments, window)
     est_seconds = _estimate_trace_timeout_seconds(est_pairs, model_name, n_params_m)
     # SUPER 模式不再以固定时间作为硬限制；timeout_ms 仅作为参考上限用于前端提示
-    # shehui / shenji 当前均为 ~470M 大模型，统一使用 30 分钟参考上限
+    # 470M 级模型（shenji-llama / shehui-llama-v4-archive）使用 30 分钟参考上限
+    # 27M 级模型（shehui-llama）速率极快，使用 10 分钟参考上限
     name_lower = model_name.lower()
-    is_large_llama = 'shehui' in name_lower or 'shenji' in name_lower
-    default_timeout = 3600000 if is_huge else (1800000 if is_large_llama else 300000)
+    is_large_llama = ('shenji' in name_lower) or ('archive' in name_lower)
+    default_timeout = 3600000 if is_huge else (1800000 if is_large_llama else 600000)
     timeout_ms = job.get('timeout_ms') or default_timeout
     log("info", f"耗时预估: {len(full_ids)} tokens -> 约 {est_pairs} 对因果计算，TRACE 阶段预计 {est_seconds:.0f}s (参考上限 {timeout_ms // 1000}s；可在前端主动停止)")
     if est_seconds * 1000 > timeout_ms * 0.7:

@@ -26,19 +26,23 @@ def _env_path(name: str) -> Path | None:
 def _is_portable_trace_root(path: Path) -> bool:
     """判断是否为成品/便携版 TRACE 根目录（模型直接放在根下）。
 
-    使用全小写目录名（shehui-llama / shenji-llama），与当前模型目录命名约定一致。
+    使用全小写目录名（shehui-llama / shenji-llama / shehui-llama-v4-archive），
+    与当前模型目录命名约定一致。至少需要 2 个模型目录才认定为根目录。
     """
-    return (
-        (path / "shehui-llama" / "model.safetensors").exists()
-        and (path / "shenji-llama" / "model.safetensors").exists()
+    models_found = sum(
+        (path / name / "model.safetensors").exists()
+        for name in ("shehui-llama", "shenji-llama", "shehui-llama-v4-archive")
     )
+    return models_found >= 2
 
 
 def _is_nested_engine_trace_root(path: Path) -> bool:
     """判断是否为层级目录布局：模型放在 path/trace-engine/models/ 下。"""
+    base = path / "trace-engine" / "models"
     return (
-        (path / "trace-engine" / "models" / "shehui-llama" / "model.safetensors").exists()
-        or (path / "trace-engine" / "models" / "shenji-llama" / "model.safetensors").exists()
+        (base / "shehui-llama" / "model.safetensors").exists()
+        or (base / "shenji-llama" / "model.safetensors").exists()
+        or (base / "shehui-llama-v4-archive" / "model.safetensors").exists()
     )
 
 

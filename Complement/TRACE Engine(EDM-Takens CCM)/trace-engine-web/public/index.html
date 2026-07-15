@@ -1054,8 +1054,9 @@
           <div class="model-device" id="superModelWrap" style="display:none;">
             <span class="k" title="SUPER 模式使用哪个训练好的 LLaMA 模型执行 token-level TRACE">// CORE_DRIVER</span>
             <select id="superModelSelect">
-              <option value="shehui-llama">Shehui-LLaMA TYPE-S</option>
-              <option value="shenji-llama">Shenji-LLaMA TYPE-X [EGG]</option>
+              <option value="shehui-llama">Shehui-LLaMA TYPE-S (27M / FAST)</option>
+              <option value="shenji-llama">Shenji-LLaMA TYPE-X (469M / 神学)</option>
+              <option value="shehui-llama-v4-archive">Shehui-LLaMA V4 [ARCHIVE] (470M / 旧版)</option>
             </select>
             <span id="modelBadge" class="model-badge speed">SPEED</span>
           </div>
@@ -1433,11 +1434,15 @@
 
     function updateModelBadge() {
       if (!modelBadge || !superModelSelect) return;
-      if (superModelSelect.value === 'shenji-llama') {
-        modelBadge.textContent = 'EGG / SLOW';
+      const v = superModelSelect.value;
+      if (v === 'shenji-llama') {
+        modelBadge.textContent = '469M / SLOW';
+        modelBadge.className = 'model-badge egg';
+      } else if (v === 'shehui-llama-v4-archive') {
+        modelBadge.textContent = '470M / ARCHIVE';
         modelBadge.className = 'model-badge egg';
       } else {
-        modelBadge.textContent = 'SPEED / FAST';
+        modelBadge.textContent = '27M / FAST';
         modelBadge.className = 'model-badge speed';
       }
     }

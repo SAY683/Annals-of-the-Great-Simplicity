@@ -77,7 +77,7 @@ sys.path.insert(0, ${JSON.stringify(skillDir)})
 try:
     from project_paths import resolve_paths
     p = resolve_paths()
-    for name in ['shehui-llama', 'shenji-llama', 'Shehui-LLaMA', 'Shenji-LLaMA']:
+    for name in ['shehui-llama', 'shenji-llama', 'shehui-llama-v4-archive', 'Shehui-LLaMA', 'Shenji-LLaMA']:
         d = p.model_dir(name)
         if d.exists() and (d / 'model.safetensors').exists():
             print(json.dumps({'id': name.lower(), 'name': name, 'path': str(d)}))
@@ -560,7 +560,7 @@ function validateAnalysisInput(text, mode, config) {
     if (mode === 'super' && config.model !== undefined) {
       const allowedModels = PROBED_LLAMA_MODELS.length > 0
         ? PROBED_LLAMA_MODELS.map((m) => m.id)
-        : ['shehui-llama'];
+        : ['shehui-llama', 'shenji-llama', 'shehui-llama-v4-archive'];
       if (!allowedModels.includes(config.model)) {
         return { ok: false, error: `SUPER 模式不支持模型 ${config.model}，可用: ${allowedModels.join(', ')}`, code: 'INVALID_MODEL', field: 'model' };
       }

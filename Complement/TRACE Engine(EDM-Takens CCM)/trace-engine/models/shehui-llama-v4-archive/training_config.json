@@ -1,0 +1,21 @@
+{
+  "preset": "heavy",
+  "model_type": "llama",
+  "n_layer": 10,
+  "n_embd": 384,
+  "n_head": 8,
+  "vocab_size": 2264,
+  "max_position_embeddings": 256,
+  "seed": 42,
+  "learning_rate": 0.0002449489742783178,
+  "batch_size": 12,
+  "grad_accum_steps": 4,
+  "effective_batch": 48,
+  "amp": true,
+  "compile": false,
+  "label_smoothing": 0.0,
+  "best_val_loss": 0.003072412102483213,
+  "best_epoch": 39,
+  "train_time_s": 617.7,
+  "data_path": "date/社会训练集_纯哲学"
+}

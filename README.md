@@ -210,10 +210,11 @@ Annals-of-the-Great-Simplicity/
 
 ### 模型体系
 
-| 模型 | 方向 | 魔搭（ModelScope） |
-| :--- | :--- | :--- |
-| **Shenji-LLaMA**（神机） | 神学/哲学文本生成与解析 | [🧩 魔搭](https://modelscope.cn/models/say101/TRACE-Engine-EDM-Takens-CCM-shenji-llama-470m) |
-| **Shehui-LLaMA**（社会） | 社会/伦理文本理解 | [🧩 魔搭](https://modelscope.cn/models/say101/TRACE-Engine-EDM-Takens-CCM-shehui-llama-470m) |
+| 模型 | 方向 | 大小 | 魔搭（ModelScope） |
+| :--- | :--- | :--- | :--- |
+| **Shenji-LLaMA**（神机） | 神学/哲学文本生成与解析 | 470M | [🧩 魔搭](https://modelscope.cn/models/say101/TRACE-Engine-EDM-Takens-CCM-shenji-llama-470m) |
+| **Shehui-LLaMA**（社会） | 社会/伦理文本理解 | 27M | [🧩 魔搭](https://modelscope.cn/models/say101/TRACE-Engine-EDM-Takens-CCM-shehui-llama-27m) |
+| **Shehui v4 Archive**（归档） | 旧版 · 仅保留配置 | 470M | 本地 `shehui-llama-v4-archive/` |
 
 ### 模型获取
 
@@ -223,8 +224,11 @@ Annals-of-the-Great-Simplicity/
 # 安装魔搭 CLI
 pip install modelscope
 
-# 下载模型（以神机为例）
+# 下载神机模型（470M）
 modelscope download say101/TRACE-Engine-EDM-Takens-CCM-shenji-llama-470m
+
+# 下载社会模型（27M，轻量版）
+modelscope download say101/TRACE-Engine-EDM-Takens-CCM-shehui-llama-27m
 
 # 将下载的模型文件 (.safetensors) 放置于对应目录：
 # trace-engine/models/shenji-llama/
@@ -232,6 +236,7 @@ modelscope download say101/TRACE-Engine-EDM-Takens-CCM-shenji-llama-470m
 ```
 
 > *魔搭（ModelScope）提供稳定快速的国内下载。*
+> *`shehui-llama-v4-archive/` 为旧版神机归档，仅保留配置供参考。*
 
 ### TRACE 引擎（EDM-Takens CCM）
 
