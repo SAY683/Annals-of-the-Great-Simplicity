@@ -43,14 +43,14 @@ def check_models(root: Path):
     except Exception:
         paths = None
 
-    for name in ['Shehui-LLaMA', 'Shenji-LLaMA']:
+    for name in ['shehui-llama', 'shenji-llama']:
         candidates = []
         if paths is not None:
             candidates.append(paths.model_dir(name))
         # 兼容历史布局：模型直接放在 trace-engine/ 根下
         candidates.append(root / name)
         # 兼容标准小写 models/ 子目录
-        candidates.append(root / 'models' / name.lower().replace('_', '-'))
+        candidates.append(root / 'models' / name)
 
         found = None
         for c in candidates:

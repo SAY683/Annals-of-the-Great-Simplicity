@@ -40,6 +40,9 @@ from typing import Any, Dict, List
 
 warnings.filterwarnings('ignore')
 
+# 大模型（469M+）在 Windows 小显存上容易因显存碎片 OOM，开启 expandable_segments 缓解
+os.environ.setdefault('PYTORCH_CUDA_ALLOC_CONF', 'expandable_segments:True')
+
 # ══════════════════════════════════════════════════════════════════════
 # 路径解析：从 trace-engine-web 定位到 trace-engine skill 目录
 # ══════════════════════════════════════════════════════════════════════
@@ -78,6 +81,7 @@ from transformers import LlamaForCausalLM
 
 from counterfactual_bridge import TRACE2DoWhy, DoWhy14Adapter
 from dowhy_auditor import DoWhyAuditor
+from presets import load_presets
 from project_paths import resolve_paths
 from six_warriors import assemble_all_six
 
@@ -93,6 +97,24 @@ def log(level: str, message: str):
     emit({"type": "log", "level": level, "message": message})
 
 
+def stats(processed: int, total: int, elapsed: float):
+    """ emit TRACE 实时速率与 ETA 统计。"""
+    rate = processed / elapsed if elapsed > 0 else 0.0
+    remaining = max(0, (total - processed) / rate) if rate > 0 else 0.0
+    progress = processed / total if total > 0 else 0.0
+    emit({
+        "type": "stats",
+        "stats": {
+            "processed_pairs": processed,
+            "total_pairs": total,
+            "rate": round(rate, 2),
+            "elapsed_seconds": round(elapsed, 1),
+            "remaining_seconds": round(remaining, 1),
+            "progress": round(progress, 2),
+        },
+    })
+
+
 def stage(name: str, message: str, progress: float = None):
     obj = {"type": "stage", "stage": name, "message": message}
     if progress is not None:
@@ -102,6 +124,60 @@ def stage(name: str, message: str, progress: float = None):
 
 def error(message: str):
     emit({"type": "error", "message": message})
+
+
+def _estimate_trace_pairs(segments: List[List[int]], window: int) -> int:
+    """估算 TRACE 阶段需要计算的总 token 对数（用于进度与耗时预估）。"""
+    total = 0
+    for seq in segments:
+        L = len(seq)
+        # 对每个 ti，候选历史长度 = min(window, ti)
+        total += sum(min(window, ti) for ti in range(1, L))
+    return max(1, total)
+
+
+def _check_vram_budget(n_params_m: float, device: torch.device):
+    """V4 模型 VRAM 预算检查：469M 参数在 FP32 下约需 3.5GB+，显存不足时给出警告。"""
+    if device.type != 'cuda':
+        return
+    try:
+        free_gb = torch.cuda.mem_get_info()[0] / 1e9
+        # 469M 参数 FP32 ≈ 1.88GB 权重 + 激活/梯度/碎片 ≈ 3.0-3.5GB 安全余量
+        required_gb = 3.0 if n_params_m and n_params_m > 200 else 1.5
+        if free_gb < required_gb:
+            log('warn', f'VRAM 预算紧张: 空闲 {free_gb:.1f}GB < 建议 {required_gb:.1f}GB')
+            log('warn', '建议: 关闭其它 GPU 程序、设置 TRACE_MODEL_DTYPE=fp16，或减少 window_size/max_segments')
+        else:
+            log('info', f'VRAM 预算 OK: 空闲 {free_gb:.1f}GB / 建议 {required_gb:.1f}GB')
+    except Exception:
+        pass
+
+
+def _estimate_trace_timeout_seconds(n_pairs: int, model_name: str, n_params_m: float = None) -> float:
+    """基于模型规模与观测吞吐，估算 TRACE 阶段所需秒数（保守值）。
+
+    经验值（本地 RTX 3050 / 云端 RTX 5090 混合保守估计）:
+      - <= 50M params: ~300 pps
+      - <= 120M params: ~100 pps
+      - 大模型 469M+: ~10 pps（显存与算力瓶颈）
+
+    shehui-llama / shenji-llama 当前均为 ~470M / ~1.8GB 级模型，统一按大模型估算。
+    """
+    params = n_params_m or 0
+    # 若未提供参数量，按模型名做保守兜底（shehui/shenji 都视为 470M）
+    name = (model_name or 'shehui-llama').lower()
+    if params == 0 and ('shehui' in name or 'shenji' in name):
+        params = 470.0
+
+    if params > 200:
+        pps = 10
+    elif params > 80:
+        pps = 50
+    elif params > 50:
+        pps = 100
+    else:
+        pps = 300
+    return n_pairs / pps
 
 
 class StageTimer:
@@ -282,10 +358,36 @@ class ModelCache:
         sp.load(spm_path)
 
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        model = LlamaForCausalLM.from_pretrained(str(model_dir)).to(device).eval()
+
+        # 加载前根据模型名估算 VRAM 预算（shehui/shenji 均为 ~470M / ~1.8GB，需要约 3.5GB+）
+        name_lower = model_name.lower()
+        estimated_params_m = 470.0 if ('shenji' in name_lower or 'shehui' in name_lower) else 100.0
+        _check_vram_budget(estimated_params_m, device)
+
+        # 量化加载策略：默认优先 FP16（速度+显存双赢），失败自动回退 FP32
+        model_dtype_env = os.environ.get('TRACE_MODEL_DTYPE', 'auto').lower()
+        effective_dtype = 'fp32'
+        load_kwargs = {}
+
+        if device.type == 'cuda' and model_dtype_env in ('auto', 'fp16', 'float16'):
+            try:
+                load_kwargs['torch_dtype'] = torch.float16
+                model = LlamaForCausalLM.from_pretrained(str(model_dir), **load_kwargs)
+                model = model.to(device)
+                effective_dtype = 'fp16'
+            except Exception as e:
+                log('warn', f'FP16 加载失败，回退 FP32: {e}')
+                load_kwargs = {}
+                model = LlamaForCausalLM.from_pretrained(str(model_dir), **load_kwargs).to(device)
+        else:
+            model = LlamaForCausalLM.from_pretrained(str(model_dir), **load_kwargs).to(device)
+
+        model.eval()
 
         n_params = sum(p.numel() for p in model.parameters()) / 1e6
-        log("info", f"模型 {model_name} 已加载: {n_params:.1f}M params, vocab={sp.get_piece_size()}, device={device}")
+        # 加载后根据实际参数量再次检查（更精确）
+        _check_vram_budget(n_params, device)
+        log("info", f"模型 {model_name} 已加载: {n_params:.1f}M params, vocab={sp.get_piece_size()}, device={device}, dtype={effective_dtype}")
 
         self._models[model_name] = model
         self._sps[model_name] = sp
@@ -299,8 +401,16 @@ TRACE_CACHE = {}  # text_hash -> (adj_matrix, tokens)
 # ══════════════════════════════════════════════════════════════════════
 # TRACE 因果发现（基于 LLaMA）
 # ══════════════════════════════════════════════════════════════════════
-def compute_trace(text: str, model, sp, window: int = 64, max_segments: int = 4):
-    """使用 LLaMA 模型计算 token-level ΔNLL 因果矩阵。"""
+def compute_trace(
+    text: str, model, sp, window: int = 64, max_segments: int = 4,
+    prune_min_freq: int = 1, max_candidates_per_step: int = 64
+):
+    """使用 LLaMA 模型计算 token-level ΔNLL 因果矩阵。
+
+    内部会定期发送 stage 进度事件与心跳日志，避免长文本推理时前端长时间无反馈。
+    支持 TRACE 剪枝：按历史频率过滤候选、限制每步最大候选数，以在几乎不影响
+    因果检出的前提下显著降低大模型推理量。
+    """
     device = next(model.parameters()).device
     MASK = sp.piece_to_id('<mask>')
     PAD = sp.pad_id()
@@ -317,11 +427,18 @@ def compute_trace(text: str, model, sp, window: int = 64, max_segments: int = 4)
         idxs = [0, len(segments) // 3, 2 * len(segments) // 3, len(segments) - 1]
         segments = [segments[i] for i in idxs if i < len(segments)]
 
+    n_segments = len(segments)
     all_raw_edges = defaultdict(list)
     all_tokens = []
 
     t0 = time.time()
+    total_pairs_est = _estimate_trace_pairs(segments, window)
     total_pairs = 0
+    processed_pairs = 0
+    last_progress = -1.0
+    last_progress_time = 0.0
+    last_heartbeat = t0
+    last_stats_time = t0
 
     for si, seq in enumerate(segments):
         L = len(seq)
@@ -329,18 +446,30 @@ def compute_trace(text: str, model, sp, window: int = 64, max_segments: int = 4)
         offset = len(all_tokens)
         all_tokens.extend(tokens)
 
-        log("info", f"TRACE segment {si+1}/{len(segments)}: {L} tokens")
+        log("info", f"TRACE segment {si+1}/{n_segments}: {L} tokens")
 
         tn = torch.tensor([seq], dtype=torch.long).to(device)
         with torch.no_grad():
             nl = model(tn).logits
 
         local_edges = 0
+        skipped_candidates_total = 0
         for ti in range(1, L):
             tid = seq[ti]
             hist_start = max(0, ti - window)
             history = seq[hist_start:ti]
             candidates = [t for t in set(history) if t not in (MASK, PAD)]
+            if not candidates:
+                continue
+
+            # TRACE 剪枝：按历史出现频率排序，过滤低频、截断高频 Top-K
+            if prune_min_freq > 1 or len(candidates) > max_candidates_per_step:
+                hist_counter = Counter(history)
+                candidates = [c for c in candidates if hist_counter[c] >= prune_min_freq]
+                candidates = sorted(candidates, key=lambda c: hist_counter[c], reverse=True)
+                if len(candidates) > max_candidates_per_step:
+                    skipped_candidates_total += (len(candidates) - max_candidates_per_step)
+                    candidates = candidates[:max_candidates_per_step]
             if not candidates:
                 continue
 
@@ -378,6 +507,19 @@ def compute_trace(text: str, model, sp, window: int = 64, max_segments: int = 4)
                             target_pos = offset + ti
                             all_raw_edges[(global_pos, target_pos)].append(dnl)
                             local_edges += 1
+                            processed_pairs += 1
+
+            # 进度与心跳：每 2% 或 30 秒汇报一次，避免前端/代理因长时间无数据断开连接
+            now = time.time()
+            if now - last_stats_time >= 3.0:
+                stats(processed_pairs, total_pairs_est, now - t0)
+                last_stats_time = now
+            progress = (si + ti / L) / n_segments if n_segments else 0
+            if (progress - last_progress >= 0.02 and now - last_progress_time >= 0.5) or now - last_heartbeat >= 30:
+                stage("trace", f"TRACE 计算中... segment {si+1}/{n_segments}, token {ti}/{L}, 已运行 {now - t0:.1f}s", round(progress, 2))
+                last_progress = progress
+                last_progress_time = now
+                last_heartbeat = now
 
         total_pairs += local_edges
         gc.collect()
@@ -385,7 +527,10 @@ def compute_trace(text: str, model, sp, window: int = 64, max_segments: int = 4)
             torch.cuda.empty_cache()
 
     elapsed = time.time() - t0
-    log("info", f"TRACE done: {total_pairs} pairs in {elapsed:.1f}s")
+    prune_info = f", skipped_candidates={skipped_candidates_total}" if skipped_candidates_total else ""
+    log("info", f"TRACE done: {total_pairs} pairs in {elapsed:.1f}s{prune_info}")
+    # 最终统计快照
+    stats(processed_pairs, total_pairs_est, elapsed)
 
     T = len(all_tokens)
     adj_matrix = np.zeros((T, T))
@@ -401,11 +546,39 @@ def compute_trace(text: str, model, sp, window: int = 64, max_segments: int = 4)
 # ══════════════════════════════════════════════════════════════════════
 # 完整 SUPER 管线
 # ══════════════════════════════════════════════════════════════════════
+def _merge_llama_presets(model_name: str, config: dict) -> dict:
+    """对 Shehui/Shenji-LLaMA V4 模型应用 llama 专项预设作为默认值。"""
+    name = (model_name or '').lower()
+    if 'shehui' not in name and 'shenji' not in name:
+        return dict(config)
+    try:
+        p = load_presets('llama')
+        defaults = {
+            'threshold': p.trace2dowhy.threshold,
+            'window_size': p.super.window_size,
+            'max_segments': p.super.max_segments,
+            'concept_min_freq': p.trace2dowhy.concept_min_freq,
+            'max_edges_for_dowhy': p.trace2dowhy.max_edges_for_dowhy,
+            'filter_mode': p.trace2dowhy.filter_mode,
+            'filter_percentile': p.trace2dowhy.filter_percentile,
+            'classical_mode': getattr(p.trace2dowhy, 'classical_mode', False),
+            'prune_min_freq': 1,
+            'max_candidates_per_step': 64,
+        }
+        merged = dict(defaults)
+        merged.update(config)
+        return merged
+    except Exception as e:
+        log('warn', f'加载 llama 预设失败，使用硬编码默认: {e}')
+        return dict(config)
+
+
 def run_super_job(job: dict):
     """执行一个 SUPER 模式任务并输出事件流。"""
     text = job.get('text', '')
     model_name = job.get('model', 'shehui-llama')
-    config = job.get('config', {})
+    raw_config = job.get('config', {})
+    config = _merge_llama_presets(model_name, raw_config)
     timer = StageTimer()
 
     if not text or not text.strip():
@@ -432,6 +605,23 @@ def run_super_job(job: dict):
         return
     timer.end()
 
+    # 1.2 模型规模感知：大模型（469M+）应用安全上限，同时尊重 llama 专项预设
+    n_params_m = sum(p.numel() for p in model.parameters()) / 1e6
+    is_huge = n_params_m > 200
+    log("info", f"模型规模: {n_params_m:.1f}M params, max_position={model.config.max_position_embeddings}")
+    if is_huge:
+        # FP16 量化后显存压力显著降低，允许 llama 预设的 window=128/max_segments=3
+        safe_window = 128
+        safe_segments = 3
+        if config.get('window_size', 64) > safe_window:
+            config = dict(config)
+            config['window_size'] = safe_window
+            log("warn", f"检测到超大模型（{n_params_m:.0f}M），window_size 已限制为 {safe_window}。")
+        if config.get('max_segments', 4) > safe_segments:
+            config = dict(config)
+            config['max_segments'] = safe_segments
+            log("warn", f"超大模型下 max_segments 已限制为 {safe_segments}，以减少重复推理。")
+
     # 1.5 输入数据质控 + 长度预检
     timer.begin("input_diagnostics")
     token_diagnostics = _compute_token_diagnostics(text, sp, model)
@@ -441,6 +631,31 @@ def run_super_job(job: dict):
     if token_diagnostics['n_tokens'] < min_tokens:
         error(f"输入文本过短，无法执行 token-level TRACE。当前 {token_diagnostics['n_tokens']} tokens，至少需要 {min_tokens} tokens。")
         return
+
+    # 1.6 耗时预检：在真正计算前告诉用户大致需要多久，避免长时间黑盒等待
+    window = config.get('window_size', 64)
+    max_segments = config.get('max_segments', 4)
+    MAX_POS = model.config.max_position_embeddings
+    full_ids = sp.encode(text, out_type=int)
+    segments = []
+    for i in range(0, len(full_ids), MAX_POS):
+        seg = full_ids[i:i + MAX_POS]
+        if len(seg) >= 16:
+            segments.append(seg)
+    if len(segments) > max_segments:
+        idxs = [0, len(segments) // 3, 2 * len(segments) // 3, len(segments) - 1]
+        segments = [segments[i] for i in idxs if i < len(segments)]
+    est_pairs = _estimate_trace_pairs(segments, window)
+    est_seconds = _estimate_trace_timeout_seconds(est_pairs, model_name, n_params_m)
+    # SUPER 模式不再以固定时间作为硬限制；timeout_ms 仅作为参考上限用于前端提示
+    # shehui / shenji 当前均为 ~470M 大模型，统一使用 30 分钟参考上限
+    name_lower = model_name.lower()
+    is_large_llama = 'shehui' in name_lower or 'shenji' in name_lower
+    default_timeout = 3600000 if is_huge else (1800000 if is_large_llama else 300000)
+    timeout_ms = job.get('timeout_ms') or default_timeout
+    log("info", f"耗时预估: {len(full_ids)} tokens -> 约 {est_pairs} 对因果计算，TRACE 阶段预计 {est_seconds:.0f}s (参考上限 {timeout_ms // 1000}s；可在前端主动停止)")
+    if est_seconds * 1000 > timeout_ms * 0.7:
+        log("warn", f"预估耗时接近 {timeout_ms // 60000} 分钟参考上限。作为研报级分析可继续等待；如无法接受，可随时在前端点击停止。亦可缩短文本、减小 window_size / max_segments，或切换到 DEEP 模式。")
     timer.end()
 
     # 2. TRACE 因果发现（带缓存）
@@ -457,7 +672,9 @@ def run_super_job(job: dict):
             adj_matrix, tokens = compute_trace(
                 text, model, sp,
                 window=config.get('window_size', 64),
-                max_segments=config.get('max_segments', 4)
+                max_segments=config.get('max_segments', 4),
+                prune_min_freq=config.get('prune_min_freq', 1),
+                max_candidates_per_step=config.get('max_candidates_per_step', 64)
             )
             if len(tokens) == 0:
                 error("TRACE 未产生有效 token 对，可能是文本过短或模型无法编码输入。")
@@ -475,12 +692,14 @@ def run_super_job(job: dict):
         bridge = TRACE2DoWhy(
             adj_matrix=adj_matrix,
             token_list=tokens,
-            threshold=config.get('threshold', 0.2),
+            threshold=config.get('threshold', 0.03),
             concept_min_freq=config.get('concept_min_freq', 2),
             max_edges_for_dowhy=config.get('max_edges_for_dowhy', 12),
             filter_mode=config.get('filter_mode', 'top_n'),
             filter_percentile=config.get('filter_percentile', 90),
             random_state=config.get('random_state', 42),
+            classical_mode=config.get('classical_mode', False),
+            max_concepts=config.get('max_concepts', 12),
         )
         bridge.aggregate_concepts()
         bridge.build_model()

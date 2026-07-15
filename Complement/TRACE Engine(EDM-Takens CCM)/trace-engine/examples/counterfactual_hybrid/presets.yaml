@@ -17,12 +17,13 @@
 # TRACE → DoWhy 桥接参数
 # ═══════════════════════════════════════════════════════
 trace2dowhy:
-  threshold: 0.5           # ΔNLL 因果边显著性阈值 {0.1-5.0}
+  threshold: 0.03          # ΔNLL 因果边显著性阈值 {0.001-5.0}；过拟合 LLaMA 模型 ΔNLL 偏低，默认取模型文档推荐标准值 0.03
   concept_min_freq: 2      # Token 最小出现次数 → 概念节点 {1-10}
   max_edges_for_dowhy: 8   # DoWhy DOT 图最大边数 {3-50}
   filter_mode: "topn"      # 边过滤模式 {topn, percentile, adaptive}
   filter_percentile: 85    # percentile 模式的百分位 {50-99}
   random_state: 42         # 随机种子
+  classical_mode: false    # 古汉语模式：true 时保留之/乎/者/也等虚词（Shenji 古文场景）
 
 # ═══════════════════════════════════════════════════════
 # DoWhy 因果推断参数
@@ -72,7 +73,7 @@ super:
 presets:
   demo:                    # 模拟数据演示 (零依赖)
     trace2dowhy:
-      threshold: 0.5
+      threshold: 0.03
       concept_min_freq: 2
       max_edges_for_dowhy: 8
 
@@ -115,3 +116,24 @@ presets:
     visualization:
       dpi: 300
       format: "svg"
+
+  llama:                    # TRACE LLaMA 过拟合专属模型 (Shenji V4 / Shehui V4)
+    trace2dowhy:
+      threshold: 0.01       # V4 过拟合模型 ΔNLL 在 0.000-0.160，0.01 捕获中等以上因果
+      concept_min_freq: 1   # 领域文本 token 频率低，放宽
+      max_edges_for_dowhy: 12
+      filter_mode: "topn"
+      classical_mode: false # Shenji 古文可设为 true，保留之/乎/者/也等虚词
+    counterfactual:
+      scan_top_n: 5
+      sem_regularization: "ridge"
+      sem_alpha: 0.01
+    auditor:
+      strict_mode: false    # 过拟合模型不适用严格的 N/V 比例检查
+      min_n_per_v_ratio: 2.0
+    super:
+      window_size: 128      # V4 seq=1024, 用更大窗口
+      max_segments: 3       # 469M 参数在 3050 上限制分段数
+    visualization:
+      dpi: 150
+      format: "png"

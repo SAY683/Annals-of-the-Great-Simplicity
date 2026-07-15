@@ -12,6 +12,7 @@ work/
 *.log
 
 # 模型文件（通常较大，不纳入版本控制）
+*.safetensors
 *.bin
 *.pt
 *.ckpt

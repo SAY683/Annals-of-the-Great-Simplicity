@@ -13,7 +13,7 @@ with open('sample_input.txt', 'rb') as f:
 parts.append(f'--{boundary}--'.encode())
 body = b'\r\n'.join(parts)
 
-conn = http.client.HTTPConnection('localhost', 3006, timeout=60)
+conn = http.client.HTTPConnection('localhost', 3000, timeout=60)
 conn.request('POST', '/api/analyze-file', body=body,
              headers={'Content-Type': f'multipart/form-data; boundary={boundary}'})
 resp = conn.getresponse()

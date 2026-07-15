@@ -144,6 +144,8 @@ const CONFIG = {
 
 // 活跃任务表（用于取消与状态查询）
 const activeJobs = new Map();
+// 活跃任务响应对象，用于取消时通知前端
+const activeJobResponses = new Map();
 // 已完成任务历史（启动时尝试从磁盘恢复）
 const jobHistory = [];
 // 结果缓存: key=hash(text+mode), value={id, timestamp}
@@ -225,11 +227,21 @@ function spawnLlamaWorker() {
 
   worker.on('close', (code) => {
     logToFile('warn', `LLaMA Worker 退出 (code=${code})，清理状态`);
+    // 通知当前关联的 SUPER 任务（若存在）
+    if (currentLlamaHandler && activeJobs.size > 0) {
+      const activeId = Array.from(activeJobs.keys()).find(() => true);
+      if (activeId) {
+        // 通过历史记录查找对应的 res 较复杂；这里依赖 runSuperAnalysisStream 内的 finish 兜底
+        recordJob(activeId, 'super', 'cancelled', `Worker 退出 code=${code}`);
+        activeJobs.delete(activeId);
+      }
+    }
     llamaWorker = null;
     llamaWorkerReady = false;
     llamaWorkerStarting = false;
     llamaWorkerBusy = false;
     currentLlamaHandler = null;
+    processJobQueue();
   });
 
   worker.on('error', (err) => {
@@ -462,9 +474,9 @@ app.options('*', (_req, res) => res.sendStatus(204));
 
 // 桥接参数 Schema（用于校验、文档、前端表单生成）
 // 优先从 trace-engine/build_bridge_schema.py 读取，与 engine presets.yaml 保持统一。
-function loadBridgeParamSchema() {
+function loadBridgeParamSchema(preset = null) {
   const fallback = {
-    threshold: { type: 'number', min: 0, max: 10, default: 0.5, description: '因果边显著性阈值' },
+    threshold: { type: 'number', min: 0, max: 10, default: 0.03, description: '因果边显著性阈值（过拟合 LLaMA 模型建议 0.01-0.05）' },
     window_size: { type: 'integer', min: 2, max: 256, default: 64, description: 'TRACE 滑动窗口大小' },
     max_segments: { type: 'integer', min: 1, max: 16, default: 4, description: 'LLaMA TRACE 最大分段数' },
     max_concepts: { type: 'integer', min: 1, max: 128, default: 12, description: '最大概念数' },
@@ -472,31 +484,53 @@ function loadBridgeParamSchema() {
     min_valid_tokens: { type: 'integer', min: 1, max: 10000, default: 10, description: '最小有效 token 数' },
     min_concepts: { type: 'integer', min: 2, max: 128, default: 3, description: '最小概念数' },
     max_edges_for_dowhy: { type: 'integer', min: 1, max: 100, default: 12, description: '传入 DoWhy 的最大边数' },
+    filter_mode: { type: 'string', default: 'topn', description: '边过滤模式 (topn / percentile / adaptive)' },
+    filter_percentile: { type: 'integer', min: 50, max: 99, default: 85, description: 'percentile 模式的百分位' },
+    random_state: { type: 'integer', min: 0, max: 999999, default: 42, description: '随机种子' },
+    classical_mode: { type: 'boolean', default: false, description: '古汉语模式（Shenji 古文保留之/乎/者/也等虚词）' },
+  };
+  const llamaFallback = {
+    threshold: { type: 'number', min: 0, max: 10, default: 0.01, description: '因果边显著性阈值（LLaMA V4 过拟合模型专属，建议 0.01-0.03）' },
+    window_size: { type: 'integer', min: 2, max: 256, default: 128, description: 'TRACE 滑动窗口大小（LLaMA V4 专属）' },
+    max_segments: { type: 'integer', min: 1, max: 16, default: 3, description: 'LLaMA TRACE 最大分段数（LLaMA V4 专属）' },
+    max_concepts: { type: 'integer', min: 1, max: 128, default: 12, description: '最大概念数' },
+    concept_min_freq: { type: 'integer', min: 1, max: 1000, default: 1, description: '概念最小出现频次（LLaMA V4 专属，放宽低频）' },
+    min_valid_tokens: { type: 'integer', min: 1, max: 10000, default: 10, description: '最小有效 token 数' },
+    min_concepts: { type: 'integer', min: 2, max: 128, default: 3, description: '最小概念数' },
+    max_edges_for_dowhy: { type: 'integer', min: 1, max: 100, default: 12, description: '传入 DoWhy 的最大边数' },
+    filter_mode: { type: 'string', default: 'topn', description: '边过滤模式 (topn / percentile / adaptive)' },
+    filter_percentile: { type: 'integer', min: 50, max: 99, default: 85, description: 'percentile 模式的百分位' },
+    random_state: { type: 'integer', min: 0, max: 999999, default: 42, description: '随机种子' },
+    classical_mode: { type: 'boolean', default: false, description: '古汉语模式（Shenji 古文保留之/乎/者/也等虚词）' },
   };
   const schemaScript = path.resolve(CONFIG.skillDir, '..', '..', 'build_bridge_schema.py');
+  const baseFallback = preset === 'llama' ? llamaFallback : fallback;
   if (!fs.existsSync(schemaScript)) {
-    return fallback;
+    return baseFallback;
   }
   try {
+    const args = [schemaScript, CONFIG.skillDir];
+    if (preset) args.push('--preset', preset);
     const result = require('child_process').spawnSync(
       CONFIG.pythonCmd,
-      [schemaScript, CONFIG.skillDir],
+      args,
       { encoding: 'utf-8', timeout: 15000, env: { ...process.env, PYTHONIOENCODING: 'utf-8' } }
     );
     if (result.status !== 0) {
       logToFile('warn', `build_bridge_schema.py 失败: ${result.stderr || 'unknown'}`);
-      return fallback;
+      return baseFallback;
     }
     const schema = JSON.parse(result.stdout);
-    logToFile('info', `已从 presets.yaml 加载桥接参数 Schema，共 ${Object.keys(schema).length} 项`);
+    logToFile('info', `已从 presets.yaml 加载桥接参数 Schema (${preset || 'default'})，共 ${Object.keys(schema).length} 项`);
     return schema;
   } catch (err) {
     logToFile('warn', `加载桥接参数 Schema 失败: ${err.message}`);
-    return fallback;
+    return baseFallback;
   }
 }
 
 const BRIDGE_PARAM_SCHEMA = loadBridgeParamSchema();
+const SUPER_BRIDGE_PARAM_SCHEMA = loadBridgeParamSchema('llama');
 
 // 参数校验辅助
 function validateAnalysisInput(text, mode, config) {
@@ -519,7 +553,8 @@ function validateAnalysisInput(text, mode, config) {
         return { ok: false, error: `SUPER 模式不支持模型 ${config.model}，可用: ${allowedModels.join(', ')}`, code: 'INVALID_MODEL', field: 'model' };
       }
     }
-    for (const [k, schema] of Object.entries(BRIDGE_PARAM_SCHEMA)) {
+    const schemaToValidate = mode === 'super' ? SUPER_BRIDGE_PARAM_SCHEMA : BRIDGE_PARAM_SCHEMA;
+    for (const [k, schema] of Object.entries(schemaToValidate)) {
       if (config[k] === undefined) continue;
       const v = config[k];
       if (schema.type === 'integer' && (!Number.isInteger(v) || v < schema.min || v > schema.max)) {
@@ -634,6 +669,7 @@ function runPythonAnalysisStream(text, outputId, mode, bridgeConfig, res) {
   if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true });
 
   recordJob(outputId, mode, 'running', null, { text, config: bridgeConfig || CONFIG.bridgeConfig || '' });
+  activeJobResponses.set(outputId, { res, mode });
   logToFile('info', `启动分析 job=${outputId} mode=${mode} text_len=${text.length}`);
 
   const args = [pyScript, skillDir, outDir, mode];
@@ -724,6 +760,7 @@ function runPythonAnalysisStream(text, outputId, mode, bridgeConfig, res) {
   py.on('close', (code) => {
     cleanupTimeout();
     activeJobs.delete(outputId);
+    activeJobResponses.delete(outputId);
     if (code !== 0) {
       const msg = `Python 进程异常退出 (code=${code})`;
       sendSSE(res, 'error', { message: msg });
@@ -738,6 +775,7 @@ function runPythonAnalysisStream(text, outputId, mode, bridgeConfig, res) {
   py.on('error', (err) => {
     cleanupTimeout();
     activeJobs.delete(outputId);
+    activeJobResponses.delete(outputId);
     sendSSE(res, 'error', { message: err.message });
     recordJob(outputId, mode, 'error', err.message);
     logToFile('error', `Python 启动错误 job=${outputId}: ${err.message}`);
@@ -756,10 +794,25 @@ async function runSuperAnalysisStream(text, outputId, bridgeConfig, res) {
 
   if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true });
   recordJob(outputId, 'super', 'running', null, { text, config: bridgeConfig || '' });
-  logToFile('info', `启动 SUPER 分析 job=${outputId} text_len=${text.length}`);
+  activeJobResponses.set(outputId, { res, mode: 'super' });
+  logToFile('info', `启动 SUPER 分析 job=${outputId} text_len=${text.length} model=${cfgObj?.model || 'shehui-llama'}`);
+
+  // SUPER 模式不再使用固定超时硬限制，改为实时速率/ETA + 用户主动停止
+  const modelNameLower = (cfgObj?.model || 'shehui-llama').toLowerCase();
+  const isLargeModel = modelNameLower.includes('shenji') || modelNameLower.includes('shehui');
+  // 保留 24 小时安全兜底，防止进程彻底失控；正常流程依赖用户主动停止
+  const superTimeoutMs = 24 * 60 * 60 * 1000;
+  if (isLargeModel) {
+    sendSSE(res, 'log', { level: 'warn', message: '当前 SUPER 模式使用 470M 级 LLaMA 模型（Shehui/Shenji 均为 1.88GB 左右），推理速度较慢。界面会实时显示处理速率与预计剩余时间；如无法接受等待时长，可随时点击“停止计算”。超大模型会自动限制 window_size≤32 / max_segments≤2 以控制显存与耗时。' });
+  }
 
   let timeoutId = null;
   let finished = false;
+  let lastStageName = 'init';
+  let lastStageTime = Date.now();
+  const taskStartTime = Date.now();
+  let keepAlive = null;
+
   const cleanupTimeout = () => {
     if (timeoutId) {
       clearTimeout(timeoutId);
@@ -771,8 +824,10 @@ async function runSuperAnalysisStream(text, outputId, bridgeConfig, res) {
     if (finished) return;
     finished = true;
     cleanupTimeout();
+    if (keepAlive) clearInterval(keepAlive);
     releaseLlamaWorker();
     activeJobs.delete(outputId);
+    activeJobResponses.delete(outputId);
     sendSSE(res, 'done', { code: doneCode });
     res.end();
     processJobQueue();
@@ -784,19 +839,26 @@ async function runSuperAnalysisStream(text, outputId, bridgeConfig, res) {
     llamaWorkerBusy = true;
 
     timeoutId = setTimeout(() => {
-      logToFile('warn', `SUPER 分析超时 job=${outputId}，强制终止`);
-      sendSSE(res, 'error', { message: `SUPER 分析超时（>${CONFIG.jobTimeoutMs}ms），已强制终止。模型推理耗时较长，可尝试缩短文本或切换到 DEEP 模式。` });
+      const elapsed = Date.now() - taskStartTime;
+      const stageDur = Date.now() - lastStageTime;
+      const msg = `SUPER 分析已运行超过 24 小时安全兜底。任务在 [${lastStageName}] 阶段停留约 ${stageDur}ms，总耗时 ${elapsed}ms。系统已强制终止；如仍需分析，请缩短文本、减小 window_size / max_segments、切换到 DEEP 模式，或检查模型/算力状态。`;
+      logToFile('warn', `SUPER 安全兜底触发 job=${outputId} model=${cfgObj?.model || 'shehui-llama'} stage=${lastStageName} elapsed=${elapsed}`);
+      sendSSE(res, 'error', { message: msg });
       recordJob(outputId, 'super', 'timeout');
       finish(124);
-    }, CONFIG.jobTimeoutMs);
+    }, superTimeoutMs);
 
     activeJobs.set(outputId, worker);
 
     currentLlamaHandler = (obj) => {
       if (obj.type === 'stage') {
+        lastStageName = obj.stage || lastStageName;
+        lastStageTime = Date.now();
         sendSSE(res, 'stage', obj);
       } else if (obj.type === 'log') {
         sendSSE(res, 'log', obj);
+      } else if (obj.type === 'stats') {
+        sendSSE(res, 'stats', obj.stats);
       } else if (obj.type === 'error') {
         cleanupTimeout();
         sendSSE(res, 'error', { message: obj.message });
@@ -837,9 +899,17 @@ async function runSuperAnalysisStream(text, outputId, bridgeConfig, res) {
       model: cfgObj && cfgObj.model ? cfgObj.model : 'shehui-llama',
       mode: 'super',
       config: cfgObj || {},
+      timeout_ms: superTimeoutMs,
     }) + '\n', 'utf-8');
+
+    // SSE 保活：每 30 秒发送一条注释，防止浏览器/代理因长时间无数据而断开连接
+    keepAlive = setInterval(() => {
+      if (finished) return;
+      try { res.write(':heartbeat\n\n'); } catch (_) {}
+    }, 30000);
   } catch (err) {
     cleanupTimeout();
+    if (keepAlive) clearInterval(keepAlive);
     sendSSE(res, 'error', { message: err.message });
     recordJob(outputId, 'super', 'error', err.message);
     logToFile('error', `SUPER 启动失败 job=${outputId}: ${err.message}`);
@@ -939,19 +1009,6 @@ function handleAnalyzeStream(req, res) {
 
 app.get('/api/analyze-stream', handleAnalyzeStream);
 app.post('/api/analyze-stream', handleAnalyzeStream);
-
-// 取消任务
-app.post('/api/cancel/:id', (req, res) => {
-  const py = activeJobs.get(req.params.id);
-  const existing = jobHistory.find((j) => j.id === req.params.id);
-  if (!py) {
-    return res.json({ success: false, message: '任务不存在或已结束' });
-  }
-  py.kill('SIGTERM');
-  activeJobs.delete(req.params.id);
-  recordJob(req.params.id, existing ? existing.mode : null, 'cancelled');
-  res.json({ success: true, message: '任务已取消' });
-});
 
 // 同步分析（旧接口，保留兼容，支持 mode 与 config）
 function runPythonAnalysisSync(text, outputId, mode = 'light', bridgeConfig = '') {
@@ -1125,6 +1182,44 @@ app.get('/api/jobs', (_req, res) => {
   });
 });
 
+// 主动取消正在运行的任务（支持 SUPER 模式常驻 Worker 与普通 Python 子进程）
+app.post('/api/cancel/:id', (req, res) => {
+  const id = req.params.id;
+  // 1. 若任务仍在队列中，直接移除
+  const queueIdx = jobQueue.findIndex((j) => j.id === id);
+  if (queueIdx >= 0) {
+    const removed = jobQueue.splice(queueIdx, 1)[0];
+    try { removed.res.end(); } catch (_) {}
+    recordJob(id, removed.mode, 'cancelled', '任务在队列中被取消');
+    logToFile('info', `任务在队列中取消 job=${id}`);
+    return res.json({ success: true, cancelled: true, reason: 'removed_from_queue' });
+  }
+
+  // 2. 若任务正在运行，终止对应进程并通知前端
+  const proc = activeJobs.get(id);
+  const jobRes = activeJobResponses.get(id);
+  if (!proc) {
+    return res.status(404).json({ success: false, error: '未找到运行中任务' });
+  }
+  try {
+    proc.kill('SIGTERM');
+  } catch (err) {
+    logToFile('warn', `取消任务 kill 失败 job=${id}: ${err.message}`);
+  }
+  activeJobs.delete(id);
+  activeJobResponses.delete(id);
+  if (jobRes) {
+    try {
+      sendSSE(jobRes.res, 'error', { message: '用户主动停止计算' });
+      sendSSE(jobRes.res, 'done', { code: 125 });
+      jobRes.res.end();
+    } catch (_) {}
+  }
+  recordJob(id, jobRes?.mode || 'unknown', 'cancelled', '用户主动停止');
+  logToFile('info', `用户主动取消任务 job=${id}`);
+  res.json({ success: true, cancelled: true, reason: 'process_terminated' });
+});
+
 
 
 // 磁盘空间检查（生产环境避免写满）
@@ -1173,12 +1268,13 @@ app.get('/api/config', (_req, res) => {
     success: true,
     config: { ...CONFIG, skillDir: CONFIG.skillDir },
     bridgeParamSchema: BRIDGE_PARAM_SCHEMA,
+    superBridgeParamSchema: SUPER_BRIDGE_PARAM_SCHEMA,
     modes: {
       light: { label: 'LIGHT', description: '快速 jieba 概念图 + 简化流程' },
       deep: { label: 'DEEP', description: '完整六战士 + 稳定性检查（jieba 概念图）' },
       super: { label: 'SUPER', description: 'LLaMA TRACE 模型驱动 + 完整六合一（最慢最准）', available: llamaAvailable && PROBED_LLAMA_MODELS.length > 0 },
     },
-    presets: ['default', 'sensitive', 'broad', 'deep'],
+    presets: ['default', 'sensitive', 'broad', 'deep', 'llama'],
     llamaModels: {
       default: 'shehui-llama',
       available: PROBED_LLAMA_MODELS,
@@ -1217,21 +1313,25 @@ app.get('/api/version', (_req, res) => {
 // 与 presets.yaml 中的 trace2dowhy + super 段对齐，便于多云参数穿透。
 app.get('/api/presets', (_req, res) => {
   const base = {
-    threshold: 0.5,
+    threshold: 0.03,
     window_size: 8,
     max_concepts: 12,
     concept_min_freq: 1,
+    min_concepts: 3,
+    min_valid_tokens: 10,
     max_edges_for_dowhy: 12,
     filter_mode: 'topn',
     filter_percentile: 85,
+    random_state: 42,
   };
   res.json({
     success: true,
     presets: {
-      default: { ...base, threshold: 0.5, window_size: 8, max_segments: 4, min_valid_tokens: 10 },
-      sensitive: { ...base, threshold: 0.3, window_size: 6, max_concepts: 16, concept_min_freq: 2, max_segments: 3, min_valid_tokens: 8 },
-      broad: { ...base, threshold: 0.8, window_size: 12, max_concepts: 24, max_segments: 6, min_valid_tokens: 12 },
-      deep: { ...base, threshold: 0.2, window_size: 8, max_concepts: 24, max_edges_for_dowhy: 15, filter_mode: 'percentile', filter_percentile: 80, max_segments: 4, min_valid_tokens: 10 },
+      default: { ...base, threshold: 0.03, window_size: 8, max_segments: 4, classical_mode: false, min_valid_tokens: 10 },
+      sensitive: { ...base, threshold: 0.3, window_size: 6, max_concepts: 16, concept_min_freq: 2, max_segments: 3, classical_mode: false, min_valid_tokens: 8 },
+      broad: { ...base, threshold: 0.8, window_size: 12, max_concepts: 24, max_segments: 6, classical_mode: false, min_valid_tokens: 12 },
+      deep: { ...base, threshold: 0.2, window_size: 8, max_concepts: 24, max_edges_for_dowhy: 15, filter_mode: 'percentile', filter_percentile: 80, max_segments: 4, classical_mode: false, min_valid_tokens: 10 },
+      llama: { threshold: 0.01, window_size: 128, max_segments: 3, max_concepts: 12, concept_min_freq: 1, max_edges_for_dowhy: 12, filter_mode: 'topn', filter_percentile: 85, random_state: 42, classical_mode: false, min_valid_tokens: 10 },
     },
   });
 });
@@ -1241,8 +1341,9 @@ app.get('/api/schema', (_req, res) => {
   res.json({
     success: true,
     schema: BRIDGE_PARAM_SCHEMA,
+    superSchema: SUPER_BRIDGE_PARAM_SCHEMA,
     modes: ['light', 'deep', 'super'],
-    presets: ['default', 'sensitive', 'broad', 'deep'],
+    presets: ['default', 'sensitive', 'broad', 'deep', 'llama'],
   });
 });
 

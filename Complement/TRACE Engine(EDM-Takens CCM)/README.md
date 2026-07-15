@@ -67,6 +67,10 @@ Web 界面提供三种分析模式：
 - **SUPER**：调用 `trace-engine/models/shehui-llama` 执行真正的 token-level TRACE 因果发现，再走完整六合一诊断（首次需加载模型，分析耗时视文本长度而定）
 
 > SUPER 模式由常驻 LLaMA Worker 处理，单线程顺序执行。模型文件较大，首次同步时自动复制到 `trace-engine/models/`。
+>
+> 模型规格：Shehui-LLaMA 与 Shenji-LLaMA 均为约 **470M 参数 / ~1.8GB** 的 safetensors 模型。建议在 NVIDIA 显卡空闲显存 **≥3.0GB** 的设备上运行；Web 端会自动尝试 FP16 加载并在显存不足时给出提示。
+>
+> 参数预设：Web 界面提供 **LLAMA** 预设（`threshold=0.01, window_size=128, max_segments=3`），专为 V4 过拟合模型设计。分析 Shenji 古文时可开启 `classical_mode=true`，保留 之/乎/者/也 等虚词。
 
 ### 4. 停止服务
 
@@ -102,3 +106,5 @@ python run_cli.py --text "你的因果分析文本"
 - 服务启动失败：检查 `work/server.log` 与 `work/start.log`
 - Python 依赖缺失：运行 `pip install -r trace-engine/requirements.txt`
 - 端口冲突：脚本会自动尝试 3000-3020，或手动设置 `PORT` 环境变量
+- SUPER 模式加载模型慢/OOM：关闭其它占用显存的程序，或在环境变量中设置 `TRACE_MODEL_DTYPE=fp32` 强制 FP32；必要时缩短文本或减小 `window_size`/`max_segments`
+- Shehui-LLaMA 输出 0 条因果边：这是当前模型权重对 TRACE mask 干预不敏感导致，可尝试切换到 Shenji-LLaMA 或改用 DEEP 模式；代码与阈值本身无异常

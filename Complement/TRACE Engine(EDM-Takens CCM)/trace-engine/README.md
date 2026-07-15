@@ -47,13 +47,41 @@ python tests/test_skill.py
 
 See [trace-engine-web/README.md](../trace-engine-web/README.md).
 
+## Model-Specific Presets
+
+`examples/counterfactual_hybrid/presets.yaml` now includes a `llama` preset tuned for the over-fitted Shehui/Shenji-LLaMA V4 models (~470M params / ~1.8GB weights):
+
+```bash
+cd examples/counterfactual_hybrid
+python run_cli.py --text "..." --preset llama
+```
+
+Key differences from the Qwen-oriented defaults:
+
+| Parameter | Qwen-oriented default | `llama` preset | Reason |
+|-----------|----------------------|----------------|--------|
+| `threshold` | 0.3–0.5 | **0.01** | V4 ΔNLL range is ~0–0.16 |
+| `window_size` | 8–64 | **128** | V4 was trained with seq_len=1024 |
+| `max_segments` | 4 | **3** | Limits runtime on consumer GPUs |
+| `concept_min_freq` | 2–3 | **1** | Domain tokens are sparse |
+| `classical_mode` | false | false (toggleable) | Keep `true` for Shenji classical Chinese |
+
+Use `classical_mode=true` when analysing Shenji-style classical Chinese texts so that function words such as 之/乎/者/也 are retained as concepts.
+
+VRAM budget: the 470M models need about **3.0GB+ free GPU memory**. The Web SUPER mode automatically attempts FP16 loading and falls back to FP32; set `TRACE_MODEL_DTYPE=fp32` to force FP32.
+
+> Known model issue: current Shehui-LLaMA weights appear insensitive to TRACE mask interventions and may report `0` non-zero causal edges even with `threshold=0.01`. Shenji-LLaMA usually returns edges under the same preset. This is a model-weight/training observation, not a code or threshold bug.
+
 ## Project Layout
 
 ```
 trace-engine/
 ├── SKILL.md                          ← Master architecture & quick start
 ├── DESIGN.md                         ← Design philosophy & six instruments
+├── README.md                         ← This file
 ├── requirements.txt                  ← Python dependencies
+├── health_check.py                   ← Standalone health check
+├── build_bridge_schema.py            ← Generate bridge parameter schema from presets.yaml
 ├── tests/
 │   └── test_skill.py                 ← Self-test suite
 ├── examples/

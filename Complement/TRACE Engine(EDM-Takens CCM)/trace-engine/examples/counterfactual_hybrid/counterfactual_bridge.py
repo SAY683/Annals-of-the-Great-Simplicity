@@ -521,6 +521,8 @@ class TRACE2DoWhy:
         sem_regularization: Optional[str] = None,
         sem_alpha: float = 0.01,
         min_concept_len: Optional[int] = None,
+        classical_mode: bool = False,
+        max_concepts: int = 0,
     ):
         self.adj_matrix = np.asarray(adj_matrix)
         self.token_list = list(token_list)
@@ -532,8 +534,12 @@ class TRACE2DoWhy:
 
         # v3: 自适应过滤参数
         self.max_edges_for_dowhy = max_edges_for_dowhy
-        self.filter_mode = filter_mode
+        # 统一 filter_mode 命名：presets.yaml / Web 使用 'topn'，bridge 内部使用 'top_n'
+        self.filter_mode = "top_n" if filter_mode == "topn" else filter_mode
         self.filter_percentile = filter_percentile
+
+        # v9: 最大概念数上限（0 表示不限制）。用于 SUPER 模式 token-level 图防止概念爆炸。
+        self.max_concepts = max(0, int(max_concepts))
 
         # v3.5: SEM 正则化参数
         self.sem_regularization = sem_regularization
@@ -541,6 +547,9 @@ class TRACE2DoWhy:
 
         # v7: 概念最小长度（自动探测：字级 BPE 保留单字，词级 BPE 过滤单字碎片）
         self.min_concept_len = min_concept_len
+
+        # v8: 古汉语模式（Shenji 古文保留之/乎/者/也等虚词）
+        self.classical_mode = classical_mode
 
         # 管线状态
         self.concept_map: dict = {}
@@ -599,7 +608,7 @@ class TRACE2DoWhy:
             # 启发式：即使 BPE 被判定为字级，只要有效 token 中有一定比例多字词，
             # 也按词级处理（过滤单字碎片）。这能避免词级模型在跨域文本上产生
             # 大量 "永"/"恒"/"目" 等无意义单字概念。
-            valid_tokens = [t for t in self.token_list if is_valid_concept(t)]
+            valid_tokens = [t for t in self.token_list if is_valid_concept(t, classical_mode=self.classical_mode)]
             total_valid = max(len(valid_tokens), 1)
             multi_char_ratio = sum(1 for t in valid_tokens if len(t.strip()) >= 2) / total_valid
             if multi_char_ratio > 0.15:
@@ -615,8 +624,18 @@ class TRACE2DoWhy:
 
         high_freq = {t for t, c in token_counter.items()
                      if c >= self.concept_min_freq
-                     and is_valid_concept(t)
+                     and is_valid_concept(t, classical_mode=self.classical_mode)
                      and len(t.strip()) >= min_len}
+
+        # v9: 如果概念数超过上限，仅保留频率最高的前 N 个 token 作为独立概念
+        if self.max_concepts > 0 and len(high_freq) > self.max_concepts:
+            sorted_tokens = sorted(
+                high_freq,
+                key=lambda t: token_counter[t],
+                reverse=True,
+            )
+            high_freq = set(sorted_tokens[:self.max_concepts])
+            self._log(f"概念数超过上限 {self.max_concepts}，已按频率截断至 {len(high_freq)} 个高频概念")
 
         concept_map = {}
         for i, tok in enumerate(self.token_list):
@@ -707,7 +726,7 @@ class TRACE2DoWhy:
         # 策略: 过滤 BPE 碎片 + top-N 最强边
         # (is_valid_concept 统一从 _token_filters 导入)
 
-        edges_filtered = [e for e in edges if is_valid_concept(e[0]) and is_valid_concept(e[1])]
+        edges_filtered = [e for e in edges if is_valid_concept(e[0], classical_mode=self.classical_mode) and is_valid_concept(e[1], classical_mode=self.classical_mode)]
 
         n_total = len(edges_filtered)
         if n_total > self.max_edges_for_dowhy:
@@ -727,7 +746,7 @@ class TRACE2DoWhy:
         # DOT 图 — 只包含有效边中出现的节点（否则 DoWhy 在大图上极慢/崩溃）
         dot_nodes = set()
         for src, dst, _ in edges_filtered:
-            if is_valid_concept(src) and is_valid_concept(dst):
+            if is_valid_concept(src, classical_mode=self.classical_mode) and is_valid_concept(dst, classical_mode=self.classical_mode):
                 dot_nodes.add(src)
                 dot_nodes.add(dst)
         dot_lines = ["digraph {"]

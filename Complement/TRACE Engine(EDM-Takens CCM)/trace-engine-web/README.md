@@ -45,7 +45,7 @@ npm install
 npm start
 ```
 
-服务默认监听 `http://localhost:3000`，端口被占用时自动尝试 3001–3020。
+服务默认监听 `http://localhost:3000`。如需更换端口，请设置环境变量 `PORT`。
 
 ## 使用界面
 
@@ -55,7 +55,7 @@ npm start
 2. 选择分析模式：
    - **LIGHT**：快速因果推断（TRACE + DoWhy 核心流程，约 1–3 秒）
    - **DEEP**：完整六战士深度诊断（额外执行 CCM、EDM、HAVOK、causallearn PC/GES，预计 10–60 秒或更长）
-   - **SUPER**：LLaMA 模型驱动的真正 token-level TRACE 因果发现 + 完整六合一诊断。默认使用 **Shehui-LLaMA**，可切换彩蛋模型 **Shenji-LLaMA**。
+   - **SUPER**：LLaMA 模型驱动的真正 token-level TRACE 因果发现 + 完整六合一诊断。默认使用 **shehui-llama**，可切换 **shenji-llama**。两者均为 ~470M 参数 / ~1.8GB safetensors 的大模型，推理速度较慢，适合研报级分析。分析前可在「参数预设」中选择 **LLAMA**（`threshold=0.01, window_size=128, max_segments=3`），或在高级参数中开启 `classical_mode=true` 以保留 Shenji 古文中的之/乎/者/也等虚词。
 3. 点击 `> RUN_ANALYSIS`
 4. 右侧终端面板会实时显示分析阶段与日志
 5. 进度条同步展示当前阶段（分词 → 构图 → 识别 → 估计 → 反驳 → 反事实扫描 → [DEEP] 六战士诊断 → [DEEP] 稳定性分析 → 报告生成）
@@ -74,7 +74,7 @@ npm start
    - 六战士诊断卡片（可展开 raw metrics）
 7. 可点击 `> OPEN_REPORT.md` 或 `> OPEN_RESULT.json` 查看详细报告
 8. 右上角 **SCALE** 滑块可整体放大/缩小 UI（75%–150%，默认 105%，自动保存到 localStorage），点击 RESET 恢复默认
-9. 支持 **拖拽上传** 文本文件，支持 **参数预设**（DEFAULT / SENSITIVE / BROAD / DEEP）
+9. 支持 **拖拽上传** 文本文件，支持 **参数预设**（DEFAULT / SENSITIVE / BROAD / DEEP / LLAMA）
 10. 任务历史面板支持 **EXPORT** 导出 JSON 与 **CLEAR** 清空
 
 ## 技术架构
@@ -106,8 +106,8 @@ SUPER 模式使用独立的常驻 Python Worker [`llama_worker.py`](./llama_work
 - **任务串行**：单 Worker 顺序处理 SUPER 任务，通过内存队列避免并发冲突
 - **路径自动探测**：支持开发布局（`TRACE/models/<name>`）与层级成品布局（`trace-engine/models/<name>`）
 - **运行诊断**：输出环境健康（Python/PyTorch/CUDA/VRAM/模型目录）、输入数据质控（token 数/UNK 率/分段数）、算法充分性研判
-- **模型切换**：默认 `Shehui-LLaMA`（快速），可选彩蛋 `Shenji-LLaMA`（慢但 loss 更低）
-- **接口限制**：SUPER 模式仅支持 `/api/analyze-stream` 流式接口；`/api/analyze-text`、`/api/analyze-file`、`/api/retry/:id` 等同步接口会返回 `SUPER_REQUIRES_STREAM`，请在前端重新提交分析。
+- **模型切换**：默认 `shehui-llama`，可选 `shenji-llama`。两者规模相同（~470M / ~1.8GB），实际速率取决于 GPU 显存与算力；当前实现中 shenji-llama 对 TRACE mask 干预更敏感，通常能检出非零因果边，而 shehui-llama 可能输出全零 ΔNLL（与模型权重/训练有关，非代码或阈值问题）。
+- **接口限制**：SUPER 模式仅支持 `/api/analyze-stream` 流式接口；`/api/analyze-text`、`/api/analyze-file` 会返回 `SUPER_REQUIRES_STREAM`。`/api/retry/:id` 会返回 `SUPER_RETRY_NOT_SUPPORTED`，请在前端重新提交分析。
 
 ### 后端端点
 
@@ -234,7 +234,7 @@ trace-engine-web/
 - **响应式 UI**：CSS `clamp()` + `--ui-scale` 变量 + SCALE 滑块（默认 105%），适配多种浏览器缩放偏好
 - **结果缓存**：相同文本+模式在内存中复用结果，减少重复计算
 - **并发控制**：最大并发任务数可配置，超额任务自动入队
-- **超时保护**：单次分析默认 5 分钟超时，防止资源耗尽
+- **超时保护**：LIGHT / DEEP 单次分析默认 5 分钟超时；SUPER 模式已取消固定超时，改为 24 小时安全兜底 + 前端主动停止（`POST /api/cancel/:id`），避免大模型长文本被误杀
 - **日志持久化**：服务端运行日志写入 `work/server.log`
 - **任务历史**：`/api/jobs` 可查看活跃任务与最近 50 条历史
 - **队列状态**：`/api/queue` 可查看当前并发与排队任务
@@ -243,7 +243,7 @@ trace-engine-web/
 - **可配置桥接器**：通过 `TRACE_BRIDGE_CONFIG` 可调整阈值、窗口大小、最大概念数等参数
 - **POST 流式接口**：`/api/analyze-stream` 支持 POST，避免长文本 URL 长度限制
 - **CORS 支持**：便于多云/跨域部署
-- **参数预设**：前端一键切换 DEFAULT / SENSITIVE / BROAD / DEEP 场景
+- **参数预设**：前端一键切换 DEFAULT / SENSITIVE / BROAD / DEEP / LLAMA 场景
 - **任务历史管理**：支持导出 JSON 与清空，记录耗时与完成时间
 - **服务版本识别**：`/api/version` 便于负载均衡与多云探针
 - **请求追踪 ID**：每个请求附带 `traceId`，错误响应与日志可串联定位
@@ -265,10 +265,10 @@ trace-engine-web/
 | `TRACE_MAX_TEXT_LENGTH` | `500000` | 单次分析最大文本长度 |
 | `TRACE_PYTHON_CMD` | `python` | Python 可执行文件命令 |
 | `TRACE_MAX_CONCURRENT` | `2` | 最大并发分析任务数 |
-| `TRACE_JOB_TIMEOUT_MS` | `300000` | 单次分析超时时间（毫秒） |
+| `TRACE_JOB_TIMEOUT_MS` | `300000` | LIGHT / DEEP 单次分析超时时间（毫秒）；SUPER 模式不受此变量约束 |
 | `TRACE_BRIDGE_CONFIG` | `''` | 传给 Python 桥接器的 JSON 配置（阈值、窗口、最大概念数等） |
 | `TRACE_ROOT` | 自动探测 | 显式指定 TRACE 项目根目录（含 models/） |
-| `TRACE_ENGINE_SKILL_DIR` | `../trace-engine/examples/counterfactual_hybrid` | Skill 目录路径 |
+| `TRACE_MODEL_DTYPE` | `auto` | SUPER 模式模型加载精度：`auto` 默认 CUDA 优先 FP16，失败回退 FP32；设为 `fp32` 强制 FP32 |
 | `TRACE_CORS_ORIGIN` | `*` | CORS 允许来源（多云/跨域部署） |
 | `TRACE_WEB_VERSION` | `1.1.0` | 服务版本号（用于多云识别） |
 

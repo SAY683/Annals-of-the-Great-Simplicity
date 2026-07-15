@@ -26,6 +26,9 @@ _CN_STOP_CHARS = set(
     "让令叫使被把给由在从向往朝到至于"
 )
 
+# 古汉语虚词/语法字：在 classical_mode 下保留，避免过滤掉 Shenji 古文中的重要因果信号
+_CLASSICAL_KEEP_CHARS = set("之乎者也矣焉哉邪与")
+
 # 中文常见虚词/连接词/语法词/代词（多字 BPE 亦需过滤）
 _CN_STOP_WORDS = {
     # 连接词
@@ -96,7 +99,7 @@ for _cp in (
     PUNCT_SET.add(chr(_cp))
 
 
-def is_valid_concept(name: str) -> bool:
+def is_valid_concept(name: str, classical_mode: bool = False) -> bool:
     """
     判断 token/concept 名称是否适合进入因果图。
     过滤条件:
@@ -104,7 +107,7 @@ def is_valid_concept(name: str) -> bool:
       - SentencePiece 前缀 ▁
       - 纯标点
       - 纯数字
-      - 单字中文虚词
+      - 单字中文虚词（classical_mode=True 时保留古汉语虚词，适用于 Shenji 古文）
       - <other> 聚合桶
     """
     if not name or name in BPE_FRAGMENTS:
@@ -131,7 +134,10 @@ def is_valid_concept(name: str) -> bool:
 
     # 字级 BPE: 单字虚词
     if len(stripped) == 1 and stripped in _CN_STOP_CHARS:
-        return False
+        if classical_mode and stripped in _CLASSICAL_KEEP_CHARS:
+            pass  # 古汉语模式下保留之/乎/者/也等虚词
+        else:
+            return False
 
     # 多字 BPE / 词级: 常见虚词/连接词/语法词
     if stripped in _CN_STOP_WORDS:

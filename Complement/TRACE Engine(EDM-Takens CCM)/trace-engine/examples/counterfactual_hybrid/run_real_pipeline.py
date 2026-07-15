@@ -1,11 +1,11 @@
 """
 Real-Data Six-in-One Pipeline
 ===============================
-使用已训练的 Shehui-LLaMA 模型，在真实 TRACE Skill 案例文本上
+使用已训练的 shehui-llama / shenji-llama 模型，在真实 TRACE Skill 案例文本上
 运行完整的六合一管线（TRACE → DoWhy → Counterfactual → Auditor → Viz）。
 
 输入: TRACE Skill 案例文本 (自动检测)
-模型: Shehui-LLaMA (15.7M, 8L/320d, vocab=4000, loss=0.01)
+模型: ~470M params, 36L/896d, ~1.8GB safetensors, max_position_embeddings=1024
 
 路径解析: 自动检测项目根目录（无需硬编码路径）
 """
@@ -55,10 +55,28 @@ sys.path.insert(0, str(BRIDGE_DIR))
 from counterfactual_bridge import TRACE2DoWhy, DoWhy14Adapter, _DOWHY_AVAILABLE
 from dowhy_auditor import DoWhyAuditor
 from enhanced_viz import render_dashboard
+from presets import load_presets
 
 
 def log(msg):
     print(f"  {msg}", flush=True)
+
+
+def _check_vram_budget(n_params_m: float, device: torch.device):
+    """V4 模型 VRAM 预算检查：469M 参数在 FP32 下约需 3.5GB+，显存不足时给出警告。"""
+    if device.type != "cuda":
+        return
+    try:
+        free_gb = torch.cuda.mem_get_info()[0] / 1e9
+        # 469M 参数 FP32 ≈ 1.88GB 权重 + 激活/梯度/碎片 ≈ 3.0-3.5GB 安全余量
+        required_gb = 3.0 if n_params_m > 200 else 1.5
+        if free_gb < required_gb:
+            log(f"⚠ VRAM 预算紧张: 空闲 {free_gb:.1f}GB < 建议 {required_gb:.1f}GB")
+            log("  建议: 关闭其它 GPU 程序、启用 FP16 量化（llama_worker.py 设置 TRACE_MODEL_DTYPE=fp16），或减少 window_size/max_segments")
+        else:
+            log(f"VRAM 预算 OK: 空闲 {free_gb:.1f}GB / 建议 {required_gb:.1f}GB")
+    except Exception:
+        pass
 
 
 def main():
@@ -66,6 +84,10 @@ def main():
     print("  Real-Data Six-in-One Pipeline")
     print(f"  Model: Shehui-LLaMA  |  Text: {TEXT_FILE.name}")
     print("=" * 60)
+
+    # 加载 LLaMA V4 专项预设（ΔNLL 范围与 Qwen 不同，需要更宽松的阈值）
+    p = load_presets("llama")
+    log(f"Preset: llama | threshold={p.trace2dowhy.threshold} | window_size={p.super.window_size}")
 
     # ═══════════════════════════════════════════════════════════════
     # Step 0: Load model + data
@@ -80,9 +102,20 @@ def main():
     sp.load(os.path.join(tmp, "spm.model"))
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    # 加载前根据模型目录名估算规模，做 VRAM 预算检查
+    # shehui-llama / shenji-llama 当前均为 ~470M / ~1.8GB safetensors，统一按大模型处理
+    model_name_lower = str(MODEL_DIR).lower()
+    estimated_params_m = 470.0 if ("shenji" in model_name_lower or "shehui" in model_name_lower) else 100.0
+    _check_vram_budget(estimated_params_m, device)
+
     model = LlamaForCausalLM.from_pretrained(str(MODEL_DIR)).to(device).eval()
-    log(f"Model: {sum(p.numel() for p in model.parameters())/1e6:.1f}M params, "
+    n_params_m = sum(p.numel() for p in model.parameters()) / 1e6
+    log(f"Model: {n_params_m:.1f}M params, "
         f"vocab={sp.get_piece_size()}, device={device}")
+
+    # 加载后根据实际参数量再次检查（更精确）
+    _check_vram_budget(n_params_m, device)
 
     text = open(str(TEXT_FILE), 'r', encoding='utf-8').read().strip()
     log(f"Text: {len(text):,} chars")
@@ -94,7 +127,7 @@ def main():
 
     MASK = sp.piece_to_id('<mask>')
     PAD = sp.pad_id()
-    MAX_POS = model.config.max_position_embeddings  # 256
+    MAX_POS = model.config.max_position_embeddings  # 当前模型为 1024
 
     # Tokenize into segments
     full_ids = sp.encode(text, out_type=int)
@@ -138,7 +171,7 @@ def main():
         local_edges = 0
         for ti in range(1, L):
             tid = seq[ti]
-            hist_start = max(0, ti - 64)  # window=64
+            hist_start = max(0, ti - p.super.window_size)  # 使用 llama 预设窗口
             history = seq[hist_start:ti]
 
             candidates = [t for t in set(history) if t not in (MASK, PAD)]
@@ -210,12 +243,15 @@ def main():
     # ═══════════════════════════════════════════════════════════════
     print("\n[Step 2] TRACE → DoWhy Bridge...")
 
+    # classical_mode 由 trace2dowhy 预设控制；显式取出后，其余参数用 ** 展开
+    trace_kwargs = dict(p.trace2dowhy)
+    classical_mode = trace_kwargs.pop('classical_mode', False)
     bridge = TRACE2DoWhy(
         adj_matrix=adj_matrix,
         token_list=all_tokens,
-        threshold=0.2,  # Real TRACE data has lower ΔNLL than simulated
-        concept_min_freq=2,
         random_state=42,
+        classical_mode=classical_mode,
+        **trace_kwargs,
     )
     bridge.aggregate_concepts()
     log(f"  Concepts: {[n for n in bridge.concept_names if n != '<other>' and len(n)>1][:15]}")
@@ -250,7 +286,7 @@ def main():
     # Step 3: Auditor
     # ═══════════════════════════════════════════════════════════════
     print("\n[Step 3] DoWhy Auditor...")
-    auditor = DoWhyAuditor(bridge)
+    auditor = DoWhyAuditor(bridge, **p.auditor)
     report = auditor.audit('full')
     report.print_report()
 

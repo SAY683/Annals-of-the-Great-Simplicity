@@ -4,7 +4,7 @@
 
 ## Analysis
 
-KV cache optimization was tested on Shehui-LLaMA (15.7M params, 8L/320d).
+KV cache optimization was originally tested on an early small prototype (~15.7M params, 8L/320d). Current production models are shehui-llama / shenji-llama (~470M params, 36L/896d, ~1.8GB safetensors).
 
 Result: KV-Cache version was 10x SLOWER than standard batch TRACE.
 

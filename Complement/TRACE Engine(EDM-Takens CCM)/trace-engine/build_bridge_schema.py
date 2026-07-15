@@ -28,79 +28,109 @@ def parse_range(comment: str):
 def infer_type(value, min_val, max_val):
     if isinstance(value, bool):
         return 'boolean'
-    if isinstance(value, int) or (min_val is not None and min_val == int(min_val) and max_val is not None and max_val == int(max_val)):
+    if isinstance(value, int):
         return 'integer'
-    return 'number' if isinstance(value, (int, float)) else 'string'
+    if isinstance(value, float):
+        return 'number'
+    # 仅当值本身无法判断类型时，才用范围推断数值类型
+    if min_val is not None and max_val is not None:
+        if min_val == int(min_val) and max_val == int(max_val):
+            return 'integer'
+        return 'number'
+    return 'string'
 
 
-def load_presets_yaml(path: Path) -> dict:
+def load_presets_yaml(skill_dir: Path) -> dict:
+    """加载 presets.yaml，优先使用 skill 目录下的 presets.py 解析器。"""
+    presets_py = skill_dir / 'presets.py'
+    if presets_py.exists():
+        import sys
+        skill_dir_str = str(skill_dir)
+        if skill_dir_str not in sys.path:
+            sys.path.insert(0, skill_dir_str)
+        try:
+            from presets import load_yaml_presets
+            return load_yaml_presets()
+        except Exception:
+            pass
     try:
         import yaml
-        return yaml.safe_load(path.read_text(encoding='utf-8'))
+        yaml_path = skill_dir / 'presets.yaml'
+        return yaml.safe_load(yaml_path.read_text(encoding='utf-8'))
     except Exception:
-        # 无 PyYAML 时做极简 YAML 解析（仅支持 key: value 单层）
-        data = {}
-        current_section = None
-        for line in path.read_text(encoding='utf-8').splitlines():
-            stripped = line.strip()
-            if not stripped or stripped.startswith('#'):
-                continue
-            if stripped.endswith(':') and not '=' in stripped:
-                current_section = stripped[:-1]
-                data[current_section] = {}
-                continue
-            if ':' in stripped and current_section is not None:
-                key, val = stripped.split(':', 1)
-                key = key.strip()
-                val = val.split('#')[0].strip()
-                if val.lower() in ('true', 'false'):
-                    parsed = val.lower() == 'true'
-                elif val.lower() in ('null', '~'):
-                    parsed = None
-                elif val.startswith('"') and val.endswith('"'):
-                    parsed = val[1:-1]
-                else:
-                    try:
-                        parsed = int(val)
-                    except ValueError:
-                        try:
-                            parsed = float(val)
-                        except ValueError:
-                            parsed = val
-                data[current_section][key] = parsed
-        return data
+        return {}
 
 
-def build_schema(skill_dir: Path) -> dict:
+def _param_meta(key: str, value, comment_line: str = '') -> dict:
+    """根据参数名和注释推断 schema 元数据。"""
+    min_val, max_val = parse_range(comment_line)
+    param_type = infer_type(value, min_val, max_val)
+
+    defaults = {
+        'threshold': {'min': 0, 'max': 10, 'description': '因果边显著性阈值（LLaMA V4 过拟合模型建议 0.01-0.03）'},
+        'concept_min_freq': {'min': 1, 'max': 1000, 'description': '概念最小出现频次'},
+        'max_edges_for_dowhy': {'min': 1, 'max': 100, 'description': '传入 DoWhy 的最大边数'},
+        'filter_mode': {'description': '边过滤模式 (topn / percentile / adaptive)'},
+        'filter_percentile': {'min': 50, 'max': 99, 'description': 'percentile 模式的百分位'},
+        'random_state': {'min': 0, 'max': 999999, 'description': '随机种子'},
+        'classical_mode': {'description': '古汉语模式（Shenji 古文保留之/乎/者/也等虚词）'},
+    }
+    meta = defaults.get(key, {})
+    if param_type in ('integer', 'number'):
+        if 'min' not in meta and min_val is not None:
+            meta['min'] = min_val
+        if 'max' not in meta and max_val is not None:
+            meta['max'] = max_val
+    return meta
+
+
+def build_schema(skill_dir: Path, preset: str = None) -> dict:
     presets_path = skill_dir / 'presets.yaml'
-    presets = load_presets_yaml(presets_path) if presets_path.exists() else {}
+    presets = load_presets_yaml(skill_dir)
+
+    # 如果指定了 preset，用预设值覆盖基础 section
+    base_trace = dict(presets.get('trace2dowhy', {}))
+    base_super = dict(presets.get('super', {}))
+    base_auditor = dict(presets.get('auditor', {}))
+    if preset and preset in presets.get('presets', {}):
+        selected = presets['presets'][preset]
+        if 'trace2dowhy' in selected:
+            base_trace.update(selected['trace2dowhy'])
+        if 'super' in selected:
+            base_super.update(selected['super'])
+        if 'auditor' in selected:
+            base_auditor.update(selected['auditor'])
 
     schema = {}
 
     # 1. 从 presets.yaml trace2dowhy 段提取参数
-    for key, value in presets.get('trace2dowhy', {}).items():
-        # 读取原始行以获取范围注释
-        min_val, max_val = None, None
-        if presets_path.exists():
-            for line in presets_path.read_text(encoding='utf-8').splitlines():
-                if line.strip().startswith(f'{key}:'):
-                    min_val, max_val = parse_range(line)
-                    break
-        param_type = infer_type(value, min_val, max_val)
+    comment_map = {}
+    if presets_path.exists():
+        for line in presets_path.read_text(encoding='utf-8').splitlines():
+            stripped = line.strip()
+            if ':' in stripped and not stripped.startswith('#'):
+                key = stripped.split(':', 1)[0].strip()
+                comment_map[key] = line
+
+    for key, value in base_trace.items():
+        meta = _param_meta(key, value, comment_map.get(key, ''))
+        param_type = infer_type(value, meta.get('min'), meta.get('max'))
         schema[key] = {
             'type': param_type,
-            'min': min_val if min_val is not None else (0 if param_type in ('integer', 'number') else None),
-            'max': max_val if max_val is not None else (1000 if param_type in ('integer', 'number') else None),
             'default': value,
-            'description': f'presets.yaml trace2dowhy.{key}',
+            'description': meta.get('description', f'presets.yaml trace2dowhy.{key}'),
         }
+        if 'min' in meta:
+            schema[key]['min'] = meta['min']
+        if 'max' in meta:
+            schema[key]['max'] = meta['max']
 
     # 2. Web/桥接层特有参数（部分在 presets.yaml super 段中定义）
     web_specific = {
-        'window_size': {'type': 'integer', 'min': 2, 'max': 256, 'default': 64, 'description': 'TRACE 滑动窗口大小'},
-        'max_segments': {'type': 'integer', 'min': 1, 'max': 16, 'default': 4, 'description': 'LLaMA TRACE 最大分段数'},
+        'window_size': {'type': 'integer', 'min': 2, 'max': 256, 'default': base_super.get('window_size', 64), 'description': 'TRACE 滑动窗口大小'},
+        'max_segments': {'type': 'integer', 'min': 1, 'max': 16, 'default': base_super.get('max_segments', 4), 'description': 'LLaMA TRACE 最大分段数'},
         'max_concepts': {'type': 'integer', 'min': 1, 'max': 128, 'default': 12, 'description': '最大概念数'},
-        'min_valid_tokens': {'type': 'integer', 'min': 1, 'max': 10000, 'default': 10, 'description': '最小有效 token 数'},
+        'min_valid_tokens': {'type': 'integer', 'min': 1, 'max': 10000, 'default': base_super.get('min_valid_tokens', 10), 'description': '最小有效 token 数'},
         'min_concepts': {'type': 'integer', 'min': 2, 'max': 128, 'default': 3, 'description': '最小概念数'},
     }
     for key, meta in web_specific.items():
@@ -110,8 +140,22 @@ def build_schema(skill_dir: Path) -> dict:
 
 
 def main():
-    skill_dir = Path(sys.argv[1]) if len(sys.argv) > 1 else Path(__file__).resolve().parent / 'examples' / 'counterfactual_hybrid'
-    schema = build_schema(Path(skill_dir))
+    args = sys.argv[1:]
+    default_skill_dir = Path(__file__).resolve().parent / 'examples' / 'counterfactual_hybrid'
+    # 支持两种调用方式：
+    #   python build_bridge_schema.py [skill_dir] [--preset <name>]
+    #   python build_bridge_schema.py [--preset <name>]
+    if args and not args[0].startswith('--'):
+        skill_dir = Path(args[0])
+        args = args[1:]
+    else:
+        skill_dir = default_skill_dir
+    preset = None
+    if '--preset' in args:
+        idx = args.index('--preset')
+        if idx + 1 < len(args):
+            preset = args[idx + 1]
+    schema = build_schema(Path(skill_dir), preset=preset)
     print(json.dumps(schema, ensure_ascii=False, indent=2))
     return 0
 

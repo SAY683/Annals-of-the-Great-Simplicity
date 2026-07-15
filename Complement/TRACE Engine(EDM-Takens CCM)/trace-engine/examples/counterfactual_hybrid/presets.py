@@ -106,7 +106,7 @@ def load_presets(preset: str = "standard") -> _DotDict:
     if preset in raw.get('presets', {}):
         # 预设场景: 用基础值覆盖预设值
         merged = {}
-        for section in ['trace2dowhy', 'dowhy', 'counterfactual', 'auditor', 'visualization']:
+        for section in ['trace2dowhy', 'dowhy', 'counterfactual', 'auditor', 'visualization', 'super']:
             if section in raw:
                 merged[section] = dict(raw[section])
                 if section in raw['presets'][preset]:

@@ -35,6 +35,7 @@ from pathlib import Path
 
 from _config import get_graphviz_bin_dir
 from project_paths import resolve_paths
+from presets import load_presets
 
 # ══════════════════════════════════════════════════════════════════════
 # 路径配置
@@ -110,7 +111,7 @@ def cmd_env():
     # Models (通过 _paths 解析，支持 TRACE_ROOT 环境变量)
     try:
         paths = resolve_paths()
-        for model_name in ['Shehui-LLaMA', 'Shenji-LLaMA']:
+        for model_name in ['shehui-llama', 'shenji-llama']:
             model_dir = paths.model_dir(model_name)
             if model_dir.exists():
                 safetensors = list(model_dir.glob("model.safetensors"))
@@ -204,8 +205,15 @@ def cmd_demo():
     print(f"\n✅ 完成 — 输出在 {DEMO_DIR}")
 
 
-def cmd_real():
-    """运行真实 TRACE 数据管线"""
+def cmd_real(preset="llama"):
+    """运行真实 TRACE 数据管线
+
+    Parameters
+    ----------
+    preset : str
+        使用的参数预设。真实 TRACE 数据默认使用 llama 预设（threshold=0.01），
+        以适配 Shehui/Shenji-LLaMA V4 过拟合模型的低 ΔNLL 范围。
+    """
     import json, numpy as np
     from _logging import setup_logging, log_env_info
     from project_paths import resolve_paths
@@ -214,8 +222,16 @@ def cmd_real():
     logger = setup_logging(paths.outputs_dir / "logs", "sentai_real")
     log_env_info(logger)
 
+    # 加载 preset（llama 为 V4 过拟合模型专属）
+    try:
+        p = load_presets(preset)
+    except Exception as e:
+        logger.warning(f"加载预设 {preset} 失败: {e}，回退到 llama")
+        p = load_presets("llama")
+
     print("═" * 50)
     print("  因果战队 · 真实 TRACE 数据管线")
+    print(f"  Preset: {preset} | threshold={p.trace2dowhy.threshold}")
     print("═" * 50)
 
     _setup_graphviz()
@@ -242,8 +258,21 @@ def cmd_real():
     tokens = json.loads(tokens_cache.read_text(encoding='utf-8'))
 
     print(f"\n[1/5] TRACE → DoWhy 桥接...")
-    logger.info(f"TRACE→DoWhy: threshold={0.3}, min_freq={2}, max_edges={8}")
-    bridge = TRACE2DoWhy(adj, tokens, threshold=0.3, concept_min_freq=2, max_edges_for_dowhy=8)
+    logger.info(
+        f"TRACE→DoWhy: threshold={p.trace2dowhy.threshold}, "
+        f"min_freq={p.trace2dowhy.concept_min_freq}, "
+        f"max_edges={p.trace2dowhy.max_edges_for_dowhy}"
+    )
+    bridge = TRACE2DoWhy(
+        adj, tokens,
+        threshold=p.trace2dowhy.threshold,
+        concept_min_freq=p.trace2dowhy.concept_min_freq,
+        max_edges_for_dowhy=p.trace2dowhy.max_edges_for_dowhy,
+        filter_mode=p.trace2dowhy.filter_mode,
+        filter_percentile=p.trace2dowhy.filter_percentile,
+        random_state=p.trace2dowhy.random_state,
+        classical_mode=getattr(p.trace2dowhy, 'classical_mode', False),
+    )
     bridge.aggregate_concepts()
     bridge.build_model()
     bridge.identify()
@@ -313,12 +342,25 @@ COMMANDS = {
     'clean': (cmd_clean, "清理输出目录"),
 }
 
+def _parse_preset(args):
+    """从命令行解析 --preset 参数，默认 llama（V4 过拟合模型专属）。"""
+    preset = "llama"
+    if "--preset" in args:
+        idx = args.index("--preset")
+        if idx + 1 < len(args):
+            preset = args[idx + 1]
+    return preset
+
+
 def main():
     if len(sys.argv) < 2 or sys.argv[1] not in COMMANDS:
         print("因果战队 CLI — 六合一管线统一入口")
-        print(f"\n用法: python run_cli.py <command>\n")
+        print(f"\n用法: python run_cli.py <command> [--preset <name>]\n")
         for name, (_, desc) in COMMANDS.items():
             print(f"  {name:8s}  {desc}")
+        print(f"\n选项:")
+        print(f"  --preset <name>   参数预设 (default / standard / deep / archival / llama)")
+        print(f"                    llama 预设专为 Shehui/Shenji-LLaMA V4 设计")
         print(f"\n环境变量:")
         print(f"  GRAPHVIZ_BIN_DIR  Graphviz bin 目录")
         print(f"  PYTHONIOENCODING  建议设为 utf-8")
@@ -326,7 +368,10 @@ def main():
 
     cmd_name = sys.argv[1]
     cmd_func, _ = COMMANDS[cmd_name]
-    cmd_func()
+    if cmd_name == "real":
+        cmd_func(preset=_parse_preset(sys.argv[2:]))
+    else:
+        cmd_func()
 
 
 if __name__ == "__main__":
