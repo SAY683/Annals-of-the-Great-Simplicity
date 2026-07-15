@@ -104,7 +104,7 @@ streams JSON Lines via Server-Sent Events. See
 ```
 counterfactual_hybrid/
 ├── README.md                  ← This file
-├── DESIGN_FIVE_IN_ONE.md      ← Engineering design details
+├── DESIGN_SIX_IN_ONE.md      ← Engineering design details
 ├── counterfactual_bridge.py   ← TRACE → DoWhy bridge
 ├── six_warriors.py            ← Six-in-one orchestrator
 ├── presets.yaml               ← Unified parameter presets

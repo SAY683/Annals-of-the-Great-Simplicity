@@ -7,7 +7,7 @@
 
 | # | 规则 | 状态 | 实现位置 | 备注 |
 |---|------|------|---------|------|
-| 1 | 审计防火墙 (3层) | ✅ ADOPTED | trace_plus.py, DESIGN.md | Layer1=env_check, Layer2=audit_trance, Layer3=CCM |
+| 1 | 审计防火墙 (3层) | ✅ ADOPTED | trace_plus.py, DESIGN.md | Layer1=env_check, Layer2=audit_trace, Layer3=CCM |
 | 2 | Ghost Token 基线 | ✅ ADOPTED | pipeline_zhihu.py §PHASE2 | 减去语法噪音 |
 | 3 | 多维动态早停 | ✅ ADOPTED | pipeline_zhihu.py, early_stop.py | 四信号加权判定 |
 | 4 | 小词表优先 | ✅ ADOPTED | train_shenji_llama.py | vocab=3000-4000, 非151936 |
@@ -22,7 +22,7 @@
 
 | # | 规则 | 状态 | 待修复 |
 |---|------|------|--------|
-| 11 | 跨模型统一接口 | ⚠️ PARTIAL | trrace_loader 只支持加载, 不含训练 |
+| 11 | 跨模型统一接口 | ⚠️ PARTIAL | trace_loader 只支持加载, 不含训练 |
 | 12 | 自动化测试套件 | ❌ DEFERRED | 无 run_tests.py |
 | 13 | GPU 不可用时 CPU 降级 | ⚠️ PARTIAL | 有 device_map="cpu" fallback 但未经充分测试 |
 | 14 | 训练/TRACE 参数自动调优 | ❌ DEFERRED | batch/epoch 需手动设 preset |

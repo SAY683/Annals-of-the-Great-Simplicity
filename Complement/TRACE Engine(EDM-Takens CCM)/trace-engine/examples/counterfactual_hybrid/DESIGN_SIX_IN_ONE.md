@@ -406,7 +406,7 @@ trace-engine/
 │   │
 │   └── counterfactual_hybrid/         ← ★ 六合一 + DoWhy + Counterfactual
 │       ├── README.md                  ← DoWhy/反事实概念说明
-│       ├── DESIGN_FIVE_IN_ONE.md      ← 本文件 — 六合一工程设计
+│       ├── DESIGN_SIX_IN_ONE.md      ← 本文件 — 六合一工程设计
 │       ├── counterfactual_bridge.py   ← TRACE→DoWhy 桥接模块
 │       ├── six_warriors.py            ← 六战士编排器
 │       ├── dowhy_auditor.py           ← 9-rule 审计防火墙

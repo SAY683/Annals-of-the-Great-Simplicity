@@ -111,7 +111,7 @@ trace-engine/
 ├── tests/test_skill.py                ← Self-test suite
 └── examples/counterfactual_hybrid/
     ├── README.md                      ← DoWhy/CF strategy
-    ├── DESIGN_FIVE_IN_ONE.md          ← Engineering details
+    ├── DESIGN_SIX_IN_ONE.md          ← Engineering details
     ├── counterfactual_bridge.py       ← TRACE → DoWhy bridge
     ├── six_warriors.py                ← Six-in-one orchestrator
     ├── presets.yaml / presets.py      ← Parameter presets

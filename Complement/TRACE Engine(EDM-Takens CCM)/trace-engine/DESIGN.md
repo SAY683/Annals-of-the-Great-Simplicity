@@ -91,4 +91,4 @@ TRACE sparse + CCM fails + EDM ρ intermediate + HAVOK linear>70%
 - Quick start & architecture: [`README.md`](README.md)
 - Skill entry & presets: [`SKILL.md`](SKILL.md)
 - DoWhy + counterfactual bridge: [`examples/counterfactual_hybrid/README.md`](examples/counterfactual_hybrid/README.md)
-- Engineering details: [`examples/counterfactual_hybrid/DESIGN_FIVE_IN_ONE.md`](examples/counterfactual_hybrid/DESIGN_FIVE_IN_ONE.md)
+- Engineering details: [`examples/counterfactual_hybrid/DESIGN_SIX_IN_ONE.md`](examples/counterfactual_hybrid/DESIGN_SIX_IN_ONE.md)

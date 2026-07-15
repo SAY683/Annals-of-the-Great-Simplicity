@@ -8,17 +8,30 @@
  *   - 简单内存缓存（相同文本+模式复用结果）
  *   - 输出目录 TTL 清理
  *   - 健康检查与配置端点
+ *   - SUPER 模式常驻 LLaMA Worker
+ *   - 任务队列与并发控制
  *
- * 端点:
+ * 端点 (20 routes):
  *   POST /api/analyze-text         分析纯文本 (JSON: {text, mode})
  *   POST /api/analyze-file         上传文本文件分析 (multipart: file, mode)
  *   GET  /api/analyze-stream?id=   SSE 实时流（阶段+日志+结果）
+ *   POST /api/analyze-stream       SSE 流（POST 别名）
  *   POST /api/cancel/:id           取消分析任务
  *   GET  /api/result/:id           获取分析结果 (JSON)
  *   GET  /api/report/:id           获取 Markdown 报告
  *   GET  /api/jobs                 任务历史列表
+ *   GET  /api/jobs/export          导出任务历史 (JSON/CSV)
+ *   POST /api/jobs/clear           清空任务历史
+ *   GET  /api/jobs/:id             查询单个任务状态
+ *   POST /api/retry/:id            重试任务（SUPER 模式不支持）
+ *   POST /api/admin/cleanup        手动触发输出目录 TTL 清理
  *   GET  /api/health               健康检查
- *   GET  /api/config               当前配置
+ *   GET  /api/config               当前配置 + bridgeParamSchema
+ *   GET  /api/queue                任务队列状态
+ *   GET  /api/version              版本信息
+ *   GET  /api/presets              参数预设（含 SUPER）
+ *   GET  /api/schema               Bridge 参数 Schema
+ *   GET  /api/metrics              运行时指标
  *   GET  /                         前端页面
  */
 
@@ -1327,10 +1340,9 @@ app.get('/api/presets', (_req, res) => {
     threshold: 0.03,
     window_size: 8,
     max_concepts: 12,
-    concept_min_freq: 1,
-    min_concepts: 3,
+    concept_min_freq: 2,
     min_valid_tokens: 10,
-    max_edges_for_dowhy: 12,
+    max_edges_for_dowhy: 8,
     filter_mode: 'topn',
     filter_percentile: 85,
     random_state: 42,

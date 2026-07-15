@@ -1,4 +1,4 @@
-﻿# TRACE Engine (EDM-Takens CCM) — 便携成品目录
+# TRACE Engine (EDM-Takens CCM) — 便携成品目录
 
 本目录包含 `trace-engine`（因果推断引擎）与 `trace-engine-web`（Web 服务）两个子项目，已整理为可独立运行的成品结构。
 

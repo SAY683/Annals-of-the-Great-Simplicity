@@ -97,7 +97,7 @@ trace-engine/
 ├── examples/
 │   ├── counterfactual_hybrid/        ← ★ Six-in-one CLI + bridge
 │   │   ├── README.md                 ← DoWhy/CF hybrid strategy
-│   │   ├── DESIGN_FIVE_IN_ONE.md     ← Engineering design details
+│   │   ├── DESIGN_SIX_IN_ONE.md     ← Engineering design details
 │   │   ├── counterfactual_bridge.py  ← TRACE → DoWhy bridge
 │   │   ├── six_warriors.py           ← Six-in-one orchestrator
 │   │   ├── presets.yaml              ← Unified parameter presets
@@ -133,7 +133,7 @@ instruments and compare their readings.
 - Architecture overview & quick start: [`SKILL.md`](SKILL.md)
 - Design philosophy & instrument metaphor: [`DESIGN.md`](DESIGN.md)
 - DoWhy + counterfactual bridge: [`examples/counterfactual_hybrid/README.md`](examples/counterfactual_hybrid/README.md)
-- Engineering details, parameters, file map: [`examples/counterfactual_hybrid/DESIGN_FIVE_IN_ONE.md`](examples/counterfactual_hybrid/DESIGN_FIVE_IN_ONE.md)
+- Engineering details, parameters, file map: [`examples/counterfactual_hybrid/DESIGN_SIX_IN_ONE.md`](examples/counterfactual_hybrid/DESIGN_SIX_IN_ONE.md)
 
 ## References
 

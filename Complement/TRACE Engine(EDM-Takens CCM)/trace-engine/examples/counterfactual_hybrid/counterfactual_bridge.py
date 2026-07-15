@@ -9,7 +9,7 @@ v2 新增: DoWhy 0.14 兼容 + causallearn (PC/FCI/GES) + Graphviz 可视化。
   Layer 3:   CCM Cross-Validation          ← ccm_causality.py
   Layer 4:   DoWhy 识别 + 三层反驳          ← 本模块
   Layer 5:   Counterfactual 反事实查询      ← 本模块
-  +:         causallearn 独立验证           ← 本模块 (NEW)
+  Layer 6:   causallearn 独立验证           ← 本模块 (NEW)
 
 用法:
     from counterfactual_bridge import TRACE2DoWhy
