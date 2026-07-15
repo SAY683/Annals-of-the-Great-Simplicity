@@ -182,7 +182,7 @@
 
 ## 🤖 模型训练：神机与社会 — TRACE 引擎 (Model Training)
 
-本仓库 `Complement/TRACE Engine(EDM-Takens CCM)/` 目录下包含基于 **LLaMA** 架构微调训练的专用语言模型，作为体系在自然语言处理领域的实证探索。
+本仓库 `Complement/TRACE Engine(EDM-Takens CCM)/trace-engine/models/` 目录下提供基于 **LLaMA** 架构微调训练的专用语言模型配置文件，作为体系在自然语言处理领域的实证探索。
 
 ### 模型体系
 
