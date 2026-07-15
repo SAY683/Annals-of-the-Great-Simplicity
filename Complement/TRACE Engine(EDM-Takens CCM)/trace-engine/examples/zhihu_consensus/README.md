@@ -89,7 +89,7 @@ CCM 有效条件:  目标 concept 在文本中至少出现 3+ 次
 examples/zhihu_consensus/
 ├── README.md                    ← 本文件
 ├── pipeline_zhihu.py            ← (在 TRACE/scripts/ 中)
-├── figures/                     ← 预留: 因果图可视化
+├── figures/                     ← 运行后生成: 因果图可视化
 └── data/
     └── 知乎网友.txt             ← (在 TRACE/date/ 中)
 ```

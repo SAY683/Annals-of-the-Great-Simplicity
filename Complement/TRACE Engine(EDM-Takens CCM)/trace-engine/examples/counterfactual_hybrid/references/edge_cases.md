@@ -165,3 +165,36 @@ def _is_valid_concept(name):
 - **文本类型检测**: `aggregate_concepts()` 中已添加 UNK 率 + 叙事文自动检测，输出阈值建议
 
 **当前状态**: v6 已在 `aggregate_concepts()` 中添加自动 WARN + 阈值建议。
+
+---
+
+## EC-9: LLaMA 过拟合模型的低 ΔNLL 体制 (llama 预设)
+
+**症状**: 使用 ~470M 参数的 Shehui-LLaMA / Shenji-LLaMA 过拟合领域模型时，ΔNLL 绝对值极低（典型范围 0.000-0.160），默认阈值（0.3-1.0）几乎捕获不到因果边。
+
+**触发条件**:
+- 使用 V4 过拟合训练的 ~470M 参数 LLaMA 模型（Shenji-LLaMA / Shehui-LLaMA）
+- 模型在领域文本上 loss 极低（如 0.092），预测过于自信 → 掩码扰动带来的 ΔNLL 被压缩
+
+**机制**: 过拟合模型对训练分布的预测概率接近 1.0，掩码一个 token 后 NLL 的变化被softmax 的平缓区压缩，导致 ΔNLL 绝对值小。但因果区分度依然存在 —— 真因果边的 ΔNLL 仍显著高于伪因果边。
+
+**缓解**: 使用 `llama` 预设（见 `presets.yaml`）
+
+| Parameter | Value | 说明 |
+|-----------|-------|------|
+| `threshold` | 0.01 | 捕获中等以上因果边 |
+| `concept_min_freq` | 1 | 领域文本 token 频率低，放宽 |
+| `window_size` | 128 | V4 seq=1024，更大窗口 |
+| `max_segments` | 3 | 469M 参数在 RTX 3050 上限制分段数 |
+| `classical_mode` | false | 默认现代白话；古汉语分析可切换为 true（保留之/乎/者/也等虚词） |
+
+**适用场景**:
+- **模型**: Shehui-LLaMA (~470M，古典社会领域) / Shenji-LLaMA (~470M，史诗领域)
+- **古汉语分析**: 当分析先秦/文言文本时，将 `classical_mode` 切换为 `true`，保留文言虚词作为有效概念节点
+
+**调用方式**:
+```python
+from presets import load_presets
+p = load_presets("llama")
+bridge = TRACE2DoWhy(adj, tokens, **p.trace2dowhy)
+```

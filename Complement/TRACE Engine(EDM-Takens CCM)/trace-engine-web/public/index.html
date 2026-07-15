@@ -1938,7 +1938,7 @@
             const mode = (j.mode || 'light').toUpperCase();
             const dur = j.durationMs != null ? ` ${(j.durationMs / 1000).toFixed(1)}s` : '';
             const errMark = j.error ? ' ⚠' : '';
-            const retryable = ['error', 'timeout', 'cancelled'].includes(j.status);
+            const retryable = ['error', 'timeout', 'cancelled'].includes(j.status) && j.mode !== 'super';
             const retryBtn = retryable
               ? ` <a href="#" class="retry-link" data-id="${j.id}" style="color:var(--accent);text-decoration:none;">[RETRY]</a>`
               : '';

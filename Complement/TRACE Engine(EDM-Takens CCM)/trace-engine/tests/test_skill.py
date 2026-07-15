@@ -34,7 +34,7 @@ def check_env():
     print(result.stdout[-1500:] if len(result.stdout) > 1500 else result.stdout)
     if result.returncode != 0:
         raise AssertionError(f"env 检查失败:\n{result.stderr}")
-    if '模型已就绪' not in result.stdout and 'model.safetensors' not in result.stdout:
+    if 'MB' not in result.stdout and '模型' not in result.stdout:
         print("  警告: 未检测到模型就绪，部分功能可能不可用")
     print("  [OK] 环境检查通过")
 

@@ -58,7 +58,7 @@ def _find_trace_root(skill_dir: Path) -> Path | None:
             return current / "TRACE"
         if (current / ".skills" / "trace-engine" / "SKILL.md").exists():
             # .skills 目录位于项目根下，真正的 TRACE 数据/模型目录在项目根/TRACE
-            return current.parent / "TRACE"
+            return current / "TRACE"
         # 层级副本: trace-engine-web 与 trace-engine 处于同一父目录，模型在 trace-engine/models
         if _is_nested_engine_trace_root(current):
             return current / "trace-engine"

@@ -43,11 +43,11 @@
       CCM (独立方法) 验证 → 筛选掉大部分噪音
 ```
 
-## Rule 5: Never Run HAVOK on Small Matrices (< 10×10)
+## Rule 5: Never Run HAVOK on Small Matrices (< 20×20)
 
 ```
 ✗ 20 个概念做 HAVOK 分解
-✓ N ≥ 10 才有意义, N ≥ 20 推荐
+✓ N ≥ 20 才有意义 (代码强制阈值 T < 20 → unavailable)
 
 原因: SVD 需要足够维度才有意义
       小矩阵 → 全部是噪声 → 无力学可分解

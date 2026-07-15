@@ -11,15 +11,15 @@
 |---|------|-------------|------------------|--------|
 | 1 | Identifiability Gate | **FAIL** | Treatment→Outcome directed path | ✅ ADOPTED |
 | 2 | Refutation Triangulation | **WARN** | N >= 30 | ✅ ADOPTED |
-| 3 | SEM Coefficient Stability | **WARN** | N >= 50, V < N/5 | ⚠️ PARTIAL |
-| 4 | Counterfactual Extrapolation Guard | **WARN** | treatment_value within observed range | 🔶 DEFERRED |
+| 3 | SEM Coefficient Stability | **WARN** | N >= 50, V < N/5 | ✅ ADOPTED |
+| 4 | Counterfactual Extrapolation Guard | **WARN** | treatment_value within observed range | ✅ ADOPTED |
 | 5 | Graph Completeness | **FAIL** | All nodes appear in DOT graph | ✅ ADOPTED |
 | 6 | Placebo Vanishing | **WARN** | Placebo treatment → effect ≈ 0 | ✅ ADOPTED |
 | 7 | CI Non-Degeneracy | **WARN** | CI must not be NaN/Inf | ✅ ADOPTED |
-| 8 | Causal Direction Consistency | **WARN** | TRACE ΔNLL direction == DoWhy ATE direction | 🔶 DEFERRED |
+| 8 | Causal Direction Consistency | **WARN** | TRACE ΔNLL direction == DoWhy ATE direction | ✅ ADOPTED |
 | 9 | Sparse Graph Sanity | **ADVISORY** | Edge density < 0.5 | ✅ ADOPTED |
 
-**Adoption rate**: 6/9 fully adopted, 1 partial, 2 deferred.
+**Adoption rate**: 9/9 fully adopted.
 
 ---
 
@@ -64,9 +64,9 @@
 - If N < 5*V → WARN: "SEM coefficients may be unstable (N={n}, V={v}). Counterfactual ITE has wide error bars."
 - If N < 2*V → FAIL: "Insufficient data for SEM estimation."
 
-**Implementation**: `counterfactual_bridge.py` § `_estimate_sem_from_data()`
+**Implementation**: `counterfactual_bridge.py` § `estimate_sem_from_data()`
 
-**Status**: ⚠️ PARTIAL — instability is detected but not formally enforced as FAIL/WARN with explicit messaging.
+**Enforcement in `dowhy_auditor.py`**: `_check_sem_stability()` — N < 2V → FAIL，N < 5V → WARN，否则 PASS。
 
 ---
 
@@ -78,7 +78,7 @@
 - Compute observed treatment range [min(T), max(T)]
 - If treatment_value or control_value outside [min, max] → WARN: "Counterfactual query extrapolates beyond observed range. Results are speculative."
 
-**Status**: 🔶 DEFERRED — structural guard exists but not yet enforced with explicit WARN messaging.
+**Implementation**: `dowhy_auditor.py` § `_check_extrapolation_guard()` — 检查 scan_results 中 treatment_value 是否超出观测数据范围，超出则 WARN。
 
 ---
 
@@ -128,7 +128,7 @@
 - For each edge: sign(ΔNLL) should match sign(ATE)
 - If mismatch → WARN: "TRACE and DoWhy disagree on causal direction for {edge}"
 
-**Status**: 🔶 DEFERRED — comparison calculated in test_case.py but not yet enforced as a firewall rule in the bridge.
+**Implementation**: `dowhy_auditor.py` § `_check_causal_direction_consistency()` — 对 scan_results 中每条边检查 sign(ΔNLL) 与 sign(ITE) 是否一致，不一致则 WARN。
 
 ---
 
@@ -148,9 +148,9 @@
 
 | EDM-Takens Rule | DoWhy/Counterfactual Analog | Status |
 |-----------------|---------------------------|--------|
-| S1: Lyapunov Horizon | R4: Extrapolation Guard | 🔶 DEFERRED |
-| S2: CCM Victim Mirror | R8: Causal Direction Consistency | 🔶 DEFERRED |
-| S3: Hankel Golden Ratio | R3: SEM Coefficient Stability | ⚠️ PARTIAL |
+| S1: Lyapunov Horizon | R4: Extrapolation Guard | ✅ ADOPTED |
+| S2: CCM Victim Mirror | R8: Causal Direction Consistency | ✅ ADOPTED |
+| S3: Hankel Golden Ratio | R3: SEM Coefficient Stability | ✅ ADOPTED |
 | S5: SVD Residual Monitor | R7: CI Non-Degeneracy | ✅ ADOPTED |
 | S6: EDM-HAVOK Cross-Validation | R2: Refutation Triangulation | ✅ ADOPTED |
 | — | R1: Identifiability Gate (unique to DoWhy) | ✅ ADOPTED |
@@ -193,4 +193,34 @@
 | `max_edges_for_dowhy` | 8-15 | 5-8 | 论证文因果边密集 |
 | `refutation_deviation_threshold` | 0.3 | 0.4 | 叙事文放宽反驳标准 |
 
-> 完整参数预设见: `presets.yaml` (demo / standard / deep / archival)
+> 完整参数预设见: `presets.yaml` (demo / standard / deep / archival / llama)
+
+---
+
+## LLaMA 预设说明
+
+`llama` 预设专为 ~470M 参数的 Shehui-LLaMA / Shenji-LLaMA 过拟合领域模型设计。这类模型 ΔNLL 信号偏低（典型范围 0.000-0.160），需要专属阈值才能捕获中等以上因果边。
+
+### 关键参数
+
+| Parameter | Value | 说明 |
+|-----------|-------|------|
+| `threshold` | 0.01 | V4 过拟合模型 ΔNLL 偏低，0.01 捕获中等以上因果 |
+| `concept_min_freq` | 1 | 领域文本 token 频率低，放宽最小出现次数 |
+| `window_size` | 128 | V4 seq=1024，使用更大滑动窗口 |
+| `max_segments` | 3 | 469M 参数在 RTX 3050 上限制分段数 |
+| `classical_mode` | false | 默认现代白话模式；Shenji 古文场景可切换为 true（保留之/乎/者/也等虚词） |
+
+### 适用场景
+
+- **模型**: Shehui-LLaMA (~470M，古典社会领域) / Shenji-LLaMA (~470M，史诗领域)
+- **特点**: 过拟合训练导致 ΔNLL 绝对值小，但因果区分度依然存在
+- **古汉语分析**: 当分析先秦/文言文本时，将 `classical_mode` 切换为 `true`，保留文言虚词作为有效概念节点
+
+### 调用方式
+
+```python
+from presets import load_presets
+p = load_presets("llama")
+bridge = TRACE2DoWhy(adj, tokens, **p.trace2dowhy)
+```

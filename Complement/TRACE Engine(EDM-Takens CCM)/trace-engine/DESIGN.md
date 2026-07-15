@@ -47,8 +47,7 @@
 | **CCM** | 测谎仪 (Lie Detector) | Nonlinear entanglement | Convergence slope; failure means "no deep logic loops" |
 | **EDM** | 节拍器 (Metronome) | Temporal rigidity / structure | ρ predictability of discourse markers |
 | **HAVOK** | X光机 (X-ray) | Hidden singularities / forcing | Linear vs nonlinear energy partition |
-| **DoWhy** | 法槌 (Gavel) | Formal identifiability + refutation | ATE + 95% CI; 3-layer refutation |
-| **Counterfactual** | 反事实镜 (Mirror) | What-if reasoning | ITE; Pearl 3-step |
+| **DoWhy + Pearl Counterfactual** | 法槌+反事实镜 (Gavel+Mirror) | Formal identifiability + what-if reasoning | ATE + 95% CI; ITE; Pearl 3-step |
 | **causallearn** | 第三人 (Third Witness) | Independent graph search | PC / FCI / GES edges |
 
 ## Composite Diagnosis Patterns

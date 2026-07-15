@@ -32,6 +32,29 @@ def check_python_deps():
     return ok, deps
 
 
+def check_optional_deps():
+    """检查可选依赖（torch/transformers/sentencepiece/causallearn）。
+
+    缺失时打印 WARN 而非 FAIL —— 这些依赖仅在特定管线（LLaMA TRACE、
+    causallearn 交叉验证）中需要，不影响核心六合一诊断。
+    """
+    optional = {}
+    for pkg, name in [
+        ('torch', 'torch'),
+        ('transformers', 'transformers'),
+        ('sentencepiece', 'sentencepiece'),
+        ('causallearn', 'causallearn'),
+    ]:
+        try:
+            mod = __import__(pkg)
+            optional[name] = getattr(mod, '__version__', 'unknown')
+        except Exception as e:
+            optional[name] = f'missing ({e})'
+            print(f"WARN: optional dependency '{name}' missing — {e}",
+                  file=sys.stderr)
+    return optional
+
+
 def check_models(root: Path):
     """按项目实际布局探测 LLaMA 模型，兼容开发/层级成品/便携根三种目录结构。"""
     models = {}
@@ -82,6 +105,7 @@ def main():
     skill_dir = root / 'examples' / 'counterfactual_hybrid'
 
     deps_ok, deps = check_python_deps()
+    optional_deps = check_optional_deps()
     models = check_models(root)
     imports_ok, import_err = check_skill_imports(skill_dir)
 
@@ -91,6 +115,7 @@ def main():
         'python': sys.version.split()[0],
         'python_ok': deps_ok,
         'deps': deps,
+        'optional_deps': optional_deps,
         'skill_dir': str(skill_dir),
         'imports_ok': imports_ok,
         'import_error': import_err,

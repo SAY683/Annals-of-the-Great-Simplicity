@@ -227,11 +227,10 @@ function spawnLlamaWorker() {
 
   worker.on('close', (code) => {
     logToFile('warn', `LLaMA Worker 退出 (code=${code})，清理状态`);
-    // 通知当前关联的 SUPER 任务（若存在）
-    if (currentLlamaHandler && activeJobs.size > 0) {
-      const activeId = Array.from(activeJobs.keys()).find(() => true);
-      if (activeId) {
-        // 通过历史记录查找对应的 res 较复杂；这里依赖 runSuperAnalysisStream 内的 finish 兜底
+    // 仅通知当前关联的 SUPER 任务（通过 currentLlamaHandler 追踪的 outputId）
+    if (currentLlamaHandler && currentLlamaHandler.outputId) {
+      const activeId = currentLlamaHandler.outputId;
+      if (activeJobs.has(activeId)) {
         recordJob(activeId, 'super', 'cancelled', `Worker 退出 code=${code}`);
         activeJobs.delete(activeId);
       }
@@ -576,7 +575,8 @@ const upload = multer({
       cb(null, UPLOAD_DIR);
     },
     filename: (_req, file, cb) => {
-      const unique = `${Date.now()}-${Math.round(Math.random() * 1e9)}-${file.originalname}`;
+      const safeName = path.basename(file.originalname).replace(/[^\w.\-]/g, '_');
+      const unique = `${Date.now()}-${Math.round(Math.random() * 1e9)}-${safeName}`;
       cb(null, unique);
     },
   }),
@@ -604,9 +604,11 @@ function cacheKey(text, mode, cfgObj = null) {
 function recordJob(id, mode, status, error = null, meta = {}) {
   const now = new Date().toISOString();
   const existing = jobHistory.find((j) => j.id === id);
+  // 当 mode 为 null 时保留已有记录的 mode（用于 gracefulShutdown 等场景）
+  const effectiveMode = mode || (existing ? existing.mode : 'unknown');
   const entry = {
     id,
-    mode,
+    mode: effectiveMode,
     status,
     createdAt: existing ? existing.createdAt : now,
     updatedAt: now,
@@ -696,6 +698,9 @@ function runPythonAnalysisStream(text, outputId, mode, bridgeConfig, res) {
       clearTimeout(timeoutId);
       timeoutId = null;
     }
+    if (heartbeat) {
+      clearInterval(heartbeat);
+    }
   };
 
   timeoutId = setTimeout(() => {
@@ -707,6 +712,11 @@ function runPythonAnalysisStream(text, outputId, mode, bridgeConfig, res) {
 
   py.stdin.write(text, 'utf-8');
   py.stdin.end();
+
+  // SSE 保活：每 30 秒发送一条注释，防止浏览器/代理因长时间无数据而断开连接
+  const heartbeat = setInterval(() => {
+    try { res.write(':heartbeat\n\n'); } catch (_) {}
+  }, 30000);
 
   py.stdout.on('data', (chunk) => {
     stdoutBuffer += chunk.toString('utf-8');
@@ -851,6 +861,7 @@ async function runSuperAnalysisStream(text, outputId, bridgeConfig, res) {
     activeJobs.set(outputId, worker);
 
     currentLlamaHandler = (obj) => {
+      currentLlamaHandler.outputId = outputId;
       if (obj.type === 'stage') {
         lastStageName = obj.stage || lastStageName;
         lastStageTime = Date.now();
@@ -1365,6 +1376,19 @@ app.get('/api/metrics', (_req, res) => {
   });
 });
 
+// 任务历史管理：导出 / 清空（必须在 /api/jobs/:id 之前定义，避免被 :id 路由吞掉）
+app.get('/api/jobs/export', (_req, res) => {
+  res.setHeader('Content-Type', 'application/json; charset=utf-8');
+  res.setHeader('Content-Disposition', 'attachment; filename="trace_jobs.json"');
+  res.json({ success: true, exportedAt: new Date().toISOString(), jobs: jobHistory });
+});
+
+app.post('/api/jobs/clear', (_req, res) => {
+  jobHistory.length = 0;
+  persistJobHistory();
+  res.json({ success: true, message: '任务历史已清空' });
+});
+
 // 单任务查询（便于轮询或前端状态同步）
 app.get('/api/jobs/:id', (req, res) => {
   const id = req.params.id;
@@ -1408,19 +1432,6 @@ app.post('/api/retry/:id', async (req, res) => {
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
-});
-
-// 任务历史管理：导出 / 清空（注意：必须在 /api/jobs/:id 之前定义，避免被 id 路由吞掉）
-app.get('/api/jobs/export', (_req, res) => {
-  res.setHeader('Content-Type', 'application/json; charset=utf-8');
-  res.setHeader('Content-Disposition', 'attachment; filename="trace_jobs.json"');
-  res.json({ success: true, exportedAt: new Date().toISOString(), jobs: jobHistory });
-});
-
-app.post('/api/jobs/clear', (_req, res) => {
-  jobHistory.length = 0;
-  persistJobHistory();
-  res.json({ success: true, message: '任务历史已清空' });
 });
 
 // 结果目录清理（手动触发，便于运维）
