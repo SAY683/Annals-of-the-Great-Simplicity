@@ -180,6 +180,30 @@
 
 ---
 
+
+
+## 📂 项目目录
+
+```
+Annals-of-the-Great-Simplicity/
+├── Core-Magician/          ← 核心文献（PDF 经卷）
+├── Base/                   ← Web 前端（DaoPan / VTS / PDF Viewer）
+├── Complement/             ← 技术补充
+│   ├── Skill/              ←    AI 技能定义
+│   ├── edm-takens/         ←    EDM-Takens CCM 计算模块
+│   └── TRACE Engine(EDM-Takens CCM)/
+│       ├── trace-engine/   ←    TRACE 引擎核心
+│       │   ├── models/     ←      模型配置（权重 → 魔搭托管）
+│       │   ├── examples/   ←      分析示例
+│       │   └── references/ ←      参考文档
+│       └── trace-engine-web/ ←  TRACE Web 接口
+├── Miscellanies/           ← 杂集 · 经文附录
+├── Remarks/                ← 札记 · 比修斯书
+└── Obsolete/               ← 旧档（保留参考）
+```
+
+---
+
 ## 🤖 模型训练：神机与社会 — TRACE 引擎 (Model Training)
 
 本仓库 `Complement/TRACE Engine(EDM-Takens CCM)/trace-engine/models/` 目录下提供基于 **LLaMA** 架构微调训练的专用语言模型配置文件，作为体系在自然语言处理领域的实证探索。
