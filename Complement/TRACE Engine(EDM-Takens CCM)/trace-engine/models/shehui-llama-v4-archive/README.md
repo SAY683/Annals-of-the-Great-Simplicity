@@ -8,6 +8,9 @@
 
 本模型为 **[Annals of the Great Simplicity（太易）](https://github.com/SAY683/Annals-of-the-Great-Simplicity)** 项目中 **TRACE 引擎** 的训练产物。
 
+- **GitHub 仓库**：[SAY683/Annals-of-the-Great-Simplicity](https://github.com/SAY683/Annals-of-the-Great-Simplicity)
+- **工程目录**：`Complement/TRACE Engine(EDM-Takens CCM)/trace-engine/models/shehui-llama-v4-archive/`
+
 ## 说明
 
-本目录原为 Shenji-LLaMA，经重构后归档为 shehui-llama-v4-archive。保留供旧版兼容参考，不建议新项目使用。
+本目录为旧版 Shenji-LLaMA 重命名为 shehui-llama-v4-archive。保留供旧版兼容参考，不建议新项目使用。
