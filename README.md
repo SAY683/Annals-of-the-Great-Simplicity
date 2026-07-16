@@ -189,8 +189,7 @@ Annals-of-the-Great-Simplicity/
 ├── Core-Magician/          ← 核心文献（PDF 经卷）
 ├── Base/                   ← Web 前端（DaoPan / VTS / PDF Viewer）
 ├── Complement/             ← 技术补充
-│   ├── Skill/              ←    AI 技能定义
-│   ├── edm-takens/         ←    EDM-Takens CCM 计算模块
+│   ├── Skill/              ←    AI 技能定义 & EDM-Takens 计算模块
 │   └── TRACE Engine(EDM-Takens CCM)/
 │       ├── trace-engine/   ←    TRACE 引擎核心
 │       │   ├── models/     ←      模型配置（权重 → 魔搭托管）
