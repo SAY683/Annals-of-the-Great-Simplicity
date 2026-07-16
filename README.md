@@ -213,7 +213,7 @@ Annals-of-the-Great-Simplicity/
 | :--- | :--- | :--- | :--- |
 | **Shenji-LLaMA**（神机） | 神学/哲学文本生成与解析 | 470M | [🧩 魔搭](https://modelscope.cn/models/say101/TRACE-Engine-EDM-Takens-CCM-shenji-llama-470m) |
 | **Shehui-LLaMA**（社会） | 社会/伦理文本理解 | 27M | [🧩 魔搭](https://modelscope.cn/models/say101/TRACE-Engine-EDM-Takens-CCM-shehui-llama-27m) |
-| **Shehui v4 Archive**（归档） | 旧版 · 仅保留配置 | 470M | 本地 `shehui-llama-v4-archive/` |
+| **Shehui v4 Archive**（归档） | 旧版社会 · 不常用，保留兼容 | 470M | [🧩 魔搭](https://modelscope.cn/models/say101/TRACE-Engine-EDM-Takens-CCM-shehui-llama-470m) |
 
 ### 模型获取
 
