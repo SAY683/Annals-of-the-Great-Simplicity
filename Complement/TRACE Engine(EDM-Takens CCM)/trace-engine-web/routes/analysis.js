@@ -133,6 +133,16 @@ router.post('/analyze-text', async (req, res) => {
       bridgeConfig = JSON.stringify(cfgObj);
     }
 
+    // 深度复审修复：sync 路径也需检查并发限制，否则可绕过 maxConcurrentJobs
+    if (activeJobs.size >= CONFIG.maxConcurrentJobs) {
+      return res.status(429).json({
+        success: false,
+        error: `并发数已达上限（${CONFIG.maxConcurrentJobs}），请使用 /api/analyze-stream 排队或稍后重试`,
+        code: 'TOO_MANY_CONCURRENT',
+        traceId: req.traceId,
+      });
+    }
+
     // 缓存命中检查
     const cacheK = cacheKey(text, mode, cfgObj);
     const cached = resultCache.get(cacheK);
@@ -182,6 +192,16 @@ router.post('/analyze-file', upload.single('file'), async (req, res) => {
     }
     if (cfgObj && typeof cfgObj === 'object') {
       bridgeConfig = JSON.stringify(cfgObj);
+    }
+    // 深度复审修复：sync 路径并发检查
+    if (activeJobs.size >= CONFIG.maxConcurrentJobs) {
+      fs.unlinkSync(req.file.path);
+      return res.status(429).json({
+        success: false,
+        error: `并发数已达上限（${CONFIG.maxConcurrentJobs}），请使用 /api/analyze-stream 排队或稍后重试`,
+        code: 'TOO_MANY_CONCURRENT',
+        traceId: req.traceId,
+      });
     }
     const id = uuidv4();
     const data = await runPythonAnalysisSync(text, id, mode, bridgeConfig);

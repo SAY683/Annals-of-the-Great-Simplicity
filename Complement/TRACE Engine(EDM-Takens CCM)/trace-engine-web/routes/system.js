@@ -94,7 +94,7 @@ router.get('/config', (_req, res) => {
       deep: { label: 'DEEP', description: '完整六战士 + 稳定性检查（jieba 概念图）' },
       super: { label: 'SUPER', description: 'LLaMA TRACE 模型驱动 + 完整六合一（最慢最准）', available: llamaAvailable && _runtimeCtx.probedLlamaModels.length > 0 },
     },
-    presets: ['default', 'sensitive', 'broad', 'deep', 'llama'],
+    presets: Object.keys(loadPresets()),
     llamaModels: {
       default: 'shehui-llama',
       available: _runtimeCtx.probedLlamaModels,
@@ -147,7 +147,7 @@ router.get('/schema', (_req, res) => {
     superSchema: _runtimeCtx.superBridgeParamSchema || {},
     resultSchema: resultSchema || null,
     modes: ['light', 'deep', 'super'],
-    presets: ['default', 'sensitive', 'broad', 'deep', 'llama'],
+    presets: Object.keys(loadPresets()),
   });
 });
 

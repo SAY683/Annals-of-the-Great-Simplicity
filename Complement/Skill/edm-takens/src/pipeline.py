@@ -536,10 +536,18 @@ def run_pipeline(config: PipelineConfig = None,
             fwd = pres['raw_result']['forward']
             ccm_rhos[cause] = fwd['final_rho']
             ccm_details[cause] = pres['raw_result']
-            direction = f"{cause} -> {config.target_col}" if fwd['final_rho'] > 0.2 else "weak/no signal"
-            conv = "converging" if fwd['is_converging'] else "NOT converging"
-            sig = "significant (corrected)" if pres['significant_corrected'] else "not significant (corrected)"
-            print(f"    M_{config.target_col} -> {cause}: rho={fwd['final_rho']:+.3f} "
+            # 深度复审修复：final_rho 可能为 None（CCM 失败时），需先检查
+            final_rho = fwd.get('final_rho')
+            if final_rho is not None and final_rho > 0.2:
+                direction = f"{cause} -> {config.target_col}"
+            elif final_rho is not None:
+                direction = "weak/no signal"
+            else:
+                direction = "CCM failed (no rho)"
+            conv = "converging" if fwd.get('is_converging') else "NOT converging"
+            sig = "significant (corrected)" if pres.get('significant_corrected') else "not significant (corrected)"
+            rho_str = f"{final_rho:+.3f}" if final_rho is not None else "N/A"
+            print(f"    M_{config.target_col} -> {cause}: rho={rho_str} "
                   f"({direction}, {conv}) — {sig}")
         if ccm_batch.get('warn'):
             print(f"    [!] {ccm_batch['note']}")

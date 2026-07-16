@@ -426,6 +426,9 @@ function runPythonAnalysisSync(text, outputId, mode = 'light', bridgeConfig = ''
 
     recordJob(outputId, mode, 'running', null, { text, config: bridgeConfig || CONFIG.bridgeConfig || '' });
 
+    // 深度复审修复：sync 路径也需注册 activeJobs，否则绕过并发限制且无法取消
+    activeJobs.set(outputId, py);
+
     const args = [pyScript, skillDir, outDir, mode];
     const cfg = bridgeConfig || CONFIG.bridgeConfig || '';
     if (cfg) args.push(cfg);
@@ -436,6 +439,7 @@ function runPythonAnalysisSync(text, outputId, mode = 'light', bridgeConfig = ''
 
     let stdout = '';
     let stderr = '';
+    let finished = false;
 
     py.stdin.write(text, 'utf-8');
     py.stdin.end();
@@ -444,6 +448,9 @@ function runPythonAnalysisSync(text, outputId, mode = 'light', bridgeConfig = ''
     py.stderr.on('data', (data) => { stderr += data.toString('utf-8'); });
 
     py.on('close', (code) => {
+      if (finished) return;
+      finished = true;
+      activeJobs.delete(outputId);
       if (code !== 0) {
         recordJob(outputId, mode, 'error', stderr || stdout);
         reject(new Error(`Python 退出码 ${code}: ${stderr || stdout}`));
@@ -467,7 +474,9 @@ function runPythonAnalysisSync(text, outputId, mode = 'light', bridgeConfig = ''
           result = JSON.parse(fs.readFileSync(resultPath, 'utf-8'));
         }
         setResultCache(cacheKey(text, mode, cfgObj), outputId);
-        recordJob(outputId, mode, 'completed');
+        // 深度复审修复：内层 result.success=false 时标 error 而非 completed
+        const finalStatus = (result && result.success === false) ? 'error' : 'completed';
+        recordJob(outputId, mode, finalStatus);
         resolve({
           id: outputId,
           result,
@@ -481,6 +490,9 @@ function runPythonAnalysisSync(text, outputId, mode = 'light', bridgeConfig = ''
     });
 
     py.on('error', (err) => {
+      if (finished) return;
+      finished = true;
+      activeJobs.delete(outputId);
       recordJob(outputId, mode, 'error', err.message);
       reject(err);
     });

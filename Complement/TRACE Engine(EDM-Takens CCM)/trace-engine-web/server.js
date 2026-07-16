@@ -144,9 +144,10 @@ const analyzeLimiter = rateLimit({
     error: '请求过于频繁：分析接口限制每分钟 10 次，请稍后再试',
     code: 'RATE_LIMITED',
   },
-  // 使用内置 ipKeyGenerator 确保 IPv4/IPv6 一致处理
+  // 深度复审修复：req.path 在挂载点是相对路径（如 '/text'），
+  // 必须用 req.originalUrl 检查原始路径才能正确匹配。
   keyGenerator: (req, res) => ipKeyGenerator(req, res),
-  skip: (req) => !req.path.startsWith('/api/analyze-'),
+  skip: (req) => !req.originalUrl.startsWith('/api/analyze-'),
 });
 app.use('/api/analyze-', analyzeLimiter);
 
