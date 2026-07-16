@@ -24,8 +24,14 @@ import os
 import re
 import sys
 import time
+import threading
 from collections import Counter
 from pathlib import Path
+
+# 抑制第三方库 causallearn 内部的 tqdm 进度条输出，
+# 这些进度条走 stderr 会被 Web UI 误显示为大量 ⚠ 噪声。
+if 'TQDM_DISABLE' not in os.environ:
+    os.environ['TQDM_DISABLE'] = '1'
 
 import numpy as np
 
@@ -55,6 +61,35 @@ def _stage(stage: str, message: str, progress: float = None):
         "message": message,
         "progress": round(progress, 2) if progress is not None else None,
     })
+
+
+# ── 长耗时阶段心跳 ─────────────────────────────────────────────────────
+# DoWhy 的 estimate_effect / refute_estimate 在 DEEP 模式下可能单次阻塞
+# 1-3 分钟且不提供进度回调。后台线程每 5 秒向终端日志发射一条心跳。
+def _heartbeat_log(label: str, interval: float = 5.0):
+    """返回 (blocking_fn) -> blocking_fn 的包装器。
+
+    用法:
+        result = _heartbeat_log("Bootstrap 估计 ATE")(lambda: bridge.estimate())
+    """
+    def _wrap(blocking_fn):
+        stop = threading.Event()
+
+        def _beat():
+            t0 = time.perf_counter()
+            while not stop.is_set():
+                elapsed = time.perf_counter() - t0
+                _log("info", f"⏳ {label} — 已运行 {elapsed:.0f}s")
+                stop.wait(interval)
+
+        t = threading.Thread(target=_beat, daemon=True)
+        t.start()
+        try:
+            return blocking_fn()
+        finally:
+            stop.set()
+            t.join(timeout=1)
+    return _wrap
 
 
 # ── debt-10：结果 Schema 校验 ─────────────────────────────────────────
@@ -451,7 +486,9 @@ def main():
         confidence_method = "OLS-analytic"
         _log("info", f"ATE={ate:.4f}, 95% CI=[{ci[0]:.4f}, {ci[1]:.4f}] (fast OLS)")
     else:
-        estimate = bridge.estimate()
+        # DEEP 模式：DoWhy bootstrap 估计可能耗时 1-5 分钟，
+        # 后台线程每 5 秒向终端日志发射心跳 "⏳ ... 已运行 Ns"
+        estimate = _heartbeat_log("Bootstrap 估计 ATE")(lambda: bridge.estimate())
         ci = DoWhy14Adapter.get_confidence_interval(estimate)
         confidence_method = "bootstrap" if not bridge.simulation else "SEM-analytic"
         _log("info", f"ATE={estimate.value:.4f}, 95% CI=[{ci[0]:.4f}, {ci[1]:.4f}]")
@@ -461,7 +498,7 @@ def main():
     if run_refuters:
         timer.start("refute")
         _stage("refute", "正在运行反驳测试 (3 refuters)...", 0.80)
-        refutations = bridge.refute()
+        refutations = _heartbeat_log("反驳测试 (3 refuters)")(lambda: bridge.refute())
         n_refuted = sum(1 for r in refutations.values()
                         if bool(getattr(getattr(r, '_check', None), 'refuted',
                                         getattr(r, 'refuted', False))))
@@ -682,6 +719,7 @@ def _run_stability_analysis(bridge, tokens, concept_names, window_size, threshol
 
     if valid_filter is None:
         valid_filter = is_valid_concept
+
 
     rng = np.random.default_rng(42)
     n_bootstrap = 30

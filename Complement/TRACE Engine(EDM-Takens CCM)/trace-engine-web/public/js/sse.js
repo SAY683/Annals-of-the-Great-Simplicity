@@ -84,6 +84,8 @@ function formatDuration(seconds) {
 function updateStats(stats) {
   if (!stats || !superStats) return;
   superStats.style.display = 'block';
+  const lbl = document.getElementById('statsLabel');
+  if (lbl) lbl.textContent = stats.label || '处理中';
   statsRate.textContent = stats.rate != null ? stats.rate.toFixed(1) : '--';
   statsProcessed.textContent = stats.processed_pairs != null ? stats.processed_pairs.toLocaleString() : '--';
   statsTotal.textContent = stats.total_pairs != null ? stats.total_pairs.toLocaleString() : '--';

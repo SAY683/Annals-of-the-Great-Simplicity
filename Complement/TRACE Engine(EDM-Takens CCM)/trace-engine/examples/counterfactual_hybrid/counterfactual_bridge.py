@@ -715,9 +715,15 @@ class TRACE2DoWhy:
 
     # ── 步骤 4: 反驳测试 ─────────────────────────────────────────────
 
-    def refute(self) -> dict:
+    def refute(self, progress_callback=None) -> dict:
         """
         三层反驳测试。DoWhy 0.14 兼容: 用偏差度判断 refuted。
+
+        Parameters
+        ----------
+        progress_callback : callable or None
+            可选的进度回调，签名为 callback(idx: int, total: int, label: str)。
+            在每次反驳测试前调用，用于 Web UI 实时进度显示。
         """
         if self.estimate_result is None:
             self.estimate()
@@ -744,7 +750,9 @@ class TRACE2DoWhy:
                 module="statsmodels.regression.linear_model",
             )
 
-            for method_name, label in refuters:
+            for idx, (method_name, label) in enumerate(refuters):
+                if progress_callback:
+                    progress_callback(idx + 1, len(refuters), label)
                 try:
                     result = self.model.refute_estimate(
                         self.identified_estimand,

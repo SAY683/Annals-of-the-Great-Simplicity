@@ -68,8 +68,8 @@ const CONFIG = {
   maxTextLength: parseInt(process.env.TRACE_MAX_TEXT_LENGTH || '500000', 10),
   pythonCmd: process.env.TRACE_PYTHON_CMD || 'python',
   maxConcurrentJobs: parseInt(process.env.TRACE_MAX_CONCURRENT || '2', 10),
-  jobTimeoutMs: parseInt(process.env.TRACE_JOB_TIMEOUT_MS || '300000', 10),
-  deepJobTimeoutMs: parseInt(process.env.TRACE_DEEP_JOB_TIMEOUT_MS || '900000', 10), // DEEP 模式专用：反驳+六战士+稳定性 需较长时间
+  jobTimeoutMs: parseInt(process.env.TRACE_JOB_TIMEOUT_MS || '600000', 10),
+  deepJobTimeoutMs: parseInt(process.env.TRACE_DEEP_JOB_TIMEOUT_MS || '1320000', 10), // DEEP 模式：反驳+六战士+稳定性 最长约 22 分钟
   bridgeConfig: process.env.TRACE_BRIDGE_CONFIG || '',
 };
 
