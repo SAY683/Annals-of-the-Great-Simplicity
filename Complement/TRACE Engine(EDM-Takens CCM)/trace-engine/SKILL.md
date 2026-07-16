@@ -67,7 +67,7 @@ Layer 2: Configuration Audit        → seq_len, threshold, VRAM safety
 Layer 3: CCM Cross-Validation       → TRACE vs CCM convergence
 Layer 4: DoWhy Formal Inference     → Model → Identify → Estimate → Refute
 Layer 5: Pearl Counterfactual       → Abduction → Action → Prediction
-Layer 6: causallearn Graph Search   → PC / FCI / GES independent check
+Layer 6: causallearn Graph Search   → PC / GES independent check
 ```
 
 ### 六维诊断矩阵
@@ -79,7 +79,7 @@ Layer 6: causallearn Graph Search   → PC / FCI / GES independent check
 | 3 | 🟡 | 时序节拍器 | 套路探测器 | EDM ρ | 时间结构骨架 | 叙事文 |
 | 4 | ⚫ | 混沌暗杀者 | X光机 | HAVOK | 隐藏驱动力 | 因果矩阵 > 50×50 |
 | 5 | 🟡 | 反事实造物主 | 思想实验引擎 | DoWhy+Pearl CF | 可识别性+反事实 | 有向路径 |
-| 6 | ⬜ | 独立验证者 | 第三人 | PC/FCI/GES | 统计因果发现 | 大数据 (N >> V) |
+| 6 | ⬜ | 独立验证者 | 第三人 | PC/GES | 统计因果发现 | 大数据 (N >> V) |
 
 **核心原则**: 每个组件测量不同物理维度；组件的“失败”也是诊断信号。
 六战士合体 = **因果拓扑画像 (Complete Topological Portrait)**。

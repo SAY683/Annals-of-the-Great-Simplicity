@@ -2,7 +2,7 @@
 TRACE → DoWhy Counterfactual Bridge v2
 =======================================
 将 TRACE 引擎的因果发现结果桥接到 DoWhy 的正式因果推断框架。
-v2 新增: DoWhy 0.14 兼容 + causallearn (PC/FCI/GES) + Graphviz 可视化。
+v2 新增: DoWhy 0.14 兼容 + causallearn (PC/GES) + Graphviz 可视化。
 
 六合一架构:
   Layer 1-2: TRACE Auditor (环境+配置)     ← trace_plus.py
@@ -20,7 +20,7 @@ v2 新增: DoWhy 0.14 兼容 + causallearn (PC/FCI/GES) + Graphviz 可视化。
     bridge.estimate()
     bridge.refute()
     bridge.counterfactual_scan(n_top_edges=5)
-    bridge.causallearn_validate()  # NEW: PC/FCI/GES 独立验证
+    bridge.causallearn_validate()  # NEW: PC/GES 独立验证
     bridge.visualize("causal_graph")  # NEW: DAG 可视化
     print(bridge.report())
 
@@ -275,7 +275,8 @@ class PearlCounterfactual:
 
 def estimate_sem_from_data(adj_matrix, data, concept_names,
                           regularization: Optional[str] = None,
-                          alpha: float = 0.01):
+                          alpha: float = 0.01,
+                          log_fn=None):
     """
     从数据和因果图（邻接矩阵）估计线性 SEM 的系数。
     对每个子节点 Y，用其所有父节点 X 做回归: Y ~ Σβ_i·X_i
@@ -288,6 +289,8 @@ def estimate_sem_from_data(adj_matrix, data, concept_names,
         lasso -> Lasso (稀疏化)
     alpha : float, default 0.01
         正则化强度。
+    log_fn : callable, optional
+        日志回调（如 TRACE2DoWhy._log），用于记录回归失败而非静默吞异常。
     """
     V = len(concept_names)
     coeff = np.zeros((V, V))
@@ -321,8 +324,9 @@ def estimate_sem_from_data(adj_matrix, data, concept_names,
                 beta = np.linalg.lstsq(X, y, rcond=None)[0]
             for k, pi in enumerate(parents):
                 coeff[pi, j] = float(beta[k])
-        except np.linalg.LinAlgError:
-            pass
+        except np.linalg.LinAlgError as e:
+            if log_fn is not None:
+                log_fn(f"SEM 估计失败: {e}")
 
     return coeff
 
@@ -333,7 +337,7 @@ def estimate_sem_from_data(adj_matrix, data, concept_names,
 
 class CausalLearnValidator:
     """
-    使用 causallearn 的 PC、FCI、GES 算法作为独立因果发现方法，
+    使用 causallearn 的 PC、GES 算法作为独立因果发现方法，
     与 TRACE 的结果进行交叉验证。
     """
 
@@ -350,6 +354,11 @@ class CausalLearnValidator:
         self.concept_names = concept_names
         self._name_to_idx = {n: i for i, n in enumerate(concept_names)}
         self.results: dict = {}
+        self.logs: list[str] = []  # 解析/检查过程中的诊断日志
+
+    def _log(self, msg: str):
+        """记录诊断日志，避免静默吞异常"""
+        self.logs.append(msg)
 
     def run_pc(self, alpha: float = 0.05, **kwargs) -> dict:
         """运行 PC (Peter-Clark) 算法"""
@@ -389,6 +398,8 @@ class CausalLearnValidator:
         except Exception as e:
             return {'error': str(e), 'edges': []}
 
+    # FCI 暂未实现，预留接口（如需支持隐藏混淆因子，可在此处添加 run_fci 方法）
+
     def _parse_causallearn_graph(self, G) -> list:
         """将 causallearn 的 GeneralGraph 解析为边列表"""
         edges = []
@@ -419,8 +430,8 @@ class CausalLearnValidator:
                         'target': self.concept_names[j],
                         'direction': direction,
                     })
-        except Exception:
-            pass
+        except Exception as e:
+            self._log(f"causallearn 图解析失败: {e}")
         return edges
 
     def compare_with_trace(self, trace_edges: list) -> dict:
@@ -528,7 +539,7 @@ class TRACE2DoWhy:
 
     v2 新增:
     - DoWhy 0.14 API 兼容层
-    - causallearn (PC/FCI/GES) 独立验证
+    - causallearn (PC/GES) 独立验证
     - Graphviz DAG 可视化
     - Pearl 三步反事实推理（独立实现，不依赖 dowhy-gcm）
     """
@@ -538,11 +549,11 @@ class TRACE2DoWhy:
         adj_matrix: np.ndarray,
         token_list: list,
         tokenizer=None,
-        threshold: float = 0.5,
+        threshold: float = 0.03,
         concept_min_freq: int = 2,
         simulation: bool = False,
         random_state: int = 42,
-        max_edges_for_dowhy: int = 20,
+        max_edges_for_dowhy: int = 8,
         filter_mode: str = "top_n",
         filter_percentile: float = 90,
         sem_regularization: Optional[str] = None,
@@ -616,8 +627,23 @@ class TRACE2DoWhy:
         # 诊断日志
         self.log: list[str] = []
 
+        # 六战士诊断卡片（外部通过 set_six_warriors_cards 注入后，
+        # report() 会在末尾追加一致性检查章节）
+        self.six_warriors_cards: dict = {}
+
     def _log(self, msg: str):
         self.log.append(msg)
+
+    def set_six_warriors_cards(self, cards: dict):
+        """注入六战士诊断卡片，供 report() 输出一致性检查章节。
+
+        Parameters
+        ----------
+        cards : dict
+            键为战士标识（如 'trace'/'ccm'/'dowhy_cf'/'causallearn'），
+            值为含 ``status`` 与 ``verdict`` 属性的卡片对象（如 six_warriors.WarriorCard）。
+        """
+        self.six_warriors_cards = cards or {}
 
     @property
     def mode_name(self) -> str:
@@ -842,6 +868,7 @@ class TRACE2DoWhy:
             bin_adj, raw_data, self.concept_names,
             regularization=self.sem_regularization,
             alpha=self.sem_alpha,
+            log_fn=self._log,
         )
 
         # 初始化 Pearl 反事实引擎
@@ -1340,6 +1367,14 @@ class TRACE2DoWhy:
         lines = [
             "# TRACE + DoWhy + Counterfactual 综合诊断报告",
             "",
+        ]
+        # 降级透明化: 模拟模式下 ATE/CI 是合成值，需显著警告避免误读
+        if self.simulation:
+            lines.extend([
+                "> ⚠ 模拟模式 — ATE/CI 是合成值（SimulationModel），不代表真实 do-calculus 结论",
+                "",
+            ])
+        lines.extend([
             "## 1. 因果图摘要",
             f"- 概念节点: {n_concepts}",
             f"- 显著边 (ΔNLL > {self.threshold}): {n_edges}",
@@ -1347,7 +1382,7 @@ class TRACE2DoWhy:
             f"- causallearn: {'可用' if _CAUSALLEARN_AVAILABLE else '未安装'}",
             f"- Graphviz: {'可用' if _GRAPHVIZ_AVAILABLE else '未安装'}",
             "",
-        ]
+        ])
 
         if self.significant_edges:
             lines.append("### Top-5 因果边 (TRACE ΔNLL)")
@@ -1443,6 +1478,23 @@ class TRACE2DoWhy:
         lines.append("## 诊断日志")
         for log_entry in self.log:
             lines.append(f"- {log_entry}")
+
+        # 六战士一致性检查（如果 cards 已外部计算并附加到 bridge）
+        if self.six_warriors_cards:
+            lines.append("")
+            lines.append("## 六战士一致性检查")
+            for key, card in self.six_warriors_cards.items():
+                status = getattr(card, 'status', '')
+                verdict = getattr(card, 'verdict', '')
+                warrior_id = getattr(card, 'warrior_id', key)
+                # 兼容 WarriorCard (deployed/fallback/unavailable) 与 ok/warn 语义
+                if status in ("ok", "deployed"):
+                    status_icon = "✓"
+                elif status in ("warn", "fallback", "ready"):
+                    status_icon = "⚠"
+                else:
+                    status_icon = "✗"
+                lines.append(f"- {status_icon} {warrior_id}: {verdict}")
 
         return "\n".join(lines)
 
@@ -1543,7 +1595,7 @@ class SimulationModel:
 # 便捷工厂函数
 # ══════════════════════════════════════════════════════════════════════
 
-def from_trace_output(trace_result: dict, threshold: float = 0.5,
+def from_trace_output(trace_result: dict, threshold: float = 0.03,
                       concept_min_freq: int = 2, **kwargs) -> TRACE2DoWhy:
     """从 TRACE 引擎的标准输出字典创建桥接实例"""
     return TRACE2DoWhy(
@@ -1556,7 +1608,7 @@ def from_trace_output(trace_result: dict, threshold: float = 0.5,
     )
 
 
-def quick_analysis(adj_matrix, token_list, threshold=0.5):
+def quick_analysis(adj_matrix, token_list, threshold=0.03):
     """一键运行完整的六合一管线并返回 bridge"""
     bridge = TRACE2DoWhy(adj_matrix, token_list, threshold=threshold)
     bridge.build_model()

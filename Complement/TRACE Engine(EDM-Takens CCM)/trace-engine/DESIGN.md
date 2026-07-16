@@ -30,7 +30,7 @@
 ├─────────────────────────────────────────────────────────────┤
 │  LAYER 6: causallearn Independent Validation                │
 │  "Do constraint/score-based searches agree?"                │
-│  - PC / FCI / GES                                           │
+│  - PC / GES                                                 │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -48,7 +48,7 @@
 | **EDM** | 节拍器 (Metronome) | Temporal rigidity / structure | ρ predictability of discourse markers |
 | **HAVOK** | X光机 (X-ray) | Hidden singularities / forcing | Linear vs nonlinear energy partition |
 | **DoWhy + Pearl Counterfactual** | 法槌+反事实镜 (Gavel+Mirror) | Formal identifiability + what-if reasoning | ATE + 95% CI; ITE; Pearl 3-step |
-| **causallearn** | 第三人 (Third Witness) | Independent graph search | PC / FCI / GES edges |
+| **causallearn** | 第三人 (Third Witness) | Independent graph search | PC / GES edges |
 
 ## Composite Diagnosis Patterns
 

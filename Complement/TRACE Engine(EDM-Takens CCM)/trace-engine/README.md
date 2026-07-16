@@ -120,7 +120,7 @@ trace-engine/
 | 3 | EDM | 节拍器 (Metronome) | Simplex projection ρ | Temporal rigidity | Narrative |
 | 4 | HAVOK | X光机 (X-ray) | Koopman decomposition | Hidden forcing terms | Large causal matrices |
 | 5 | DoWhy+CF | 反事实镜 (Mirror) | do-calculus + Pearl 3-step | Identifiability + what-if | Directed paths |
-| 6 | causallearn | 第三人 (Third Witness) | PC/FCI/GES | Independent graph search | Sufficient samples |
+| 6 | causallearn | 第三人 (Third Witness) | PC/GES | Independent graph search | Sufficient samples |
 
 A component's **failure** is itself a diagnostic signal: CCM failing on a text
 with high EDM ρ and linear HAVOK structure strongly suggests a narrative rather

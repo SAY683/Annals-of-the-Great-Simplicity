@@ -1753,8 +1753,12 @@
       try {
         const res = await fetch(`/api/cancel/${currentJobId}`, { method: 'POST' });
         const data = await res.json();
-        log('warn', data.message);
-        showToast(data.message, 'info');
+        // S11：统一错误响应访问方式——失败读 data.error，成功读 data.message/data.reason
+        const msg = data.success
+          ? (data.message || `已取消（${data.reason || 'process_terminated'}）`)
+          : (data.error || '取消失败');
+        log('warn', msg);
+        showToast(msg, data.success ? 'info' : 'error');
       } catch (err) {
         showToast(err.message, 'error');
       }
@@ -2283,7 +2287,7 @@
         const tr = document.createElement('tr');
         const cls = ref.refuted ? 'fail' : 'pass';
         const metricStr = ref.display_metric != null
-          ? `${escapeHtml(ref.display_label)}=${ref.display_metric < 0.001 ? '<0.01%' : safeFmt(ref.display_metric * 100, 2) + '%'}`
+          ? `${escapeHtml(ref.display_label)}=${ref.display_metric < 0.001 ? '&lt;0.01%' : safeFmt(ref.display_metric * 100, 2) + '%'}`
           : '-';
         tr.innerHTML = `<td>${escapeHtml(ref.method)}</td><td>${safeFmt(r.ate, 4)}</td><td>${safeFmt(ref.new_effect, 4)}</td><td>${metricStr}</td><td><span class="badge ${cls}">${ref.refuted ? 'REFUTED' : 'ROBUST'}</span></td>`;
         refuteBody.appendChild(tr);

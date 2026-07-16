@@ -56,7 +56,7 @@
         │   外展          干预         预测                              │
         │                               │                               │
         │  LAYER 6: causallearn 独立验证 │  ← CausalLearnValidator       │
-        │  "图搜索算法同意吗？"           │  PC + FCI + GES                │
+        │  "图搜索算法同意吗？"           │  PC + GES                      │
         └───────────────────────────────┼───────────────────────────────┘
                                         │
                          ┌──────────────┴───────────────────┐
@@ -273,8 +273,10 @@ ITE = +0.25
 | 算法 | 类型 | 原理 |
 |------|------|------|
 | **PC** (Peter-Clark) | Constraint-based | 条件独立性检验 → 骨架学习 → 方向定向 |
-| **FCI** (Fast Causal Inference) | Constraint-based | PC 的扩展，允许隐藏混淆因子 |
 | **GES** (Greedy Equivalence Search) | Score-based | 贪心搜索 BIC 分数最优的等价类 |
+
+> 注: FCI (Fast Causal Inference) 暂未实现。FCI 是 PC 的扩展，允许隐藏混淆因子；
+> 如需支持，可在 `CausalLearnValidator` 中添加 `run_fci` 方法。
 
 ### 6.2 TRACE vs causallearn 比较
 
@@ -360,7 +362,7 @@ ITE = +0.25
 | `pandas` | ≥2.0 | DoWhy 数据接口 | 推荐 |
 | `statsmodels` | ≥0.14 | OLS 回归（DoWhy 后端） | ✓ (DoWhy 依赖) |
 | `scikit-learn` | ≥1.5 | 倾向得分、ML 估计器 | 推荐 |
-| `causal-learn` | ≥0.1.4 | PC/FCI/GES 独立验证 | 可选 |
+| `causal-learn` | ≥0.1.4 | PC/GES 独立验证 | 可选 |
 | `graphviz` | ≥0.20 (Python) + binary | DAG 可视化 | 可选 |
 
 ### 8.3 Graphviz 系统二进制

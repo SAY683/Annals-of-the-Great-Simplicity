@@ -12,7 +12,7 @@ $pyKilled = 0
 $childKilled = 0
 
 function Stop-ProcessTree($pid) {
-    Get-WmiObject Win32_Process | Where-Object { $_.ParentProcessId -eq $pid } | ForEach-Object {
+    Get-CimInstance Win32_Process | Where-Object { $_.ParentProcessId -eq $pid } | ForEach-Object {
         Stop-ProcessTree $_.ProcessId
         try {
             Stop-Process -Id $_.ProcessId -Force
@@ -21,7 +21,7 @@ function Stop-ProcessTree($pid) {
     }
 }
 
-Get-WmiObject Win32_Process -Filter "name='node.exe'" | ForEach-Object {
+Get-CimInstance Win32_Process -Filter "name='node.exe'" | ForEach-Object {
     $cmd = $_.CommandLine
     if ($cmd -and ($cmd -like '*server.js*') -and ($cmd -notlike '*vite*')) {
         Write-Host "正在结束 Node 进程 PID=$($_.ProcessId) CMD=$cmd" -ForegroundColor Yellow
@@ -31,7 +31,7 @@ Get-WmiObject Win32_Process -Filter "name='node.exe'" | ForEach-Object {
     }
 }
 
-Get-WmiObject Win32_Process -Filter "name='python.exe'" | ForEach-Object {
+Get-CimInstance Win32_Process -Filter "name='python.exe'" | ForEach-Object {
     $cmd = $_.CommandLine
     if ($cmd -and (($cmd -like '*py_bridge.py*') -or ($cmd -like '*llama_worker.py*'))) {
         Write-Host "正在结束 Python 进程 PID=$($_.ProcessId)" -ForegroundColor Yellow

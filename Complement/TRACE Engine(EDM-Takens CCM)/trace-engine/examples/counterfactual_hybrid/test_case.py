@@ -103,7 +103,7 @@ def test_1_aggregation():
     """Token → Concept 聚合"""
     banner("测试 1: Token 级 → 概念级聚合")
     token_adj = build_token_adj_from_concept_adj()
-    bridge = TRACE2DoWhy(token_adj, SIMULATED_TOKENS, threshold=0.5,
+    bridge = TRACE2DoWhy(token_adj, SIMULATED_TOKENS, threshold=0.03,
                          concept_min_freq=2)
     bridge.aggregate_concepts()
 
@@ -322,7 +322,7 @@ def test_10_edge_cases(bridge):
     print("\n  10a: 空因果图")
     empty_adj = np.zeros((5, 5))
     empty_tokens = ["价格", "成本", "需求", "供给", "利润"]
-    b1 = TRACE2DoWhy(empty_adj, empty_tokens, threshold=0.5,
+    b1 = TRACE2DoWhy(empty_adj, empty_tokens, threshold=0.03,
                      concept_min_freq=1)
     b1.build_model()
     assert len(b1.significant_edges) == 0
@@ -333,7 +333,7 @@ def test_10_edge_cases(bridge):
     unique_tokens = ["价格", "成本", "需求", "供给", "利润"]
     adj = np.random.default_rng(42).uniform(0, 3, (5, 5))
     adj = np.triu(adj, 1)
-    b2 = TRACE2DoWhy(adj, unique_tokens, threshold=0.5,
+    b2 = TRACE2DoWhy(adj, unique_tokens, threshold=0.03,
                      concept_min_freq=2)
     # 仅调用 aggregate_concepts 验证 <other> 归档；
     # build_model 在概念节点 <2 时会抛 ValueError，此处不调用
@@ -361,7 +361,7 @@ def test_10_edge_cases(bridge):
     mixed_tokens = ["a", "e", "i", "o", "u", "价格", "成本", "价格", "成本", "价格", "成本"]
     mixed_adj = np.random.default_rng(42).uniform(0, 3, (11, 11))
     mixed_adj = np.triu(mixed_adj, 1)
-    b3 = TRACE2DoWhy(mixed_adj, mixed_tokens, threshold=0.5,
+    b3 = TRACE2DoWhy(mixed_adj, mixed_tokens, threshold=0.03,
                      concept_min_freq=2)
     b3.aggregate_concepts()
     # concept_map 中不应包含任何 ASCII 单字母

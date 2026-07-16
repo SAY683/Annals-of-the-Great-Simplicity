@@ -16,6 +16,9 @@
 # ═══════════════════════════════════════════════════════
 # TRACE → DoWhy 桥接参数
 # ═══════════════════════════════════════════════════════
+# 注意: 以下顶层 trace2dowhy 值仅在 load_presets('trace2dowhy') 时直接生效；
+#       使用 load_presets('<场景>') (如 standard/llama) 时，场景预设会覆盖这些值。
+#       TRACE2DoWhy.__init__ 的默认参数已与顶层值对齐，保证无参调用一致。
 trace2dowhy:
   threshold: 0.03          # ΔNLL 因果边显著性阈值 {0.001-5.0}；过拟合 LLaMA 模型 ΔNLL 偏低，默认取模型文档推荐标准值 0.03
   concept_min_freq: 2      # Token 最小出现次数 → 概念节点 {1-10}

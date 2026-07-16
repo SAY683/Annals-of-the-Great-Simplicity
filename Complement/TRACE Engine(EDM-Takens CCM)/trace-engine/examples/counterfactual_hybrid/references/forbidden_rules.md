@@ -61,8 +61,10 @@
 **Principle**: The Pearl counterfactual query relies on SEM coefficients estimated via OLS. If N is small relative to the number of variables (V), the coefficient estimates are unstable — and the counterfactual query inherits that instability.
 
 **Enforcement**:
-- If N < 5*V → WARN: "SEM coefficients may be unstable (N={n}, V={v}). Counterfactual ITE has wide error bars."
-- If N < 2*V → FAIL: "Insufficient data for SEM estimation."
+- If N < 5*V_eff → WARN: "SEM coefficients may be unstable (N={n}, V_eff={v}). Counterfactual ITE has wide error bars."
+- If N < 2*V_eff → FAIL: "Insufficient data for SEM estimation."
+
+> **Note**: 此处 V_eff 指 DOT 图有效概念数（经概念过滤后实际参与 SEM 估计的节点数），而非原始变量总数 V。
 
 **Implementation**: `counterfactual_bridge.py` § `estimate_sem_from_data()`
 
@@ -87,8 +89,8 @@
 **Principle**: DoWhy's CausalModel builds an nx.DiGraph from the DOT string. If a node declared as treatment or outcome is not in the DOT graph, nx raises `NetworkXError` — the entire pipeline crashes.
 
 **Enforcement**:
-- When building DOT graph, declare ALL concept nodes (even isolated ones) before adding edges
-- Verify: every concept in `concept_names` (except `<other>`) appears in DOT
+- When building DOT graph, declare only the nodes that appear in valid (filtered) edges — not ALL concept nodes. Declaring all concept nodes on large graphs makes DoWhy extremely slow or causes it to crash.
+- Verify: every treatment/outcome variable appears in DOT (i.e., is an endpoint of at least one significant edge)
 
 **Implementation**: `counterfactual_bridge.py` § `build_model()` — FIXED in v2.
 

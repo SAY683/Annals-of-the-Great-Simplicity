@@ -86,8 +86,11 @@ except Exception as e:
 `;
   try {
     fs.writeFileSync(tmpFile, script, { encoding: 'utf-8' });
+    // S18：统一 Python 命令变量——优先 TRACE_PYTHON_CMD（与 CONFIG.pythonCmd 一致），
+    // 回退 PYTHON_CMD（向后兼容），最后回退 'python'，避免探测与分析使用不同解释器
+    const probePythonCmd = process.env.TRACE_PYTHON_CMD || process.env.PYTHON_CMD || 'python';
     const result = require('child_process').execSync(
-      `${process.env.PYTHON_CMD || 'python'} "${tmpFile}"`,
+      `${probePythonCmd} "${tmpFile}"`,
       { encoding: 'utf-8', timeout: 15000, env: { ...process.env, PYTHONIOENCODING: 'utf-8' } }
     );
     for (const line of result.trim().split(/\r?\n/)) {
@@ -642,12 +645,15 @@ function validateAnalysisInput(text, mode, config) {
   if (!['light', 'deep', 'super'].includes(mode)) {
     return { ok: false, error: 'mode 必须是 light、deep 或 super', code: 'INVALID_MODE' };
   }
+  // S16：SUPER 模式依赖探测到的 LLaMA 模型，未探测到时直接禁用而非回退硬编码白名单，
+  // 避免允许不存在的模型导致运行时失败
+  if (mode === 'super' && PROBED_LLAMA_MODELS.length === 0) {
+    return { ok: false, error: 'SUPER 模式不可用：未探测到任何 LLaMA 模型，请检查模型目录或 TRACE_ENGINE_SKILL_DIR 配置', code: 'SUPER_NO_MODELS', field: 'model' };
+  }
   if (config && typeof config === 'object') {
-    // SUPER 模式下 model 参数白名单校验
+    // SUPER 模式下 model 参数白名单校验（仅基于探测结果，不再回退硬编码白名单）
     if (mode === 'super' && config.model !== undefined) {
-      const allowedModels = PROBED_LLAMA_MODELS.length > 0
-        ? PROBED_LLAMA_MODELS.map((m) => m.id)
-        : ['shehui-llama', 'shenji-llama', 'shehui-llama-v4-archive'];
+      const allowedModels = PROBED_LLAMA_MODELS.map((m) => m.id);
       if (!allowedModels.includes(config.model)) {
         return { ok: false, error: `SUPER 模式不支持模型 ${config.model}，可用: ${allowedModels.join(', ')}`, code: 'INVALID_MODEL', field: 'model' };
       }
@@ -708,6 +714,13 @@ const upload = multer({
   },
 });
 
+// 发送 SSE 事件到客户端
+// S4：done 事件 code 语义统一约定（前端据此判定任务终态）：
+//   0   = 正常完成（LIGHT/DEEP 为 Python 退出码 0，SUPER 为 finish(0)）
+//   124 = 超时（SUPER 安全兜底 24h 超时 / 阶段 hang 看门狗触发）
+//   125 = 取消（用户主动停止 / 客户端断开连接）
+//   -1  = 错误（Python 异常退出 / SUPER 启动或运行错误 / Worker 退出）
+//   其他非零值 = LIGHT/DEEP 模式 Python 子进程原始退出码（如 1/2）
 function sendSSE(res, event, data) {
   res.write(`event: ${event}\n`);
   res.write(`data: ${JSON.stringify(data)}\n\n`);
@@ -723,6 +736,21 @@ function recordJob(id, mode, status, error = null, meta = {}) {
   const existing = jobHistory.find((j) => j.id === id);
   // 当 mode 为 null 时保留已有记录的 mode（用于 gracefulShutdown 等场景）
   const effectiveMode = mode || (existing ? existing.mode : 'unknown');
+  // S7：历史记录不存全量 text，只存 textHash + textPreview（前 200 字符摘要），
+  // 全量 text 落盘到 work/inputs/<id>.txt 供 /api/retry 读取，避免 job_history.json 膨胀
+  const entryMeta = { ...meta };
+  if (entryMeta.text !== undefined) {
+    const fullText = entryMeta.text;
+    entryMeta.textHash = crypto.createHash('sha256').update(fullText).digest('hex');
+    entryMeta.textPreview = fullText.slice(0, 200);
+    try {
+      ensureDir(path.join(WORK_DIR, 'inputs'));
+      fs.writeFileSync(path.join(WORK_DIR, 'inputs', `${id}.txt`), fullText, 'utf-8');
+    } catch (err) {
+      logToFile('warn', `保存任务输入文本失败 job=${id}: ${err.message}`);
+    }
+    delete entryMeta.text;
+  }
   const entry = {
     id,
     mode: effectiveMode,
@@ -734,11 +762,11 @@ function recordJob(id, mode, status, error = null, meta = {}) {
       ? Date.now() - new Date(existing.createdAt).getTime()
       : undefined,
     error,
-    ...meta,
+    ...entryMeta,
   };
   const idx = jobHistory.findIndex((j) => j.id === id);
   if (idx >= 0) {
-    // 保留已有字段（如 text、config），避免后续更新时覆盖
+    // 保留已有字段（如 textHash、config），避免后续更新时覆盖
     jobHistory[idx] = { ...jobHistory[idx], ...entry };
   } else {
     jobHistory.push(entry);
@@ -773,8 +801,9 @@ function cleanupOldOutputs() {
 }
 
 // 启动时与周期性清理
-setInterval(cleanupOldOutputs, Math.min(CONFIG.outputTtlMs, 3600000));
-setTimeout(cleanupOldOutputs, 5000);
+// S6：保存 timer 句柄，便于 gracefulShutdown 时清理，避免进程因未清除的定时器延迟退出
+const cleanupInterval = setInterval(cleanupOldOutputs, Math.min(CONFIG.outputTtlMs, 3600000));
+const startupCleanupTimer = setTimeout(cleanupOldOutputs, 5000);
 
 /**
  * 流式调用 Python 桥接脚本分析文本
@@ -1407,10 +1436,10 @@ function isValidId(id) {
 app.get('/api/result/:id', (req, res) => {
   // P1-6：校验 ID 格式，避免路径遍历
   if (!isValidId(req.params.id)) {
-    return res.status(400).json({ error: '非法的任务 ID' });
+    return res.status(400).json({ success: false, error: '非法的任务 ID', code: 'ERROR' });
   }
   const resultPath = path.join(OUTPUT_DIR, req.params.id, 'result.json');
-  if (!fs.existsSync(resultPath)) return res.status(404).json({ error: '结果不存在' });
+  if (!fs.existsSync(resultPath)) return res.status(404).json({ success: false, error: '结果不存在', code: 'ERROR' });
   res.setHeader('Content-Type', 'application/json');
   res.sendFile(resultPath);
 });
@@ -1418,10 +1447,10 @@ app.get('/api/result/:id', (req, res) => {
 app.get('/api/report/:id', (req, res) => {
   // P1-6：校验 ID 格式，避免路径遍历
   if (!isValidId(req.params.id)) {
-    return res.status(400).json({ error: '非法的任务 ID' });
+    return res.status(400).json({ success: false, error: '非法的任务 ID', code: 'ERROR' });
   }
   const reportPath = path.join(OUTPUT_DIR, req.params.id, 'report.md');
-  if (!fs.existsSync(reportPath)) return res.status(404).json({ error: '报告不存在' });
+  if (!fs.existsSync(reportPath)) return res.status(404).json({ success: false, error: '报告不存在', code: 'ERROR' });
   res.setHeader('Content-Type', 'text/markdown; charset=utf-8');
   res.sendFile(reportPath);
 });
@@ -1658,6 +1687,10 @@ app.get('/api/metrics', (_req, res) => {
     jobHistoryTotal: jobHistory.length,
     statusCounts,
     skillReady: validateSkillDir().ok,
+    // S17：暴露 LLaMA Worker 运行时状态，便于监控 SUPER 模式可用性与排队情况
+    llamaWorkerReady,
+    llamaWorkerBusy,
+    llamaWorkerJobWaiters: llamaWorkerJobWaiters.length,
     timestamp: new Date().toISOString(),
   });
 });
@@ -1704,16 +1737,38 @@ app.post('/api/retry/:id', async (req, res) => {
   if (!['error', 'timeout', 'cancelled'].includes(old.status)) {
     return res.status(400).json({ success: false, error: `当前状态 ${old.status} 不支持重试` });
   }
-  if (!old.text) {
-    return res.status(400).json({ success: false, error: '历史记录中未保留原始文本，无法重试' });
+  // S7：历史记录不再存全量 text，优先用 old.text（旧记录兼容），否则从 inputs 文件读取
+  let retryText = old.text;
+  if (!retryText) {
+    const inputPath = path.join(WORK_DIR, 'inputs', `${id}.txt`);
+    if (!fs.existsSync(inputPath)) {
+      return res.status(400).json({ success: false, error: '历史记录中未保留原始文本，无法重试' });
+    }
+    try {
+      retryText = fs.readFileSync(inputPath, 'utf-8');
+    } catch (err) {
+      return res.status(400).json({ success: false, error: `读取历史文本失败: ${err.message}` });
+    }
   }
   // SUPER 模式依赖常驻 LLaMA Worker 与 SSE 流，同步重试无法承载模型加载与流式输出。
   if (old.mode === 'super') {
     return res.status(400).json({ success: false, error: 'SUPER 模式不支持同步重试，请在前端重新提交分析', code: 'SUPER_RETRY_NOT_SUPPORTED', originalId: id });
   }
+  // S13：重试前对历史 text 与 config 重新走 validateAnalysisInput，
+  // 防止历史记录中过长的 text 或非法 config 绕过校验直接进入分析流程
+  let retryCfgObj = null;
+  if (old.config) {
+    try { retryCfgObj = JSON.parse(old.config); } catch (_) { retryCfgObj = null; }
+  }
+  const retryValidation = validateAnalysisInput(retryText, old.mode || 'light', retryCfgObj);
+  if (!retryValidation.ok) {
+    return res.status(400).json({ success: false, error: retryValidation.error, code: retryValidation.code || 'RETRY_VALIDATION_FAILED', field: retryValidation.field, originalId: id });
+  }
+  // 基于校验后已过滤未知字段的 cfgObj 重新序列化 config
+  const retryConfig = retryCfgObj && typeof retryCfgObj === 'object' ? JSON.stringify(retryCfgObj) : (old.config || '');
   const newId = uuidv4();
   try {
-    const data = await runPythonAnalysisSync(old.text, newId, old.mode || 'light', old.config || '');
+    const data = await runPythonAnalysisSync(retryText, newId, old.mode || 'light', retryConfig);
     res.json({ success: true, message: '重试任务已启动', originalId: id, newId, data });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -1741,16 +1796,34 @@ const server = app.listen(PORT, () => {
 });
 
 // 优雅关闭：收到终止信号时先停止接收新连接，再清理活跃任务
+// S6：修复多类缺陷——使用 killProcessWithFallback 防止僵尸进程、
+// 区分 SUPER 占位对象（无 kill 方法）、显式终止 LLaMA Worker、清理全局定时器
 function gracefulShutdown(signal) {
   console.log(`[${signal}] 正在优雅关闭服务...`);
   logToFile('info', `收到 ${signal}，开始优雅关闭`);
   server.close(() => {
-    for (const [id, py] of activeJobs.entries()) {
+    // 遍历活跃任务，区分真实子进程与 SUPER 占位对象分别处理
+    for (const [id, proc] of activeJobs.entries()) {
       try {
-        py.kill('SIGTERM');
+        if (proc && typeof proc.kill === 'function') {
+          // 真实子进程：SIGTERM 后 5 秒未退出则 SIGKILL 兜底
+          killProcessWithFallback(proc);
+        } else if (proc && typeof proc.cancel === 'function') {
+          // SUPER 占位对象（等待 Worker 中的任务）无 kill 方法，调用 cancel 标记取消
+          proc.cancel();
+        }
         recordJob(id, null, 'terminated_by_shutdown');
       } catch (_) {}
     }
+    // 显式终止常驻 LLaMA Worker，避免僵尸进程残留
+    if (llamaWorker) {
+      try { killProcessWithFallback(llamaWorker); } catch (_) {}
+      llamaWorker = null;
+      llamaWorkerReady = false;
+    }
+    // 清理全局定时器，避免进程因活跃句柄延迟退出
+    try { clearInterval(cleanupInterval); } catch (_) {}
+    try { clearTimeout(startupCleanupTimer); } catch (_) {}
     persistJobHistory();
     console.log('[shutdown] 服务已关闭');
     process.exit(0);

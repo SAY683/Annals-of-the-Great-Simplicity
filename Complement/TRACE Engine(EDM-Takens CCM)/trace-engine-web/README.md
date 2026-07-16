@@ -271,6 +271,7 @@ trace-engine-web/
 | `TRACE_PYTHON_CMD` | `python` | Python 可执行文件命令 |
 | `TRACE_MAX_CONCURRENT` | `2` | 最大并发分析任务数 |
 | `TRACE_JOB_TIMEOUT_MS` | `300000` | LIGHT / DEEP 单次分析超时时间（毫秒）；SUPER 模式不受此变量约束 |
+| `TRACE_STAGE_TIMEOUT_MS` | `900000` | SUPER 模式阶段性进度看门狗超时（毫秒），无 stage 更新则判定 hang |
 | `TRACE_BRIDGE_CONFIG` | `''` | 传给 Python 桥接器的 JSON 配置（阈值、窗口、最大概念数等） |
 | `TRACE_ROOT` | 自动探测 | 显式指定 TRACE 项目根目录（含 models/） |
 | `TRACE_MODEL_DTYPE` | `auto` | SUPER 模式模型加载精度：`auto` 默认 CUDA 优先 FP16，失败回退 FP32；设为 `fp32` 强制 FP32 |

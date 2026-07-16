@@ -503,7 +503,7 @@ def _deploy_dowhy_cf(bridge) -> WarriorCard:
 # ══════════════════════════════════════════════════════════════════════
 
 def _deploy_causallearn(bridge) -> WarriorCard:
-    card = WarriorCard("causallearn", "独立验证者", "PC/FCI/GES", color="⬜")
+    card = WarriorCard("causallearn", "独立验证者", "PC/GES", color="⬜")
 
     try:
         # 只对 top-12 高频概念运行（PC/GES 在全量概念上极慢）
@@ -658,7 +658,7 @@ def assemble_all_six(adj_matrix, token_list, bridge=None, text="", concept_names
         try:
             cards['causallearn'] = _deploy_causallearn(bridge)
         except Exception as e:
-            cards['causallearn'] = WarriorCard("causallearn", "独立验证者", "PC/FCI/GES",
+            cards['causallearn'] = WarriorCard("causallearn", "独立验证者", "PC/GES",
                                                status="unavailable", color="⬜",
                                                verdict=f"ERROR — {str(e)[:80]}")
 

@@ -99,6 +99,7 @@ python run_cli.py --text "你的因果分析文本"
 | `TRACE_ENGINE_SKILL_DIR` | 引擎 Skill 路径 | `...\trace-engine\examples\counterfactual_hybrid` |
 | `TRACE_PYTHON_CMD` | Python 命令 | `python` 或 `python3` |
 | `PORT` | Web 服务端口 | `3000` |
+| `TRACE_STAGE_TIMEOUT_MS` | SUPER 模式阶段性进度看门狗超时（毫秒），无 stage 更新则判定 hang | `900000` |
 
 ## 维护说明
 
