@@ -45,9 +45,14 @@ const _OFFLINE_FALLBACK_SUPER_SCHEMA = Object.assign({}, _OFFLINE_FALLBACK_SCHEM
 });
 
 // 极简离线预设兜底（仅当 /api/presets 不可达时使用）
+// 预设名与服务端 presets.yaml 对齐：demo/standard/deep/archival/llama
+// 同时保留旧名称别名（default→demo, sensitive→standard, broad→archival）兼容旧前端按钮
 const _OFFLINE_PRESETS = {
+  demo: { threshold: 0.03, window_size: 8, max_segments: 4, min_valid_tokens: 10 },
   default: { threshold: 0.03, window_size: 8, max_segments: 4, min_valid_tokens: 10 },
+  standard: { threshold: 0.3, window_size: 6, max_concepts: 16, concept_min_freq: 2, max_segments: 3, min_valid_tokens: 8 },
   sensitive: { threshold: 0.3, window_size: 6, max_concepts: 16, concept_min_freq: 2, max_segments: 3, min_valid_tokens: 8 },
+  archival: { threshold: 0.8, window_size: 12, max_concepts: 24, max_segments: 6, min_valid_tokens: 12 },
   broad: { threshold: 0.8, window_size: 12, max_concepts: 24, max_segments: 6, min_valid_tokens: 12 },
   deep: { threshold: 0.2, window_size: 8, max_concepts: 24, max_edges_for_dowhy: 15, filter_mode: 'percentile', filter_percentile: 80, max_segments: 4, min_valid_tokens: 10 },
   llama: { threshold: 0.01, window_size: 128, max_segments: 3, max_concepts: 12, concept_min_freq: 1, max_edges_for_dowhy: 12, filter_mode: 'topn', filter_percentile: 85, classical_mode: false, min_valid_tokens: 10 },
@@ -192,10 +197,24 @@ function populateModelSelect(models, defaultId) {
 /**
  * debt-16：应用参数预设。从 /api/presets 返回的 PRESETS 中取值，
  *          未命中的字段回退到当前 Schema 的 default 值。
+ * 竣工审查修复：前端按钮预设名（default/sensitive/broad）与服务端
+ *          presets.yaml 预设名（demo/standard/archival）不一致，
+ *          通过别名映射表兼容两端。
  */
+const _PRESET_ALIASES = {
+  default: 'demo',
+  sensitive: 'standard',
+  broad: 'archival',
+};
+
 function applyPreset(presetName) {
   const schema = BRIDGE_SCHEMA || _OFFLINE_FALLBACK_SCHEMA;
-  const overrides = (PRESETS && PRESETS[presetName]) || _OFFLINE_PRESETS[presetName] || {};
+  // 先尝试原名，再尝试别名映射
+  const resolvedName = _PRESET_ALIASES[presetName] || presetName;
+  const overrides = (PRESETS && (PRESETS[presetName] || PRESETS[resolvedName]))
+    || _OFFLINE_PRESETS[presetName]
+    || _OFFLINE_PRESETS[resolvedName]
+    || {};
   Object.keys(schema).forEach(key => {
     const el = document.getElementById(`param-${key}`);
     if (!el) return;
@@ -203,5 +222,5 @@ function applyPreset(presetName) {
     let value = overrides[key] !== undefined ? overrides[key] : meta.default;
     el.value = value;
   });
-  log('info', `已加载参数预设: ${presetName.toUpperCase()}`);
+  log('info', `已加载参数预设: ${presetName.toUpperCase()}${resolvedName !== presetName ? ` (→${resolvedName})` : ''}`);
 }

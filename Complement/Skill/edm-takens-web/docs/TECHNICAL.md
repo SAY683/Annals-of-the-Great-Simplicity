@@ -28,16 +28,36 @@
 
 - 前端：Vite + 原生 JS，负责上传 CSV、选择列、展示实时日志与结果图。
 - 后端：FastAPI，负责变量校验、调用 `run_full_analysis()`、流式返回日志。
-- 算法层：从 `edm-takens/src/` 复制到 `backend/edmtakens/`，共有 6 处适应性修改（详见 `docs/ALGORITHM_AUDIT.md`），其中 `_paths.py` 支持运行时数据目录覆盖。
+- 算法层：从 `edm-takens/src/` 复制到 `backend/edmtakens/`，共有 4 处适应性修改（详见 `docs/ALGORITHM_AUDIT.md`），其中 `_paths.py` 支持运行时数据目录覆盖。
 
 ## 2. 目录结构
 
 ```
 edm-takens-web/
 ├── backend/
-│   ├── api.py                 # FastAPI 路由与流式封装
-│   ├── job_store.py           # JobStore 抽象 + SQLite 持久化实现
-│   └── edmtakens/             # 复制的 EDM-Takens 核心代码
+│   ├── api.py              # FastAPI 入口（145行，仅路由挂载 + 向后兼容重导出）
+│   ├── core/               # 核心基础设施
+│   │   ├── locks.py        # 4 把并发锁（Semaphore/Lock）
+│   │   └── runtime.py      # JobStore 工厂 + 运行时配置
+│   ├── routes/             # API 路由（express.Router 模式）
+│   │   ├── datasets.py     # 数据集管理（7 端点）
+│   │   ├── analyze.py      # 分析执行（6 端点）
+│   │   └── history.py      # 历史与归档（12 端点）
+│   ├── services/           # 业务逻辑层
+│   │   ├── file_management.py  # 文件管理 + CSV解析 + 路径安全
+│   │   └── summary_builder.py  # 报告摘要生成
+│   ├── workers/            # 后台任务
+│   │   └── analysis_worker.py  # 分析任务执行器
+│   ├── edmtakens/          # EDM 核心库（从 edm-takens/src/ 同步）
+│   │   ├── _usability.py   # 可用性判定（统一入口）
+│   │   ├── data_quality.py # 数据质量诊断
+│   │   ├── edm_auditor.py  # 审计防火墙（6档verdict）
+│   │   ├── pipeline.py     # 主流水线
+│   │   ├── sovereign_havok.py # HAVOK 分析
+│   │   ├── _numpy_edm.py   # EDM/CCM/Multiview 纯 numpy 实现
+│   │   └── ...
+│   ├── job_store.py        # JobStore ABC + SQLite/InMemory 实现
+│   └── sync_check.py       # 副本一致性校验
 ├── frontend/
 │   ├── index.html
 │   ├── src/
@@ -150,7 +170,7 @@ GET /api/analyze/jobs/{job_id}/stream
 
 #### 异步实现要点
 
-- **JobStore 抽象接口**：`backend/api.py` 定义了 `JobStore` ABC，包含 `create()`、`get()`、`spawn()`、`events()` 四个方法。FastAPI 路由只依赖该接口。
+- **JobStore 抽象接口**：`backend/job_store.py` 定义了 `JobStore` ABC，包含 `create()`、`get()`、`spawn()`、`events()` 四个方法。FastAPI 路由只依赖该接口。
 - **默认实现**：默认使用 `PersistentJobStore`（SQLite，`jobs.sqlite`），支持 `JOBS_DB` 环境变量指定数据库路径，服务重启后仍可通过 `job_id` 查询已完成任务；若 SQLite 初始化失败则回退到 `InMemoryJobStore`（内存任务注册表，最多保留 50 条近期记录）。每个 Job 在独立后台线程中执行 `run_full_analysis()`。
 - 用 `contextlib.redirect_stdout` + `contextlib.redirect_stderr` 把输出导入线程安全的 `queue.Queue`。
 - FastAPI 通过 `asyncio.to_thread(queue.get)` 异步取日志，生成 NDJSON 流。
@@ -177,7 +197,7 @@ GET /api/analyze/jobs/{job_id}/stream
 
 原 Skill 把结果图写入固定的 `results/*.png`。Web 版在每次分析时：
 
-1. 通过 `_ANALYSIS_LOCK` 串行执行分析，防止并发覆盖。
+1. 通过 `_ANALYSIS_LOCK`(Semaphore(2)) 限制并发分析数为2，`_STDOUT_LOCK` 串行化 stdout 重定向。
 2. 分析完成后，把本次新生成的图片和配置 JSON 移入 `results/<task_id>/`。
 3. `/api/results/{task_id}/{filename}` 返回对应的任务结果图。
 
@@ -185,13 +205,11 @@ GET /api/analyze/jobs/{job_id}/stream
 
 ### 3.6 与原 Skill 的关系
 
-- `backend/edmtakens/` 复制自 `edm-takens/src/`，共有 6 处适应性修改（详见 `docs/ALGORITHM_AUDIT.md`）：
-  - `_paths.py`：默认数据路径指向 sibling skill，并支持 `EDMTAKENS_DATA_DIR` 环境变量覆盖数据目录。
-  - `_edm_bridge.py`：删除未使用的 `import os`。
-  - `enhanced_cross_validate.py`：将硬编码列名泛化为 `target_col` / `variables` 参数。
-  - `final_interpretation.py`：同上列名泛化。
-  - `ccm_causality.py`：回退了 `_SELFTEST_LIB_SIZES` 速度调优。
-  - `edm_auditor.py`：新增 1 行 docstring 注释。
+- `backend/edmtakens/` 复制自 `edm-takens/src/`，共有 4 处适应性修改（详见 `docs/ALGORITHM_AUDIT.md`），仅以下文件与源不同：
+  - `_paths.py`（路径适配）
+  - `__init__.py`（包注释）
+  - `enhanced_cross_validate.py`（数据路径适配）
+  - `environment_check.py`（路径检查适配）
 - `backend/api.py`、前端、启动脚本、文档均为网页版新增，未修改原 `edm-takens/` 目录。
 
 ### 3.7 数据质量诊断与嵌入维度曲线

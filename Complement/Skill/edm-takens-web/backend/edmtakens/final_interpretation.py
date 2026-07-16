@@ -11,9 +11,9 @@ Produces: a plain-language dynamical interpretation of the game data.
 """
 
 import os, tempfile, warnings
-os.environ['MPLBACKEND'] = 'Agg'
-os.environ['MPLCONFIGDIR'] = os.path.join(tempfile.gettempdir(), 'edm_takens_mpl')
-os.environ['OMP_NUM_THREADS'] = '1'; os.environ['MKL_NUM_THREADS'] = '1'
+os.environ.setdefault('MPLBACKEND', 'Agg')
+os.environ.setdefault('MPLCONFIGDIR', os.path.join(tempfile.gettempdir(), 'edm_takens_mpl'))
+os.environ.setdefault('OMP_NUM_THREADS', '1'); os.environ.setdefault('MKL_NUM_THREADS', '1')
 
 import numpy as np
 import pandas as pd

@@ -245,8 +245,8 @@ def _deploy_ccm(adj_matrix, token_list, concept_names=None) -> WarriorCard:
                     f"Top5 TRACE边的CCM覆盖率: {ccm_ok}/5 ({['✗','✓'][min(ccm_ok,1)]})")
                 if ccm_ok < 5:
                     card.findings.append(f"→ 叙事文: TRACE强边概念出现稀疏，CCM验证力低")
-        except Exception:
-            pass
+        except Exception as e:
+            card.findings.append(f"CCM边级检查失败: {e}")
 
     return card
 

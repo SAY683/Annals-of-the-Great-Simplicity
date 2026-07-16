@@ -258,17 +258,12 @@ trace-engine-web/
 ├── stop_servers.ps1       # 结束残留 Node 进程
 ├── stop_servers.bat       # stop_servers.ps1 的 CMD 包装
 ├── package.json           # NodeJS 依赖
-├── server.js              # Express + SSE 服务端（232 行，模块化拆分）
+├── server.js              # Express + SSE 服务端
 ├── py_bridge.py           # Python 桥接脚本（LIGHT / DEEP）
 ├── llama_worker.py        # 常驻 LLaMA Worker（SUPER）
 ├── sample_input.txt       # 示例输入文本
 ├── README.md              # 本文档
 ├── .gitignore             # 排除运行时产物
-├── lib/                   # 状态管理（state.js）+ 工具函数（utils.js）
-├── middleware/            # 鉴权（auth.js）+ CORS/安全头（index.js）
-├── routes/                # API 路由（analysis.js, jobs.js, system.js, admin.js）
-├── services/              # 分析服务（analysis.js）+ LLaMA Worker 管理（llamaWorker.js）
-├── schema/                # result_schema.json + bridge_schema.json
 ├── work/                  # 运行时产物（启动日志、输出目录）
 │   ├── sync_product.py    # 同步到成品目录的脚本
 │   └── outputs/           # 任务输出（按 UUID 存放）
@@ -276,8 +271,6 @@ trace-engine-web/
 │   ├── test_api.py        # API 端到端测试脚本
 │   └── test_upload.py     # 文件上传兼容性测试
 └── public/
-    ├── css/               # main.css + theme.css
-    ├── js/                # app.js + sse.js + render.js + schema.js + jobs.js
     └── index.html         # 极客风格前端页面
 ```
 
@@ -337,27 +330,3 @@ trace-engine-web/
 - 文本越长、因果描述越清晰，分析效果越好
 - 首次 `npm install` 需要网络访问
 - 如需完全独立部署，可将 Skill 目录复制到本项目的 `skill/` 下并修改 `server.js` 中的 `CONFIG.skillDir`
-
-## 架构（v2 模块化）
-
-server.js (232行) 仅负责 Express 初始化与路由挂载，具体逻辑分散到：
-
-| 目录 | 职责 |
-|------|------|
-| lib/ | 状态管理（state.js）+ 工具函数（utils.js） |
-| middleware/ | 鉴权（auth.js）+ CORS/安全头（index.js） |
-| routes/ | API 路由（analysis.js, jobs.js, system.js, admin.js） |
-| services/ | 分析服务（analysis.js）+ LLaMA Worker 管理（llamaWorker.js） |
-| schema/ | result_schema.json + bridge_schema.json |
-| public/css/ | main.css + theme.css |
-| public/js/ | app.js + sse.js + render.js + schema.js + jobs.js |
-
-### 安全特性
-- 鉴权分级：TRACE_API_KEY（普通用户）/ TRACE_ADMIN_KEY（管理员）
-- helmet 安全头
-- express-rate-limit 限流（/api/analyze-*）
-- CORS 精确白名单（TRACE_CORS_ORIGIN）
-
-### SSE 重连
-- 服务端发送递增 event id + retry:5000
-- 前端记录 lastSseEventId，重连时通过 Last-Event-ID 请求头发送

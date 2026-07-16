@@ -7,26 +7,28 @@ Node.js/Vite 前端 + Python/FastAPI 后端的 EDM-Takens 网页版 MVP。
 ```
 edm-takens-web/
 ├── backend/
-│   ├── api.py              # FastAPI 入口（140行，仅路由挂载）
-│   ├── core/               # 锁 + 运行时
-│   │   ├── locks.py
-│   │   └── runtime.py
-│   ├── routes/             # API 路由
-│   │   ├── datasets.py
-│   │   ├── analyze.py
-│   │   └── history.py
-│   ├── services/           # 业务逻辑
-│   │   ├── file_management.py
-│   │   └── summary_builder.py
+│   ├── api.py              # FastAPI 入口（145行，仅路由挂载 + 向后兼容重导出）
+│   ├── core/               # 核心基础设施
+│   │   ├── locks.py        # 4 把并发锁（Semaphore/Lock）
+│   │   └── runtime.py      # JobStore 工厂 + 运行时配置
+│   ├── routes/             # API 路由（express.Router 模式）
+│   │   ├── datasets.py     # 数据集管理（7 端点）
+│   │   ├── analyze.py      # 分析执行（6 端点）
+│   │   └── history.py      # 历史与归档（12 端点）
+│   ├── services/           # 业务逻辑层
+│   │   ├── file_management.py  # 文件管理 + CSV解析 + 路径安全
+│   │   └── summary_builder.py  # 报告摘要生成
 │   ├── workers/            # 后台任务
-│   │   └── analysis_worker.py
-│   ├── edmtakens/          # EDM 核心库（从 src/ 同步）
-│   │   ├── _usability.py   # 可用性判定（统一）
+│   │   └── analysis_worker.py  # 分析任务执行器
+│   ├── edmtakens/          # EDM 核心库（从 edm-takens/src/ 同步）
+│   │   ├── _usability.py   # 可用性判定（统一入口）
 │   │   ├── data_quality.py # 数据质量诊断
-│   │   ├── edm_auditor.py  # 审计防火墙（5档verdict）
+│   │   ├── edm_auditor.py  # 审计防火墙（6档verdict）
 │   │   ├── pipeline.py     # 主流水线
 │   │   ├── sovereign_havok.py # HAVOK 分析
+│   │   ├── _numpy_edm.py   # EDM/CCM/Multiview 纯 numpy 实现
 │   │   └── ...
+│   ├── job_store.py        # JobStore ABC + SQLite/InMemory 实现
 │   └── sync_check.py       # 副本一致性校验
 ├── data/                   # 上传的 CSV 存放处
 ├── results/                # 运行时生成的图片/配置（按 task_id 分目录）
@@ -193,13 +195,9 @@ EDM 要求变量处于度量空间。若 CSV 中大部分是 0/1 指示变量（
 ## 与原 Skill 的关系
 
 - `backend/edmtakens/` 是从 `edm-takens/src/` 复制而来。
-- Web 版对 `backend/edmtakens/` 共有 8 处适应性修改（详见 `docs/ALGORITHM_AUDIT.md`）：
-  - `_paths.py`：默认数据路径指向 sibling skill，并支持 `EDMTAKENS_DATA_DIR` 环境变量覆盖数据目录。
-  - `_edm_bridge.py`：删除未使用的 `import os`。
-  - `enhanced_cross_validate.py`：将硬编码列名泛化为 `target_col` / `variables` 参数。
-  - `final_interpretation.py`：同上列名泛化。
-  - `ccm_causality.py`：回退了 `_SELFTEST_LIB_SIZES` 速度调优。
-  - `__init__.py`：替换包级注释为 web 后端说明（sibling-style 裸导入、模块遮蔽警告）。
-  - `environment_check.py`：环境验证逻辑适配 web 部署上下文（后与源同步）。
-  - `pipeline.py`：管线入口适配 web sibling-style 调用（后与源同步）。
+- Web 版对 `backend/edmtakens/` 共有 4 处适应性修改（详见 `docs/ALGORITHM_AUDIT.md`），仅以下文件与源不同：
+  - `_paths.py`（路径适配）
+  - `__init__.py`（包注释）
+  - `enhanced_cross_validate.py`（数据路径适配）
+  - `environment_check.py`（路径检查适配）
 - `backend/api.py` 是网页版新增封装，未修改原 `edm-takens/` 目录下的任何文件。
