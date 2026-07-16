@@ -415,6 +415,12 @@ def main():
                          random_state=config.get("random_state", 42),
                          classical_mode=config.get("classical_mode", False),
                          max_concepts=max_concepts)
+    # 注入已聚合的概念级数据，避免 bridge.build_model() 内部对概念名列表
+    # 重新执行 aggregate_concepts()（概念名列表每个元素只出现一次，会被
+    # concept_min_freq=2 全部过滤掉，导致 "概念节点不足（<2）" 错误）。
+    bridge.concept_adj = adj
+    bridge.concept_names = concept_names
+    bridge.concept_idx = concept_idx
     bridge.build_model()
     _log("info", f"聚合后概念节点: {len(bridge.concept_names)}, 显著边: {len(bridge.significant_edges)}")
     timer.end("bridge")
