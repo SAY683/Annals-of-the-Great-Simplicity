@@ -235,7 +235,7 @@ modelscope download say101/TRACE-Engine-EDM-Takens-CCM-shehui-llama-27m
 ```
 
 > *魔搭（ModelScope）提供稳定快速的国内下载。*
-> *`shehui-llama-v4-archive/` 为旧版神机归档，仅保留配置供参考。*
+> *`shehui-llama-v4-archive/` 为旧版社会归档，仅保留配置供参考。*
 
 ### TRACE 引擎（EDM-Takens CCM）
 
