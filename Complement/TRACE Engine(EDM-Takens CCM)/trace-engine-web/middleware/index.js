@@ -50,6 +50,18 @@ function optionsHandler(_req, res) {
 
 // ── 全局错误处理（保留 traceId 串联） ───────────────────────────────
 function errorHandler(err, req, res, _next) {
+  // body-parser / express.json() 解析失败时抛出 SyntaxError，且 err.status === 400、'body' in err
+  // 此类错误属于客户端请求体问题，应返回 400 Bad Request 而非 500
+  if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
+    reqLog(req, 'warn', `JSON 解析失败: ${err.message}`);
+    res.status(400).json({
+      success: false,
+      error: '请求体不是合法的 JSON',
+      code: 'INVALID_JSON',
+      traceId: req.traceId,
+    });
+    return;
+  }
   reqLog(req, 'error', `Express 错误: ${err.message}`);
   res.status(500).json({ success: false, error: err.message, traceId: req.traceId });
 }

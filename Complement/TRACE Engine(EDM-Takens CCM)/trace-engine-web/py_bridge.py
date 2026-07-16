@@ -47,10 +47,14 @@ def _log(level: str, message: str):
 
 
 def _stage(stage: str, message: str, progress: float = None):
-    obj = {"type": "stage", "stage": stage, "message": message}
-    if progress is not None:
-        obj["progress"] = round(progress, 2)
-    _emit(obj)
+    # 统一 SSE 事件结构：始终输出 progress 字段（None 时为 null），
+    # 避免前端因字段时有时无而产生解析分支。
+    _emit({
+        "type": "stage",
+        "stage": stage,
+        "message": message,
+        "progress": round(progress, 2) if progress is not None else None,
+    })
 
 
 # ── debt-10：结果 Schema 校验 ─────────────────────────────────────────

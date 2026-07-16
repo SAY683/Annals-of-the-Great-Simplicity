@@ -617,6 +617,15 @@ class SovereignHAVOK:
                 "basis": self.basis,
                 "condition_number": "N/A",
                 "sampling_adequacy": self.sampling_adequacy_,
+                # 数值版本字段（_raw）——与下方正常分支保持同名同构，
+                # 便于程序化消费方在 degenerate 与正常两种情形下使用统一键名。
+                "truncation_rank_r_raw": int(self.r_),
+                "explained_variance_raw": 0.0,
+                "regression_r2_raw": float(self.regression_r2_),
+                "kurtosis_vr_raw": float(self.kurtosis_vr_),
+                "max_eigenvalue_d_raw": None,
+                "min_eigenvalue_d_raw": None,
+                "condition_number_raw": None,
             }
 
         # Stability from discrete-time eigenvalues (|λ_d| vs 1)
@@ -661,6 +670,16 @@ class SovereignHAVOK:
             "basis": self.basis,
             "condition_number": f"{float(np.linalg.cond(self.A_)):.2f}",
             "sampling_adequacy": self.sampling_adequacy_,  # Secret 14
+            # 数值版本字段（_raw）——格式化字符串字段旁附同名数值副本，
+            # 便于程序化消费方直接读取 float/int，无需解析百分号/小数字符串。
+            # 现有字符串字段保持不变（向后兼容）。
+            "truncation_rank_r_raw": int(self.r_),
+            "explained_variance_raw": float(self.explained_var_),
+            "regression_r2_raw": float(self.regression_r2_),
+            "kurtosis_vr_raw": float(self.kurtosis_vr_),
+            "max_eigenvalue_d_raw": float(max_growth),
+            "min_eigenvalue_d_raw": float(min_growth),
+            "condition_number_raw": float(np.linalg.cond(self.A_)),
         }
 
     def report(self) -> str:

@@ -121,10 +121,14 @@ def stats(processed: int, total: int, elapsed: float):
 
 
 def stage(name: str, message: str, progress: float = None):
-    obj = {"type": "stage", "stage": name, "message": message}
-    if progress is not None:
-        obj["progress"] = round(progress, 2)
-    emit(obj)
+    # 统一 SSE 事件结构：始终输出 progress 字段（None 时为 null），
+    # 与 py_bridge.py 的 _stage 保持一致，避免前端因字段时有时无而产生解析分支。
+    emit({
+        "type": "stage",
+        "stage": name,
+        "message": message,
+        "progress": round(progress, 2) if progress is not None else None,
+    })
 
 
 def error(message: str):

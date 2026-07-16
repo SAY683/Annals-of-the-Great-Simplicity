@@ -412,6 +412,14 @@ trace-engine/
 │       ├── counterfactual_bridge.py   ← TRACE→DoWhy 桥接模块
 │       ├── six_warriors.py            ← 六战士编排器
 │       ├── dowhy_auditor.py           ← 9-rule 审计防火墙
+│       ├── dowhy_adapter.py           ← DoWhy 0.14 兼容适配器（可识别性/CI 适配）
+│       ├── pearl_counterfactual.py    ← Pearl 三步反事实推理（外展/干预/预测）
+│       ├── causallearn_validator.py   ← causallearn PC/GES 独立图搜索验证
+│       ├── _causallearn_utils.py      ← causallearn 算法辅助工具函数
+│       ├── minimal_dataframe.py       ← DoWhy 接口最小数据帧构造
+│       ├── simulation_model.py        ← SEM 模拟数据生成器
+│       ├── compound_diagnostic.py     ← 六维复合诊断聚合
+│       ├── pipeline_helpers.py        ← 管线辅助函数（加载/缓存/格式化）
 │       ├── presets.py / presets.yaml  ← 统一参数预设
 │       ├── run_cli.py                 ← CLI 统一入口
 │       ├── run_real_pipeline.py       ← 真实数据管线
