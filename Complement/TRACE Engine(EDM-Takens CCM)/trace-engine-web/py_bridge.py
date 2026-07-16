@@ -53,6 +53,42 @@ def _stage(stage: str, message: str, progress: float = None):
     _emit(obj)
 
 
+# ── debt-10：结果 Schema 校验 ─────────────────────────────────────────
+# 加载 schema/result_schema.json，在序列化 result 前校验必需字段。
+# 校验为非阻塞式：缺失字段仅记录 warn 日志并补 _schema_missing 标记，
+# 不中断已有结果输出，保证向后兼容。
+_RESULT_SCHEMA = None
+
+
+def _load_result_schema():
+    global _RESULT_SCHEMA
+    if _RESULT_SCHEMA is not None:
+        return _RESULT_SCHEMA
+    try:
+        schema_path = Path(__file__).resolve().parent / "schema" / "result_schema.json"
+        with open(schema_path, "r", encoding="utf-8") as f:
+            _RESULT_SCHEMA = json.load(f)
+    except Exception as e:
+        _log("warn", f"加载 result_schema.json 失败，跳过结果校验: {e}")
+        _RESULT_SCHEMA = {}
+    return _RESULT_SCHEMA
+
+
+def _validate_result(result: dict) -> dict:
+    """按 result_schema.json 校验必需字段，缺失字段记 warn 并补标记。"""
+    schema = _load_result_schema()
+    required = schema.get("required") if schema else None
+    if not required:
+        return result
+    missing = [f for f in required if result.get(f) is None]
+    if missing:
+        _log("warn", f"结果缺少 Schema 必需字段: {', '.join(missing)}（已标记，结果仍输出）")
+        result["_schema_missing"] = missing
+    else:
+        result["_schema_validated"] = True
+    return result
+
+
 class StageTimer:
     """简单的阶段计时器，用于生成执行时间剖面。"""
 
@@ -554,6 +590,7 @@ def main():
     )
 
     _stage("done", "分析完成。", 1.0)
+    _validate_result(result)
     _emit({"type": "result", "payload": result})
 
 

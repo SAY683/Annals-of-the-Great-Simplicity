@@ -33,9 +33,10 @@ import logging
 import subprocess
 from pathlib import Path
 
-from _config import get_graphviz_bin_dir
+from _config import setup_graphviz
 from project_paths import resolve_paths
 from presets import load_presets
+from pipeline_helpers import run_full_pipeline
 
 # ══════════════════════════════════════════════════════════════════════
 # 路径配置
@@ -56,15 +57,13 @@ for d in [DEMO_DIR, REAL_DIR, CACHE_DIR]:
 # ══════════════════════════════════════════════════════════════════════
 
 def _setup_graphviz():
-    """通过环境变量 GRAPHVIZ_BIN_DIR 配置 graphviz PATH"""
-    gv_dir = get_graphviz_bin_dir()
-    if gv_dir is None:
-        return None
-    c = str(gv_dir)
-    current = os.environ.get('PATH', '')
-    if c not in current:
-        os.environ['PATH'] = f"{c};{current}"
-    return c
+    """通过环境变量 GRAPHVIZ_BIN_DIR 配置 graphviz PATH。
+
+    debt-05: PATH 配置逻辑统一委托给 _config.setup_graphviz()，
+    使用 os.pathsep 跨平台分隔符（替代原硬编码的 ';'）。
+    保留本包装函数以维持 cmd_env/cmd_demo/cmd_real 的调用契约。
+    """
+    return setup_graphviz()
 
 def cmd_env():
     """打印环境状态"""
@@ -163,7 +162,7 @@ def cmd_demo():
                     for sj in pos[cd]:
                         if si<sj: adj[si,sj]=ADJ[ci,cj]
 
-    print(f"\n[1/5] TRACE → DoWhy 桥接...")
+    print(f"\n[1/5] TRACE → DoWhy 桥接 + 全管线（聚合→建模→识别→估计→反驳→反事实）...")
     # 加载 demo 预设参数，避免硬编码绕过 presets.yaml
     demo_preset = load_presets("demo")
     bridge = TRACE2DoWhy(
@@ -172,23 +171,24 @@ def cmd_demo():
         concept_min_freq=demo_preset.trace2dowhy.concept_min_freq,
         max_edges_for_dowhy=demo_preset.trace2dowhy.max_edges_for_dowhy,
     )
-    bridge.aggregate_concepts()
-    bridge.build_model()
-    bridge.identify(treatment='算法推荐', outcome='信息茧房')
+    # debt-05: 管线核心序列抽取到 pipeline_helpers.run_full_pipeline（双轨入口合并）
+    run_full_pipeline(
+        bridge,
+        preset=demo_preset,
+        identify_kwargs={'treatment': '算法推荐', 'outcome': '信息茧房'},
+        n_top_edges=5,
+    )
     print(f"  概念: {len(bridge.concept_names)} → 边: {len(bridge.significant_edges)}")
     for i, e in enumerate(bridge.significant_edges[:5]):
         print(f"    {i+1}. {e[0]} → {e[1]} (ΔNLL={e[2]:.2f})")
 
-    print(f"\n[2/5] 效应估计 + 反驳...")
-    bridge.estimate()
-    bridge.refute()
+    print(f"\n[2/5] 效应估计 + 反驳结果...")
     est = bridge.estimate_result
     ci = DoWhy14Adapter.get_confidence_interval(est)
     print(f"  {bridge.treatment} → {bridge.outcome}")
     print(f"  ATE={est.value:.4f}  95%CI=[{ci[0]:.4f},{ci[1]:.4f}]")
 
-    print(f"\n[3/5] 反事实扫描...")
-    bridge.counterfactual_scan(n_top_edges=5)
+    print(f"\n[3/5] 反事实扫描结果...")
     for r in bridge.scan_results[:5]:
         print(f"  {r['source']}→{r['target']}: ITE={r['ite']:+.4f}")
 
@@ -264,7 +264,7 @@ def cmd_real(preset="llama"):
     adj = np.load(str(adj_cache))
     tokens = json.loads(tokens_cache.read_text(encoding='utf-8'))
 
-    print(f"\n[1/5] TRACE → DoWhy 桥接...")
+    print(f"\n[1/5] TRACE → DoWhy 桥接 + 全管线（聚合→建模→识别→估计→反驳→反事实）...")
     logger.info(
         f"TRACE→DoWhy: threshold={p.trace2dowhy.threshold}, "
         f"min_freq={p.trace2dowhy.concept_min_freq}, "
@@ -280,29 +280,28 @@ def cmd_real(preset="llama"):
         random_state=p.trace2dowhy.random_state,
         classical_mode=getattr(p.trace2dowhy, 'classical_mode', False),
     )
-    bridge.aggregate_concepts()
-    bridge.build_model()
-    bridge.identify()
+    # debt-05: 管线核心序列抽取到 pipeline_helpers.run_full_pipeline（双轨入口合并）
+    run_full_pipeline(bridge, preset=p)
     logger.info(f"Concepts: {len(bridge.concept_names)}, Edges: {len(bridge.significant_edges)}, Mode: {bridge.mode_name}")
     print(f"  Tokens: {len(tokens)} → Concepts: {len(bridge.concept_names)} → Edges: {len(bridge.significant_edges)}")
     print(f"  Mode: {bridge.mode_name}")
     for i, e in enumerate(bridge.significant_edges[:6]):
         print(f"    {i+1}. {e[0]:12s} → {e[1]:12s}  ΔNLL={e[2]:.3f}")
 
-    print(f"\n[2/5] 效应估计 + 反驳...")
-    bridge.estimate()
-    bridge.refute()
+    print(f"\n[2/5] 效应估计 + 反驳结果...")
     est = bridge.estimate_result
     ci = DoWhy14Adapter.get_confidence_interval(est)
     logger.info(f"ATE={est.value:.4f}, CI=[{ci[0]:.4f},{ci[1]:.4f}]")
     print(f"  {bridge.treatment} → {bridge.outcome}")
     print(f"  ATE={est.value:.4f}  95%CI=[{ci[0]:.4f},{ci[1]:.4f}]")
 
-    print(f"\n[3/5] 反事实扫描...")
-    bridge.counterfactual_scan(n_top_edges=min(5, len(bridge.significant_edges)))
+    print(f"\n[3/5] 反事实扫描结果...")
+    # scan_results 已由 run_full_pipeline 计算
 
     print(f"\n[4/5] 六战士合体...")
     cards = assemble_all_six(adj, tokens, bridge=bridge)
+    # debt-04 audit 修复：将六战士卡片注入 bridge，激活 report() 中的复合诊断引擎
+    bridge.set_six_warriors_cards(cards)
     logger.info(f"Six warriors: {', '.join(f'{k}={c.status}' for k,c in cards.items())}")
     for key, card in cards.items():
         icon = f'[{card.status.upper()}]'

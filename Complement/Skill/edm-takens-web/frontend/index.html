@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>EDM-Takens Web</title>
+  <link rel="stylesheet" href="/src/style.css" />
+</head>
+<body>
+  <div id="app">
+    <header>
+      <h1>EDM-Takens Web</h1>
+      <p>上传 CSV，自动运行 EDM + HAVOK + CCM 动力学分析</p>
+    </header>
+
+    <main>
+      <section class="panel upload-panel">
+        <h2>1. 上传数据</h2>
+        <input type="file" id="csvInput" accept=".csv" />
+        <button id="uploadBtn">上传 CSV</button>
+        <div id="uploadStatus"></div>
+
+        <h3>或选择已上传文件</h3>
+        <select id="datasetSelect">
+          <option value="">-- 选择数据集 --</option>
+        </select>
+        <button id="refreshDatasetsBtn">刷新列表</button>
+      </section>
+
+      <section class="panel config-panel">
+        <h2>2. 配置列</h2>
+        <div id="columnInfo">请先上传或选择一个 CSV 文件。</div>
+        <label>
+          目标列 (target_col):
+          <select id="targetSelect"></select>
+        </label>
+        <label>
+          分析变量 (用逗号分隔，留空则自动选前6个):
+          <input type="text" id="variablesInput" placeholder="留空自动选择（排除 ID/常数列）" />
+        </label>
+        <label>
+          嵌入维度 q (留空自动检测，范围 2-64):
+          <input type="number" id="qInput" placeholder="自动" min="2" max="64" step="1" />
+        </label>
+        <label>
+          分析项目名称 (留空则自动生成随机 ID):
+          <input type="text" id="projectNameInput" placeholder="例如：yinshen_2025q3_experiment1" />
+        </label>
+        <label>
+          分析强度:
+          <select id="intensitySelect">
+            <option value="auto">自动（推荐）</option>
+            <option value="light">轻度 — 小样本/稀疏数据</option>
+            <option value="medium">中度 — 默认参数</option>
+            <option value="heavy">重度 — 大样本/连续数据</option>
+          </select>
+        </label>
+        <div id="intensityRecommendation" class="recommendation-box" style="display:none"></div>
+        <label>
+          <input type="checkbox" id="autoFixCheckbox" checked />
+          自动修正次优配置 (--auto-fix)
+        </label>
+        <button id="runBtn" disabled>运行分析</button>
+      </section>
+
+      <section class="panel quality-panel">
+        <h2>3. 数据质量预览
+          <button id="refreshQualityBtn" class="small">刷新</button>
+          <button id="embedCurveBtn" class="small">查看嵌入维度曲线</button>
+        </h2>
+        <div id="qualityList">请先选择数据集。</div>
+        <div id="embedCurveWrap" class="embed-curve-wrap" style="display:none">
+          <h4>嵌入维度曲线 (rho vs E)</h4>
+          <canvas id="embedCurveCanvas" width="800" height="360"></canvas>
+          <div id="embedCurveOptimal" class="embed-curve-optimal"></div>
+        </div>
+      </section>
+
+      <section class="panel result-panel">
+        <h2>4. 结果</h2>
+        <div id="summary"></div>
+        <div id="images"></div>
+      </section>
+
+      <section class="panel history-panel">
+        <h2>5. 历史分析
+          <button id="refreshHistoryBtn" class="small">刷新</button>
+          <button id="cleanupHistoryBtn" class="small danger">清理旧数据</button>
+        </h2>
+        <div id="cleanupHint" class="hint">保留最近 30 天的结果，更早的将被删除。</div>
+        <div id="historyBatchToolbar" class="history-batch-toolbar" style="display:none">
+          <span id="historyBatchCount">已选 0 项</span>
+          <button id="batchArchiveBtn" class="small">批量归档</button>
+          <button id="batchDeleteBtn" class="small danger">批量删除</button>
+          <button id="batchDownloadBtn" class="small">批量下载</button>
+          <button id="compareSelectedBtn" class="small">对比选中任务</button>
+        </div>
+        <div id="historyList">暂无历史数据。</div>
+      </section>
+
+      <section class="panel archive-panel">
+        <h2>归档管理
+          <button id="refreshArchivesBtn" class="small">刷新</button>
+        </h2>
+        <div id="archiveList">暂无归档数据。</div>
+      </section>
+
+      <section class="panel terminal-panel">
+        <h2>
+          6. 实时日志
+          <span class="terminal-status" id="terminalStatus">idle</span>
+          <span class="terminal-meta" id="terminalJobId"></span>
+        </h2>
+        <div id="terminal" class="terminal"><div class="terminal-line">等待分析任务...</div></div>
+      </section>
+    </main>
+
+    <div id="compareModal" class="modal" role="dialog" aria-modal="true" style="display:none">
+      <div class="modal-backdrop"></div>
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>任务对比</h3>
+          <button id="closeCompareModal" class="small" aria-label="关闭">✕</button>
+        </div>
+        <div id="compareBody" class="compare-body">加载中...</div>
+      </div>
+    </div>
+
+    <footer>
+      <p>MVP powered by Node.js + Vite frontend + Python/FastAPI backend</p>
+    </footer>
+  </div>
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,18 @@
+# 依赖
+node_modules/
+
+# 运行时产物
+work/
+*.log
+outputs/
+__pycache__/
+*.pyc
+*.pyo
+
+# 测试临时文件
+*_test_result.json
+*_result.json
+
+# 系统文件
+.DS_Store
+Thumbs.db

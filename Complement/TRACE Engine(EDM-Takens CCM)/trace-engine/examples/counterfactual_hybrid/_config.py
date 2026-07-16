@@ -128,6 +128,40 @@ def get_graphviz_bin_dir() -> Path | None:
     return _env_path("GRAPHVIZ_BIN_DIR")
 
 
+def setup_graphviz(bin_dir: str | None = None) -> str | None:
+    """配置 graphviz PATH（仅通过环境变量或显式参数）。
+
+    debt-05: 将原散落在 counterfactual_bridge.visualize / run_cli._setup_graphviz
+    中的 PATH 配置逻辑集中到此处。将给定的 ``bin_dir`` 或
+    ``GRAPHVIZ_BIN_DIR`` 环境变量指向的目录加入 ``PATH``（若尚未包含且目录
+    存在）。不扫描磁盘绝对路径，保持可移植性。
+
+    Parameters
+    ----------
+    bin_dir : str or None
+        显式指定的 graphviz bin 目录，优先于环境变量。
+
+    Returns
+    -------
+    str or None
+        实际加入 ``PATH`` 的目录；若无需配置（目录不存在或未提供）返回 None。
+    """
+    dirs_to_try = []
+    if bin_dir:
+        dirs_to_try.append(str(bin_dir))
+    env_bin = get_graphviz_bin_dir()
+    if env_bin is not None:
+        dirs_to_try.append(str(env_bin))
+
+    for d in dirs_to_try:
+        if os.path.isdir(d):
+            current = os.environ.get('PATH', '')
+            if d not in current:
+                os.environ['PATH'] = f"{d}{os.pathsep}{current}"
+            return d
+    return None
+
+
 def ensure_trace_scripts_in_sys_path() -> None:
     """将 TRACE/scripts 加入 sys.path，供动态导入使用。"""
     import sys

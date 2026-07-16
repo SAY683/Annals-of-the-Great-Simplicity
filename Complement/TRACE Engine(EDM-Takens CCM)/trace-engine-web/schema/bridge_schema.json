@@ -1,0 +1,101 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://trace-engine-web/schema/bridge_schema.json",
+  "title": "TRACE Engine Bridge Parameter Schema (Unified Fallback)",
+  "description": "统一 bridgeParamSchema 的 fallback 定义（debt-16）。server.js 与 public/js/schema.js 都从此加载，避免双端硬编码漂移。当 trace-engine/build_bridge_schema.py 可用时，运行时优先采用其输出（与 presets.yaml 一致）；本文件仅作为缺失时的兜底。同时包含 /api/presets 端点的预设参数定义，复用 llama_worker.py 的 _merge_llama_presets 逻辑。",
+  "default": {
+    "threshold": { "type": "number", "min": 0, "max": 10, "default": 0.03, "description": "因果边显著性阈值（过拟合 LLaMA 模型建议 0.01-0.05）" },
+    "window_size": { "type": "integer", "min": 2, "max": 256, "default": 64, "description": "TRACE 滑动窗口大小" },
+    "max_segments": { "type": "integer", "min": 1, "max": 16, "default": 4, "description": "LLaMA TRACE 最大分段数" },
+    "max_concepts": { "type": "integer", "min": 1, "max": 128, "default": 12, "description": "最大概念数" },
+    "concept_min_freq": { "type": "integer", "min": 1, "max": 1000, "default": 2, "description": "概念最小出现频次" },
+    "min_valid_tokens": { "type": "integer", "min": 1, "max": 10000, "default": 10, "description": "最小有效 token 数" },
+    "min_concepts": { "type": "integer", "min": 2, "max": 128, "default": 3, "description": "最小概念数" },
+    "max_edges_for_dowhy": { "type": "integer", "min": 1, "max": 100, "default": 8, "description": "传入 DoWhy 的最大边数" },
+    "filter_mode": { "type": "string", "default": "topn", "description": "边过滤模式 (topn / percentile / adaptive)" },
+    "filter_percentile": { "type": "integer", "min": 50, "max": 99, "default": 85, "description": "percentile 模式的百分位" },
+    "random_state": { "type": "integer", "min": 0, "max": 999999, "default": 42, "description": "随机种子" },
+    "classical_mode": { "type": "boolean", "default": false, "description": "古汉语模式（Shenji 古文保留之/乎/者/也等虚词）" }
+  },
+  "llama": {
+    "threshold": { "type": "number", "min": 0, "max": 10, "default": 0.01, "description": "因果边显著性阈值（LLaMA V4 过拟合模型专属，建议 0.01-0.03）" },
+    "window_size": { "type": "integer", "min": 2, "max": 256, "default": 128, "description": "TRACE 滑动窗口大小（LLaMA V4 专属）" },
+    "max_segments": { "type": "integer", "min": 1, "max": 16, "default": 3, "description": "LLaMA TRACE 最大分段数（LLaMA V4 专属）" },
+    "max_concepts": { "type": "integer", "min": 1, "max": 128, "default": 12, "description": "最大概念数" },
+    "concept_min_freq": { "type": "integer", "min": 1, "max": 1000, "default": 1, "description": "概念最小出现频次（LLaMA V4 专属，放宽低频）" },
+    "min_valid_tokens": { "type": "integer", "min": 1, "max": 10000, "default": 10, "description": "最小有效 token 数" },
+    "min_concepts": { "type": "integer", "min": 2, "max": 128, "default": 3, "description": "最小概念数" },
+    "max_edges_for_dowhy": { "type": "integer", "min": 1, "max": 100, "default": 12, "description": "传入 DoWhy 的最大边数" },
+    "filter_mode": { "type": "string", "default": "topn", "description": "边过滤模式 (topn / percentile / adaptive)" },
+    "filter_percentile": { "type": "integer", "min": 50, "max": 99, "default": 85, "description": "percentile 模式的百分位" },
+    "random_state": { "type": "integer", "min": 0, "max": 999999, "default": 42, "description": "随机种子" },
+    "classical_mode": { "type": "boolean", "default": false, "description": "古汉语模式（Shenji 古文保留之/乎/者/也等虚词）" }
+  },
+  "presets": {
+    "default": {
+      "threshold": 0.03,
+      "window_size": 8,
+      "max_concepts": 12,
+      "concept_min_freq": 2,
+      "min_valid_tokens": 10,
+      "max_edges_for_dowhy": 8,
+      "filter_mode": "topn",
+      "filter_percentile": 85,
+      "random_state": 42,
+      "max_segments": 4,
+      "classical_mode": false
+    },
+    "sensitive": {
+      "threshold": 0.3,
+      "window_size": 6,
+      "max_concepts": 16,
+      "concept_min_freq": 2,
+      "min_valid_tokens": 8,
+      "max_edges_for_dowhy": 8,
+      "filter_mode": "topn",
+      "filter_percentile": 85,
+      "random_state": 42,
+      "max_segments": 3,
+      "classical_mode": false
+    },
+    "broad": {
+      "threshold": 0.8,
+      "window_size": 12,
+      "max_concepts": 24,
+      "concept_min_freq": 2,
+      "min_valid_tokens": 12,
+      "max_edges_for_dowhy": 8,
+      "filter_mode": "topn",
+      "filter_percentile": 85,
+      "random_state": 42,
+      "max_segments": 6,
+      "classical_mode": false
+    },
+    "deep": {
+      "threshold": 0.2,
+      "window_size": 8,
+      "max_concepts": 24,
+      "concept_min_freq": 2,
+      "min_valid_tokens": 10,
+      "max_edges_for_dowhy": 15,
+      "filter_mode": "percentile",
+      "filter_percentile": 80,
+      "random_state": 42,
+      "max_segments": 4,
+      "classical_mode": false
+    },
+    "llama": {
+      "threshold": 0.01,
+      "window_size": 128,
+      "max_concepts": 12,
+      "concept_min_freq": 1,
+      "min_valid_tokens": 10,
+      "max_edges_for_dowhy": 12,
+      "filter_mode": "topn",
+      "filter_percentile": 85,
+      "random_state": 42,
+      "max_segments": 3,
+      "classical_mode": false
+    }
+  }
+}

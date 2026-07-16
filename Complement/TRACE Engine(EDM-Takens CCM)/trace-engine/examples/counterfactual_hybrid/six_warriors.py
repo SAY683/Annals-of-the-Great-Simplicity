@@ -23,21 +23,7 @@ from collections import Counter
 
 from _config import ensure_edm_takens_in_sys_path
 from _token_filters import is_valid_concept, is_unk_token
-
-
-# ══════════════════════════════════════════════════════════════════════
-# causallearn GraphNode 索引提取
-# ══════════════════════════════════════════════════════════════════════
-
-def _node_index(node) -> int:
-    """从 causallearn 的 GraphNode 中提取节点索引。
-
-    GraphNode 没有 get_index() 方法，get_name() 返回形如 'X12' 的字符串，
-    用正则提取其中的数字部分作为索引。
-    """
-    name = node.get_name()
-    m = re.search(r'\d+', name)
-    return int(m.group()) if m else 0
+from _causallearn_utils import node_index as _node_index
 
 # ══════════════════════════════════════════════════════════════════════
 # 战士导入 — 多路径 fallback
@@ -214,7 +200,11 @@ def _deploy_ccm(adj_matrix, token_list, concept_names=None) -> WarriorCard:
         card.findings = [
             f"CCM 覆盖 {ccm_ratio:.1%} — 可进行交叉映射验证",
         ]
-        card.verdict = "VERIFIABLE"
+        if _CCM_AVAILABLE:
+            card.verdict = "VERIFIABLE"
+        else:
+            card.verdict = "HEURISTIC_FALLBACK"
+            card.findings.append("⚠ 启发式回退: edm-takens 真算法不可用，仅做覆盖率统计")
         # ── 显示TRACE边概念的CCM资格 ──
         # 兼容 token-level TRACE 矩阵（尺寸与 token_list 一致）和 concept-level 矩阵
         try:
@@ -300,18 +290,22 @@ def _deploy_edm(token_list) -> WarriorCard:
 
     card.metrics = {"rho_high": len(high_rho), "rho_mid": len(mid_rho),
                     "analyzed": len(rho_scores)}
+    # EDM 始终使用自包含启发式（无真算法导入路径），明确标注
+    card.status = "fallback"
     if high_rho:
-        card.status = "deployed"
         top = sorted(high_rho.items(), key=lambda x: x[1], reverse=True)[:3]
         card.findings = [
             f"高可预测性概念: {', '.join(f'{t}(ρ={r:.2f})' for t,r in top)}",
             "→ 文本具有强叙事结构（非论证文）",
+            "⚠ 启发式回退: 使用间隔变异系数近似 ρ，非 Sugihara EDM 算法",
         ]
-        card.verdict = "STRONG_NARRATIVE_STRUCTURE"
+        card.verdict = "HEURISTIC_STRONG_NARRATIVE_STRUCTURE"
     else:
-        card.status = "deployed"
-        card.findings = ["无明显高可预测性概念 → 非套路化叙事"]
-        card.verdict = "WEAK_STRUCTURE"
+        card.findings = [
+            "无明显高可预测性概念 → 非套路化叙事",
+            "⚠ 启发式回退: 使用间隔变异系数近似 ρ，非 Sugihara EDM 算法",
+        ]
+        card.verdict = "HEURISTIC_WEAK_STRUCTURE"
     return card
 
 

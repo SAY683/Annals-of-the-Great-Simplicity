@@ -28,6 +28,7 @@ v2 新增: DoWhy 0.14 兼容 + causallearn (PC/GES) + Graphviz 可视化。
     bridge = TRACE2DoWhy(adj_matrix, token_list, simulation=True)
 """
 
+import functools
 import re
 import sys
 import warnings
@@ -38,38 +39,68 @@ import numpy as np
 
 from _token_filters import is_valid_concept, classify_bpe_type, is_unk_token
 
-# ── Dependency checks ─────────────────────────────────────────────────
-_DOWHY_AVAILABLE = False
-_CAUSALLEARN_AVAILABLE = False
-_GRAPHVIZ_AVAILABLE = False
-_PANDAS_AVAILABLE = False
+# ── 可用性探测函数（debt-05: lru_cache 缓存，避免重复 import 开销）────────
+# 将原模块级全局状态 _X_AVAILABLE 改为带缓存的探测函数；
+# 旧变量名作为兼容别名保留（见文件末尾 _X_AVAILABLE = is_X_available()）。
+@functools.lru_cache(maxsize=1)
+def is_dowhy_available() -> bool:
+    """探测 DoWhy 是否可用（带缓存）。"""
+    try:
+        import dowhy  # noqa: F401
+        from dowhy import CausalModel  # noqa: F401
+        return True
+    except ImportError:
+        return False
 
+
+@functools.lru_cache(maxsize=1)
+def is_causallearn_available() -> bool:
+    """探测 causallearn 是否可用（带缓存）。"""
+    try:
+        import causallearn  # noqa: F401
+        from causallearn.search.ConstraintBased.PC import pc  # noqa: F401
+        from causallearn.search.ScoreBased.GES import ges  # noqa: F401
+        return True
+    except ImportError:
+        return False
+
+
+@functools.lru_cache(maxsize=1)
+def is_graphviz_available() -> bool:
+    """探测 graphviz 是否可用（带缓存）。"""
+    try:
+        import graphviz  # noqa: F401
+        return True
+    except ImportError:
+        return False
+
+
+@functools.lru_cache(maxsize=1)
+def is_pandas_available() -> bool:
+    """探测 pandas 是否可用（带缓存）。"""
+    try:
+        import pandas  # noqa: F401
+        return True
+    except ImportError:
+        return False
+
+
+# ── 模块级导入（供 bridge 代码直接使用；可用性由上述函数判断）─────────
+# 保留 CausalModel/pd/graphviz/nx 名称供本模块内部使用；缺失时为 None。
 try:
-    import dowhy
     from dowhy import CausalModel
-    _DOWHY_AVAILABLE = True
 except ImportError:
-    pass
-
-try:
-    import causallearn
-    from causallearn.search.ConstraintBased.PC import pc as pc_alg
-    from causallearn.search.ScoreBased.GES import ges as ges_alg
-    _CAUSALLEARN_AVAILABLE = True
-except ImportError:
-    pass
-
-try:
-    import graphviz
-    _GRAPHVIZ_AVAILABLE = True
-except ImportError:
-    pass
+    CausalModel = None
 
 try:
     import pandas as pd
-    _PANDAS_AVAILABLE = True
 except ImportError:
-    pass
+    pd = None
+
+try:
+    import graphviz
+except ImportError:
+    graphviz = None
 
 try:
     import networkx as nx
@@ -77,455 +108,55 @@ except ImportError:
     nx = None
 
 
-# ══════════════════════════════════════════════════════════════════════
-# causallearn GraphNode 索引提取
-# ══════════════════════════════════════════════════════════════════════
-
-def _node_index(node) -> int:
-    """从 causallearn 的 GraphNode 中提取节点索引。
-
-    GraphNode 没有 get_index() 方法，get_name() 返回形如 'X12' 的字符串，
-    用正则提取其中的数字部分作为索引。
-    """
-    name = node.get_name()
-    m = re.search(r'\d+', name)
-    return int(m.group()) if m else 0
+# ── 兼容别名（保持 _DOWHY_AVAILABLE 等旧名可用，debt-05 双轨）──────────
+_DOWHY_AVAILABLE = is_dowhy_available()
+_CAUSALLEARN_AVAILABLE = is_causallearn_available()
+_GRAPHVIZ_AVAILABLE = is_graphviz_available()
+_PANDAS_AVAILABLE = is_pandas_available()
 
 
 # ══════════════════════════════════════════════════════════════════════
-# DoWhy 0.14 API 适配层
+# 抽取模块再导出 (debt-01: 职责拆分)
 # ══════════════════════════════════════════════════════════════════════
+# 以下公共名称已移入独立职责模块，此处 re-import 以保持向后兼容:
+#   from counterfactual_bridge import TRACE2DoWhy, DoWhy14Adapter, ...
+#   from counterfactual_bridge import _DOWHY_AVAILABLE, ...
+# 新模块不维护依赖检查块；可用性标志由本文件统一探测并通过参数下传。
+from dowhy_adapter import DoWhy14Adapter
+from pearl_counterfactual import PearlCounterfactual, estimate_sem_from_data
+from causallearn_validator import CausalLearnValidator
+from minimal_dataframe import _MinimalDataFrame, _ILocIndexer, _MinimalRow
+from simulation_model import (
+    SimulationEstimand,
+    SimulationEstimate,
+    SimulationRefutation,
+    SimulationModel,
+)
 
-class DoWhy14Adapter:
-    """
-    统一 DoWhy 0.14 和模拟模式之间的 API 差异。
-
-    DoWhy 0.14 的关键 API 变更（相对于旧版）:
-    - IdentifiedEstimand 没有 .identifiable 属性 → 用 estimand_type 判断
-    - CausalRefutation 没有 .refuted / .p_value → 用偏差度判断
-    - CausalEstimate 没有 .confidence_interval → 用 .get_confidence_intervals()
-    - CausalModel 没有 .counterfactual() → 用 Pearl 三步手动实现
-    """
-
-    @staticmethod
-    def is_identifiable(estimand) -> bool:
-        """跨版本检查可识别性"""
-        if estimand is None:
-            return False
-        if hasattr(estimand, 'identifiable'):
-            return bool(estimand.identifiable)
-        # DoWhy 0.14: estimand_type 包含 'nonparametric' 表示可识别
-        if hasattr(estimand, 'estimand_type') and estimand.estimand_type is not None:
-            et = str(estimand.estimand_type)
-            return 'nonparametric' in et.lower()
-        return False
-
-    @staticmethod
-    def get_confidence_interval(estimate):
-        """跨版本获取置信区间"""
-        if hasattr(estimate, 'confidence_interval'):
-            return estimate.confidence_interval
-        if hasattr(estimate, 'get_confidence_intervals'):
-            ci = estimate.get_confidence_intervals()
-            if ci is not None:
-                # 统一处理 [[low, high]] / [low, high] / ndarray 等形态
-                ci_arr = np.asarray(ci)
-                if ci_arr.size >= 2:
-                    if ci_arr.ndim == 2:
-                        return [float(ci_arr[0, 0]), float(ci_arr[0, -1])]
-                    else:
-                        return [float(ci_arr[0]), float(ci_arr[-1])]
-        return [float('nan'), float('nan')]
-
-    @staticmethod
-    def check_refuted(estimate, refutation, threshold: float = 0.3,
-                      method_name: str = None) -> dict:
-        """
-        跨版本检查反驳状态。
-        DoWhy 0.14 的 CausalRefutation 没有 .refuted 属性，
-        我们用 new_effect 与原始 estimate.value 的偏差来判断。
-
-        特殊处理:
-          - placebo_treatment_refuter: 新效应应接近 0，偏差大反而说明
-            原效应不是随机噪声，因此 refuted=False。
-          - random_common_cause / data_subset_refuter: 偏差大说明效应不稳健。
-
-        Returns
-        -------
-        dict: {refuted: bool, deviation: float, new_effect: float}
-        """
-        # 当原效应接近 0 时，相对偏差会无穷大，改用绝对偏差（阈值 0.01）
-        if abs(estimate.value) < 1e-6:
-            orig = 1.0
-            deviation = abs(refutation.new_effect - estimate.value)
-            effective_threshold = 0.01
-        else:
-            orig = abs(estimate.value)
-            deviation = abs(refutation.new_effect - estimate.value) / orig
-            effective_threshold = threshold
-
-        # 安慰剂反驳: 新效应接近 0 是期望结果，不应判定为 refuted
-        if method_name == "placebo_treatment_refuter":
-            # 用 |新效应| 与 |原效应| 的比值衡量安慰剂是否成功消失
-            placebo_ratio = abs(refutation.new_effect) / orig
-            refuted = placebo_ratio > threshold
-            display_metric = placebo_ratio
-            display_label = "剩余比率"
-        else:
-            refuted = deviation > effective_threshold
-            display_metric = deviation
-            display_label = "偏差"
-
-        return {
-            'refuted': refuted,
-            'deviation': deviation,
-            'new_effect': refutation.new_effect,
-            'display_metric': display_metric,
-            'display_label': display_label,
-        }
-
-
-# ══════════════════════════════════════════════════════════════════════
-# Pearl 反事实推理引擎（DoWhy 0.14 base 版无 counterfactual 方法）
-# ══════════════════════════════════════════════════════════════════════
-
-class PearlCounterfactual:
-    """
-    Pearl 三步反事实推理的独立实现。
-    基于线性 SEM: Y = β·T + Σγ_k·pa_k(Y) + U
-
-    三步:
-    1. Abduction:  U = Y_obs - (β·T_obs + Σγ_k·pa_k(Y_obs))
-    2. Action:     do(T = t')
-    3. Prediction: Y_cf = β·t' + Σγ_k·pa_k(Y_obs) + U
-    """
-
-    def __init__(self, sem_coeff: np.ndarray, name_to_idx: dict,
-                 rng: np.random.Generator = None):
-        """
-        Parameters
-        ----------
-        sem_coeff : (V, V) array
-            结构系数矩阵，coeff[i,j] = 变量 i 对 j 的直接因果效应
-        name_to_idx : dict
-            变量名 → 矩阵索引
-        rng : np.random.Generator
-        """
-        self._coeff = sem_coeff
-        self._name_to_idx = name_to_idx
-        self._rng = rng if rng is not None else np.random.default_rng(42)
-
-    def query(self, observed, treatment_var, outcome_var,
-              control_value=0.0, treatment_value=1.0) -> dict:
-        """
-        执行 Pearl 三步反事实推理。
-
-        Parameters
-        ----------
-        observed : np.ndarray
-            观测到的所有变量值
-        treatment_var : str
-        outcome_var : str
-        control_value : float
-        treatment_value : float
-
-        Returns
-        -------
-        dict with observed_outcome, counterfactual_outcome, causal_effect, abduction_noise
-        """
-        ti = self._name_to_idx.get(treatment_var)
-        oi = self._name_to_idx.get(outcome_var)
-
-        if ti is None or oi is None:
-            return {
-                'observed_outcome': float('nan'),
-                'counterfactual_outcome': float('nan'),
-                'causal_effect': 0.0,
-                'abduction_noise': {},
-                'error': f'Variable not found: {treatment_var} or {outcome_var}'
-            }
-
-        # 直接效应系数
-        beta = self._coeff[ti, oi]
-
-        # 其他父节点对 outcome 的效应
-        parent_effects = 0.0
-        for p in range(len(self._name_to_idx)):
-            if p != ti and self._coeff[p, oi] != 0:
-                parent_effects += self._coeff[p, oi] * observed[p]
-
-        # Step 1: Abduction
-        y_obs = float(observed[oi])
-        x_obs = float(observed[ti])
-        y_pred_from_model = beta * x_obs + parent_effects
-        U = y_obs - y_pred_from_model
-
-        # Step 2 & 3: Action + Prediction
-        y_control = beta * control_value + parent_effects + U
-        y_treatment = beta * treatment_value + parent_effects + U
-        ite = y_treatment - y_control
-
-        return {
-            'observed_outcome': y_obs,
-            'counterfactual_outcome': float(y_treatment),
-            'causal_effect': float(ite),
-            'abduction_noise': {'U': float(U)},
-        }
-
-
-def estimate_sem_from_data(adj_matrix, data, concept_names,
-                          regularization: Optional[str] = None,
-                          alpha: float = 0.01,
-                          log_fn=None):
-    """
-    从数据和因果图（邻接矩阵）估计线性 SEM 的系数。
-    对每个子节点 Y，用其所有父节点 X 做回归: Y ~ Σβ_i·X_i
-
-    Parameters
-    ----------
-    regularization : {None, "ridge", "lasso"}, optional
-        None   -> OLS
-        ridge -> 岭回归 (稳定小样本/共线数据)
-        lasso -> Lasso (稀疏化)
-    alpha : float, default 0.01
-        正则化强度。
-    log_fn : callable, optional
-        日志回调（如 TRACE2DoWhy._log），用于记录回归失败而非静默吞异常。
-    """
-    V = len(concept_names)
-    coeff = np.zeros((V, V))
-
-    for j in range(V):
-        parents = [i for i in range(V) if adj_matrix[i, j] > 0]
-        if not parents:
-            continue
-        X = data[:, parents]
-        y = data[:, j]
-        try:
-            if regularization == "ridge":
-                # β = (X'X + αI)^(-1) X'y
-                XtX = X.T @ X
-                reg = XtX + alpha * np.eye(len(parents))
-                beta = np.linalg.solve(reg, X.T @ y)
-            elif regularization == "lasso":
-                try:
-                    from sklearn.linear_model import Lasso
-                except ImportError:
-                    # sklearn 不可用时回退到 ridge
-                    XtX = X.T @ X
-                    reg = XtX + alpha * np.eye(len(parents))
-                    beta = np.linalg.solve(reg, X.T @ y)
-                else:
-                    model = Lasso(alpha=alpha, fit_intercept=False, max_iter=5000)
-                    model.fit(X, y)
-                    beta = model.coef_
-            else:
-                # OLS: β = (X'X)^(-1) X'y
-                beta = np.linalg.lstsq(X, y, rcond=None)[0]
-            for k, pi in enumerate(parents):
-                coeff[pi, j] = float(beta[k])
-        except np.linalg.LinAlgError as e:
-            if log_fn is not None:
-                log_fn(f"SEM 估计失败: {e}")
-
-    return coeff
-
-
-# ══════════════════════════════════════════════════════════════════════
-# causallearn 集成层
-# ══════════════════════════════════════════════════════════════════════
-
-class CausalLearnValidator:
-    """
-    使用 causallearn 的 PC、GES 算法作为独立因果发现方法，
-    与 TRACE 的结果进行交叉验证。
-    """
-
-    def __init__(self, data: np.ndarray, concept_names: list):
-        """
-        Parameters
-        ----------
-        data : (N, V) array
-            观测数据矩阵
-        concept_names : list[str]
-            变量名列表
-        """
-        self.data = data
-        self.concept_names = concept_names
-        self._name_to_idx = {n: i for i, n in enumerate(concept_names)}
-        self.results: dict = {}
-        self.logs: list[str] = []  # 解析/检查过程中的诊断日志
-
-    def _log(self, msg: str):
-        """记录诊断日志，避免静默吞异常"""
-        self.logs.append(msg)
-
-    def run_pc(self, alpha: float = 0.05, **kwargs) -> dict:
-        """运行 PC (Peter-Clark) 算法"""
-        if not _CAUSALLEARN_AVAILABLE:
-            return {'error': 'causallearn not installed', 'edges': []}
-
-        try:
-            pc_result = pc_alg(self.data, alpha=alpha, **kwargs)
-            edges = self._parse_causallearn_graph(pc_result.G)
-
-            self.results['pc'] = {
-                'algorithm': 'PC (constraint-based)',
-                'edges': edges,
-                'n_edges': len(edges),
-                'graph': pc_result.G,
-            }
-            return self.results['pc']
-        except Exception as e:
-            return {'error': str(e), 'edges': []}
-
-    def run_ges(self, **kwargs) -> dict:
-        """运行 GES (Greedy Equivalence Search) 算法"""
-        if not _CAUSALLEARN_AVAILABLE:
-            return {'error': 'causallearn not installed', 'edges': []}
-
-        try:
-            ges_result = ges_alg(self.data, **kwargs)
-            edges = self._parse_causallearn_graph(ges_result['G'])
-
-            self.results['ges'] = {
-                'algorithm': 'GES (score-based)',
-                'edges': edges,
-                'n_edges': len(edges),
-                'graph': ges_result['G'],
-            }
-            return self.results['ges']
-        except Exception as e:
-            return {'error': str(e), 'edges': []}
-
-    # FCI 暂未实现，预留接口（如需支持隐藏混淆因子，可在此处添加 run_fci 方法）
-
-    def _parse_causallearn_graph(self, G) -> list:
-        """将 causallearn 的 GeneralGraph 解析为边列表"""
-        edges = []
-        try:
-            graph_edges = G.get_graph_edges()
-            for edge in graph_edges:
-                i = _node_index(edge.get_node1())
-                j = _node_index(edge.get_node2())
-                endpoint1 = edge.get_endpoint1()
-                endpoint2 = edge.get_endpoint2()
-
-                # ENDPOINT_TAIL = 1, ENDPOINT_ARROW = 2
-                tail, arrow = 1, 2
-                if endpoint1 == tail and endpoint2 == arrow:
-                    direction = '→'
-                elif endpoint1 == arrow and endpoint2 == tail:
-                    direction = '←'
-                elif endpoint1 == arrow and endpoint2 == arrow:
-                    direction = '↔'
-                elif endpoint1 == tail and endpoint2 == tail:
-                    direction = '—'
-                else:
-                    direction = '?'
-
-                if i < len(self.concept_names) and j < len(self.concept_names):
-                    edges.append({
-                        'source': self.concept_names[i],
-                        'target': self.concept_names[j],
-                        'direction': direction,
-                    })
-        except Exception as e:
-            self._log(f"causallearn 图解析失败: {e}")
-        return edges
-
-    def compare_with_trace(self, trace_edges: list) -> dict:
-        """
-        比较 causallearn 发现与 TRACE 发现的边。
-        trace_edges: [(src, dst, strength), ...]
-        """
-        trace_set = {(e[0], e[1]) for e in trace_edges}
-
-        comparison = {}
-        for algo_key, algo_result in self.results.items():
-            cl_edges = algo_result.get('edges', [])
-            cl_undirected = {(e['source'], e['target']) for e in cl_edges}
-            cl_undirected |= {(e['target'], e['source']) for e in cl_edges}
-
-            agree = trace_set & cl_undirected
-            trace_only = trace_set - cl_undirected
-            cl_only = cl_undirected - trace_set
-
-            comparison[algo_key] = {
-                'algorithm': algo_result['algorithm'],
-                'trace_n_edges': len(trace_set),
-                'cl_n_edges': len(cl_undirected),
-                'agree': len(agree),
-                'trace_only': len(trace_only),
-                'cl_only': len(cl_only),
-                'agreement_rate': len(agree) / max(len(trace_set), 1),
-                'agreed_edges': list(agree),
-            }
-
-        self.comparison = comparison
-        return comparison
-
-
-# ══════════════════════════════════════════════════════════════════════
-# 最小化 DataFrame（pandas 未安装时的轻量替代）
-# ══════════════════════════════════════════════════════════════════════
-
-class _ILocIndexer:
-    def __init__(self, data, columns, col_idx):
-        self.data = np.asarray(data)
-        self.columns = columns
-        self._col_idx = col_idx
-
-    def __getitem__(self, idx):
-        if isinstance(idx, int):
-            return _MinimalRow(self.data[idx], self.columns, self._col_idx)
-        if isinstance(idx, tuple):
-            row_idx, col_idx = idx
-            result = self.data[row_idx]
-            if isinstance(col_idx, (slice, list, np.ndarray)):
-                return result[..., col_idx]
-            return result[col_idx]
-        return self.data[idx]
-
-
-class _MinimalRow:
-    def __init__(self, row_data, columns, col_idx):
-        self._data = np.asarray(row_data)
-        self._col_idx = col_idx
-
-    @property
-    def values(self):
-        return self._data
-
-    def __repr__(self):
-        return str(self._data)
-
-    def to_dict(self):
-        return {}
-
-
-class _MinimalDataFrame:
-    def __init__(self, data: np.ndarray, columns: list):
-        self.data = np.asarray(data)
-        self.columns = list(columns)
-        self._col_idx = {c: i for i, c in enumerate(columns)}
-        self.iloc = _ILocIndexer(self.data, self.columns, self._col_idx)
-
-    @property
-    def values(self):
-        return self.data
-
-    def __getitem__(self, key):
-        if isinstance(key, str):
-            return self.data[:, self._col_idx[key]]
-        if isinstance(key, list) and key and isinstance(key[0], str):
-            # list[str] 映射到列索引，返回新的 _MinimalDataFrame（兼容 pandas 语义）
-            idx = [self._col_idx[k] for k in key]
-            return _MinimalDataFrame(self.data[:, idx], list(key))
-        return self.data[:, key]
-
-    def __len__(self):
-        return len(self.data)
+__all__ = [
+    "TRACE2DoWhy",
+    "DoWhy14Adapter",
+    "PearlCounterfactual",
+    "estimate_sem_from_data",
+    "CausalLearnValidator",
+    "_MinimalDataFrame",
+    "_ILocIndexer",
+    "_MinimalRow",
+    "SimulationEstimand",
+    "SimulationEstimate",
+    "SimulationRefutation",
+    "SimulationModel",
+    "from_trace_output",
+    "quick_analysis",
+    "is_dowhy_available",
+    "is_causallearn_available",
+    "is_graphviz_available",
+    "is_pandas_available",
+    "_DOWHY_AVAILABLE",
+    "_CAUSALLEARN_AVAILABLE",
+    "_GRAPHVIZ_AVAILABLE",
+    "_PANDAS_AVAILABLE",
+]
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -1252,7 +883,8 @@ class TRACE2DoWhy:
             self._log("causallearn 验证跳过: 有效概念 < 3")
             return {'error': 'too few concepts', 'n_concepts': len(valid_names)}
 
-        self.cl_validator = CausalLearnValidator(valid_data, valid_names)
+        self.cl_validator = CausalLearnValidator(
+            valid_data, valid_names, causallearn_available=_CAUSALLEARN_AVAILABLE)
 
         if run_pc:
             result_pc = self.cl_validator.run_pc(alpha=0.05)
@@ -1307,22 +939,10 @@ class TRACE2DoWhy:
         if not self.significant_edges:
             self.build_model()
 
-        # Windows: 确保 graphviz bin 在 PATH 中（仅通过参数或环境变量）
-        import os as _os
-        from _config import get_graphviz_bin_dir
-        bin_dirs_to_try = []
-        if graphviz_bin_dir:
-            bin_dirs_to_try.append(graphviz_bin_dir)
-        env_bin = get_graphviz_bin_dir()
-        if env_bin is not None:
-            bin_dirs_to_try.append(str(env_bin))
-
-        for bin_dir in bin_dirs_to_try:
-            if _os.path.isdir(bin_dir):
-                current_path = _os.environ.get('PATH', '')
-                if bin_dir not in current_path:
-                    _os.environ['PATH'] = f"{bin_dir};{current_path}"
-                break
+        # Windows: 确保 graphviz bin 在 PATH 中（委托给 _config.setup_graphviz，
+        # debt-05: PATH 配置逻辑集中到 _config.py）
+        from _config import setup_graphviz
+        setup_graphviz(graphviz_bin_dir)
 
         try:
             dot = graphviz.Digraph(
@@ -1496,99 +1116,22 @@ class TRACE2DoWhy:
                     status_icon = "✗"
                 lines.append(f"- {status_icon} {warrior_id}: {verdict}")
 
+            # 复合诊断引擎：跨战士聚合判定文本类型
+            try:
+                from compound_diagnostic import CompoundDiagnosticEngine, render_compound_diagnosis
+                engine = CompoundDiagnosticEngine()
+                compound_result = engine.diagnose(self.six_warriors_cards)
+                lines.append("")
+                lines.append(render_compound_diagnosis(compound_result))
+            except Exception as e:
+                lines.append(f"\n(复合诊断引擎不可用: {e})")
+
         return "\n".join(lines)
 
 
 # ══════════════════════════════════════════════════════════════════════
-# 模拟模式类（DoWhy 未安装时的替代）
+# 模拟模式类已移至 simulation_model.py（debt-01），通过文件顶部 re-import 提供
 # ══════════════════════════════════════════════════════════════════════
-
-class SimulationEstimand:
-    def __init__(self, treatment, outcome, identifiable=True):
-        self.treatment = treatment
-        self.outcome = outcome
-        self.identifiable = identifiable
-        self.identifier = "backdoor (simulated)"
-        self.estimand_type = "nonparametric-ate"
-
-
-class SimulationEstimate:
-    def __init__(self, value, ci_lower, ci_upper):
-        self.value = value
-        self._ci = [ci_lower, ci_upper]
-        self.confidence_interval = self._ci
-
-    def get_confidence_intervals(self):
-        return [self._ci]
-
-
-class SimulationRefutation:
-    def __init__(self, new_effect, refuted=False, is_placebo: bool = False):
-        self.new_effect = new_effect
-        orig = 1.0  # 模拟模式下原效应归一化参考
-        display_metric = abs(new_effect) / orig if is_placebo else 0.0
-        display_label = "剩余比率" if is_placebo else "偏差"
-        self._check = {
-            'refuted': refuted,
-            'deviation': 0.0,
-            'display_metric': display_metric,
-            'display_label': display_label,
-        }
-        self.refuted = refuted  # backward compat
-
-
-class SimulationModel:
-    """DoWhy 的模拟替代。API 与 DoWhy 0.14 一致。"""
-
-    def __init__(self, graph_edges, concept_names, data, rng):
-        self.graph_edges = graph_edges
-        self.concept_names = concept_names
-        self.data = data
-        self.rng = rng
-
-        self.n_vars = len(concept_names)
-        self._name_to_idx = {n: i for i, n in enumerate(concept_names)}
-        self._coeff = np.zeros((self.n_vars, self.n_vars))
-        for src, dst in graph_edges:
-            si = self._name_to_idx.get(src)
-            di = self._name_to_idx.get(dst)
-            if si is not None and di is not None:
-                self._coeff[si, di] = rng.uniform(0.3, 0.9)
-
-    def identify_effect(self, proceed_when_unidentifiable=True):
-        return SimulationEstimand(
-            treatment=self.concept_names[0],
-            outcome=self.concept_names[-1],
-            identifiable=True,
-        )
-
-    def estimate_effect(self, identified_estimand, method_name,
-                        confidence_intervals=True):
-        ti = self._name_to_idx.get(identified_estimand.treatment, 0)
-        oi = self._name_to_idx.get(identified_estimand.outcome, -1)
-
-        direct = self._coeff[ti, oi]
-        effect = direct if direct > 0 else self.rng.uniform(0.1, 0.5)
-        se = effect * 0.15
-        ci_lower = max(0, effect - 1.96 * se)
-        ci_upper = effect + 1.96 * se
-
-        return SimulationEstimate(effect, ci_lower, ci_upper)
-
-    def refute_estimate(self, identified_estimand, estimate,
-                        method_name="random_common_cause"):
-        if method_name == "random_common_cause":
-            perturbation = self.rng.normal(0, estimate.value * 0.05)
-            refuted = abs(perturbation) > estimate.value * 0.3
-            return SimulationRefutation(estimate.value + perturbation, refuted)
-        elif method_name == "placebo_treatment_refuter":
-            placebo = abs(self.rng.normal(0, estimate.value * 0.1))
-            return SimulationRefutation(placebo, placebo > estimate.value * 0.2, is_placebo=True)
-        elif method_name == "data_subset_refuter":
-            subset_effect = estimate.value * self.rng.uniform(0.8, 1.1)
-            refuted = abs(subset_effect - estimate.value) > estimate.value * 0.3
-            return SimulationRefutation(subset_effect, refuted)
-        return SimulationRefutation(estimate.value)
 
 
 # ══════════════════════════════════════════════════════════════════════

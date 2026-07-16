@@ -139,6 +139,42 @@ def build_schema(skill_dir: Path, preset: str = None) -> dict:
     return schema
 
 
+def build_presets_only(skill_dir: Path) -> dict:
+    """仅输出 presets 段（debt-16 audit 修复：供 trace-engine-web loadPresets() 调用）。
+
+    读取 presets.yaml 的 presets 段，将每个预设的 trace2dowhy+super+auditor
+    扁平化为单一字典，与 bridge_schema.json 的 presets 段格式一致。
+    """
+    presets = load_presets_yaml(skill_dir)
+    preset_section = presets.get('presets', {})
+    base_trace = presets.get('trace2dowhy', {})
+    base_super = presets.get('super', {})
+
+    result = {}
+    for name, preset_config in preset_section.items():
+        merged = {}
+        # 基础值
+        merged.update(base_trace)
+        merged.update(base_super)
+        # 预设覆盖
+        if 'trace2dowhy' in preset_config:
+            merged.update(preset_config['trace2dowhy'])
+        if 'super' in preset_config:
+            merged.update(preset_config['super'])
+        # Web 特有参数默认值
+        merged.setdefault('max_concepts', 12)
+        merged.setdefault('concept_min_freq', 2)
+        merged.setdefault('min_valid_tokens', 10)
+        merged.setdefault('max_edges_for_dowhy', 8)
+        merged.setdefault('filter_mode', 'topn')
+        merged.setdefault('filter_percentile', 85)
+        merged.setdefault('random_state', 42)
+        merged.setdefault('classical_mode', False)
+        merged.setdefault('max_segments', 4)
+        result[name] = merged
+    return result
+
+
 def main():
     args = sys.argv[1:]
     default_skill_dir = Path(__file__).resolve().parent / 'examples' / 'counterfactual_hybrid'
@@ -155,6 +191,13 @@ def main():
         idx = args.index('--preset')
         if idx + 1 < len(args):
             preset = args[idx + 1]
+
+    # debt-16 audit 修复：支持 --presets-only 参数，仅输出 presets 段
+    if '--presets-only' in args:
+        presets = build_presets_only(Path(skill_dir))
+        print(json.dumps(presets, ensure_ascii=False, indent=2))
+        return
+
     schema = build_schema(Path(skill_dir), preset=preset)
     print(json.dumps(schema, ensure_ascii=False, indent=2))
     return 0

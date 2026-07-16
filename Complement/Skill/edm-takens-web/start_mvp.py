@@ -1,0 +1,102 @@
+#!/usr/bin/env python3
+"""
+EDM-Takens Web MVP — 一键启动脚本
+
+同时启动 Python FastAPI 后端与 Vite 前端开发服务器，
+按 Ctrl+C 可一次性终止两个进程。
+"""
+import os
+import sys
+import time
+import shutil
+import subprocess
+
+_PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
+_BACKEND_CMD = [sys.executable, "run_backend.py"]
+_NPM = shutil.which("npm") or "npm"
+_FRONTEND_CMD = [_NPM, "run", "dev"]
+
+
+def _wait_for_port(host: str, port: int, timeout: float = 30.0):
+    """简单探测端口是否已监听，用于给出更友好的启动提示。
+
+    Vite 默认绑定到 ``localhost``，在某些系统上 ``127.0.0.1`` 可能解析不一致，
+    所以探测失败时会再尝试 ``localhost``。
+    """
+    import socket
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        for h in (host, "localhost"):
+            try:
+                with socket.create_connection((h, port), timeout=1):
+                    return True
+            except OSError:
+                pass
+        time.sleep(0.5)
+    return False
+
+
+def main():
+    print("=" * 60)
+    print("  EDM-Takens Web MVP 启动器")
+    print("=" * 60)
+
+    backend = subprocess.Popen(
+        _BACKEND_CMD,
+        cwd=_PROJECT_ROOT,
+        stdout=None,
+        stderr=None,
+    )
+    print(f"[+] 后端 PID {backend.pid}: {' '.join(_BACKEND_CMD)}")
+
+    frontend = subprocess.Popen(
+        _FRONTEND_CMD,
+        cwd=os.path.join(_PROJECT_ROOT, "frontend"),
+        stdout=None,
+        stderr=None,
+    )
+    print(f"[+] 前端 PID {frontend.pid}: {' '.join(_FRONTEND_CMD)}")
+
+    print("[*] 等待服务就绪...")
+    ready_be = False
+    ready_fe = False
+    deadline = time.time() + 60.0
+    while time.time() < deadline:
+        if not ready_be and _wait_for_port("127.0.0.1", 8000, timeout=1.0):
+            print("[OK] 后端已就绪: http://localhost:8000")
+            ready_be = True
+        if not ready_fe and _wait_for_port("127.0.0.1", 5173, timeout=1.0):
+            print("[OK] 前端已就绪: http://localhost:5173")
+            ready_fe = True
+        if ready_be and ready_fe:
+            break
+        if backend.poll() is not None or frontend.poll() is not None:
+            break
+        time.sleep(0.3)
+
+    if not ready_be:
+        print("[!] 后端未能在预期时间内就绪，请检查端口 8000 是否被占用。")
+    if not ready_fe:
+        print("[!] 前端未能在预期时间内就绪（若 5173 被占，Vite 会自动换端口）。")
+
+    print("\n[*] 按 Ctrl+C 停止所有服务\n")
+
+    try:
+        while backend.poll() is None and frontend.poll() is None:
+            time.sleep(0.5)
+    except KeyboardInterrupt:
+        print("\n[*] 收到中断信号，正在停止...")
+    finally:
+        for p, name in [(backend, "后端"), (frontend, "前端")]:
+            if p.poll() is None:
+                p.terminate()
+                try:
+                    p.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    p.kill()
+                    p.wait(timeout=5)
+                print(f"[-] {name} 已停止")
+
+
+if __name__ == "__main__":
+    main()

@@ -59,6 +59,7 @@ from counterfactual_bridge import TRACE2DoWhy, DoWhy14Adapter, _DOWHY_AVAILABLE
 from dowhy_auditor import DoWhyAuditor
 from enhanced_viz import render_dashboard
 from presets import load_presets
+from pipeline_helpers import run_full_pipeline
 
 
 def log(msg):
@@ -275,19 +276,14 @@ def main():
         classical_mode=classical_mode,
         **trace_kwargs,
     )
-    bridge.aggregate_concepts()
-    log(f"  Concepts: {[n for n in bridge.concept_names if n != '<other>' and len(n)>1][:15]}")
+    # debt-05: 管线核心序列抽取到 pipeline_helpers.run_full_pipeline（双轨入口合并）
+    run_full_pipeline(bridge, preset=p)
 
-    bridge.build_model()
+    log(f"  Concepts: {[n for n in bridge.concept_names if n != '<other>' and len(n)>1][:15]}")
     log(f"  Edges: {len(bridge.significant_edges)} (ΔNLL > {bridge.threshold})")
     if bridge.significant_edges:
         log(f"  Top edge: {bridge.significant_edges[0][0]} → "
             f"{bridge.significant_edges[0][1]} ({bridge.significant_edges[0][2]:.3f})")
-
-    bridge.identify()
-    bridge.estimate()
-    bridge.refute()
-    bridge.counterfactual_scan(n_top_edges=min(5, len(bridge.significant_edges)))
 
     # ═══════════════════════════════════════════════════════════════
     # Step 2.5: Six Warriors — 保证 run_real_pipeline 也是完整六合一
@@ -297,6 +293,8 @@ def main():
         from six_warriors import assemble_all_six
         from six_panel_viz import render_chart_suite
         cards = assemble_all_six(adj_matrix, all_tokens, bridge=bridge, text=text[:500])
+        # debt-04 audit 修复：将六战士卡片注入 bridge，激活 report() 中的复合诊断引擎
+        bridge.set_six_warriors_cards(cards)
         for key, card in cards.items():
             print(f"  {card.color} {card.warrior_id:12s} [{card.status.upper()}] {card.verdict}")
         charts = render_chart_suite(bridge, cards, str(OUTPUT_DIR), dpi=150)

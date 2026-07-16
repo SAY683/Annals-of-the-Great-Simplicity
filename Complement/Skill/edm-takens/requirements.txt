@@ -1,0 +1,14 @@
+# EDM-Takens Skill — Runtime Dependencies (lower bounds)
+# Use this for broad portability. For exact reproducible versions, see
+# requirements-lock.txt (the pinned manifest from the reference environment).
+#
+# Install: pip install -r requirements.txt
+numpy>=1.22
+scipy>=1.8
+pandas>=1.4
+matplotlib>=3.5
+pyEDM>=1.0          # optional but recommended for C++ fidelity; numpy fallback exists
+scikit-learn>=1.0   # optional, used by some pyEDM paths
+statsmodels>=0.14   # optional — Secret 8 (Stationarity Gate: ADF/KPSS tests)
+# Example-specific extras:
+#   examples/yinshen/ requires pypinyin (see examples/yinshen/requirements.txt)

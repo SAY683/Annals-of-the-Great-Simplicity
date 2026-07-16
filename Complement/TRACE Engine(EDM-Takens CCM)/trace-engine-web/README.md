@@ -139,6 +139,52 @@ SUPER 模式使用独立的常驻 Python Worker [`llama_worker.py`](./llama_work
 | GET | `/api/metrics` | 运行时指标（活跃任务、历史状态统计等） |
 | POST | `/api/admin/cleanup` | 手动触发输出目录 TTL 清理 |
 
+### API 鉴权（debt-12）
+
+服务端支持基于 API Key 的分级鉴权，通过环境变量配置：
+
+| 环境变量 | 用途 | 说明 |
+|----------|------|------|
+| `TRACE_API_KEY` | 普通鉴权密钥 | 保护分析、结果、任务历史等读写端点。**未设置时鉴权自动禁用**（开发模式兼容）。 |
+| `TRACE_ADMIN_KEY` | 管理员密钥 | 保护管理员端点（`/api/admin/cleanup`、`/api/jobs/clear`）。需与 `TRACE_API_KEY` 配合使用。 |
+
+**分级保护策略：**
+
+- **公开只读**（无需鉴权）：`/api/health`、`/api/version`、`/api/schema`、`/api/presets`
+- **需鉴权**（验证 `TRACE_API_KEY`）：`/api/analyze-*`、`/api/result/:id`、`/api/report/:id`、`/api/jobs`、`/api/jobs/export`、`/api/jobs/:id`、`/api/retry/:id`、`/api/cancel/:id`、`/api/queue`、`/api/config`、`/api/metrics`
+- **管理员**（额外验证 `TRACE_ADMIN_KEY`）：`/api/admin/cleanup`、`/api/jobs/clear`
+
+**密钥传递方式**（三选一，推荐第一种）：
+
+```bash
+# 1. Authorization: Bearer 头（推荐）
+curl -H "Authorization: Bearer <TRACE_API_KEY>" http://localhost:3000/api/jobs
+
+# 2. X-Api-Key 头
+curl -H "X-Api-Key: <TRACE_API_KEY>" http://localhost:3000/api/jobs
+
+# 3. query 参数（便于浏览器直接访问，不推荐用于生产）
+curl "http://localhost:3000/api/jobs?api_key=<TRACE_API_KEY>"
+```
+
+**生产环境配置示例：**
+
+```powershell
+# PowerShell
+$env:TRACE_API_KEY = "your-strong-api-key-here"
+$env:TRACE_ADMIN_KEY = "your-strong-admin-key-here"
+npm start
+```
+
+```bash
+# Bash
+export TRACE_API_KEY="your-strong-api-key-here"
+export TRACE_ADMIN_KEY="your-strong-admin-key-here"
+npm start
+```
+
+> **安全说明**：密钥比较使用常数时间算法（constant-time comparison）以防止时序攻击。管理员端点要求请求密钥与 `TRACE_ADMIN_KEY` 精确匹配（而非 `TRACE_API_KEY`），确保权限最小化。未设置 `TRACE_API_KEY` 时服务会输出警告日志，所有端点均可匿名访问——仅供本地开发使用。
+
 ### 实时事件类型
 
 SSE 流推送以下事件：
@@ -212,12 +258,17 @@ trace-engine-web/
 ├── stop_servers.ps1       # 结束残留 Node 进程
 ├── stop_servers.bat       # stop_servers.ps1 的 CMD 包装
 ├── package.json           # NodeJS 依赖
-├── server.js              # Express + SSE 服务端
+├── server.js              # Express + SSE 服务端（232 行，模块化拆分）
 ├── py_bridge.py           # Python 桥接脚本（LIGHT / DEEP）
 ├── llama_worker.py        # 常驻 LLaMA Worker（SUPER）
 ├── sample_input.txt       # 示例输入文本
 ├── README.md              # 本文档
 ├── .gitignore             # 排除运行时产物
+├── lib/                   # 状态管理（state.js）+ 工具函数（utils.js）
+├── middleware/            # 鉴权（auth.js）+ CORS/安全头（index.js）
+├── routes/                # API 路由（analysis.js, jobs.js, system.js, admin.js）
+├── services/              # 分析服务（analysis.js）+ LLaMA Worker 管理（llamaWorker.js）
+├── schema/                # result_schema.json + bridge_schema.json
 ├── work/                  # 运行时产物（启动日志、输出目录）
 │   ├── sync_product.py    # 同步到成品目录的脚本
 │   └── outputs/           # 任务输出（按 UUID 存放）
@@ -225,6 +276,8 @@ trace-engine-web/
 │   ├── test_api.py        # API 端到端测试脚本
 │   └── test_upload.py     # 文件上传兼容性测试
 └── public/
+    ├── css/               # main.css + theme.css
+    ├── js/                # app.js + sse.js + render.js + schema.js + jobs.js
     └── index.html         # 极客风格前端页面
 ```
 
@@ -284,3 +337,27 @@ trace-engine-web/
 - 文本越长、因果描述越清晰，分析效果越好
 - 首次 `npm install` 需要网络访问
 - 如需完全独立部署，可将 Skill 目录复制到本项目的 `skill/` 下并修改 `server.js` 中的 `CONFIG.skillDir`
+
+## 架构（v2 模块化）
+
+server.js (232行) 仅负责 Express 初始化与路由挂载，具体逻辑分散到：
+
+| 目录 | 职责 |
+|------|------|
+| lib/ | 状态管理（state.js）+ 工具函数（utils.js） |
+| middleware/ | 鉴权（auth.js）+ CORS/安全头（index.js） |
+| routes/ | API 路由（analysis.js, jobs.js, system.js, admin.js） |
+| services/ | 分析服务（analysis.js）+ LLaMA Worker 管理（llamaWorker.js） |
+| schema/ | result_schema.json + bridge_schema.json |
+| public/css/ | main.css + theme.css |
+| public/js/ | app.js + sse.js + render.js + schema.js + jobs.js |
+
+### 安全特性
+- 鉴权分级：TRACE_API_KEY（普通用户）/ TRACE_ADMIN_KEY（管理员）
+- helmet 安全头
+- express-rate-limit 限流（/api/analyze-*）
+- CORS 精确白名单（TRACE_CORS_ORIGIN）
+
+### SSE 重连
+- 服务端发送递增 event id + retry:5000
+- 前端记录 lastSseEventId，重连时通过 Last-Event-ID 请求头发送

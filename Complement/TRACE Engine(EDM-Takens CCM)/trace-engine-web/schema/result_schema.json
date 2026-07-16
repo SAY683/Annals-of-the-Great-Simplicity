@@ -1,0 +1,239 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://trace-engine-web/schema/result_schema.json",
+  "title": "TRACE Engine Result Schema",
+  "description": "统一描述 LIGHT/DEEP/SUPER 三种分析模式的结果结构。py_bridge.py 与 llama_worker.py 在序列化 result 时按此校验必需字段；前端 public/js/render.js 据此动态渲染。",
+  "type": "object",
+  "required": ["success", "analysis_mode", "concepts", "ate", "identifiable", "n_significant_edges", "execution_profile"],
+  "properties": {
+    "success": {
+      "type": "boolean",
+      "description": "分析是否成功完成"
+    },
+    "analysis_mode": {
+      "type": "string",
+      "enum": ["light", "deep", "super"],
+      "description": "分析模式"
+    },
+    "mode": {
+      "type": "string",
+      "description": "内部桥接模式名（如 nonparametric-simulated），可选"
+    },
+    "model": {
+      "type": ["string", "null"],
+      "description": "SUPER 模式使用的 LLaMA 模型名（LIGHT/DEEP 为 null）"
+    },
+    "text_hash": {
+      "type": ["string", "null"],
+      "description": "输入文本的 SHA256 摘要前 16 位，便于去重"
+    },
+    "concepts": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "提取的概念列表（已过滤虚词）"
+    },
+    "concept_frequencies": {
+      "type": "object",
+      "description": "概念到出现频次的映射",
+      "additionalProperties": { "type": "integer" }
+    },
+    "ccm_eligible_concepts": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "符合 CCM 资格的概念（频次 >= 3）"
+    },
+    "adjacency_matrix": {
+      "type": "array",
+      "description": "概念级邻接矩阵（二维数组）",
+      "items": {
+        "type": "array",
+        "items": { "type": "number" }
+      }
+    },
+    "treatment": {
+      "type": ["string", "null"],
+      "description": "处理变量"
+    },
+    "outcome": {
+      "type": ["string", "null"],
+      "description": "结果变量"
+    },
+    "identifiable": {
+      "type": "boolean",
+      "description": "因果效应是否可识别"
+    },
+    "identifiability": {
+      "type": "object",
+      "description": "可识别性细节",
+      "properties": {
+        "identifiable": { "type": "boolean" },
+        "estimand_type": { "type": "string" },
+        "backdoor_paths": {},
+        "adjustment_set": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "ate": {
+      "type": ["number", "null"],
+      "description": "平均处理效应（ATE）点估计"
+    },
+    "confidence_interval": {
+      "type": "array",
+      "description": "95% 置信区间 [lower, upper]",
+      "items": { "type": ["number", "null"] },
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "confidence_method": {
+      "type": "string",
+      "description": "置信区间计算方法（bootstrap / OLS-analytic / SEM-analytic）"
+    },
+    "refutations": {
+      "type": "array",
+      "description": "反驳测试结果列表",
+      "items": {
+        "type": "object",
+        "required": ["method", "new_effect", "refuted"],
+        "properties": {
+          "method": { "type": "string" },
+          "label": { "type": "string" },
+          "new_effect": { "type": ["number", "null"] },
+          "refuted": { "type": "boolean" },
+          "display_metric": { "type": ["number", "null"] },
+          "display_label": { "type": ["string", "null"] }
+        }
+      }
+    },
+    "counterfactual_scan": {
+      "type": "array",
+      "description": "反事实扫描结果（统一结构）",
+      "items": {
+        "type": "object",
+        "required": ["source", "target"],
+        "properties": {
+          "source": { "type": ["string", "null"] },
+          "target": { "type": ["string", "null"] },
+          "trace_dnl": { "type": ["number", "null"] },
+          "ite": { "type": ["number", "null"] },
+          "observed": { "type": ["number", "null"] },
+          "counterfactual": { "type": ["number", "null"] }
+        }
+      }
+    },
+    "n_significant_edges": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "显著因果边数量"
+    },
+    "top_edges": {
+      "type": "array",
+      "description": "Top 因果边列表",
+      "items": {
+        "type": "object",
+        "required": ["source", "target", "strength"],
+        "properties": {
+          "source": { "type": "string" },
+          "target": { "type": "string" },
+          "strength": { "type": "number" },
+          "direction": { "type": "string" }
+        }
+      }
+    },
+    "threshold": { "type": "number" },
+    "window_size": { "type": "integer" },
+    "concept_min_freq": { "type": "integer" },
+    "max_concepts": { "type": "integer" },
+    "max_edges_for_dowhy": { "type": "integer" },
+    "n_samples": { "type": ["integer", "null"] },
+    "backend": { "type": "string" },
+    "simulation": { "type": "boolean" },
+    "dowhy_available": { "type": "boolean" },
+    "causallearn_available": { "type": "boolean" },
+    "estimand_type": { "type": "string" },
+    "data_diagnostics": {
+      "type": "object",
+      "description": "数据与模型诊断指标"
+    },
+    "environment_diagnostics": {
+      "type": "object",
+      "description": "SUPER 模式环境诊断（Python/PyTorch/CUDA/VRAM/模型目录）"
+    },
+    "execution_profile": {
+      "type": "object",
+      "required": ["stages", "total_ms"],
+      "description": "执行时间剖面",
+      "properties": {
+        "stages": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["stage", "ms"],
+            "properties": {
+              "stage": { "type": "string" },
+              "ms": { "type": "integer" }
+            }
+          }
+        },
+        "total_ms": { "type": "integer" }
+      }
+    },
+    "algorithm_sufficiency": {
+      "type": "object",
+      "description": "算法充分性研判（SUPER 模式）",
+      "properties": {
+        "sufficient": { "type": "boolean" },
+        "recommendations": { "type": "array", "items": { "type": "string" } },
+        "n_tokens": { "type": "integer" },
+        "n_concepts": { "type": "integer" },
+        "n_edges": { "type": "integer" }
+      }
+    },
+    "six_warriors": {
+      "type": "object",
+      "description": "六战士诊断卡片（DEEP/SUPER 模式）",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "warrior_id": { "type": "string" },
+          "name": { "type": "string" },
+          "instrument": { "type": "string" },
+          "status": { "type": "string", "enum": ["deployed", "fallback", "unavailable"] },
+          "color": { "type": "string" },
+          "findings": { "type": "array", "items": { "type": "string" } },
+          "metrics": { "type": "object" },
+          "verdict": { "type": "string" },
+          "raw": {}
+        }
+      }
+    },
+    "stability_analysis": {
+      "type": "object",
+      "description": "稳定性与鲁棒性分析（DEEP/SUPER 模式）",
+      "properties": {
+        "edge_stability_mean": { "type": "number" },
+        "edge_stability_std": { "type": "number" },
+        "edge_stability_per_edge": { "type": "object" },
+        "ate_bootstrap_std": { "type": ["number", "null"] },
+        "permutation_p_value": { "type": ["number", "null"] },
+        "cv_folds": { "type": "integer" },
+        "cv_ate_mean": { "type": ["number", "null"] },
+        "cv_ate_std": { "type": ["number", "null"] }
+      }
+    },
+    "auditor": {
+      "type": ["object", "null"],
+      "description": "DoWhy 审计结果（SUPER 模式）",
+      "properties": {
+        "verdict": { "type": "string" },
+        "n_pass": { "type": "integer" },
+        "n_warn": { "type": "integer" },
+        "n_fail": { "type": "integer" }
+      }
+    }
+  },
+  "additionalProperties": true,
+  "$defs": {
+    "mode_specific": {
+      "description": "模式特化字段说明：LIGHT 模式 six_warriors/stability_analysis 为空对象；DEEP 模式 environment_diagnostics/algorithm_sufficiency/model 可缺失；SUPER 模式必须含 model/environment_diagnostics/algorithm_sufficiency。"
+    }
+  }
+}

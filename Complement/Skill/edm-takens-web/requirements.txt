@@ -1,0 +1,10 @@
+# EDM-Takens Web — Python backend dependencies
+fastapi>=0.110
+uvicorn[standard]>=0.27
+python-multipart>=0.0.9
+numpy>=1.22
+scipy>=1.8
+pandas>=1.4
+matplotlib>=3.5
+pyEDM>=1.0
+scikit-learn>=1.0

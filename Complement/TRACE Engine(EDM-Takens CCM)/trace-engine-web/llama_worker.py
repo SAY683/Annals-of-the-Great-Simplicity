@@ -31,6 +31,7 @@ import os
 import platform
 import queue
 import shutil
+import signal
 import sys
 import tempfile
 import threading
@@ -128,6 +129,53 @@ def stage(name: str, message: str, progress: float = None):
 
 def error(message: str):
     emit({"type": "error", "message": message})
+
+
+# ── debt-13：错误分级（fatal vs recoverable） ─────────────────────────
+# fatal_error：不可恢复错误（如 TRACE/DoWhy 桥接失败），终止当前任务并通知主循环。
+# recoverable_error：可恢复错误（如某个战士诊断失败），跳过当前阶段继续执行。
+# 二者在协议上通过 severity 字段区分；server.js 仍按 type=error 处理，向后兼容。
+def fatal_error(message: str):
+    emit({"type": "error", "severity": "fatal", "message": message})
+
+
+def recoverable_error(message: str):
+    emit({"type": "error", "severity": "recoverable", "message": message})
+
+
+# ── debt-10：结果 Schema 校验 ─────────────────────────────────────────
+# 加载 schema/result_schema.json，在序列化 result 前校验必需字段。
+# 非阻塞式：缺失字段仅记录 warn 日志并补 _schema_missing 标记，不中断输出。
+_RESULT_SCHEMA = None
+
+
+def _load_result_schema():
+    global _RESULT_SCHEMA
+    if _RESULT_SCHEMA is not None:
+        return _RESULT_SCHEMA
+    try:
+        schema_path = Path(__file__).resolve().parent / "schema" / "result_schema.json"
+        with open(schema_path, "r", encoding="utf-8") as f:
+            _RESULT_SCHEMA = json.load(f)
+    except Exception as e:
+        log("warn", f"加载 result_schema.json 失败，跳过结果校验: {e}")
+        _RESULT_SCHEMA = {}
+    return _RESULT_SCHEMA
+
+
+def _validate_result(result: dict) -> dict:
+    """按 result_schema.json 校验必需字段，缺失字段记 warn 并补标记。"""
+    schema = _load_result_schema()
+    required = schema.get("required") if schema else None
+    if not required:
+        return result
+    missing = [f for f in required if result.get(f) is None]
+    if missing:
+        log("warn", f"结果缺少 Schema 必需字段: {', '.join(missing)}（已标记，结果仍输出）")
+        result["_schema_missing"] = missing
+    else:
+        result["_schema_validated"] = True
+    return result
 
 
 def _estimate_trace_pairs(segments: List[List[int]], window: int) -> int:
@@ -603,13 +651,17 @@ TRACE_CACHE_MAX_ENTRIES = 16
 # ══════════════════════════════════════════════════════════════════════
 def compute_trace(
     text: str, model, sp, window: int = 64, max_segments: int = 4,
-    prune_min_freq: int = 1, max_candidates_per_step: int = 64
+    prune_min_freq: int = 1, max_candidates_per_step: int = 64,
+    job_id: str = None
 ):
     """使用 LLaMA 模型计算 token-level ΔNLL 因果矩阵。
 
     内部会定期发送 stage 进度事件与心跳日志，避免长文本推理时前端长时间无反馈。
     支持 TRACE 剪枝：按历史频率过滤候选、限制每步最大候选数，以在几乎不影响
     因果检出的前提下显著降低大模型推理量。
+
+    debt-13：若传入 job_id，则在内层 token 循环中每 16 个 token 检查一次取消信号，
+    使长文本推理可被及时中断（此前仅在阶段边界检查，长分段可能延迟数十秒才响应取消）。
     """
     device = next(model.parameters()).device
     MASK = sp.piece_to_id('<mask>')
@@ -655,6 +707,9 @@ def compute_trace(
         local_edges = 0
         skipped_candidates_total = 0
         for ti in range(1, L):
+            # debt-13：每 16 个 token 检查一次取消信号，使长分段推理可被及时中断
+            if job_id and ti % 16 == 0:
+                _check_cancel(job_id, "trace")
             tid = seq[ti]
             hist_start = max(0, ti - window)
             history = seq[hist_start:ti]
@@ -886,17 +941,21 @@ def run_super_job(job: dict):
                 window=config.get('window_size', 64),
                 max_segments=config.get('max_segments', 4),
                 prune_min_freq=config.get('prune_min_freq', 1),
-                max_candidates_per_step=config.get('max_candidates_per_step', 64)
+                max_candidates_per_step=config.get('max_candidates_per_step', 64),
+                job_id=job_id,
             )
             if len(tokens) == 0:
-                error("TRACE 未产生有效 token 对，可能是文本过短或模型无法编码输入。")
+                fatal_error("TRACE 未产生有效 token 对，可能是文本过短或模型无法编码输入。")
                 return
             TRACE_CACHE[cache_key] = (adj_matrix, tokens)
             # LRU 淘汰：超出上限时移除最久未使用的条目
             while len(TRACE_CACHE) > TRACE_CACHE_MAX_ENTRIES:
                 TRACE_CACHE.popitem(last=False)
+        except _CancelledError:
+            # debt-13：取消信号需向上冒泡到主循环，不能被下面的 Exception 吞掉
+            raise
         except Exception as e:
-            error(f"TRACE 计算失败: {e}")
+            fatal_error(f"TRACE 计算失败: {e}")
             return
     timer.end()
 
@@ -925,8 +984,10 @@ def run_super_job(job: dict):
         bridge.estimate()
         bridge.refute()
         bridge.counterfactual_scan(n_top_edges=min(5, len(bridge.significant_edges)))
+    except _CancelledError:
+        raise
     except Exception as e:
-        error(f"DoWhy 桥接失败: {e}")
+        fatal_error(f"DoWhy 桥接失败: {e}")
         return
     timer.end()
 
@@ -943,7 +1004,7 @@ def run_super_job(job: dict):
     try:
         cards = assemble_all_six(adj_matrix, tokens, bridge=bridge, text=text[:500])
     except Exception as e:
-        log("warn", f"六战士诊断部分失败: {e}")
+        recoverable_error(f"六战士诊断部分失败: {e}")
         cards = {}
     timer.end()
 
@@ -954,7 +1015,7 @@ def run_super_job(job: dict):
         auditor = DoWhyAuditor(bridge)
         audit = auditor.audit('full')
     except Exception as e:
-        log("warn", f"审计失败: {e}")
+        recoverable_error(f"审计失败: {e}")
         audit = None
     timer.end()
 
@@ -1019,6 +1080,7 @@ def run_super_job(job: dict):
     }
     timer.end()
 
+    _validate_result(result)
     emit({"type": "result", "payload": result})
     stage("done", "SUPER 分析完成", 1.0)
 
@@ -1087,9 +1149,54 @@ class _CancelledError(Exception):
 
 
 # ══════════════════════════════════════════════════════════════════════
+# debt-13：信号处理（SIGTERM / SIGINT 优雅退出）
+# 收到终止信号时刷新 MODEL_CACHE 与 TRACE_CACHE，释放显存后退出，
+# 避免常驻 Worker 被 kill -9 时残留显存碎片或未落盘的缓存。
+# ══════════════════════════════════════════════════════════════════════
+_SHUTTING_DOWN = False
+
+
+def _flush_caches_and_exit(signum, frame):
+    global _SHUTTING_DOWN
+    if _SHUTTING_DOWN:
+        # 重复信号：强制退出
+        os._exit(130)
+    _SHUTTING_DOWN = True
+    sig_name = signal.Signals(signum).name if hasattr(signal, 'Signals') else str(signum)
+    try:
+        log("info", f"收到 {sig_name} 信号，开始刷新缓存并优雅退出...")
+    except Exception:
+        pass
+    try:
+        TRACE_CACHE.clear()
+    except Exception:
+        pass
+    try:
+        MODEL_CACHE._models.clear()
+        MODEL_CACHE._sps.clear()
+    except Exception:
+        pass
+    try:
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+    except Exception:
+        pass
+    try:
+        log("info", "缓存已刷新，Worker 退出。")
+    except Exception:
+        pass
+    os._exit(0)
+
+
+# ══════════════════════════════════════════════════════════════════════
 # Worker 主循环
 # ══════════════════════════════════════════════════════════════════════
 def main():
+    # debt-13：注册 SIGTERM / SIGINT 信号处理器
+    signal.signal(signal.SIGTERM, _flush_caches_and_exit)
+    signal.signal(signal.SIGINT, _flush_caches_and_exit)
+
     log("info", "LLaMA Worker 已启动，等待任务...")
     threading.Thread(target=_reader_thread, daemon=True).start()
     while True:
