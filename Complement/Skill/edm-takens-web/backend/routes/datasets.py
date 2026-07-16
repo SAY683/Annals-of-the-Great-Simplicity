@@ -115,11 +115,18 @@ def get_columns(filename: str):
     df = _read_csv_robust(path)
     numeric_cols = list(df.select_dtypes(include=["number"]).columns)
     recommended_target = _recommend_target(numeric_cols, df=df)
+    # 把 NaN / Inf 替换为 None（JSON null），避免 JSON 序列化报错
+    import math
+    preview = df.head(5).to_dict(orient="records")
+    for row in preview:
+        for k, v in row.items():
+            if isinstance(v, float) and (math.isnan(v) or math.isinf(v)):
+                row[k] = None
     return {
         "columns": list(df.columns),
         "numeric_columns": numeric_cols,
         "rows": len(df),
-        "preview": df.head(5).to_dict(orient="records"),
+        "preview": preview,
         "recommended_target": recommended_target,
     }
 

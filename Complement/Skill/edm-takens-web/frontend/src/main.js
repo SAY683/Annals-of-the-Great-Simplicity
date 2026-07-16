@@ -36,26 +36,31 @@ async function refreshDatasets() {
 }
 
 async function loadDatasetColumns(filename) {
-  const info = await apiJson(`/datasets/${encodeURIComponent(filename)}/columns`)
-  $('#columnInfo').innerHTML = `
-    <strong>${escapeHtml(filename)}</strong><br/>
-    行数: ${info.rows} &nbsp;|&nbsp; 数值列: ${escapeHtml(info.numeric_columns.join(', '))}
-  `
-  const targetSel = $('#targetSelect')
-  targetSel.innerHTML = ''
-  info.numeric_columns.forEach((col) => {
-    const opt = document.createElement('option')
-    opt.value = col
-    opt.textContent = col
-    targetSel.appendChild(opt)
-  })
-  // Default to the backend's recommended target (avoids ID columns like game/id)
-  if (info.recommended_target) {
-    targetSel.value = info.recommended_target
+  try {
+    const info = await apiJson(`/datasets/${encodeURIComponent(filename)}/columns`)
+    $('#columnInfo').innerHTML = `
+      <strong>${escapeHtml(filename)}</strong><br/>
+      行数: ${info.rows} &nbsp;|&nbsp; 数值列: ${escapeHtml(info.numeric_columns.join(', '))}
+    `
+    const targetSel = $('#targetSelect')
+    targetSel.innerHTML = ''
+    info.numeric_columns.forEach((col) => {
+      const opt = document.createElement('option')
+      opt.value = col
+      opt.textContent = col
+      targetSel.appendChild(opt)
+    })
+    // Default to the backend's recommended target (avoids ID columns like game/id)
+    if (info.recommended_target) {
+      targetSel.value = info.recommended_target
+    }
+    await loadRecommendation(filename)
+    await loadQuality(filename)
+    $('#runBtn').disabled = false
+  } catch (e) {
+    $('#columnInfo').innerHTML = `<span style="color:red">加载失败: ${escapeHtml(e.message)}</span>`
+    $('#runBtn').disabled = true
   }
-  await loadRecommendation(filename)
-  await loadQuality(filename)
-  $('#runBtn').disabled = false
 }
 
 async function loadRecommendation(filename) {
