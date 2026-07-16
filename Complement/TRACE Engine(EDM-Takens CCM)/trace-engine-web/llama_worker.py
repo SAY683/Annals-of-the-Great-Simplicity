@@ -29,12 +29,14 @@ import hashlib
 import json
 import os
 import platform
+import queue
 import shutil
 import sys
 import tempfile
+import threading
 import time
 import warnings
-from collections import Counter, defaultdict
+from collections import Counter, OrderedDict, defaultdict
 from pathlib import Path
 from typing import Any, Dict, List
 
@@ -312,6 +314,124 @@ def _algorithm_sufficiency(diagnostics: Dict[str, Any], concepts: List[str], edg
     }
 
 
+def _run_super_stability(bridge, tokens, config, estimate):
+    """SUPER 模式轻量稳定性分析：ATE bootstrap / permutation / K-fold CV + 边稳定性。
+
+    与 py_bridge.py 的 _run_stability_analysis 对齐，但：
+    - 边稳定性使用 token 序列 bootstrap + 共现窗口（不重新跑 TRACE）
+    - ATE 稳定性直接在 bridge.data_df 上做行级 resample
+    """
+    rng = np.random.default_rng(42)
+    n_bootstrap = 30
+    edge_stability = {}
+    ate_bootstrap = []
+
+    original_edges = {(s, t) for s, t, _ in bridge.significant_edges}
+    concept_names = bridge.concept_names
+    max_concepts = config.get('max_concepts', 12)
+    window_size = config.get('window_size', 64)
+    threshold = config.get('threshold', 0.03)
+
+    # ── 边稳定性：token 序列 bootstrap + 共现矩阵 ──
+    token_arr = np.asarray(tokens)
+    T = len(tokens)
+    for b in range(n_bootstrap):
+        idx = rng.integers(0, T, size=T)
+        boot_tokens = token_arr[idx].tolist()
+        valid_boot = [t for t in boot_tokens if is_valid_concept(t)]
+        if len(valid_boot) < 10:
+            continue
+        freq = Counter(valid_boot)
+        boot_concepts = [w for w, _ in freq.most_common(max_concepts)]
+        if len(boot_concepts) < 3:
+            continue
+        ci = {name: i for i, name in enumerate(boot_concepts)}
+        boot_adj = np.zeros((len(boot_concepts), len(boot_concepts)))
+        boot_ids = [ci.get(t) for t in boot_tokens if t in ci]
+        for i in range(len(boot_ids)):
+            for j in range(i + 1, min(i + window_size, len(boot_ids))):
+                a, bb = boot_ids[i], boot_ids[j]
+                if a is None or bb is None or a == bb:
+                    continue
+                boot_adj[a, bb] += 1.0
+        if boot_adj.max() > 0:
+            boot_adj = boot_adj / boot_adj.max() * 8.0
+        for s, t in original_edges:
+            if s in ci and t in ci:
+                key = f"{s} → {t}"
+                edge_stability.setdefault(key, []).append(
+                    float(boot_adj[ci[s], ci[t]] > threshold)
+                )
+
+    # ── ATE 稳定性：数据行级 bootstrap / permutation / CV ──
+    df = None
+    treatment_col = getattr(bridge, 'treatment', concept_names[0] if concept_names else None)
+    outcome_col = getattr(bridge, 'outcome', concept_names[-1] if concept_names else None)
+    try:
+        df = bridge.data_df.copy()
+    except Exception:
+        pass
+
+    if df is not None and treatment_col and treatment_col in df.columns and outcome_col in df.columns:
+        try:
+            n_rows = df.shape[0]
+            covariates = [c for c in df.columns if c not in (treatment_col, outcome_col)]
+            for _ in range(n_bootstrap):
+                idx = rng.integers(0, n_rows, size=n_rows)
+                boot_df = df.iloc[idx]
+                X = boot_df[[treatment_col] + covariates].values
+                y = boot_df[outcome_col].values
+                coef = np.linalg.lstsq(X, y, rcond=None)[0][0]
+                ate_bootstrap.append(float(coef))
+        except Exception:
+            pass
+
+    permutation_ates = []
+    p_value = None
+    if df is not None and treatment_col in df.columns and outcome_col in df.columns:
+        try:
+            orig_ate = float(estimate.value) if estimate else 0.0
+            for _ in range(20):
+                perm_df = df.copy()
+                perm_df[treatment_col] = rng.permutation(perm_df[treatment_col].values)
+                X = perm_df[[treatment_col] + [c for c in df.columns if c not in (treatment_col, outcome_col)]].values
+                y = perm_df[outcome_col].values
+                coef = np.linalg.lstsq(X, y, rcond=None)[0][0]
+                permutation_ates.append(float(coef))
+            p_value = np.mean([abs(a) >= abs(orig_ate) for a in permutation_ates]) if permutation_ates else None
+        except Exception:
+            pass
+
+    cv_ates = []
+    n_folds = 3
+    n_rows = df.shape[0] if df is not None else 0
+    if df is not None and n_rows >= n_folds * 2:
+        fold_size = n_rows // n_folds
+        for fold in range(n_folds):
+            mask = np.ones(n_rows, dtype=bool)
+            mask[fold * fold_size:(fold + 1) * fold_size] = False
+            try:
+                train_df = df.iloc[mask]
+                X = train_df[[treatment_col] + [c for c in df.columns if c not in (treatment_col, outcome_col)]].values
+                y = train_df[outcome_col].values
+                coef = np.linalg.lstsq(X, y, rcond=None)[0][0]
+                cv_ates.append(float(coef))
+            except Exception:
+                pass
+
+    per_edge = {k: float(np.mean(v)) for k, v in edge_stability.items() if v}
+    return {
+        "edge_stability_mean": float(np.mean(list(per_edge.values()))) if per_edge else 0.0,
+        "edge_stability_std": float(np.std(list(per_edge.values()))) if per_edge else 0.0,
+        "edge_stability_per_edge": per_edge,
+        "ate_bootstrap_std": float(np.std(ate_bootstrap)) if ate_bootstrap else None,
+        "permutation_p_value": float(p_value) if p_value is not None else None,
+        "cv_folds": n_folds,
+        "cv_ate_mean": float(np.mean(cv_ates)) if cv_ates else None,
+        "cv_ate_std": float(np.std(cv_ates)) if cv_ates else None,
+    }
+
+
 def _serialize_refutations(refutation_results):
     """将 DoWhy 反驳结果序列化为 JSON 安全字典，兼容 dict/list/None。"""
     if not refutation_results:
@@ -346,18 +466,57 @@ def _serialize_refutations(refutation_results):
     return out
 
 
+def _serialize_counterfactual_scan(scan_results):
+    """将反事实扫描结果序列化为与 py_bridge.py 一致的统一结构。
+
+    统一结构: [{source, target, trace_dnl, ite, observed, counterfactual}]
+    兼容原始 dict 列表与缺失字段，缺失数值统一为 None 供前端 safeFmt 处理。
+    """
+    if not scan_results:
+        return []
+    if not isinstance(scan_results, (list, tuple)):
+        return []
+
+    out = []
+    for r in scan_results:
+        if not isinstance(r, dict):
+            continue
+
+        def _num(key):
+            v = r.get(key)
+            try:
+                return float(v) if v is not None else None
+            except (TypeError, ValueError):
+                return None
+
+        out.append({
+            "source": r.get("source"),
+            "target": r.get("target"),
+            "trace_dnl": _num("trace_dnl"),
+            "ite": _num("ite"),
+            "observed": _num("observed"),
+            "counterfactual": _num("counterfactual"),
+        })
+    return out
+
+
 # ══════════════════════════════════════════════════════════════════════
 # 模型加载与缓存
 # ══════════════════════════════════════════════════════════════════════
 class ModelCache:
-    """按模型名称缓存已加载的模型与 tokenizer。"""
+    """按模型名称缓存已加载的模型与 tokenizer（LRU，限制常驻模型数量）。"""
+
+    MAX_MODELS = 2  # 最多同时缓存 2 个模型，避免显存无限增长
 
     def __init__(self):
-        self._models = {}
-        self._sps = {}
+        self._models = OrderedDict()  # name -> model
+        self._sps = OrderedDict()     # name -> SentencePieceProcessor
 
     def load(self, model_name: str):
         if model_name in self._models:
+            # 命中缓存：提升为最近使用
+            self._models.move_to_end(model_name)
+            self._sps.move_to_end(model_name)
             return self._models[model_name], self._sps[model_name]
 
         stage("model_load", f"正在加载 {model_name} 模型...", 0.0)
@@ -415,11 +574,28 @@ class ModelCache:
 
         self._models[model_name] = model
         self._sps[model_name] = sp
+        # LRU 驱逐：超出上限时释放最久未使用的模型并回收显存
+        self._evict_if_needed()
         return model, sp
+
+    def _evict_if_needed(self):
+        while len(self._models) > self.MAX_MODELS:
+            evict_name, evict_model = self._models.popitem(last=False)
+            self._sps.popitem(last=False)
+            log("info", f"ModelCache LRU 驱逐模型: {evict_name}")
+            del evict_model
+            gc.collect()
+            if torch.cuda.is_available():
+                try:
+                    torch.cuda.empty_cache()
+                except Exception:
+                    pass
 
 
 MODEL_CACHE = ModelCache()
-TRACE_CACHE = {}  # text_hash -> (adj_matrix, tokens)
+# TRACE 结果缓存：使用 OrderedDict 限制条目数，避免内存无限增长
+TRACE_CACHE = OrderedDict()  # text_hash -> (adj_matrix, tokens)
+TRACE_CACHE_MAX_ENTRIES = 16
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -608,6 +784,7 @@ def run_super_job(job: dict):
     raw_config = job.get('config', {})
     config = _merge_llama_presets(model_name, raw_config)
     timer = StageTimer()
+    job_id = job.get('id', '')  # 用于取消检查
 
     if not text or not text.strip():
         error("输入文本为空")
@@ -691,12 +868,15 @@ def run_super_job(job: dict):
     timer.end()
 
     # 2. TRACE 因果发现（带缓存）
+    _check_cancel(job_id, "trace")
     text_hash = hashlib.sha256(text.encode('utf-8')).hexdigest()[:16]
     cache_key = f"{model_name}:{text_hash}"
     timer.begin("trace")
 
     if cache_key in TRACE_CACHE:
         adj_matrix, tokens = TRACE_CACHE[cache_key]
+        # 命中缓存：提升为最近使用
+        TRACE_CACHE.move_to_end(cache_key)
         log("info", "命中 TRACE 结果缓存")
     else:
         stage("trace", "使用 LLaMA 执行 token-level TRACE 因果发现...", 0.2)
@@ -712,12 +892,16 @@ def run_super_job(job: dict):
                 error("TRACE 未产生有效 token 对，可能是文本过短或模型无法编码输入。")
                 return
             TRACE_CACHE[cache_key] = (adj_matrix, tokens)
+            # LRU 淘汰：超出上限时移除最久未使用的条目
+            while len(TRACE_CACHE) > TRACE_CACHE_MAX_ENTRIES:
+                TRACE_CACHE.popitem(last=False)
         except Exception as e:
             error(f"TRACE 计算失败: {e}")
             return
     timer.end()
 
     # 3. DoWhy 桥接
+    _check_cancel(job_id, "bridge")
     timer.begin("bridge")
     stage("bridge", "TRACE → DoWhy 桥接...", 0.5)
     try:
@@ -753,6 +937,7 @@ def run_super_job(job: dict):
             log("warn", f"算法充分性: {rec}")
 
     # 5. 六战士诊断
+    _check_cancel(job_id, "six_warriors")
     timer.begin("six_warriors")
     stage("six_warriors", "六战士合体诊断...", 0.8)
     try:
@@ -773,6 +958,18 @@ def run_super_job(job: dict):
         audit = None
     timer.end()
 
+    # 6.5 稳定性分析（与 DEEP 模式对齐）
+    timer.begin("stability")
+    stage("stability", "稳定性与鲁棒性分析 (bootstrap / permutation / CV)...", 0.95)
+    stability_analysis = {}
+    try:
+        log("info", "SUPER 稳定性分析启动: n_bootstrap=30, n_permutation=20, n_folds=3")
+        stability_analysis = _run_super_stability(bridge, tokens, config, bridge.estimate_result)
+        log("info", f"稳定性分析完成: edge_stability_mean={stability_analysis.get('edge_stability_mean', 0):.3f}")
+    except Exception as e:
+        log("warn", f"稳定性分析部分失败: {e}")
+    timer.end()
+
     # 7. 组装结果
     timer.begin("finalize")
     stage("finalize", "生成 SUPER 报告...", 0.95)
@@ -786,8 +983,8 @@ def run_super_job(job: dict):
         "analysis_mode": "super",
         "model": model_name,
         "text_hash": text_hash,
-        "concepts": bridge.concept_names,
-        "concept_frequencies": concept_frequencies,
+        "concepts": [c for c in bridge.concept_names if c != "<other>"],
+        "concept_frequencies": {k: v for k, v in concept_frequencies.items() if k != "<other>"},
         "n_significant_edges": len(bridge.significant_edges),
         "top_edges": [
             {"source": e[0], "target": e[1], "strength": e[2], "direction": "→"}
@@ -799,7 +996,8 @@ def run_super_job(job: dict):
         "confidence_interval": ci,
         "identifiable": identifiable,
         "refutations": _serialize_refutations(bridge.refutation_results),
-        "counterfactual_scan": bridge.scan_results,
+        # P1-7：将 scan_results 转换为与 py_bridge.py 一致的统一结构，避免前端字段不匹配
+        "counterfactual_scan": _serialize_counterfactual_scan(bridge.scan_results),
         "six_warriors": {k: v.to_dict() if hasattr(v, 'to_dict') else v for k, v in (cards or {}).items()},
         "auditor": {
             "verdict": audit.verdict if audit else None,
@@ -807,6 +1005,7 @@ def run_super_job(job: dict):
             "n_warn": audit.n_warn if audit else 0,
             "n_fail": audit.n_fail if audit else 0,
         } if audit else None,
+        "stability_analysis": stability_analysis,
         "execution_profile": timer.profile(),
         "data_diagnostics": token_diagnostics,
         "environment_diagnostics": env_diag,
@@ -825,21 +1024,82 @@ def run_super_job(job: dict):
 
 
 # ══════════════════════════════════════════════════════════════════════
-# Worker 主循环
+# 任务取消机制：后台线程读取 stdin，主线程处理任务
+# 通过 {"type":"cancel","id":...} 信号中断正在执行的任务
 # ══════════════════════════════════════════════════════════════════════
-def main():
-    log("info", "LLaMA Worker 已启动，等待任务...")
+_CANCEL_LOCK = threading.Lock()
+_CANCELLED_JOBS = set()
+_JOB_QUEUE = queue.Queue()
+
+
+def _reader_thread():
+    """后台读取 stdin：分发任务到队列，cancel 信号立即标记。
+
+    P2-12：``for line in sys.stdin`` 在无输入时会阻塞，这是常驻 Worker 的预期空闲
+    行为——等待 server.js 派发任务。无需额外读取超时，原因：
+      1. 本线程以 daemon=True 启动（见 main()），进程退出时不会被阻塞；
+      2. server.js 控制本 Worker 生命周期：关闭 stdin 或 kill 进程时，迭代自然结束；
+      3. server.js 侧已有 SUPER 阶段看门狗（P2-6，30 分钟无 stage 更新即判定 hang）
+         与 24 小时安全兜底，会在上游检测到无进展并终止本 Worker；
+      4. 主线程在 ``_JOB_QUEUE.get()`` 上同样阻塞等待任务，二者 idle 语义一致。
+    因此这里的阻塞不会导致僵死，上游超时机制已覆盖异常场景。
+    """
     for line in sys.stdin:
         line = line.strip()
         if not line:
             continue
         try:
-            job = json.loads(line)
+            msg = json.loads(line)
         except json.JSONDecodeError as e:
             error(f"无法解析任务 JSON: {e}")
             continue
+        # 取消信号：标记对应任务，run_super_job 会在检查点中止
+        if msg.get("type") == "cancel":
+            job_id = msg.get("id")
+            if job_id:
+                with _CANCEL_LOCK:
+                    _CANCELLED_JOBS.add(job_id)
+                log("info", f"收到取消信号 job={job_id}")
+            continue
+        _JOB_QUEUE.put(msg)
+
+
+def is_cancelled(job_id) -> bool:
+    with _CANCEL_LOCK:
+        return job_id in _CANCELLED_JOBS
+
+
+def clear_cancel(job_id):
+    with _CANCEL_LOCK:
+        _CANCELLED_JOBS.discard(job_id)
+
+
+def _check_cancel(job_id, stage_name):
+    """在阶段检查点调用：若任务已取消则输出 error 并抛出 CancelledError。"""
+    if is_cancelled(job_id):
+        clear_cancel(job_id)
+        raise _CancelledError(stage_name)
+
+
+class _CancelledError(Exception):
+    """任务被用户取消时抛出，用于在阶段检查点提前退出。"""
+    pass
+
+
+# ══════════════════════════════════════════════════════════════════════
+# Worker 主循环
+# ══════════════════════════════════════════════════════════════════════
+def main():
+    log("info", "LLaMA Worker 已启动，等待任务...")
+    threading.Thread(target=_reader_thread, daemon=True).start()
+    while True:
+        job = _JOB_QUEUE.get()
+        if job is None:
+            break
         try:
             run_super_job(job)
+        except _CancelledError as ce:
+            error(f"任务已取消 (阶段={ce})")
         except Exception as e:
             error(f"任务执行异常: {e}")
 

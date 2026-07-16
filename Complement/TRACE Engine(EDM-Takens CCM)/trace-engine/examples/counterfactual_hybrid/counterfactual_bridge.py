@@ -28,6 +28,7 @@ v2 新增: DoWhy 0.14 兼容 + causallearn (PC/FCI/GES) + Graphviz 可视化。
     bridge = TRACE2DoWhy(adj_matrix, token_list, simulation=True)
 """
 
+import re
 import sys
 import warnings
 from collections import Counter
@@ -74,6 +75,21 @@ try:
     import networkx as nx
 except ImportError:
     nx = None
+
+
+# ══════════════════════════════════════════════════════════════════════
+# causallearn GraphNode 索引提取
+# ══════════════════════════════════════════════════════════════════════
+
+def _node_index(node) -> int:
+    """从 causallearn 的 GraphNode 中提取节点索引。
+
+    GraphNode 没有 get_index() 方法，get_name() 返回形如 'X12' 的字符串，
+    用正则提取其中的数字部分作为索引。
+    """
+    name = node.get_name()
+    m = re.search(r'\d+', name)
+    return int(m.group()) if m else 0
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -138,8 +154,15 @@ class DoWhy14Adapter:
         -------
         dict: {refuted: bool, deviation: float, new_effect: float}
         """
-        orig = abs(estimate.value) + 1e-10
-        deviation = abs(refutation.new_effect - estimate.value) / orig
+        # 当原效应接近 0 时，相对偏差会无穷大，改用绝对偏差（阈值 0.01）
+        if abs(estimate.value) < 1e-6:
+            orig = 1.0
+            deviation = abs(refutation.new_effect - estimate.value)
+            effective_threshold = 0.01
+        else:
+            orig = abs(estimate.value)
+            deviation = abs(refutation.new_effect - estimate.value) / orig
+            effective_threshold = threshold
 
         # 安慰剂反驳: 新效应接近 0 是期望结果，不应判定为 refuted
         if method_name == "placebo_treatment_refuter":
@@ -149,7 +172,7 @@ class DoWhy14Adapter:
             display_metric = placebo_ratio
             display_label = "剩余比率"
         else:
-            refuted = deviation > threshold
+            refuted = deviation > effective_threshold
             display_metric = deviation
             display_label = "偏差"
 
@@ -372,8 +395,8 @@ class CausalLearnValidator:
         try:
             graph_edges = G.get_graph_edges()
             for edge in graph_edges:
-                i = edge.get_node1().get_index()
-                j = edge.get_node2().get_index()
+                i = _node_index(edge.get_node1())
+                j = _node_index(edge.get_node2())
                 endpoint1 = edge.get_endpoint1()
                 endpoint2 = edge.get_endpoint2()
 
@@ -484,6 +507,10 @@ class _MinimalDataFrame:
     def __getitem__(self, key):
         if isinstance(key, str):
             return self.data[:, self._col_idx[key]]
+        if isinstance(key, list) and key and isinstance(key[0], str):
+            # list[str] 映射到列索引，返回新的 _MinimalDataFrame（兼容 pandas 语义）
+            idx = [self._col_idx[k] for k in key]
+            return _MinimalDataFrame(self.data[:, idx], list(key))
         return self.data[:, key]
 
     def __len__(self):
@@ -525,7 +552,20 @@ class TRACE2DoWhy:
         max_concepts: int = 0,
     ):
         self.adj_matrix = np.asarray(adj_matrix)
+        if isinstance(token_list, str):
+            raise TypeError("token_list 必须是列表/数组，不能是字符串")
         self.token_list = list(token_list)
+        # 形状校验：adj_matrix 必须是 (T, T) 方阵且与 token_list 长度一致
+        if self.adj_matrix.ndim != 2 or self.adj_matrix.shape[0] != self.adj_matrix.shape[1]:
+            raise ValueError(f"adj_matrix 必须是 2D 方阵，得到 shape={self.adj_matrix.shape}")
+        if self.adj_matrix.shape[0] != len(self.token_list):
+            raise ValueError(
+                f"adj_matrix shape ({self.adj_matrix.shape[0]}, {self.adj_matrix.shape[1]}) 与 token_list 长度 ({len(self.token_list)}) 不匹配"
+            )
+        # NaN/Inf 清理：避免在后续聚合/估计中静默传播
+        if not np.all(np.isfinite(self.adj_matrix)):
+            warnings.warn("adj_matrix 含 NaN/Inf，已替换为 0.0", RuntimeWarning)
+            self.adj_matrix = np.nan_to_num(self.adj_matrix, nan=0.0, posinf=0.0, neginf=0.0)
         self.tokenizer = tokenizer
         self.threshold = threshold
         self.concept_min_freq = concept_min_freq
@@ -639,11 +679,14 @@ class TRACE2DoWhy:
 
         concept_map = {}
         for i, tok in enumerate(self.token_list):
-            # 高频 token 仍需通过 is_valid_concept 与长度过滤才能成为独立概念节点
             if tok in high_freq:
                 concept_map[i] = tok
-            else:
+            elif is_valid_concept(tok, classical_mode=self.classical_mode):
+                # 有效但低频的 token 归入 <other> 聚合桶
                 concept_map[i] = "<other>"
+            else:
+                # 无效 token（标点、BPE 碎片、虚词、<other> token 本身）直接丢弃，不参与概念图
+                continue
 
         unique_concepts = sorted(set(concept_map.values()))
         C = len(unique_concepts)
@@ -653,8 +696,10 @@ class TRACE2DoWhy:
         concept_counts = np.zeros((C, C))
 
         for i in range(T):
-            for j in range(T):
-                if i >= j:
+            if i not in concept_map:
+                continue
+            for j in range(i + 1, T):
+                if j not in concept_map:
                     continue
                 ci = concept_idx[concept_map[i]]
                 cj = concept_idx[concept_map[j]]
@@ -677,7 +722,7 @@ class TRACE2DoWhy:
         self.unk_rate = unk_rate
         self._log(f"Token {T} → Concept {C} "
                   f"(高频={len(high_freq)}, "
-                  f"低频={sum(1 for i in range(T) if self.token_list[i] not in high_freq)})")
+                  f"低频={sum(1 for i, t in enumerate(self.token_list) if t not in high_freq and is_valid_concept(t, classical_mode=self.classical_mode))})")
 
         if unk_rate > 0.2:
             self._log(f"⚠ UNK rate={unk_rate:.1%} (严重跨域). "
@@ -711,10 +756,22 @@ class TRACE2DoWhy:
 
         C = len(self.concept_names)
 
-        # 提取显著边
+        if C == 0:
+            raise ValueError("无有效概念节点：所有 token 均被过滤（标点/BPE碎片/虚词）。请提供更长或更多元的文本。")
+
+        if C < 2:
+            raise ValueError("概念节点不足（<2），因果分析无意义")
+
+        # 阈值校验：负数 threshold 会产生自环和零权边
+        if self.threshold < 0:
+            raise ValueError("threshold 不能为负数")
+
+        # 提取显著边（跳过自环 ci == cj）
         edges = []
         for ci in range(C):
             for cj in range(C):
+                if ci == cj:
+                    continue
                 if self.concept_adj[ci, cj] > self.threshold:
                     edges.append((self.concept_names[ci],
                                   self.concept_names[cj],
@@ -815,8 +872,13 @@ class TRACE2DoWhy:
             else:
                 valid_names = [n for n in self.concept_names
                               if n != "<other>" and len(n) > 1]
-                default_treatment = valid_names[0] if valid_names else self.concept_names[0]
-                default_outcome = valid_names[-1] if len(valid_names) > 1 else self.concept_names[-1]
+                if valid_names:
+                    default_treatment = valid_names[0]
+                    default_outcome = valid_names[-1]
+                else:
+                    non_other = [n for n in self.concept_names if n != "<other>"]
+                    default_treatment = non_other[0] if non_other else self.concept_names[0]
+                    default_outcome = non_other[-1] if len(non_other) > 1 else default_treatment
 
             # 精简数据: 只包含 DOT 图中出现的列（否则 DoWhy 在大数据上失败）
             dot_cols = sorted(dot_nodes)
@@ -846,10 +908,12 @@ class TRACE2DoWhy:
         noise = self.rng.normal(0, 1.0, (n_samples, n_concepts))
         data[:] = noise[:]
 
-        # 收集所有显著边 (父节点 -> 子节点)
+        # 收集所有显著边 (父节点 -> 子节点)，跳过自环
         edges = []
         for i in range(n_concepts):
             for j in range(n_concepts):
+                if i == j:
+                    continue
                 if self.concept_adj[i, j] > self.threshold:
                     edges.append((i, j, self.concept_adj[i, j] / 10.0))
 
@@ -909,10 +973,12 @@ class TRACE2DoWhy:
         if treatment is None or outcome is None:
             valid_names = [n for n in self.concept_names
                            if n != "<other>" and len(n) > 1]
+            if not valid_names:
+                valid_names = [n for n in self.concept_names if n != "<other>"]
             if treatment is None:
                 treatment = valid_names[0] if valid_names else self.concept_names[0]
             if outcome is None:
-                outcome = valid_names[-1] if valid_names else self.concept_names[-1]
+                outcome = valid_names[-1] if len(valid_names) > 1 else treatment
 
         self.treatment = treatment
         self.outcome = outcome
@@ -1088,7 +1154,7 @@ class TRACE2DoWhy:
 
     def counterfactual_scan(self, n_top_edges: int = 5) -> list[dict]:
         """对 ΔNLL 最强的 N 条边逐个执行反事实查询"""
-        if not self.significant_edges:
+        if self.concept_adj is None:
             self.build_model()
 
         results = []
@@ -1110,6 +1176,16 @@ class TRACE2DoWhy:
                 })
             except Exception as e:
                 self._log(f"反事实扫描 [{src}→{dst}]: 失败 ({e})")
+                # 异常分支也记录一条带 error 字段的结果，避免静默丢失失败边
+                results.append({
+                    "source": src,
+                    "target": dst,
+                    "trace_dnl": strength,
+                    "ite": float('nan'),
+                    "observed": float('nan'),
+                    "counterfactual": float('nan'),
+                    "error": str(e),
+                })
 
         self.scan_results = results
         return results
@@ -1253,11 +1329,13 @@ class TRACE2DoWhy:
         """生成 Markdown 格式的六合一（+六维）诊断报告"""
         n_edges = len(self.significant_edges)
         n_concepts = len(self.concept_names)
-        n_refuted = sum(
-            1 for r in self.refutation_results.values()
-            if getattr(getattr(r, '_check', None), 'refuted',
-                       getattr(r, 'refuted', False))
-        )
+        # _check 是 dict 而非对象，需用键访问而非 getattr
+        n_refuted = 0
+        for r in self.refutation_results.values():
+            check = getattr(r, '_check', None)
+            refuted = check['refuted'] if isinstance(check, dict) else getattr(r, 'refuted', False)
+            if refuted:
+                n_refuted += 1
 
         lines = [
             "# TRACE + DoWhy + Counterfactual 综合诊断报告",

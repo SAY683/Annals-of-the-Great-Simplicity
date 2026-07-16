@@ -107,7 +107,9 @@ def is_valid_concept(name: str, classical_mode: bool = False) -> bool:
       - SentencePiece 前缀 ▁
       - 纯标点
       - 纯数字
+      - ASCII 单字符（英文单字母 BPE 碎片，如 a/e/i/o/u）
       - 单字中文虚词（classical_mode=True 时保留古汉语虚词，适用于 Shenji 古文）
+      - 多字中文虚词/连接词/语法词
       - <other> 聚合桶
     """
     if not name or name in BPE_FRAGMENTS:
@@ -131,6 +133,11 @@ def is_valid_concept(name: str, classical_mode: bool = False) -> bool:
             return False
     except (ValueError, TypeError):
         pass
+
+    # ASCII 单字符过滤：英文单字母（a-z/A-Z）是 BPE 碎片，无独立语义
+    # CJK 单字（价/涨/用）有意义，不受此规则影响
+    if len(stripped) == 1 and ord(stripped) < 128:
+        return False
 
     # 字级 BPE: 单字虚词
     if len(stripped) == 1 and stripped in _CN_STOP_CHARS:
@@ -159,7 +166,7 @@ def classify_bpe_type(token_list: list[str]) -> str:
     根据有效 token 中单字比例，推测 BPE 类型。
     返回 "character" 或 "word"。
     """
-    valid = [t for t in token_list if t not in BPE_FRAGMENTS and not t.startswith("▁")]
+    valid = [t for t in token_list if t is not None and t not in BPE_FRAGMENTS and not t.startswith("▁")]
     if not valid:
         return "unknown"
     n_single = sum(1 for t in valid if len(t.strip()) == 1)

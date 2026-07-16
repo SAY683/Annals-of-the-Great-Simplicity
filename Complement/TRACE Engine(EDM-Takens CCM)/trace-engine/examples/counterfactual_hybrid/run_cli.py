@@ -164,7 +164,14 @@ def cmd_demo():
                         if si<sj: adj[si,sj]=ADJ[ci,cj]
 
     print(f"\n[1/5] TRACE → DoWhy 桥接...")
-    bridge = TRACE2DoWhy(adj, TOKENS, threshold=0.5, concept_min_freq=2)
+    # 加载 demo 预设参数，避免硬编码绕过 presets.yaml
+    demo_preset = load_presets("demo")
+    bridge = TRACE2DoWhy(
+        adj, TOKENS,
+        threshold=demo_preset.trace2dowhy.threshold,
+        concept_min_freq=demo_preset.trace2dowhy.concept_min_freq,
+        max_edges_for_dowhy=demo_preset.trace2dowhy.max_edges_for_dowhy,
+    )
     bridge.aggregate_concepts()
     bridge.build_model()
     bridge.identify(treatment='算法推荐', outcome='信息茧房')
@@ -291,26 +298,28 @@ def cmd_real(preset="llama"):
     print(f"  {bridge.treatment} → {bridge.outcome}")
     print(f"  ATE={est.value:.4f}  95%CI=[{ci[0]:.4f},{ci[1]:.4f}]")
 
-    print(f"\n[3/5] 六战士合体...")
+    print(f"\n[3/5] 反事实扫描...")
+    bridge.counterfactual_scan(n_top_edges=min(5, len(bridge.significant_edges)))
+
+    print(f"\n[4/5] 六战士合体...")
     cards = assemble_all_six(adj, tokens, bridge=bridge)
     logger.info(f"Six warriors: {', '.join(f'{k}={c.status}' for k,c in cards.items())}")
     for key, card in cards.items():
         icon = f'[{card.status.upper()}]'
         print(f"  {card.color} {card.warrior_id:12s} {icon:14s} {card.verdict}")
-    bridge.counterfactual_scan(n_top_edges=min(5, len(bridge.significant_edges)))
 
-    print(f"\n[4/5] 审计防火墙...")
+    print(f"\n[5/6] 审计防火墙...")
     auditor = DoWhyAuditor(bridge)
     audit = auditor.audit('full')
     logger.info(f"Auditor: {audit.verdict} (P={audit.n_pass}, W={audit.n_warn}, F={audit.n_fail})")
     print(f"  Verdict: {audit.verdict} (PASS={audit.n_pass}, WARN={audit.n_warn}, FAIL={audit.n_fail})")
 
-    print(f"\n[5/5] 生成多云化图谱套件...")
+    print(f"\n[6/6] 生成多云化图谱套件...")
     charts = render_chart_suite(bridge, cards, str(REAL_DIR), dpi=150)
     logger.info(f"Generated {len(charts)} chart files")
-    for p in charts:
-        print(f"  {p}")
-        logger.debug(f"  Chart: {p}")
+    for chart_path in charts:
+        print(f"  {chart_path}")
+        logger.debug(f"  Chart: {chart_path}")
     report = render_six_panel_report(cards) + "\n\n" + bridge.report()
     (REAL_DIR / "report.md").write_text(report, encoding='utf-8')
     logger.info(f"Report: {REAL_DIR / 'report.md'} ({len(report)} chars)")

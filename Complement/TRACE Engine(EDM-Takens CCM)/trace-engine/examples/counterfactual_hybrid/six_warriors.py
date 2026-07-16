@@ -15,6 +15,7 @@ Six Warriors Integration — 六战士统一编排器
     for card in cards: print(card.render())
 """
 
+import re
 import warnings
 import numpy as np
 from pathlib import Path
@@ -22,6 +23,21 @@ from collections import Counter
 
 from _config import ensure_edm_takens_in_sys_path
 from _token_filters import is_valid_concept, is_unk_token
+
+
+# ══════════════════════════════════════════════════════════════════════
+# causallearn GraphNode 索引提取
+# ══════════════════════════════════════════════════════════════════════
+
+def _node_index(node) -> int:
+    """从 causallearn 的 GraphNode 中提取节点索引。
+
+    GraphNode 没有 get_index() 方法，get_name() 返回形如 'X12' 的字符串，
+    用正则提取其中的数字部分作为索引。
+    """
+    name = node.get_name()
+    m = re.search(r'\d+', name)
+    return int(m.group()) if m else 0
 
 # ══════════════════════════════════════════════════════════════════════
 # 战士导入 — 多路径 fallback
@@ -122,6 +138,7 @@ class WarriorCard:
 # ══════════════════════════════════════════════════════════════════════
 
 def _deploy_trace(adj_matrix, token_list) -> WarriorCard:
+    adj_matrix = np.asarray(adj_matrix)
     card = WarriorCard("TRACE", "拓扑先锋", "探照灯", color="🔴")
     T = len(token_list)
     if adj_matrix.size == 0:
@@ -303,6 +320,7 @@ def _deploy_edm(token_list) -> WarriorCard:
 # ══════════════════════════════════════════════════════════════════════
 
 def _deploy_havok(adj_matrix, token_list=None) -> WarriorCard:
+    adj_matrix = np.asarray(adj_matrix)
     card = WarriorCard("HAVOK", "混沌暗杀者", "X光机", color="⚫")
 
     T = adj_matrix.shape[0]
@@ -364,6 +382,12 @@ def _deploy_havok(adj_matrix, token_list=None) -> WarriorCard:
 
         # 能量分配
         total_energy = np.sum(s ** 2)
+        # 全零邻接矩阵会导致 total_energy=0，cumsum 除零产生 NaN
+        if total_energy < 1e-12:
+            card.status = "unavailable"
+            card.verdict = "ZERO_SIGNAL"
+            card.findings = ["邻接矩阵全零，无因果信号可供 HAVOK 分解"]
+            return card
         cumsum = np.cumsum(s ** 2) / total_energy
         r = int(np.searchsorted(cumsum, 0.90) + 1)  # 90% cutoff
         r = max(1, min(r, len(s) - 1))
@@ -431,6 +455,12 @@ def _deploy_dowhy_cf(bridge) -> WarriorCard:
     card = WarriorCard("DoWhy+CF", "反事实造物主", "思想实验引擎", color="🟡")
 
     est = bridge.estimate_result
+    if est is None:
+        card.status = "unavailable"
+        card.verdict = "NO_ESTIMATE — 估计失败"
+        card.metrics = {"treatment": getattr(bridge, 'treatment', '?'),
+                        "outcome": getattr(bridge, 'outcome', '?')}
+        return card
     ci = DoWhy14Adapter.get_confidence_interval(est)
 
     card.metrics = {
@@ -450,15 +480,21 @@ def _deploy_dowhy_cf(bridge) -> WarriorCard:
             f"反事实 ITE: {top_cf['ite']:+.4f}",
         ]
 
-    n_refuted = sum(1 for r in bridge.refutation_results.values()
-                    if getattr(getattr(r, '_check', None), 'refuted', False))
+    # _check 是 dict 而非对象，需用键访问而非 getattr
+    n_refuted = 0
+    for r in bridge.refutation_results.values():
+        check = getattr(r, '_check', None)
+        refuted = check['refuted'] if isinstance(check, dict) else getattr(r, 'refuted', False)
+        if refuted:
+            n_refuted += 1
     if n_refuted == 0:
         card.verdict = "ROBUST — 0/3 反驳"
     else:
         card.verdict = f"CAUTION — {n_refuted}/3 反驳"
 
     card.status = "deployed" if not bridge.simulation else "fallback"
-    card.raw = bridge
+    # 避免存储不可序列化的 bridge 对象（to_dict 时会被过滤为 None）
+    card.raw = None
     return card
 
 
@@ -512,8 +548,8 @@ def _deploy_causallearn(bridge) -> WarriorCard:
         pc_result = _pc_alg(sub_data, alpha=0.01)
         pc_edges = set()
         for e in pc_result.G.get_graph_edges():
-            ni = int(e.get_node1().get_index())
-            nj = int(e.get_node2().get_index())
+            ni = _node_index(e.get_node1())
+            nj = _node_index(e.get_node2())
             if ni < len(sub_names) and nj < len(sub_names):
                 pc_edges.add((sub_names[ni], sub_names[nj]))
 
@@ -522,8 +558,8 @@ def _deploy_causallearn(bridge) -> WarriorCard:
         ges_result = _ges_alg(sub_data)
         ges_edges = set()
         for e in ges_result['G'].get_graph_edges():
-            ni = int(e.get_node1().get_name()[1:])
-            nj = int(e.get_node2().get_name()[1:])
+            ni = _node_index(e.get_node1())
+            nj = _node_index(e.get_node2())
             if ni < len(sub_names) and nj < len(sub_names):
                 ges_edges.add((sub_names[ni], sub_names[nj]))
 
@@ -610,11 +646,21 @@ def assemble_all_six(adj_matrix, token_list, bridge=None, text="", concept_names
 
     # 🟡 DoWhy+CF
     if bridge is not None:
-        cards['dowhy_cf'] = _deploy_dowhy_cf(bridge)
+        try:
+            cards['dowhy_cf'] = _deploy_dowhy_cf(bridge)
+        except Exception as e:
+            cards['dowhy_cf'] = WarriorCard("DoWhy+CF", "反事实造物主", "思想实验引擎",
+                                            status="unavailable", color="🟡",
+                                            verdict=f"ERROR — {str(e)[:80]}")
 
     # ⬜ causallearn
     if bridge is not None:
-        cards['causallearn'] = _deploy_causallearn(bridge)
+        try:
+            cards['causallearn'] = _deploy_causallearn(bridge)
+        except Exception as e:
+            cards['causallearn'] = WarriorCard("causallearn", "独立验证者", "PC/FCI/GES",
+                                               status="unavailable", color="⬜",
+                                               verdict=f"ERROR — {str(e)[:80]}")
 
     return cards
 

@@ -120,11 +120,14 @@ class EnhancedCausalViz:
         n_edges = len(bridge.significant_edges)
         n_concepts = len([n for n in bridge.concept_names if n != '<other>'])
 
-        n_refuted = sum(
-            1 for r in bridge.refutation_results.values()
-            if getattr(getattr(r, '_check', None), 'refuted',
-                       getattr(r, 'refuted', False))
-        ) if bridge.refutation_results else 0
+        # _check 是 dict 而非对象，需用键访问而非 getattr
+        n_refuted = 0
+        if bridge.refutation_results:
+            for r in bridge.refutation_results.values():
+                check = getattr(r, '_check', None)
+                refuted = check['refuted'] if isinstance(check, dict) else getattr(r, 'refuted', False)
+                if refuted:
+                    n_refuted += 1
 
         mode = "DoWhy 0.14 do-calculus" if not bridge.simulation else "Simulation (SEM)"
 

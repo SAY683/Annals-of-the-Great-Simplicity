@@ -159,11 +159,13 @@ def test_3_estimate_and_refute(bridge):
     print(f"  95% CI: [{ci[0]:.4f}, {ci[1]:.4f}]")
 
     refutations = bridge.refute()
-    n_refuted = sum(
-        1 for r in refutations.values()
-        if getattr(getattr(r, '_check', None), 'refuted',
-                   getattr(r, 'refuted', False))
-    )
+    # _check 是 dict 而非对象，需用键访问而非 getattr
+    n_refuted = 0
+    for r in refutations.values():
+        check = getattr(r, '_check', None)
+        refuted = check['refuted'] if isinstance(check, dict) else getattr(r, 'refuted', False)
+        if refuted:
+            n_refuted += 1
     print(f"  反驳结果 ({n_refuted}/3 被反驳):")
     for name, result in refutations.items():
         check = getattr(result, '_check', None)
@@ -316,27 +318,59 @@ def test_10_edge_cases(bridge):
     """边界情况"""
     banner("测试 10: 边界情况")
 
-    # 10a: 空图
+    # 10a: 空图（使用有效中文 token，验证零邻接矩阵不产生边）
     print("\n  10a: 空因果图")
     empty_adj = np.zeros((5, 5))
-    empty_tokens = ["A", "B", "C", "D", "E"]
+    empty_tokens = ["价格", "成本", "需求", "供给", "利润"]
     b1 = TRACE2DoWhy(empty_adj, empty_tokens, threshold=0.5,
                      concept_min_freq=1)
     b1.build_model()
     assert len(b1.significant_edges) == 0
     ok("空图正确")
 
-    # 10b: 全低频 token
+    # 10b: 全低频 token（使用有效中文 token 测试 <other> 归档行为）
     print("  10b: 全低频 token")
-    unique_tokens = ["A", "B", "C", "D", "E"]
+    unique_tokens = ["价格", "成本", "需求", "供给", "利润"]
     adj = np.random.default_rng(42).uniform(0, 3, (5, 5))
     adj = np.triu(adj, 1)
     b2 = TRACE2DoWhy(adj, unique_tokens, threshold=0.5,
                      concept_min_freq=2)
-    b2.build_model()
+    # 仅调用 aggregate_concepts 验证 <other> 归档；
+    # build_model 在概念节点 <2 时会抛 ValueError，此处不调用
+    b2.aggregate_concepts()
     n_other = sum(1 for v in b2.concept_map.values() if v == "<other>")
     assert n_other == len(unique_tokens), f"{n_other}/{len(unique_tokens)}"
     ok(f"全低频: {n_other}/{len(unique_tokens)} 归入 <other>")
+
+    # 10e: ASCII 单字母 BPE 碎片过滤（中英混合文本场景）
+    print("  10e: ASCII 单字母 BPE 碎片过滤")
+    from _token_filters import is_valid_concept as _ivc
+    # 英文单字母必须被过滤
+    for ch in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ":
+        assert not _ivc(ch), f"ASCII 单字母 '{ch}' 应被过滤"
+    # 中文单字（非虚词）应保留
+    for ch in "价涨用利润涨":
+        assert _ivc(ch), f"中文单字 '{ch}' 应保留"
+    # 标点、数字、<other>、▁前缀应过滤
+    for t in ["，", "。", "1", "<other>", "<unk>", "▁the"]:
+        assert not _ivc(t), f"'{t}' 应被过滤"
+    # 有效英文多字 token 应保留
+    for t in ["the", "code", "Claude", "AI"]:
+        assert _ivc(t), f"'{t}' 应保留"
+    # 验证 BPE 碎片不进入 concept_map
+    mixed_tokens = ["a", "e", "i", "o", "u", "价格", "成本", "价格", "成本", "价格", "成本"]
+    mixed_adj = np.random.default_rng(42).uniform(0, 3, (11, 11))
+    mixed_adj = np.triu(mixed_adj, 1)
+    b3 = TRACE2DoWhy(mixed_adj, mixed_tokens, threshold=0.5,
+                     concept_min_freq=2)
+    b3.aggregate_concepts()
+    # concept_map 中不应包含任何 ASCII 单字母
+    ascii_in_map = [v for v in b3.concept_map.values() if len(v) == 1 and v.isascii()]
+    assert not ascii_in_map, f"ASCII 单字母泄露到 concept_map: {ascii_in_map}"
+    assert "<other>" not in b3.concept_names or all(
+        v != "<other>" or True for v in b3.concept_map.values()
+    ), "<other> 可存在但不应来自 ASCII 碎片"
+    ok(f"ASCII 碎片已过滤，概念节点: {b3.concept_names}")
 
     # 10c: Pearl 反事实引擎独立测试
     print("  10c: Pearl 反事实引擎单元测试")

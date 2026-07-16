@@ -50,8 +50,13 @@ def render_six_panel(bridge, cards: dict, filepath: str, dpi: int = 150) -> str:
     # ── 标题 ──
     ax_t = fig.add_subplot(gs[0, :])
     n_e = len(bridge.significant_edges)
-    n_r = sum(1 for r in bridge.refutation_results.values()
-              if getattr(getattr(r, '_check', None), 'refuted', False))
+    # _check 是 dict 而非对象，需用键访问而非 getattr
+    n_r = 0
+    for r in bridge.refutation_results.values():
+        check = getattr(r, '_check', None)
+        refuted = check['refuted'] if isinstance(check, dict) else getattr(r, 'refuted', False)
+        if refuted:
+            n_r += 1
     ax_t.text(0.5, 0.5,
         f"因 果 战 队 · 六 合 一 诊 断 仪 表 板   |   "
         f"{len([n for n in bridge.concept_names if n != '<other>' and len(n) > 1])} concepts · {n_e} edges · "

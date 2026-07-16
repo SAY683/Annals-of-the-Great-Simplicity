@@ -1356,9 +1356,13 @@
         if (meta.type === 'string') {
           cfg[key] = raw;
         } else if (meta.type === 'integer') {
-          cfg[key] = parseInt(raw, 10);
+          // P2-3：parseInt 可能返回 NaN（空串/非法输入），NaN 时回退到 schema 默认值
+          const parsed = parseInt(raw, 10);
+          cfg[key] = Number.isNaN(parsed) ? (meta.default ?? 0) : parsed;
         } else {
-          cfg[key] = parseFloat(raw);
+          // P2-3：parseFloat 同样需要 NaN 检查并回退默认值
+          const parsed = parseFloat(raw);
+          cfg[key] = Number.isNaN(parsed) ? (meta.default ?? 0) : parsed;
         }
       });
       return cfg;
@@ -1928,6 +1932,9 @@
       return String(str).replace(/[&<>"']/g, (m) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[m]));
     }
 
+    // 安全数值格式化：null/undefined/NaN 等非数值返回 'N/A'，避免 toFixed 崩溃
+    const safeFmt = (v, n = 4) => (v != null && typeof v === 'number' && !isNaN(v)) ? v.toFixed(n) : 'N/A';
+
     function showToast(msg, type) {
       toast.textContent = msg;
       toast.className = 'toast ' + (type || 'hidden');
@@ -2001,9 +2008,9 @@
 
       document.getElementById('mConcepts').textContent = r.concepts ? r.concepts.length : '-';
       document.getElementById('mEdges').textContent = r.n_significant_edges ?? '-';
-      document.getElementById('mATE').textContent = r.ate != null ? r.ate.toFixed(4) : '-';
+      document.getElementById('mATE').textContent = safeFmt(r.ate, 4);
       document.getElementById('mCI').textContent = r.confidence_interval
-        ? `[${r.confidence_interval[0].toFixed(2)}, ${r.confidence_interval[1].toFixed(2)}]`
+        ? `[${safeFmt(r.confidence_interval[0], 2)}, ${safeFmt(r.confidence_interval[1], 2)}]`
         : '-';
       document.getElementById('mIdentifiable').textContent = r.identifiable ? 'YES' : 'NO';
       document.getElementById('mIdentifiable').style.color = r.identifiable ? 'var(--success)' : 'var(--fail)';
@@ -2011,8 +2018,8 @@
         ? `${r.refutations.filter(x => x.refuted).length}/${r.refutations.length}`
         : '-';
       document.getElementById('mMode').textContent = (r.analysis_mode || 'light').toUpperCase();
-      document.getElementById('mDuration').textContent = r.execution_profile
-        ? `${(r.execution_profile.total_ms / 1000).toFixed(2)}s`
+      document.getElementById('mDuration').textContent = r.execution_profile && r.execution_profile.total_ms != null
+        ? `${safeFmt(r.execution_profile.total_ms / 1000, 2)}s`
         : '-';
 
       // Parameters — 质谱级参数网格
@@ -2050,7 +2057,7 @@
         const total = r.execution_profile.total_ms || 1;
         r.execution_profile.stages.forEach(s => {
           const tr = document.createElement('tr');
-          tr.innerHTML = `<td>${s.stage}</td><td>${s.ms}</td><td>${((s.ms / total) * 100).toFixed(1)}%</td>`;
+          tr.innerHTML = `<td>${s.stage}</td><td>${s.ms}</td><td>${total > 0 ? safeFmt((s.ms / total) * 100, 1) : 'N/A'}%</td>`;
           tbody.appendChild(tr);
         });
         table.appendChild(tbody);
@@ -2185,8 +2192,8 @@
             cell.style.background = i === j ? 'var(--panel-3)'
               : `rgba(102, 252, 241, ${0.08 + intensity * 0.72})`;
             cell.style.color = intensity > 0.5 ? '#000' : 'var(--text)';
-            cell.title = `${concepts[i]} → ${concepts[j]}: ${Number(v).toFixed(2)}`;
-            cell.textContent = v !== 0 ? Number(v).toFixed(1) : '';
+            cell.title = `${concepts[i]} → ${concepts[j]}: ${safeFmt(Number(v), 2)}`;
+            cell.textContent = v !== 0 ? safeFmt(Number(v), 1) : '';
             grid.appendChild(cell);
           });
         });
@@ -2204,7 +2211,11 @@
       stabilityPanel.innerHTML = '';
       const stability = r.stability_analysis || {};
       if (Object.keys(stability).length === 0) {
-        stabilityPanel.innerHTML = '<div class="empty-state">LIGHT 模式未执行稳定性/排列检验。切换 DEEP 模式可获得 bootstrap 边稳定性、置换 p-value 等质谱级指标。</div>';
+        const mode = r.analysis_mode || r.mode || 'light';
+        const stabilityEmptyMsg = mode === 'light'
+          ? 'LIGHT 模式未执行稳定性/排列检验。切换 DEEP 或 SUPER 模式可获得 bootstrap 边稳定性、置换 p-value 等质谱级指标。'
+          : `${mode.toUpperCase()} 模式稳定性分析未返回数据（可能因数据量不足或分析失败）。请检查日志或增大文本长度。`;
+        stabilityPanel.innerHTML = `<div class="empty-state">${stabilityEmptyMsg}</div>`;
       } else {
         const stabParams = [
           { k: 'Edge Stability Mean', v: stability.edge_stability_mean != null ? stability.edge_stability_mean.toFixed(4) : 'N/A' },
@@ -2233,7 +2244,7 @@
             const verdict = s > 0.7 ? 'STABLE' : (s > 0.4 ? 'MODERATE' : 'FRAGILE');
             const cls = s > 0.7 ? 'pass' : (s > 0.4 ? 'warn' : 'fail');
             const tr = document.createElement('tr');
-            tr.innerHTML = `<td>${escapeHtml(edge)}</td><td>${s.toFixed(3)}</td><td><span class="badge ${cls}">${verdict}</span></td>`;
+            tr.innerHTML = `<td>${escapeHtml(edge)}</td><td>${safeFmt(s, 3)}</td><td><span class="badge ${cls}">${verdict}</span></td>`;
             tb.appendChild(tr);
           });
           t.appendChild(tb);
@@ -2246,7 +2257,7 @@
       edgesBody.innerHTML = '';
       (r.top_edges || []).forEach(e => {
         const tr = document.createElement('tr');
-        tr.innerHTML = `<td>${e.source}</td><td>${e.target}</td><td>${e.strength.toFixed(3)}</td><td>${e.direction || '→'}</td>`;
+        tr.innerHTML = `<td>${escapeHtml(e.source)}</td><td>${escapeHtml(e.target)}</td><td>${safeFmt(e.strength, 3)}</td><td>${escapeHtml(e.direction || '→')}</td>`;
         edgesBody.appendChild(tr);
       });
 
@@ -2255,8 +2266,10 @@
       scanBody.innerHTML = '';
       (r.counterfactual_scan || []).forEach(s => {
         const tr = document.createElement('tr');
-        const cls = s.ite > 0 ? 'pass' : (s.ite < 0 ? 'fail' : 'warn');
-        tr.innerHTML = `<td>${s.source} → ${s.target}</td><td>${s.trace_dnl.toFixed(3)}</td><td><span class="badge ${cls}">${s.ite >= 0 ? '+' : ''}${s.ite.toFixed(4)}</span></td><td>${s.observed.toFixed(4)}</td><td>${s.counterfactual.toFixed(4)}</td>`;
+        const iteNum = typeof s.ite === 'number' ? s.ite : 0;
+        const cls = iteNum > 0 ? 'pass' : (iteNum < 0 ? 'fail' : 'warn');
+        const iteStr = (typeof s.ite === 'number' && s.ite >= 0) ? '+' : '';
+        tr.innerHTML = `<td>${escapeHtml(s.source)} → ${escapeHtml(s.target)}</td><td>${safeFmt(s.trace_dnl, 3)}</td><td><span class="badge ${cls}">${iteStr}${safeFmt(s.ite, 4)}</span></td><td>${safeFmt(s.observed, 4)}</td><td>${safeFmt(s.counterfactual, 4)}</td>`;
         scanBody.appendChild(tr);
       });
 
@@ -2270,9 +2283,9 @@
         const tr = document.createElement('tr');
         const cls = ref.refuted ? 'fail' : 'pass';
         const metricStr = ref.display_metric != null
-          ? `${ref.display_label}=${ref.display_metric < 0.001 ? '<0.01%' : (ref.display_metric * 100).toFixed(2) + '%'}`
+          ? `${escapeHtml(ref.display_label)}=${ref.display_metric < 0.001 ? '<0.01%' : safeFmt(ref.display_metric * 100, 2) + '%'}`
           : '-';
-        tr.innerHTML = `<td>${ref.method}</td><td>${r.ate.toFixed(4)}</td><td>${ref.new_effect.toFixed(4)}</td><td>${metricStr}</td><td><span class="badge ${cls}">${ref.refuted ? 'REFUTED' : 'ROBUST'}</span></td>`;
+        tr.innerHTML = `<td>${escapeHtml(ref.method)}</td><td>${safeFmt(r.ate, 4)}</td><td>${safeFmt(ref.new_effect, 4)}</td><td>${metricStr}</td><td><span class="badge ${cls}">${ref.refuted ? 'REFUTED' : 'ROBUST'}</span></td>`;
         refuteBody.appendChild(tr);
       });
       }
@@ -2282,7 +2295,11 @@
       warriorGrid.innerHTML = '';
       const warriors = r.six_warriors || {};
       if (Object.keys(warriors).length === 0) {
-        warriorGrid.innerHTML = '<div class="empty-state">LIGHT 模式未执行六战士深度诊断。切换 DEEP 模式可获得 TRACE / CCM / EDM / HAVOK / DoWhy+CF / causallearn 的完整诊断。</div>';
+        const mode = r.analysis_mode || r.mode || 'light';
+        const warriorEmptyMsg = mode === 'light'
+          ? 'LIGHT 模式未执行六战士深度诊断。切换 DEEP 或 SUPER 模式可获得 TRACE / CCM / EDM / HAVOK / DoWhy+CF / causallearn 的完整诊断。'
+          : `${mode.toUpperCase()} 模式六战士诊断未返回数据（可能因分析失败）。请检查日志。`;
+        warriorGrid.innerHTML = `<div class="empty-state">${warriorEmptyMsg}</div>`;
       } else {
       Object.entries(warriors).forEach(([key, card]) => {
         const div = document.createElement('div');
@@ -2290,8 +2307,12 @@
         const metrics = Object.entries(card.metrics || {}).map(([k, v]) => `${k}: ${v}`).join(' · ');
         const findings = (card.findings || []).map(f => `<div class="warrior-finding">→ ${escapeHtml(f)}</div>`).join('');
         const rawDetails = card.raw ? `<details><summary>raw metrics</summary><div style="font-family:var(--font-mono);font-size:0.72rem;color:var(--muted);white-space:pre-wrap;">${escapeHtml(JSON.stringify(card.raw, null, 2))}</div></details>` : '';
+        // P2-10：warrior_id / name / status 来自后端结果，插入 innerHTML 前必须转义，防止 XSS
+        const safeWarriorId = escapeHtml(card.warrior_id);
+        const safeName = escapeHtml(card.name);
+        const safeStatus = escapeHtml(card.status);
         div.innerHTML = `
-          <div class="warrior-title">${card.warrior_id} · ${card.name} <span class="warrior-status ${card.status}">${card.status}</span></div>
+          <div class="warrior-title">${safeWarriorId} · ${safeName} <span class="warrior-status ${safeStatus}">${safeStatus}</span></div>
           <div class="warrior-metrics">${escapeHtml(metrics)}</div>
           ${findings}
           <div class="warrior-verdict">// ${escapeHtml(card.verdict || 'N/A')}</div>

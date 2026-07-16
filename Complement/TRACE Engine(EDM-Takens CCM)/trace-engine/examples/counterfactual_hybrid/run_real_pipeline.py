@@ -135,7 +135,8 @@ def main():
     # 加载后根据实际参数量再次检查（更精确）
     _check_vram_budget(n_params_m, device)
 
-    text = open(str(TEXT_FILE), 'r', encoding='utf-8').read().strip()
+    with open(str(TEXT_FILE), 'r', encoding='utf-8') as f:
+        text = f.read().strip()
     log(f"Text: {len(text):,} chars")
 
     # ═══════════════════════════════════════════════════════════════
@@ -242,6 +243,9 @@ def main():
     # Build adjacency matrix
     T = len(all_tokens)
     adj_matrix = np.zeros((T, T))
+    # 跨段 dnl 平均：同一 (src, dst) token 对在多段中可能产生多个 ΔNLL 值，
+    # 这里取简单均值作为聚合。这是当前设计选择（而非加权/最大值），
+    # 因为各段被视为对同一因果结构的独立观测，简单均值是最无偏的估计。
     for (i, j), vals in all_raw_edges.items():
         adj_matrix[i, j] = np.mean(vals) if vals else 0.0
 

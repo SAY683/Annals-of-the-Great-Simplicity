@@ -102,14 +102,19 @@ class DoWhyAuditor:
     在每一步关键操作前/后进行检查。
     """
 
-    def __init__(self, bridge):
+    def __init__(self, bridge, **kwargs):
         """
         Parameters
         ----------
         bridge : TRACE2DoWhy
             已完成 build_model() 的桥接实例
+        **kwargs : dict
+            兼容 presets.yaml 的 auditor 参数（strict_mode, min_n_per_v_ratio 等），
+            当前版本忽略未使用的参数，保持向前兼容。
         """
         self.bridge = bridge
+        self._strict_mode = kwargs.get('strict_mode', False)
+        self._min_n_per_v_ratio = kwargs.get('min_n_per_v_ratio', 5.0)
         self._checks: list[RuleCheck] = []
 
     def audit(self, stage: str = "post_build") -> AuditReport:
@@ -190,11 +195,13 @@ class DoWhyAuditor:
 
     def _check_refutation_triangulation(self):
         bridge = self.bridge
-        n_refuted = sum(
-            1 for r in bridge.refutation_results.values()
-            if getattr(getattr(r, '_check', None), 'refuted',
-                       getattr(r, 'refuted', False))
-        )
+        # _check 是 dict 而非对象，需用键访问而非 getattr
+        n_refuted = 0
+        for r in bridge.refutation_results.values():
+            check = getattr(r, '_check', None)
+            refuted = check['refuted'] if isinstance(check, dict) else getattr(r, 'refuted', False)
+            if refuted:
+                n_refuted += 1
 
         if not bridge.refutation_results:
             self._add(2, "Refutation Triangulation", Enforcement.WARN,

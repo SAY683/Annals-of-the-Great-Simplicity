@@ -238,6 +238,14 @@ function spawnLlamaWorker() {
     }
   });
 
+  // P1-9：worker 为常驻进程，此处一次性挂载 stdin 'error' 监听器即可，
+  // 避免在 runSuperAnalysisStream 每次任务中重复挂载导致 listener 累积泄漏。
+  // stdin 写入失败（如 Worker 已退出）时仅记录日志，真正的任务级错误处理
+  // 由 worker 'close'/'error' 事件及 currentLlamaHandler 错误分支完成。
+  worker.stdin.on('error', (err) => {
+    logToFile('error', `LLaMA Worker stdin 错误: ${err.message}`);
+  });
+
   worker.on('close', (code) => {
     logToFile('warn', `LLaMA Worker 退出 (code=${code})，清理状态`);
     // 仅通知当前关联的 SUPER 任务（通过 currentLlamaHandler 追踪的 outputId）
@@ -246,6 +254,15 @@ function spawnLlamaWorker() {
       if (activeJobs.has(activeId)) {
         recordJob(activeId, 'super', 'cancelled', `Worker 退出 code=${code}`);
         activeJobs.delete(activeId);
+        const jobRes = activeJobResponses.get(activeId);
+        if (jobRes) {
+          try {
+            sendSSE(jobRes.res, 'error', { message: `LLaMA Worker 退出 (code=${code})` });
+            sendSSE(jobRes.res, 'done', { code: -1 });
+            jobRes.res.end();
+          } catch (_) {}
+          activeJobResponses.delete(activeId);
+        }
       }
     }
     llamaWorker = null;
@@ -253,6 +270,12 @@ function spawnLlamaWorker() {
     llamaWorkerStarting = false;
     llamaWorkerBusy = false;
     currentLlamaHandler = null;
+    // 唤醒所有等待 Worker 空闲的任务，避免 Worker 崩溃后永久死锁
+    const jobWaiters = llamaWorkerJobWaiters; llamaWorkerJobWaiters = [];
+    jobWaiters.forEach((fn) => fn());
+    // reject 所有等待 Worker 启动的请求
+    const startWaiters = llamaWorkerStartWaiters; llamaWorkerStartWaiters = [];
+    startWaiters.forEach((w) => w.reject(new Error('LLaMA Worker 退出')));
     processJobQueue();
   });
 
@@ -263,6 +286,11 @@ function spawnLlamaWorker() {
     llamaWorkerStarting = false;
     llamaWorkerBusy = false;
     currentLlamaHandler = null;
+    // 同样唤醒所有 waiters，避免错误后死锁
+    const jobWaiters = llamaWorkerJobWaiters; llamaWorkerJobWaiters = [];
+    jobWaiters.forEach((fn) => fn());
+    const startWaiters = llamaWorkerStartWaiters; llamaWorkerStartWaiters = [];
+    startWaiters.forEach((w) => w.reject(new Error('LLaMA Worker 启动错误: ' + err.message)));
   });
 
   return worker;
@@ -284,6 +312,14 @@ function ensureLlamaWorker() {
     // 等待 Worker 就绪日志
     const timer = setTimeout(() => {
       llamaWorkerStarting = false;
+      // P1-8：超时后清理所有等待启动的 waiter，避免永久挂起；杀死超时的 Worker 进程
+      const waiters = llamaWorkerStartWaiters; llamaWorkerStartWaiters = [];
+      waiters.forEach((w) => w.reject(new Error('LLaMA Worker 启动超时')));
+      if (llamaWorker) {
+        try { llamaWorker.kill(); } catch (_) {}
+        llamaWorker = null;
+      }
+      llamaWorkerReady = false;
       reject(new Error('LLaMA Worker 启动超时'));
     }, 120000);
 
@@ -317,30 +353,78 @@ function releaseLlamaWorker() {
   if (next) next();
 }
 
+// P2-7：终止子进程的兜底机制——先发 SIGTERM，若 delayMs（默认 5s）后仍未退出则发 SIGKILL 强制结束
+// 防止 Python 子进程忽略 SIGTERM 导致僵尸进程长期占用资源
+function killProcessWithFallback(proc, delayMs = 5000) {
+  // 仅对真实 ChildProcess 生效（activeJobs 中可能存在 SUPER 占位对象）
+  if (!proc || typeof proc.kill !== 'function' || typeof proc.once !== 'function') return;
+  if (proc.exitCode !== null || proc.signalCode !== null) return;
+  let killed = false;
+  let fallbackTimer = null;
+  const onExit = () => { killed = true; if (fallbackTimer) clearTimeout(fallbackTimer); };
+  try { proc.once('exit', onExit); } catch (_) {}
+  try { proc.kill('SIGTERM'); } catch (_) {}
+  fallbackTimer = setTimeout(() => {
+    if (killed) return;
+    try { proc.kill('SIGKILL'); } catch (_) {}
+  }, delayMs);
+}
+
+// P2-8：背压感知写入——write 返回 false 时等待 drain 事件，避免内部缓冲区无限膨胀
+// 用于向 Worker stdin 写入较大载荷（如 SUPER 任务文本可达 500KB）
+function writeWithDrain(stream, chunk, encoding = 'utf-8') {
+  return new Promise((resolve, reject) => {
+    const onError = (err) => { stream.off('drain', onDrain); reject(err); };
+    const onDrain = () => { stream.off('error', onError); resolve(); };
+    let ok;
+    try {
+      ok = stream.write(chunk, encoding);
+    } catch (err) {
+      reject(err);
+      return;
+    }
+    if (ok) {
+      resolve();
+    } else {
+      stream.once('drain', onDrain);
+      stream.once('error', onError);
+    }
+  });
+}
+
 // 日志持久化 + 简单轮转
-function rotateLogIfNeeded() {
+// P2-5：轮转与写入均改为异步，避免同步 fs 调用阻塞事件循环
+// P2-10：引入轮转锁，避免高频日志写入触发并发轮转导致 rename 竞态
+let _logRotating = false;
+async function rotateLogIfNeeded() {
+  if (_logRotating) return;
+  _logRotating = true;
   try {
-    if (fs.existsSync(LOG_FILE)) {
-      const stats = fs.statSync(LOG_FILE);
-      if (stats.size >= MAX_LOG_SIZE) {
-        for (let i = MAX_LOG_BACKUPS - 1; i >= 1; i--) {
-          const src = `${LOG_FILE}.${i}`;
-          const dst = `${LOG_FILE}.${i + 1}`;
-          if (fs.existsSync(src)) fs.renameSync(src, dst);
-        }
-        fs.renameSync(LOG_FILE, `${LOG_FILE}.1`);
+    const exists = await fs.promises.access(LOG_FILE).then(() => true).catch(() => false);
+    if (!exists) return;
+    const stats = await fs.promises.stat(LOG_FILE);
+    if (stats.size >= MAX_LOG_SIZE) {
+      for (let i = MAX_LOG_BACKUPS - 1; i >= 1; i--) {
+        const src = `${LOG_FILE}.${i}`;
+        const dst = `${LOG_FILE}.${i + 1}`;
+        const srcExists = await fs.promises.access(src).then(() => true).catch(() => false);
+        if (srcExists) await fs.promises.rename(src, dst);
       }
+      await fs.promises.rename(LOG_FILE, `${LOG_FILE}.1`);
     }
   } catch (_) { /* ignore */ }
+  finally {
+    _logRotating = false;
+  }
 }
 
 function logToFile(level, message, traceId = null) {
   const trace = traceId ? ` [${traceId}]` : '';
   const line = `[${new Date().toISOString()}]${trace} [${level}] ${message}\n`;
-  try {
-    rotateLogIfNeeded();
-    fs.appendFileSync(LOG_FILE, line);
-  } catch (_) { /* ignore */ }
+  // P2-5：使用异步写入避免阻塞事件循环；日志为 best-effort，错误忽略
+  rotateLogIfNeeded()
+    .then(() => { fs.appendFile(LOG_FILE, line, () => { /* ignore */ }); })
+    .catch(() => { /* ignore */ });
 }
 
 function reqLog(req, level, message) {
@@ -476,6 +560,9 @@ app.use((req, _res, next) => {
 });
 
 // CORS（多云/跨域部署支持）
+// P2-4：默认 Allow-Origin: '*' 仅适用于本地开发场景（同机浏览器访问无跨域凭证需求）。
+// 生产/多云部署应通过环境变量 TRACE_CORS_ORIGIN 指定精确来源（如 https://trace.example.com），
+// 避免通配符导致任意站点跨域调用本服务。
 app.use((_req, res, next) => {
   res.setHeader('Access-Control-Allow-Origin', process.env.TRACE_CORS_ORIGIN || '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -575,6 +662,22 @@ function validateAnalysisInput(text, mode, config) {
       if (schema.type === 'number' && (typeof v !== 'number' || Number.isNaN(v) || v < schema.min || v > schema.max)) {
         return { ok: false, error: `参数 ${k} 必须在 [${schema.min}, ${schema.max}] 之间`, code: 'INVALID_PARAM', field: k };
       }
+      // P2-1：boolean 类型必须严格校验，防止字符串/数字被当作真值注入
+      if (schema.type === 'boolean' && typeof v !== 'boolean') {
+        return { ok: false, error: `参数 ${k} 必须是布尔值 (true/false)`, code: 'INVALID_PARAM', field: k };
+      }
+    }
+    // P2-1：filter_mode 白名单校验，防止注入非法过滤模式
+    if (config.filter_mode !== undefined && !['topn', 'percentile', 'adaptive'].includes(config.filter_mode)) {
+      return { ok: false, error: '参数 filter_mode 必须是 topn / percentile / adaptive 之一', code: 'INVALID_PARAM', field: 'filter_mode' };
+    }
+    // P2-1：过滤 config 中未在 schema 定义的字段，仅保留 schema 已知键（SUPER 模式额外保留 model）
+    const allowedKeys = new Set(Object.keys(schemaToValidate));
+    if (mode === 'super') allowedKeys.add('model');
+    for (const k of Object.keys(config)) {
+      if (!allowedKeys.has(k)) {
+        delete config[k];
+      }
     }
   }
   return { ok: true };
@@ -595,7 +698,8 @@ const upload = multer({
   }),
   limits: { fileSize: 10 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
-    const allowed = ['text/plain', 'text/markdown', 'application/octet-stream'];
+    // P2-9：移除 application/octet-stream 白名单，仅靠扩展名 + 文本 mimetype 判断，避免上传任意二进制
+    const allowed = ['text/plain', 'text/markdown'];
     if (allowed.includes(file.mimetype) || file.originalname.endsWith('.txt') || file.originalname.endsWith('.md')) {
       cb(null, true);
     } else {
@@ -697,7 +801,8 @@ function runPythonAnalysisStream(text, outputId, mode, bridgeConfig, res) {
     env: {
       ...process.env,
       PYTHONIOENCODING: 'utf-8',
-      TRACE_BRIDGE_CONFIG: CONFIG.bridgeConfig,
+      // P2-2：使用当前任务的 bridgeConfig，而非全局 CONFIG.bridgeConfig，避免任务级配置被全局空串覆盖
+      TRACE_BRIDGE_CONFIG: cfg,
     },
   });
 
@@ -705,6 +810,9 @@ function runPythonAnalysisStream(text, outputId, mode, bridgeConfig, res) {
 
   let stdoutBuffer = '';
   let timeoutId = null;
+  // P2-9：与 SUPER 模式一致，使用 finished 标记防止 close/error 重复处理，
+  // 并在客户端提前断开时清理资源。
+  let finished = false;
 
   const cleanupTimeout = () => {
     if (timeoutId) {
@@ -719,12 +827,26 @@ function runPythonAnalysisStream(text, outputId, mode, bridgeConfig, res) {
   timeoutId = setTimeout(() => {
     logToFile('warn', `分析超时 job=${outputId}，强制终止`);
     sendSSE(res, 'error', { message: `分析超时（>${CONFIG.jobTimeoutMs}ms），已强制终止。请尝试 LIGHT 模式或缩短文本。` });
-    try { py.kill('SIGTERM'); } catch (_) {}
+    // P2-7：SIGTERM 后 5 秒未退出则 SIGKILL 兜底
+    killProcessWithFallback(py);
     recordJob(outputId, mode, 'timeout');
   }, CONFIG.jobTimeoutMs);
 
   py.stdin.write(text, 'utf-8');
   py.stdin.end();
+
+  // P2-9：SSE 客户端提前断开时清理 LIGHT/DEEP 资源，避免悬挂的 Python 进程与定时器
+  res.on('close', () => {
+    if (finished) return;
+    logToFile('info', `SSE 客户端断开，清理 ${mode} 任务 job=${outputId}`);
+    finished = true;
+    cleanupTimeout();
+    killProcessWithFallback(py);
+    recordJob(outputId, mode, 'cancelled', '客户端断开连接');
+    activeJobs.delete(outputId);
+    activeJobResponses.delete(outputId);
+    processJobQueue();
+  });
 
   // SSE 保活：每 30 秒发送一条注释，防止浏览器/代理因长时间无数据而断开连接
   const heartbeat = setInterval(() => {
@@ -781,6 +903,8 @@ function runPythonAnalysisStream(text, outputId, mode, bridgeConfig, res) {
   });
 
   py.on('close', (code) => {
+    // P2-9：标记结束，阻止 res.on('close') 重复清理
+    finished = true;
     cleanupTimeout();
     activeJobs.delete(outputId);
     activeJobResponses.delete(outputId);
@@ -796,6 +920,8 @@ function runPythonAnalysisStream(text, outputId, mode, bridgeConfig, res) {
   });
 
   py.on('error', (err) => {
+    // P2-9：标记结束，阻止 res.on('close') 重复清理
+    finished = true;
     cleanupTimeout();
     activeJobs.delete(outputId);
     activeJobResponses.delete(outputId);
@@ -820,6 +946,14 @@ async function runSuperAnalysisStream(text, outputId, bridgeConfig, res) {
   activeJobResponses.set(outputId, { res, mode: 'super' });
   logToFile('info', `启动 SUPER 分析 job=${outputId} text_len=${text.length} model=${cfgObj?.model || 'shehui-llama'}`);
 
+  // P1-1/P1-2：入口处立即在 activeJobs 占位，使并发检查生效并支持取消等待中的任务
+  const placeholder = {
+    isSuperQueued: true,
+    cancelled: false,
+    cancel: () => { placeholder.cancelled = true; },
+  };
+  activeJobs.set(outputId, placeholder);
+
   // SUPER 模式不再使用固定超时硬限制，改为实时速率/ETA + 用户主动停止
   const modelNameLower = (cfgObj?.model || 'shehui-llama').toLowerCase();
   // 区分轻量模型（shehui-llama 27M）与重量级模型（shenji-llama / shehui-llama-v4-archive 470M）
@@ -827,6 +961,12 @@ async function runSuperAnalysisStream(text, outputId, bridgeConfig, res) {
   const isLargeModel = modelNameLower.includes('shenji') || modelNameLower.includes('archive');
   // 保留 24 小时安全兜底，防止进程彻底失控；正常流程依赖用户主动停止
   const superTimeoutMs = 24 * 60 * 60 * 1000;
+  // P2-6：阶段性进度检测——默认 15 分钟内无 stage 更新则判定 hang 并终止；
+  // 可通过环境变量 TRACE_STAGE_TIMEOUT_MS（毫秒）覆盖，便于大模型场景调优
+  const _envStageTimeout = parseInt(process.env.TRACE_STAGE_TIMEOUT_MS, 10);
+  const stageHangMs = Number.isFinite(_envStageTimeout) && _envStageTimeout > 0
+    ? _envStageTimeout
+    : 15 * 60 * 1000;
   if (isLargeModel) {
     sendSSE(res, 'log', { level: 'warn', message: '当前 SUPER 模式使用 470M 级 LLaMA 模型（Shenji/Archive 均为 1.88GB 左右），推理速度较慢。界面会实时显示处理速率与预计剩余时间；如无法接受等待时长，可随时点击“停止计算”。LLaMA 预设会自动设置 window_size=128 / max_segments=3 以平衡显存与因果覆盖。' });
   } else if (isLightModel) {
@@ -839,11 +979,17 @@ async function runSuperAnalysisStream(text, outputId, bridgeConfig, res) {
   let lastStageTime = Date.now();
   const taskStartTime = Date.now();
   let keepAlive = null;
+  let stageWatchdog = null;
 
   const cleanupTimeout = () => {
     if (timeoutId) {
       clearTimeout(timeoutId);
       timeoutId = null;
+    }
+    // P2-6：清理阶段性进度看门狗
+    if (stageWatchdog) {
+      clearInterval(stageWatchdog);
+      stageWatchdog = null;
     }
   };
 
@@ -863,6 +1009,17 @@ async function runSuperAnalysisStream(text, outputId, bridgeConfig, res) {
   try {
     const worker = await ensureLlamaWorker();
     await waitForLlamaWorkerIdle();
+    // P1-2：等待期间被取消则直接退出，释放 Worker 槽位给下一个任务
+    if (placeholder.cancelled) {
+      releaseLlamaWorker();
+      activeJobs.delete(outputId);
+      activeJobResponses.delete(outputId);
+      recordJob(outputId, 'super', 'cancelled', '等待 Worker 期间被取消');
+      logToFile('info', `SUPER 任务在等待 Worker 期间被取消 job=${outputId}`);
+      try { sendSSE(res, 'error', { message: '用户主动停止计算' }); sendSSE(res, 'done', { code: 125 }); res.end(); } catch (_) {}
+      processJobQueue();
+      return;
+    }
     llamaWorkerBusy = true;
 
     timeoutId = setTimeout(() => {
@@ -875,6 +1032,22 @@ async function runSuperAnalysisStream(text, outputId, bridgeConfig, res) {
       finish(124);
     }, superTimeoutMs);
 
+    // P2-6：阶段性进度看门狗——每 60 秒检查一次，若 stageHangMs 内无 stage 更新则判定 hang 并终止
+    stageWatchdog = setInterval(() => {
+      if (finished) return;
+      const stageSilence = Date.now() - lastStageTime;
+      if (stageSilence >= stageHangMs) {
+        const elapsed = Date.now() - taskStartTime;
+        const msg = `SUPER 分析在 [${lastStageName}] 阶段停留超过 ${Math.round(stageHangMs / 60000)} 分钟无进度更新（已停留 ${Math.round(stageSilence / 60000)} 分钟，总耗时 ${Math.round(elapsed / 60000)} 分钟），判定为 hang，系统已强制终止。建议检查模型加载/算力状态，或缩短文本、减小 window_size / max_segments。`;
+        logToFile('warn', `SUPER 阶段 hang 触发 job=${outputId} model=${cfgObj?.model || 'shehui-llama'} stage=${lastStageName} silence=${stageSilence}ms elapsed=${elapsed}ms`);
+        sendSSE(res, 'error', { message: msg });
+        recordJob(outputId, 'super', 'timeout', 'stage_hang');
+        finish(124);
+      }
+    }, 60000);
+
+    // 占位对象替换为实际 Worker 引用，并标记取消时发送取消信号
+    placeholder.isRunning = true;
     activeJobs.set(outputId, worker);
 
     currentLlamaHandler = (obj) => {
@@ -921,7 +1094,32 @@ async function runSuperAnalysisStream(text, outputId, bridgeConfig, res) {
       }
     };
 
-    worker.stdin.write(JSON.stringify({
+    // P1-9：worker.stdin 的 'error' 监听器已迁移至 spawnLlamaWorker 内一次性挂载，
+    // 避免每次 SUPER 任务都新增 listener 导致在常驻 worker 上累积泄漏。
+    // Worker 通信失败会通过 worker 'close' / 'error' 事件以及 currentLlamaHandler 中的错误处理链路捕获。
+
+    // P1-3：SSE 客户端断开连接时清理 SUPER 资源（发送取消信号，释放 Worker）
+    res.on('close', () => {
+      if (finished) return;
+      logToFile('info', `SSE 客户端断开，清理 SUPER 任务 job=${outputId}`);
+      // 向 Worker 发送取消信号，中断当前计算
+      try {
+        worker.stdin.write(JSON.stringify({ type: 'cancel', id: outputId }) + '\n', 'utf-8');
+      } catch (_) {}
+      recordJob(outputId, 'super', 'cancelled', '客户端断开连接');
+      // 标记结束并释放资源，阻止后续 handler 写入已关闭的响应
+      finished = true;
+      cleanupTimeout();
+      if (keepAlive) clearInterval(keepAlive);
+      currentLlamaHandler = null;
+      releaseLlamaWorker();
+      activeJobs.delete(outputId);
+      activeJobResponses.delete(outputId);
+      processJobQueue();
+    });
+
+    // P2-8：使用背压感知写入，避免大文本（可达 500KB）撑爆 stdin 内部缓冲区
+    await writeWithDrain(worker.stdin, JSON.stringify({
       id: outputId,
       text,
       model: cfgObj && cfgObj.model ? cfgObj.model : 'shehui-llama',
@@ -1006,13 +1204,17 @@ function handleAnalyzeStream(req, res) {
   const id = req.query.id || req.body.id || crypto.randomUUID();
   const text = req.query.text || req.body.text;
   const mode = (req.query.mode || req.body.mode || 'light').toLowerCase();
-  const bridgeConfig = parseBridgeConfig(req.query.config || req.body.config);
+  let bridgeConfig = parseBridgeConfig(req.query.config || req.body.config);
 
   const cfgObj = bridgeConfig ? (() => { try { return JSON.parse(bridgeConfig); } catch (_) { return null; } })() : null;
   const validation = validateAnalysisInput(text, mode, cfgObj);
   if (!validation.ok) {
     reqLog(req, 'warn', `SSE 输入校验失败: ${validation.error} (${validation.code || ''})`);
     return res.status(400).json({ success: false, error: validation.error, code: validation.code, field: validation.field, traceId: req.traceId });
+  }
+  // P2-1：基于校验后已过滤未知字段的 cfgObj 重新序列化 bridgeConfig，确保下游使用净化后的配置
+  if (cfgObj && typeof cfgObj === 'object') {
+    bridgeConfig = JSON.stringify(cfgObj);
   }
 
   res.setHeader('Content-Type', 'text/event-stream');
@@ -1035,6 +1237,8 @@ function handleAnalyzeStream(req, res) {
   }
 }
 
+// P2-11：GET /api/analyze-stream 仅用于短文本探针/快速调用（text 通过 URL query 传递，受浏览器与服务器 URL 长度限制，通常 < 2KB）。
+// 长文本必须改用 POST /api/analyze-stream（text 放入 body，支持至 maxTextLength，默认 500KB），避免 URL 截断或 414 URI Too Long。
 app.get('/api/analyze-stream', handleAnalyzeStream);
 app.post('/api/analyze-stream', handleAnalyzeStream);
 
@@ -1115,7 +1319,7 @@ app.post('/api/analyze-text', async (req, res) => {
   try {
     const text = req.body.text || '';
     const mode = (req.body.mode || 'light').toLowerCase();
-    const bridgeConfig = parseBridgeConfig(req.body.config);
+    let bridgeConfig = parseBridgeConfig(req.body.config);
     const cfgObj = bridgeConfig ? JSON.parse(bridgeConfig) : null;
 
     const validation = validateAnalysisInput(text, mode, cfgObj);
@@ -1125,6 +1329,10 @@ app.post('/api/analyze-text', async (req, res) => {
     }
     if (mode === 'super') {
       return res.status(400).json({ success: false, error: 'SUPER 模式请使用 /api/analyze-stream 流式接口', code: 'SUPER_REQUIRES_STREAM', traceId: req.traceId });
+    }
+    // P2-1：基于校验后已过滤未知字段的 cfgObj 重新序列化 bridgeConfig，确保下游使用净化后的配置
+    if (cfgObj && typeof cfgObj === 'object') {
+      bridgeConfig = JSON.stringify(cfgObj);
     }
 
     // 缓存命中检查（缓存键包含 config，避免不同参数复用错误结果）
@@ -1160,7 +1368,7 @@ app.post('/api/analyze-file', upload.single('file'), async (req, res) => {
     if (!req.file) return res.status(400).json({ success: false, error: '未上传文件' });
     const text = fs.readFileSync(req.file.path, 'utf-8');
     const mode = (req.body.mode || 'light').toLowerCase();
-    const bridgeConfig = parseBridgeConfig(req.body.config);
+    let bridgeConfig = parseBridgeConfig(req.body.config);
     const cfgObj = bridgeConfig ? JSON.parse(bridgeConfig) : null;
 
     const validation = validateAnalysisInput(text, mode, cfgObj);
@@ -1172,6 +1380,10 @@ app.post('/api/analyze-file', upload.single('file'), async (req, res) => {
     if (mode === 'super') {
       fs.unlinkSync(req.file.path);
       return res.status(400).json({ success: false, error: 'SUPER 模式请使用 /api/analyze-stream 流式接口', code: 'SUPER_REQUIRES_STREAM', traceId: req.traceId });
+    }
+    // P2-1：基于校验后已过滤未知字段的 cfgObj 重新序列化 bridgeConfig，确保下游使用净化后的配置
+    if (cfgObj && typeof cfgObj === 'object') {
+      bridgeConfig = JSON.stringify(cfgObj);
     }
     const id = uuidv4();
     const data = await runPythonAnalysisSync(text, id, mode, bridgeConfig);
@@ -1186,7 +1398,17 @@ app.post('/api/analyze-file', upload.single('file'), async (req, res) => {
   }
 });
 
+// 合法 ID 校验：仅允许 UUID 形态，防止路径遍历（如 ../foo）
+const UUID_RE = /^[0-9a-f-]{36}$/i;
+function isValidId(id) {
+  return typeof id === 'string' && UUID_RE.test(id);
+}
+
 app.get('/api/result/:id', (req, res) => {
+  // P1-6：校验 ID 格式，避免路径遍历
+  if (!isValidId(req.params.id)) {
+    return res.status(400).json({ error: '非法的任务 ID' });
+  }
   const resultPath = path.join(OUTPUT_DIR, req.params.id, 'result.json');
   if (!fs.existsSync(resultPath)) return res.status(404).json({ error: '结果不存在' });
   res.setHeader('Content-Type', 'application/json');
@@ -1194,6 +1416,10 @@ app.get('/api/result/:id', (req, res) => {
 });
 
 app.get('/api/report/:id', (req, res) => {
+  // P1-6：校验 ID 格式，避免路径遍历
+  if (!isValidId(req.params.id)) {
+    return res.status(400).json({ error: '非法的任务 ID' });
+  }
   const reportPath = path.join(OUTPUT_DIR, req.params.id, 'report.md');
   if (!fs.existsSync(reportPath)) return res.status(404).json({ error: '报告不存在' });
   res.setHeader('Content-Type', 'text/markdown; charset=utf-8');
@@ -1223,14 +1449,58 @@ app.post('/api/cancel/:id', (req, res) => {
     return res.json({ success: true, cancelled: true, reason: 'removed_from_queue' });
   }
 
-  // 2. 若任务正在运行，终止对应进程并通知前端
+  // 2. 若任务正在运行/等待，区分 SUPER 与普通进程分别处理
   const proc = activeJobs.get(id);
   const jobRes = activeJobResponses.get(id);
   if (!proc) {
     return res.status(404).json({ success: false, error: '未找到运行中任务' });
   }
+
+  // 2a. SUPER 模式：等待中的占位任务（isSuperQueued），通过标记取消并释放槽位
+  if (proc.isSuperQueued && !proc.isRunning) {
+    proc.cancel();
+    activeJobs.delete(id);
+    activeJobResponses.delete(id);
+    if (jobRes) {
+      try {
+        sendSSE(jobRes.res, 'error', { message: '用户主动停止计算' });
+        sendSSE(jobRes.res, 'done', { code: 125 });
+        jobRes.res.end();
+      } catch (_) {}
+    }
+    recordJob(id, 'super', 'cancelled', '等待 Worker 期间被用户取消');
+    logToFile('info', `用户取消等待中的 SUPER 任务 job=${id}`);
+    return res.json({ success: true, cancelled: true, reason: 'super_queued_cancelled' });
+  }
+
+  // 2b. SUPER 模式：正在 Worker 上运行的任务，发送取消信号而非杀死常驻 Worker（P0-3）
+  if (jobRes && jobRes.mode === 'super') {
+    try {
+      proc.stdin.write(JSON.stringify({ type: 'cancel', id }) + '\n', 'utf-8');
+    } catch (err) {
+      logToFile('warn', `SUPER 取消信号发送失败 job=${id}: ${err.message}`);
+    }
+    // 置空 handler 防止 Worker 后续 error 事件重复写已关闭的响应；释放 Worker 给下一任务
+    currentLlamaHandler = null;
+    releaseLlamaWorker();
+    activeJobs.delete(id);
+    activeJobResponses.delete(id);
+    if (jobRes) {
+      try {
+        sendSSE(jobRes.res, 'error', { message: '用户主动停止计算' });
+        sendSSE(jobRes.res, 'done', { code: 125 });
+        jobRes.res.end();
+      } catch (_) {}
+    }
+    recordJob(id, 'super', 'cancelled', '用户主动停止');
+    logToFile('info', `用户主动取消 SUPER 任务（发送取消信号）job=${id}`);
+    return res.json({ success: true, cancelled: true, reason: 'super_cancel_signal' });
+  }
+
+  // 2c. 普通子进程：终止进程并通知前端
+  // P2-7：SIGTERM 后 5 秒未退出则 SIGKILL 兜底，防止僵尸进程
   try {
-    proc.kill('SIGTERM');
+    killProcessWithFallback(proc);
   } catch (err) {
     logToFile('warn', `取消任务 kill 失败 job=${id}: ${err.message}`);
   }
