@@ -198,6 +198,8 @@ def _tokenize(text: str) -> list:
     """中文分词：优先使用 jieba（加载领域词），否则回退到简单正则。"""
     try:
         import jieba
+        import logging
+        jieba.setLogLevel(logging.WARNING)  # 抑制词典加载的 INFO 日志
         _DOMAIN_WORDS = [
             "算法推荐", "信息茧房", "观点极化", "社会共识", "公共讨论",
             "用户行为", "算法透明", "推荐系统", "因果推断",
