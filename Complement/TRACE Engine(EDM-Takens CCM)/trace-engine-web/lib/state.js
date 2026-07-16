@@ -69,6 +69,7 @@ const CONFIG = {
   pythonCmd: process.env.TRACE_PYTHON_CMD || 'python',
   maxConcurrentJobs: parseInt(process.env.TRACE_MAX_CONCURRENT || '2', 10),
   jobTimeoutMs: parseInt(process.env.TRACE_JOB_TIMEOUT_MS || '300000', 10),
+  deepJobTimeoutMs: parseInt(process.env.TRACE_DEEP_JOB_TIMEOUT_MS || '900000', 10), // DEEP 模式专用：反驳+六战士+稳定性 需较长时间
   bridgeConfig: process.env.TRACE_BRIDGE_CONFIG || '',
 };
 

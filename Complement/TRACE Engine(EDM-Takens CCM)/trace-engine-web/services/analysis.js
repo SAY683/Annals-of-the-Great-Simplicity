@@ -94,12 +94,17 @@ function runPythonAnalysisStream(text, outputId, mode, bridgeConfig, res, schema
     }
   };
 
+  const jobTimeout = (mode === 'deep')
+    ? CONFIG.deepJobTimeoutMs
+    : CONFIG.jobTimeoutMs;
+
   timeoutId = setTimeout(() => {
-    logToFile('warn', `分析超时 job=${outputId}，强制终止`);
-    sendSSE(res, 'error', { message: `分析超时（>${CONFIG.jobTimeoutMs}ms），已强制终止。请尝试 LIGHT 模式或缩短文本。` });
+    const limitMin = Math.round(jobTimeout / 60000);
+    logToFile('warn', `分析超时 job=${outputId} mode=${mode}，强制终止`);
+    sendSSE(res, 'error', { message: `分析超时（>${jobTimeout}ms / ${limitMin}min），已强制终止。${mode === 'deep' ? '可缩短文本或降低阈值加速。' : '请尝试 LIGHT 模式或缩短文本。'}` });
     killProcessWithFallback(py);
     recordJob(outputId, mode, 'timeout');
-  }, CONFIG.jobTimeoutMs);
+  }, jobTimeout);
 
   py.stdin.write(text, 'utf-8');
   py.stdin.end();
