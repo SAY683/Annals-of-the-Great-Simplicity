@@ -85,7 +85,9 @@ def _read_csv_robust(csv_path: str) -> pd.DataFrame:
 
 def _prepare_dataset(filename: str) -> Tuple[str, pd.DataFrame, List[str]]:
     """Load a CSV from DATA_DIR and return (path, df, numeric_cols)."""
-    csv_path = os.path.join(DATA_DIR, filename)
+    csv_path = os.path.abspath(os.path.join(DATA_DIR, os.path.basename(filename)))
+    if not csv_path.startswith(os.path.abspath(DATA_DIR) + os.sep) and csv_path != os.path.abspath(DATA_DIR):
+        raise HTTPException(status_code=400, detail=f"Invalid filename: path traversal rejected")
     if not os.path.exists(csv_path):
         raise HTTPException(status_code=404, detail=f"File not found: {filename}")
     df = _read_csv_robust(csv_path)

@@ -457,6 +457,7 @@ class TRACE2DoWhy:
                     edges_filtered = [e for e in edges_filtered if e[2] >= threshold_val]
                     self._log(f"adaptive 模式: 图密度 {density:.1%} > 30%, 使用 percentile 过滤")
                 else:
+                    edges_filtered = edges_filtered[:self.max_edges_for_dowhy]
                     self._log(f"adaptive 模式: 图密度 {density:.1%} ≤ 30%, 使用 top-N 过滤")
             else:
                 # Default: top-N

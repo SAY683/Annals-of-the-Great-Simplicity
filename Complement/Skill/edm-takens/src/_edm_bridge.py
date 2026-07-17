@@ -159,7 +159,7 @@ def CCM(data, columns, target, E, Tp=0, libSizes=None, sample=30,
                 if 'legacy' in signature(pyEDM.CCM).parameters:
                     kwargs = dict(kwargs, legacy=_legacy)
             except (ImportError, ValueError):
-                pass  # silently skip if inspection fails
+                pass  # silently skip if inspection fails; pyEDM likely too old for deadlock too
         return pyEDM.CCM(
             dataFrame=data, columns=columns, target=target,
             E=E, Tp=Tp, libSizes=libSizes, sample=sample,

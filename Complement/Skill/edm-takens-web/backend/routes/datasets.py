@@ -28,6 +28,17 @@ from data_quality import evaluate_dataframe
 router = APIRouter()
 
 
+def _safe_data_path(filename: str) -> str:
+    """Strip directory components from filenames to prevent path traversal."""
+    safe = os.path.basename(filename)
+    if safe != filename:
+        raise HTTPException(status_code=400, detail="Invalid filename: path separators not allowed")
+    full = os.path.abspath(os.path.join(DATA_DIR, safe))
+    if not full.startswith(os.path.abspath(DATA_DIR) + os.sep) and full != os.path.abspath(DATA_DIR):
+        raise HTTPException(status_code=400, detail="Invalid filename")
+    return full
+
+
 @router.get("/api/health")
 def health():
     return {"status": "ok", "time": datetime.utcnow().isoformat()}
@@ -58,7 +69,7 @@ def upload_file(request: Request, file: UploadFile = File(...)):
 
     # 2) 流式读取并校验：边写边统计字节数，并对首块做文本性探测，
     #    避免把二进制文件当作 CSV 落盘后误导后续解析。
-    dest = os.path.join(DATA_DIR, file.filename)
+    dest = _safe_data_path(file.filename)
     total = 0
     sniffed = b""
     try:
@@ -109,7 +120,7 @@ def upload_file(request: Request, file: UploadFile = File(...)):
 
 @router.get("/api/datasets/{filename}/columns")
 def get_columns(filename: str):
-    path = os.path.join(DATA_DIR, filename)
+    path = _safe_data_path(filename)
     if not os.path.exists(path):
         raise HTTPException(status_code=404, detail="File not found")
     df = _read_csv_robust(path)
