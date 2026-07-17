@@ -162,13 +162,13 @@ class SovereignHAVOK:
         p, cols = v.shape
         # Adaptive window cap: never use more than p/4 points for derivative
         # This prevents the reviewer-identified over-smoothing issue
-        max_safe_wl = max(5, p // 4)
+        max_safe_wl = max(3, p // 4)  # 小数据下至少保留 3-point window
         if max_safe_wl % 2 == 0:
             max_safe_wl -= 1
         wl = min(self.window_length, max_safe_wl)
         if wl % 2 == 0:
             wl -= 1
-        if wl < self.poly_order + 2:
+        if wl > p or wl < self.poly_order + 2:
             # Fallback: central finite difference
             dv = np.zeros_like(v)
             for col in range(cols):

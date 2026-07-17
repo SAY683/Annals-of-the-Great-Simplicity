@@ -50,6 +50,8 @@ def run_adaptive_edm(df, target_col, lib=None, pred=None, max_E=10, is_binary=Fa
             maxE=max_E, Tp=1, columns=target_col, target=target_col,
             showPlot=False, numProcess=1
         )
+        if not rho_E['rho'].notna().any():
+            raise ValueError("EmbedDimension returned all-NA rho — data may be constant or too short")
         best_idx = rho_E['rho'].idxmax()
         optimal_E = int(rho_E.loc[best_idx, 'E'])
         max_rho = rho_E.loc[best_idx, 'rho']

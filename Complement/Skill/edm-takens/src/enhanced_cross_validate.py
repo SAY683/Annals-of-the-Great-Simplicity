@@ -741,6 +741,16 @@ def run_enhanced_validation(csv_path=data_path('game_log.csv'),
             # canonical 1.05/0.90 thresholds used elsewhere (diagnose(),
             # pipeline.py). See classify_havok_stability's docstring.
             evals = hv.eigenvalues_d_  # discrete-time eigenvalues for stability
+            if len(evals) == 0:
+                # 退化 HAVOK 模型（近常量信号），跳过 eigenvalue-dependent 输出
+                # 而不是让它被外层 except Exception 捕获并报晦涩的 [SKIPPED]
+                all_results[var] = {
+                    'edm': edm, 'havok_v': hv, 'havok_u': hu,
+                    'lyapunov': lyap, 'hankel_check': hankel_check,
+                    'ccm_verification': {}, 'cross_checks': [],
+                }
+                print(f"  [SKIPPED] Variable '{var}': HAVOK degenerate — eigenvalues empty")
+                continue
             growth = np.sort(np.abs(evals))[::-1]
             max_ev = growth[0]
             print(f"  Koopman: max|eig_d|={max_ev:.4f} ", end='')

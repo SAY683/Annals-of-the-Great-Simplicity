@@ -263,7 +263,7 @@ def series_quality(series: pd.Series) -> Dict[str, Any]:
     if len(finite_values) > 1:
         std = float(np.std(finite_values, ddof=1))
     else:
-        std = float('nan')
+        std = None  # 常量列无标准差，None→JSON null（避免 NaN 破坏 JSON）
     is_constant = unique_count <= 1
 
     # Sparsity: minority-class ratio for low-cardinality columns

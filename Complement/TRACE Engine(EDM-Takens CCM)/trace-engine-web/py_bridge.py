@@ -560,12 +560,14 @@ def main():
     ref_list = []
     for name, r in refutations.items():
         check = getattr(r, '_check', None)
+        ne = float(r.new_effect)
+        dm = check.get('display_metric') if isinstance(check, dict) else None
         ref_list.append({
             "method": name,
-            "new_effect": float(r.new_effect),
-            "refuted": bool(check['refuted']) if check else bool(getattr(r, 'refuted', False)),
-            "display_metric": float(check['display_metric']) if check and check.get('display_metric') is not None else None,
-            "display_label": check.get('display_label') if check else None,
+            "new_effect": ne if np.isfinite(ne) else None,
+            "refuted": bool(check.get('refuted', False)) if isinstance(check, dict) else bool(getattr(r, 'refuted', False)),
+            "display_metric": float(dm) if dm is not None and np.isfinite(float(dm)) else None,
+            "display_label": check.get('display_label') if isinstance(check, dict) else None,
         })
 
     scan_list = []
@@ -621,8 +623,11 @@ def main():
         "outcome": outcome,
         "identifiable": identifiable,
         "identifiability": identifiability,
-        "ate": float(estimate.value),
-        "confidence_interval": [float(ci[0]), float(ci[1])],
+        "ate": float(estimate.value) if np.isfinite(estimate.value) else None,
+        "confidence_interval": [
+            float(ci[0]) if np.isfinite(ci[0]) else None,
+            float(ci[1]) if np.isfinite(ci[1]) else None,
+        ],
         "confidence_method": confidence_method,
         "refutations": ref_list,
         "counterfactual_scan": scan_list,
