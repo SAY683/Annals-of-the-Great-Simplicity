@@ -247,14 +247,20 @@ def _tokenize(text: str) -> list:
 
 
 def _write_error(out_dir: Path, message: str):
-    """统一错误输出：日志、文件、SSE。"""
+    """统一错误输出：日志、文件、SSE。
+    文件 I/O 失败不阻断 SSE 错误事件——即使磁盘满，
+    前端仍能收到错误消息而非静默超时。
+    """
     _log("error", message)
     _stage("error", message, 1.0)
     result = {"success": False, "error": message}
-    (out_dir / "result.json").write_text(
-        json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8"
-    )
-    (out_dir / "report.md").write_text(f"# 分析失败\n\n{message}\n", encoding="utf-8")
+    try:
+        (out_dir / "result.json").write_text(
+            json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+        (out_dir / "report.md").write_text(f"# 分析失败\n\n{message}\n", encoding="utf-8")
+    except OSError as e:
+        _log("warn", f"写入错误文件失败（磁盘满/权限不足）: {e}")
     _emit({"type": "error", "message": message})
 
 
@@ -545,7 +551,10 @@ def main():
     timer.start("report")
     _stage("report", "正在生成 Markdown 报告与 JSON 结果...", 0.98)
     report = bridge.report()
-    (out_dir / "report.md").write_text(report, encoding="utf-8")
+    try:
+        (out_dir / "report.md").write_text(report, encoding="utf-8")
+    except OSError as e:
+        _log("warn", f"写入 report.md 失败: {e}")
     timer.end("report")
 
     ref_list = []
@@ -559,17 +568,22 @@ def main():
             "display_label": check.get('display_label') if check else None,
         })
 
-    scan_list = [
-        {
+    scan_list = []
+    for r in scan:
+        def _safe_float(v):
+            f = float(v)
+            return None if np.isnan(f) else f
+        item = {
             "source": r["source"],
             "target": r["target"],
-            "trace_dnl": float(r["trace_dnl"]),
-            "ite": float(r["ite"]),
-            "observed": float(r["observed"]),
-            "counterfactual": float(r["counterfactual"]),
+            "trace_dnl": _safe_float(r["trace_dnl"]),
+            "ite": _safe_float(r.get("ite", float('nan'))),
+            "observed": _safe_float(r.get("observed", float('nan'))),
+            "counterfactual": _safe_float(r.get("counterfactual", float('nan'))),
         }
-        for r in scan
-    ]
+        if "error" in r:
+            item["error"] = r["error"]
+        scan_list.append(item)
 
     # 提取可识别性细节
     identifiability = _extract_identifiability(bridge, DoWhy14Adapter)
@@ -634,9 +648,12 @@ def main():
         "stability_analysis": stability_analysis,
     }
 
-    (out_dir / "result.json").write_text(
-        json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8"
-    )
+    try:
+        (out_dir / "result.json").write_text(
+            json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+    except OSError as e:
+        _log("warn", f"写入 result.json 失败: {e}")
 
     _stage("done", "分析完成。", 1.0)
     _validate_result(result)

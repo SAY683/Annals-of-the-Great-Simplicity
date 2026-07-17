@@ -457,6 +457,8 @@ def run_pipeline(config: PipelineConfig = None,
               "near-constant or zero-energy signal. SVD rank ~1; "
               "kurtosis/eigenvalue/stability diagnostics are NOT meaningful. "
               "Interpretation will be annotated as degenerate.")
+        # 跳过 eigenvalue-dependent 输出（空数组会导致 np.max 崩溃）
+        return  # 其余 HAVOK 输出无意义
 
     print(f"\n  [HAVOK Results]")
     print(f"    Rank r:              {sh.r_}")

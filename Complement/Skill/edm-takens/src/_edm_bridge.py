@@ -151,8 +151,15 @@ def CCM(data, columns, target, E, Tp=0, libSizes=None, sample=30,
     if EDM_AVAILABLE and hasattr(data, 'columns'):
         # Windows: pyEDM 2.5+ parallel CCM can deadlock/hang with spawn
         # multiprocessing. Force the sequential legacy implementation there.
+        # Older pyEDM versions (< 2.5) don't accept 'legacy' — detect first.
         if os.name == 'nt' and 'legacy' not in kwargs:
-            kwargs = dict(kwargs, legacy='ccm_24')
+            _legacy = 'ccm_24'
+            try:
+                from inspect import signature
+                if 'legacy' in signature(pyEDM.CCM).parameters:
+                    kwargs = dict(kwargs, legacy=_legacy)
+            except (ImportError, ValueError):
+                pass  # silently skip if inspection fails
         return pyEDM.CCM(
             dataFrame=data, columns=columns, target=target,
             E=E, Tp=Tp, libSizes=libSizes, sample=sample,

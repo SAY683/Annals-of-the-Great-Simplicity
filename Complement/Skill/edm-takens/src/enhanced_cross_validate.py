@@ -334,9 +334,11 @@ def edm_pipeline_full(df, target_col, lib, pred, max_E=8):
 def havok_pipeline(data, q, dt=1.0):
     """Run SovereignHAVOK V-basis and U-basis."""
     n = len(data)
-    wl = min(11, (n - q) // 2 * 2 - 1)
-    if wl < 5: wl = 5
-    if wl % 2 == 0: wl -= 1
+    p = n - q + 1
+    wl = min(11, p)  # 窗口绝不能超过 Hankel 行数 p
+    if wl % 2 == 0: wl -= 1  # 确保奇数
+    if wl < 5: wl = min(5, p)
+    if wl % 2 == 0: wl -= 1  # 二次确保奇偶
 
     sh_v = SovereignHAVOK(
         q_delays=q, dt=dt, energy_threshold=0.99,
