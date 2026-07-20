@@ -23,6 +23,7 @@ body {
   color: var(--text);
   line-height: 1.5;
   min-height: 100vh;
+  overflow-x: hidden;
 }
 
 #app {
@@ -31,13 +32,14 @@ body {
   padding: clamp(12px, 2vw, 32px);
   position: relative;
 }
+#app > *:not(.crt-overlay) { position: relative; z-index: 2; }
 
 /* ── 特摄防卫队氛围: CRT 扫描线 ─────────── */
 .crt-overlay {
   position: fixed;
   top: 0; left: 0; right: 0; bottom: 0;
   pointer-events: none;
-  z-index: 9999;
+  z-index: 1;
   background:
     linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.12) 50%),
     linear-gradient(90deg, rgba(255, 0, 0, 0.03), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.03));
@@ -133,6 +135,7 @@ header p { color: var(--muted); font-size: 0.8rem; margin-top: 4px; }
 .project-bar {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
   margin-bottom: 16px;
   padding: 8px 12px;
@@ -142,8 +145,8 @@ header p { color: var(--muted); font-size: 0.8rem; margin-top: 4px; }
   font-size: 0.7rem;
 }
 .project-bar label { color: var(--muted); white-space: nowrap; }
-.project-bar select { flex: 1; background: var(--panel); color: var(--text); border: 1px solid var(--border); padding: 4px 8px; font-family: inherit; font-size: 0.7rem; }
-.project-bar input { background: var(--panel); color: var(--text); border: 1px solid var(--border); padding: 4px 8px; font-family: inherit; font-size: 0.7rem; }
+.project-bar select { flex: 1 1 140px; min-width: 140px; background: var(--panel); color: var(--text); border: 1px solid var(--border); padding: 4px 8px; font-family: inherit; font-size: 0.7rem; }
+.project-bar input { flex: 1 1 120px; min-width: 120px; background: var(--panel); color: var(--text); border: 1px solid var(--border); padding: 4px 8px; font-family: inherit; font-size: 0.7rem; }
 
 /* ── Work Scan ──────────────────────────── */
 .work-scan-table { width: 100%; font-size: 0.6rem; max-height: 240px; overflow-y: auto; }
@@ -203,13 +206,16 @@ header p { color: var(--muted); font-size: 0.8rem; margin-top: 4px; }
 .form-row {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
   margin-bottom: 8px;
   font-size: 0.7rem;
 }
 .form-row label { color: var(--muted); min-width: 80px; white-space: nowrap; }
+.input-hint { font-size: 0.6rem; color: var(--muted); margin-top: 4px; margin-bottom: 2px; }
 .form-row select, .form-row input {
-  flex: 1;
+  flex: 1 1 140px;
+  min-width: 140px;
   background: var(--panel);
   color: var(--text);
   border: 1px solid var(--border);
@@ -359,8 +365,9 @@ tr:hover td { background: #151d28; }
 }
 
 /* ── Two-Column Layout ──────────────────── */
-.two-col { display: grid; grid-template-columns: 420px 1fr; gap: 16px; align-items: start; }
-.col-left, .col-right { min-width: 0; }
+.two-col { display: grid; grid-template-columns: minmax(320px, 420px) 1fr; gap: 16px; align-items: start; }
+.col-left, .col-right { min-width: 0; max-width: 100%; }
+.col-left textarea, .col-right textarea { max-width: 100%; }
 
 /* ── Dataset Table ──────────────────────── */
 .ds-row { display: flex; align-items: center; gap: 8px; padding: 4px 6px; border-bottom: 1px solid var(--border); font-size: 0.65rem; }
@@ -380,7 +387,16 @@ tr:hover td { background: #151d28; }
 .ws-row:hover { background: #151d28; }
 .ws-row input[type=checkbox] { accent-color: var(--accent); }
 
-@media (max-width: 900px) { .two-col { grid-template-columns: 1fr; } }
+@media (max-width: 1000px) { .two-col { grid-template-columns: 1fr; } }
+@media (max-width: 520px) {
+  .project-bar, .form-row { gap: 6px; }
+  .project-bar select, .project-bar input,
+  .form-row select, .form-row input { flex: 1 1 100%; min-width: 0; width: 100%; }
+  .status-bar { gap: 6px; }
+  .stat { flex: 1 1 calc(50% - 6px); min-width: 0; }
+  header { flex-direction: column; align-items: stretch; }
+  .header-right { align-items: flex-start; }
+}
 
 /* ── Table Layer Headers ────────────────── */
 th.l1 { color: var(--accent); }

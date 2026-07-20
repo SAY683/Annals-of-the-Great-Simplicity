@@ -446,9 +446,6 @@ function runPythonAnalysisSync(text, outputId, mode = 'light', bridgeConfig = ''
 
     recordJob(outputId, mode, 'running', null, { text, config: bridgeConfig || CONFIG.bridgeConfig || '' });
 
-    // 深度复审修复：sync 路径也需注册 activeJobs，否则绕过并发限制且无法取消
-    activeJobs.set(outputId, py);
-
     const args = [pyScript, skillDir, outDir, mode];
     const cfg = bridgeConfig || CONFIG.bridgeConfig || '';
     if (cfg) args.push(cfg);
@@ -456,6 +453,9 @@ function runPythonAnalysisSync(text, outputId, mode = 'light', bridgeConfig = ''
     const py = spawn(CONFIG.pythonCmd, args, {
       env: { ...process.env, PYTHONIOENCODING: 'utf-8' },
     });
+
+    // 深度复审修复：sync 路径也需注册 activeJobs，否则绕过并发限制且无法取消
+    activeJobs.set(outputId, py);
 
     let stdout = '';
     let stderr = '';

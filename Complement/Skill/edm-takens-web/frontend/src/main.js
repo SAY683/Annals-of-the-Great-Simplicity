@@ -57,6 +57,8 @@ async function loadDatasetColumns(filename) {
     await loadRecommendation(filename)
     await loadQuality(filename)
     $('#runBtn').disabled = false
+    // UX: 数据集就绪后将运行按钮滚动到可视区域，避免长页面中按钮被淹没
+    setTimeout(() => $('#runBtn').scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 100)
   } catch (e) {
     $('#columnInfo').innerHTML = `<span style="color:red">加载失败: ${escapeHtml(e.message)}</span>`
     $('#runBtn').disabled = true
@@ -969,6 +971,14 @@ $('#variablesInput').addEventListener('input', () => {
   }
 })
 $('#runBtn').addEventListener('click', runAnalysis)
+
+// UX: 全局快捷键 Ctrl+Enter 触发分析（方便长页面中快速运行）
+document.addEventListener('keydown', (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter' && !$('#runBtn').disabled) {
+    e.preventDefault()
+    runAnalysis()
+  }
+})
 
 // Init
 refreshDatasets()

@@ -21,9 +21,10 @@ function Stop-ProcessTree($pid) {
     }
 }
 
+# 仅结束 trace-engine-web 自身的 server.js 进程（避免误杀 trace-to-edm 等其它项目）
 Get-CimInstance Win32_Process -Filter "name='node.exe'" | ForEach-Object {
     $cmd = $_.CommandLine
-    if ($cmd -and ($cmd -like '*server.js*') -and ($cmd -notlike '*vite*')) {
+    if ($cmd -and ($cmd -like '*trace-engine-web*') -and ($cmd -like '*server.js*') -and ($cmd -notlike '*vite*')) {
         Write-Host "正在结束 Node 进程 PID=$($_.ProcessId) CMD=$cmd" -ForegroundColor Yellow
         Stop-ProcessTree $_.ProcessId
         Stop-Process -Id $_.ProcessId -Force

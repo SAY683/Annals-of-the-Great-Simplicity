@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>trace-to-edm 操纵台</title>
-  <link rel="stylesheet" href="/css/main.css" />
+  <link rel="stylesheet" href="/css/main.css?v=20260720f" />
 </head>
 <body>
   <div id="app">
@@ -52,7 +52,7 @@
       <section class="panel">
         <div class="project-bar">
           <label>模型:</label>
-          <select id="modelSelect" style="flex:0 0 auto;width:240px"></select>
+          <select id="modelSelect" style="flex:0 0 auto;width:240px"><option value="">加载中...</option></select>
           <span id="modelInfo" style="font-size:0.6rem;color:var(--muted);margin-left:12px"></span>
           <button id="btnRefreshModels" class="btn-mini">刷新</button>
         </div>
@@ -91,6 +91,7 @@
             <div style="margin-top:6px">
               <textarea id="textDirect" placeholder="或直接粘贴文本 (多段用 --- 分隔)..." rows="4" style="width:100%;background:var(--bg);color:var(--text);border:1px solid var(--border);font-family:inherit;font-size:0.7rem;padding:6px;resize:vertical"></textarea>
             </div>
+            <div class="input-hint">Enter 提交 · Shift+Enter 换行 · 多段用 --- 分隔</div>
             <button id="btnAddText" class="btn btn-run" style="margin-top:6px">+ 将文本加入数据集</button>
           </section>
 
@@ -186,7 +187,7 @@
     </main>
   </div>
 
-  <script src="/js/logCockpit.js"></script>
-  <script src="/js/app.js"></script>
+  <script src="/js/logCockpit.js?v=20260720f"></script>
+  <script src="/js/app.js?v=20260720f"></script>
 </body>
 </html>

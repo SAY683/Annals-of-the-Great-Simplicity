@@ -579,6 +579,29 @@ function pyDS(action, args) {
   });
 }
 
+// ── API: 列出可用输入 CSV ─────────────────────────────────
+app.get('/api/inputs', async (_req, res) => {
+  try {
+    const script = `
+import sys, json; sys.path.insert(0, '.')
+from pathlib import Path
+from project_manager import get_project_manager, PROJECT_ROOT
+pm = get_project_manager()
+roots = [PROJECT_ROOT / 'data' / 'inputs', pm.current_dir / 'inputs']
+files = []
+for r in roots:
+    if r.exists():
+        for f in sorted(r.glob('*.csv')):
+            rel = f.relative_to(PROJECT_ROOT)
+            files.append({"path": str(rel).replace('\\\\','/'), "name": f.name, "size": f.stat().st_size})
+print(json.dumps({"files": files}, ensure_ascii=False))
+    `.trim();
+    const { out } = await pyScript(script, 5000);
+    try { res.json(JSON.parse(out)); }
+    catch { res.json({ files: [] }); }
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 app.get('/api/dataset', async (_req, res) => {
   try {
     const script = `import sys, json; sys.path.insert(0, '.'); from project_manager import get_project_manager; from dataset_manager import DatasetManager; pm = get_project_manager(); dm = DatasetManager(pm.current_dir); print(json.dumps({"entries": dm.entries, "summary": dm.summary()}, ensure_ascii=False, default=str))`;

@@ -131,7 +131,10 @@ function streamJob(url, body, label) {
 async function refreshAll() {
   await Promise.all([refreshStatus(), refreshDataset(), refreshTable()]);
 }
+let _statusPending = false;
 async function refreshStatus() {
+  if (_statusPending) return;
+  _statusPending = true;
   try {
     const r = await fetch('/api/status');
     const d = await r.json();
@@ -146,21 +149,7 @@ async function refreshStatus() {
     document.getElementById('edmStatus').textContent = d.trajectory.edm_ready ? '✓ 就绪' : `需≥15行 (当前${d.trajectory.rows})`;
     document.getElementById('edmStatus').style.color = d.trajectory.edm_ready ? 'var(--accent)' : 'var(--warn)';
 
-    // 从轨迹数据自动填充数据范围
-    if (d.trajectory.rows > 0) {
-      try {
-        const tr = await fetch('/api/trajectory'); const td = await tr.json();
-        if (td.rows && td.rows.length) {
-          const timestamps = td.rows.map(r => r.time_step || '').filter(t => t).sort();
-          if (timestamps.length) {
-            const first = timestamps[0].slice(0, 16);
-            const last = timestamps[timestamps.length - 1].slice(0, 16);
-            document.getElementById('edmDataRange').textContent =
-              `${first} ~ ${last} (${timestamps.length}个时间点)`;
-          }
-        }
-      } catch (e) { document.getElementById('edmDataRange').textContent = '无法读取时间范围'; }
-    } else {
+    if (d.trajectory.rows === 0) {
       document.getElementById('edmDataRange').textContent = '无数据 (需≥15行)';
     }
 
@@ -183,6 +172,7 @@ async function refreshStatus() {
       }
     }
   } catch (e) { console.error(e); }
+  finally { _statusPending = false; }
 }
 
 // ── 项目管理 ──────────────────────────────────────────────
@@ -222,21 +212,55 @@ document.getElementById('projectSelect').addEventListener('change', async (e) =>
     body: JSON.stringify({ name: e.target.value }),
   });
   currentProject = e.target.value;
+  refreshInputs();
   refreshAll();
 });
 
-document.getElementById('btnCreateProject').addEventListener('click', async () => {
-  const name = document.getElementById('newProjectName').value.trim();
+async function createProject() {
+  const input = document.getElementById('newProjectName');
+  const name = input.value.trim();
   if (!name) return;
-  await fetch('/api/projects', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name }),
-  });
-  document.getElementById('newProjectName').value = '';
-  refreshProjects();
+  try {
+    const r = await fetch('/api/projects', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name }),
+    });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    input.value = '';
+    await refreshProjects();
+    t(`✓ 项目 "${name}" 创建成功`, 'done');
+  } catch (e) {
+    console.error('create project:', e);
+    t('✗ 创建项目失败: ' + (e.message || e), 'error');
+  }
+}
+
+document.getElementById('btnCreateProject').addEventListener('click', createProject);
+document.getElementById('newProjectName').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') createProject();
 });
 
 document.getElementById('btnRefreshProjects').addEventListener('click', refreshProjects);
+
+async function refreshInputs() {
+  const sel = document.getElementById('textCsvSelect');
+  if (!sel) return;
+  const current = sel.value;
+  try {
+    const r = await fetch('/api/inputs');
+    const d = await r.json();
+    sel.innerHTML = '<option value="">-- 项目 inputs/ 中的文件 --</option>';
+    if (d.files && d.files.length) {
+      d.files.forEach(f => {
+        const o = document.createElement('option');
+        o.value = f.path;
+        o.textContent = `${f.name} (${(f.size/1024).toFixed(1)}KB)`;
+        sel.appendChild(o);
+      });
+      if ([...sel.options].some(o => o.value === current)) sel.value = current;
+    }
+  } catch (e) { console.error('refresh inputs:', e); }
+}
 
 async function deleteProject(name) {
   if (!confirm(`删除项目 "${name}" 及全部数据？`)) return;
@@ -247,13 +271,15 @@ async function deleteProject(name) {
 // ── 模型配置 ──────────────────────────────────────────────
 
 async function refreshModels() {
+  const sel = document.getElementById('modelSelect');
+  const info = document.getElementById('modelInfo');
   try {
     const r = await fetch('/api/models');
+    if (!r.ok) throw new Error('HTTP ' + r.status);
     const d = await r.json();
-    const sel = document.getElementById('modelSelect');
     if (!sel) return;
     sel.innerHTML = '';
-    if (d.models) {
+    if (d.models && d.models.length > 0) {
       d.models.forEach(m => {
         const o = document.createElement('option');
         o.value = m.key;
@@ -261,12 +287,18 @@ async function refreshModels() {
         if (m.key === d.active) o.selected = true;
         sel.appendChild(o);
       });
+      if (info) info.textContent = (d.active || '') + ' | 切换后首次编码需重载模型 (~60-90s)';
+      const coreEl = document.getElementById('statCore');
+      if (coreEl) coreEl.textContent = d.active === 'qwen2.5-3b' ? 'Qwen3B' : 'Qwen1.5B';
+    } else {
+      sel.innerHTML = '<option value="">无可用模型</option>';
+      if (info) info.textContent = '未找到模型，请检查 Models 目录';
     }
-    document.getElementById('modelInfo').textContent =
-      (d.active || '') + ' | 切换后首次编码需重载模型 (~60-90s)';
-    const coreEl = document.getElementById('statCore');
-    if (coreEl) coreEl.textContent = d.active === 'qwen2.5-3b' ? 'Qwen3B' : 'Qwen1.5B';
-  } catch (e) { console.error('model list:', e); }
+  } catch (e) {
+    console.error('model list:', e);
+    if (sel) sel.innerHTML = '<option value="">加载失败</option>';
+    if (info) info.textContent = '加载失败: ' + (e.message || e) + ' (服务未启动?)';
+  }
 }
 
 document.getElementById('modelSelect').addEventListener('change', async (e) => {
@@ -409,7 +441,7 @@ document.getElementById('btnCleanInvalid').addEventListener('click', async () =>
 });
 
 // ── 文本输入 ──────────────────────────────────────────────
-document.getElementById('btnAddText').addEventListener('click', async () => {
+async function addDirectText() {
   const csvFile = document.getElementById('textCsvSelect').value;
   const directText = document.getElementById('textDirect').value.trim();
 
@@ -424,8 +456,9 @@ document.getElementById('btnAddText').addEventListener('click', async () => {
         body: JSON.stringify({ csv_path: csvFile }),
       });
       const d = await r.json();
-      t(`✓ 已添加 ${d.added} 条文本`, 'done');
-    } catch (e) { t(`✗ 失败: ${e.message}`, 'error'); }
+      if (!r.ok || d.error) throw new Error(d.error || `HTTP ${r.status}`);
+      t(`✓ 已添加 ${d.added !== undefined ? d.added : d} 条文本`, 'done');
+    } catch (e) { t(`✗ CSV 添加失败: ${e.message}`, 'error'); }
   }
 
   if (directText) {
@@ -437,13 +470,23 @@ document.getElementById('btnAddText').addEventListener('click', async () => {
         body: JSON.stringify({ texts: segments.map(t => ({ text: t.trim(), timestamp: new Date().toISOString().slice(0,16), source: '手动输入' })) }),
       });
       const d = await r.json();
-      t(`✓ 已添加 ${d.added} 条文本`, 'done');
+      if (!r.ok || d.error) throw new Error(d.error || `HTTP ${r.status}`);
+      t(`✓ 已添加 ${d.added !== undefined ? d.added : d} 条文本`, 'done');
       document.getElementById('textDirect').value = '';
-    } catch (e) { t(`✗ 失败: ${e.message}`, 'error'); }
+    } catch (e) { t(`✗ 文本添加失败: ${e.message}`, 'error'); }
   }
 
   refreshDataset();
   document.getElementById('btnRunPipeline').disabled = false;
+}
+
+document.getElementById('btnAddText').addEventListener('click', addDirectText);
+document.getElementById('textDirect').addEventListener('keydown', (e) => {
+  // UX: Enter 提交，Shift+Enter 换行（与即时通讯/表单一致）
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    addDirectText();
+  }
 });
 
 // ── 数据集管理 ────────────────────────────────────────────
@@ -882,7 +925,19 @@ async function refreshTable() {
   try {
     const r = await fetch('/api/trajectory');
     const d = await r.json();
-    if (!d.rows || !d.rows.length) { document.getElementById('tableWrap').innerHTML = '<p class="dim">暂无数据</p>'; return; }
+    if (!d.rows || !d.rows.length) {
+      document.getElementById('tableWrap').innerHTML = '<p class="dim">暂无数据</p>';
+      document.getElementById('edmDataRange').textContent = '无数据 (需≥15行)';
+      return;
+    }
+    // 复用轨迹数据更新数据范围，避免 refreshStatus 再次请求 /api/trajectory
+    const timestamps = d.rows.map(row => row.time_step || '').filter(t => t).sort();
+    if (timestamps.length) {
+      const first = timestamps[0].slice(0, 16);
+      const last = timestamps[timestamps.length - 1].slice(0, 16);
+      document.getElementById('edmDataRange').textContent =
+        `${first} ~ ${last} (${timestamps.length}个时间点)`;
+    }
     // 三层体系分组的列选择
     const preferredCols = [
       // Meta
@@ -972,8 +1027,10 @@ updateMissionClock();
 // ── 启动 ──────────────────────────────────────────────────
 refreshModels();
 refreshProjects();
+refreshInputs();
 refreshStatus();
 refreshDataset();
 refreshTable();
 refreshChart();
-setInterval(refreshStatus, 15000);
+// 降低状态轮询频率以减少隧道开销；数据范围由 refreshTable 复用轨迹数据更新
+setInterval(refreshStatus, 30000);
