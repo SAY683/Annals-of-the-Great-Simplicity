@@ -148,7 +148,7 @@ class WarriorCard:
 # 🔴 TRACE — 拓扑先锋
 # ══════════════════════════════════════════════════════════════════════
 
-def _deploy_trace(adj_matrix, token_list) -> WarriorCard:
+def _deploy_trace(adj_matrix, token_list, bridge=None) -> WarriorCard:
     adj_matrix = np.asarray(adj_matrix)
     card = WarriorCard("TRACE", "拓扑先锋", "探照灯", color="🔴")
     T = len(token_list)
@@ -178,7 +178,9 @@ def _deploy_trace(adj_matrix, token_list) -> WarriorCard:
         card.status = "fallback"
     else:
         card.status = "deployed"
-    card.verdict = "SIGNAL_OK" if max_dnl > 1.0 else "SIGNAL_WEAK"
+    # D2 修复: 阈值随预设 threshold 缩放，避免 llama 预设下永远 SIGNAL_WEAK
+    _signal_ok_threshold = getattr(bridge, 'threshold', 0.03) * 10
+    card.verdict = "SIGNAL_OK" if max_dnl > _signal_ok_threshold else "SIGNAL_WEAK"
     return card
 
 
@@ -661,7 +663,7 @@ def assemble_all_six(adj_matrix, token_list, bridge=None, text="", concept_names
     cards = {}
 
     # 🔴 TRACE (Tier-A)
-    cards['trace'] = _deploy_trace(adj_matrix, token_list)
+    cards['trace'] = _deploy_trace(adj_matrix, token_list, bridge=bridge)
 
     # 🔵 CCM (Tier-B — 启发式诊断层，依赖 edm-takens 真算法，不可用时降级)
     cards['ccm'] = _deploy_ccm(adj_matrix, token_list, concept_names=concept_names)

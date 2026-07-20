@@ -62,6 +62,11 @@ function errorHandler(err, req, res, _next) {
     });
     return;
   }
+  // P1 修复: 显式捕获 PayloadTooLargeError (413)
+  if (err.type === 'entity.too.large' || err.status === 413) {
+    reqLog(req, 'warn', `请求体过大: ${err.message}`);
+    return res.status(413).json({ error: 'PAYLOAD_TOO_LARGE', detail: 'Request body exceeds 20MB limit' });
+  }
   reqLog(req, 'error', `Express 错误: ${err.message}`);
   res.status(500).json({ success: false, error: err.message, traceId: req.traceId });
 }

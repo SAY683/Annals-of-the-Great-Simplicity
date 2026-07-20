@@ -109,6 +109,26 @@ router.get('/config', (_req, res) => {
   });
 });
 
+// P1 修复: 新增 /api/models 端点，返回已探测的 LLaMA 模型列表，30s 超时
+router.get('/models', async (req, res) => {
+  const timeoutMs = 30000;
+  const timer = setTimeout(() => {
+    if (!res.headersSent) {
+      res.status(504).json({ error: 'MODELS_QUERY_TIMEOUT', detail: `Exceeded ${timeoutMs}ms` });
+    }
+  }, timeoutMs);
+  try {
+    const models = (_runtimeCtx.probedLlamaModels || []).map(m => ({
+      id: m.id, name: m.name, path: m.path, size_mb: m.size_mb
+    }));
+    clearTimeout(timer);
+    res.json({ models, count: models.length });
+  } catch (e) {
+    clearTimeout(timer);
+    res.status(500).json({ error: 'MODELS_QUERY_FAILED', detail: e.message });
+  }
+});
+
 // ── 队列状态 ────────────────────────────────────────────────────────
 router.get('/queue', (_req, res) => {
   res.json({

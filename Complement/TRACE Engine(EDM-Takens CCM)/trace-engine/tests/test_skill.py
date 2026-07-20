@@ -2,6 +2,18 @@
 """
 trace-engine Skill 本地 smoke test
 ==================================
+
+注意：本文件保留为 subprocess + assert 模式的 smoke test，可独立运行：
+    python tests/test_skill.py
+
+更细粒度的 pytest 单元测试见同目录其他 test_*.py 文件：
+    - test_counterfactual_bridge.py  TRACE2DoWhy 桥接核心功能
+    - test_presets.py                预设系统 (presets.yaml / load_presets)
+    - test_six_warriors.py           六勇士 (WarriorCard / assemble_all_six)
+
+使用 pytest 框架运行全部测试：
+    pytest                            # 通过 pytest.ini 收集 tests/ 下全部 test_*.py
+
 用法:
     python tests/test_skill.py
 

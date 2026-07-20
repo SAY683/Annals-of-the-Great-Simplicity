@@ -915,6 +915,11 @@ app.get('/api/work-scan', async (_req, res) => {
 });
 
 app.delete('/api/work-uuid/:uuid', async (req, res) => {
+  // P1 修复: UUID 格式校验，防止注入
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!UUID_RE.test(req.params.uuid)) {
+    return res.status(400).json({ error: 'INVALID_UUID', detail: 'UUID format required' });
+  }
   try {
     const script = `
 import sys, json; sys.path.insert(0, '.')

@@ -93,13 +93,14 @@ from workers.analysis_worker import _JobStream, _job_worker, _stream_from_job
 # ── App creation + CORS ─────────────────────────────────
 app = FastAPI(title="EDM-Takens Web", version="0.1.0")
 
+# P2 修复: CORS 生产环境收窄，通过 EDM_CORS_ORIGINS 环境变量配置
+_EDM_CORS_ORIGINS = os.environ.get("EDM_CORS_ORIGINS", "http://localhost:5173,http://localhost:8000,http://127.0.0.1:5173,http://127.0.0.1:8000").split(",")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=False,
-    allow_methods=["*"],
+    allow_origins=_EDM_CORS_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
-    expose_headers=["Content-Disposition"],
 )
 
 # ── Mount routers (debt-19) ──────────────────────────────
