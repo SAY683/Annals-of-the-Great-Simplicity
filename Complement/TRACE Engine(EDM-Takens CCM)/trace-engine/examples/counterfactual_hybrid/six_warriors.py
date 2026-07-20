@@ -4,10 +4,30 @@ Six Warriors Integration — 六战士统一编排器
 将 🔴TRACE、🔵CCM、🟡EDM、⚫HAVOK、🟡DoWhy/CF、⬜causallearn
 统一编排为一个完整的六合一诊断管线。
 
+═══════════════════════════════════════════════════════════════════
+架构等级声明 (Architecture Tier Declaration) — 元审计 P0 修缮
+═══════════════════════════════════════════════════════════════════
+六战士并非"六个等价算法"，而是异质性诊断联盟，分两个等级：
+
+  Tier-A 真算法层 (4 名) — 真实算法实现，输出可追溯因果证据：
+    🔴 TRACE      — ΔNLL 掩码干预 (run_real_pipeline.py:178-262)
+    ⚫ HAVOK      — Hankel+SVD+强迫项定位 (six_warriors.py:_deploy_havok)
+    🟡 DoWhy+CF   — do-calculus + Pearl 三步反事实 (counterfactual_bridge.py)
+    ⬜ causallearn — PC/GES 独立验证 (causallearn_validator.py)
+
+  Tier-B 启发式诊断层 (2 名) — 文本特征启发式，标注 "HEURISTIC_FALLBACK"：
+    🔵 CCM        — 概念覆盖率统计 (依赖 edm-takens 真算法，不可用时降级)
+    🟡 EDM        — 间隔变异系数近似 ρ (非 Sugihara EDM，仅诊断文本结构)
+
+设计意图：
+  - Tier-B 的"启发式回退"不是缺陷，而是"文本类型诊断信号"
+  - 当 CCM/EDM 报告 NARRATIVE_TEXT/LOW_TRUST 时，是诊断结论而非失败
+  - 六合一"不是投票，是测绘" (DESIGN_SIX_IN_ONE.md:69-73)
+
 策略:
-  - 优先从 edm-takens Skill 导入（如果可用）
-  - 不可用时回退到轻量自包含实现
-  - 所有战士输出统一格式的 diagnostic card
+  - 优先从 edm-takens Skill 导入 Tier-B 真算法（如果可用）
+  - 不可用时回退到轻量自包含启发式实现
+  - 所有战士输出统一格式的 diagnostic card，status 字段标注层级
 
 用法:
     from six_warriors import assemble_all_six
@@ -71,12 +91,15 @@ except ImportError:
 class WarriorCard:
     """单个战士的诊断卡片"""
     def __init__(self, warrior_id: str, name: str, instrument: str,
-                 status: str = "ready", color: str = ""):
+                 status: str = "ready", color: str = "", tier: str = "A"):
         self.warrior_id = warrior_id
         self.name = name
         self.instrument = instrument
         self.status = status       # "deployed" | "fallback" | "unavailable"
         self.color = color
+        # tier: "A"=真算法层(可追溯因果证据), "B"=启发式诊断层(文本特征启发式)
+        # 元审计 P0 修缮: 让六勇士等级显式化，消除"六勇士名实不符"歧义
+        self.tier = tier
         self.findings: list[str] = []
         self.metrics: dict = {}
         self.verdict: str = ""
@@ -84,8 +107,9 @@ class WarriorCard:
 
     def render(self) -> str:
         icon = {'deployed': '⚔️', 'fallback': '🔄', 'unavailable': '⏸️'}.get(self.status, '?')
+        tier_tag = f"[Tier-{self.tier}]" if self.tier else ""
         lines = [
-            f"{self.color} {self.warrior_id} {icon} [{self.status.upper()}]",
+            f"{self.color} {self.warrior_id} {icon} [{self.status.upper()}] {tier_tag}",
             f"  称号: {self.name} ({self.instrument})",
         ]
         if self.findings:
@@ -111,6 +135,7 @@ class WarriorCard:
             "name": self.name,
             "instrument": self.instrument,
             "status": self.status,
+            "tier": self.tier,
             "color": self.color,
             "findings": self.findings,
             "metrics": self.metrics,
@@ -162,7 +187,7 @@ def _deploy_trace(adj_matrix, token_list) -> WarriorCard:
 # ══════════════════════════════════════════════════════════════════════
 
 def _deploy_ccm(adj_matrix, token_list, concept_names=None) -> WarriorCard:
-    card = WarriorCard("CCM", "流形力场", "测谎仪", color="🔵")
+    card = WarriorCard("CCM", "流形力场", "测谎仪", color="🔵", tier="B")
 
     # 自包含 CCM 启发式: 检查有效概念（过滤 BPE 碎片/停用词）的重复度
     # CCM 需要每个 concept 至少出现 3 次才能做交叉映射
@@ -256,7 +281,7 @@ def _deploy_ccm(adj_matrix, token_list, concept_names=None) -> WarriorCard:
 # ══════════════════════════════════════════════════════════════════════
 
 def _deploy_edm(token_list) -> WarriorCard:
-    card = WarriorCard("EDM", "时序节拍器", "套路探测器", color="🟡")
+    card = WarriorCard("EDM", "时序节拍器", "套路探测器", color="🟡", tier="B")
 
     # EDM 测量"时序刚性": 高 ρ 表示概念的出现高度可预测
     # 自包含实现: 对 top tokens 做简单自回归预测
@@ -606,6 +631,15 @@ def assemble_all_six(adj_matrix, token_list, bridge=None, text="", concept_names
     """
     六战士统一编排 — 生成完整六合一诊断。
 
+    ════════════════════════════════════════════════════════════════
+    架构等级 (Tier) — 元审计 P0 修缮：六勇士异质性显式化
+    ════════════════════════════════════════════════════════════════
+    返回的 WarriorCard 含 tier 字段：
+      Tier-A (4 名): trace/havok/dowhy_cf/causallearn — 真算法层
+      Tier-B (2 名): ccm/edm — 启发式诊断层
+    消费方（如 Web UI、报告生成器）可依据 tier 区分证据等级，
+    避免将启发式回退与真算法混为"六票投票"。
+
     Parameters
     ----------
     adj_matrix : np.ndarray
@@ -626,16 +660,16 @@ def assemble_all_six(adj_matrix, token_list, bridge=None, text="", concept_names
     """
     cards = {}
 
-    # 🔴 TRACE
+    # 🔴 TRACE (Tier-A)
     cards['trace'] = _deploy_trace(adj_matrix, token_list)
 
-    # 🔵 CCM
+    # 🔵 CCM (Tier-B — 启发式诊断层，依赖 edm-takens 真算法，不可用时降级)
     cards['ccm'] = _deploy_ccm(adj_matrix, token_list, concept_names=concept_names)
 
-    # 🟡 EDM
+    # 🟡 EDM (Tier-B — 启发式诊断层，间隔变异系数近似 ρ)
     cards['edm'] = _deploy_edm(token_list)
 
-    # ⚫ HAVOK
+    # ⚫ HAVOK (Tier-A)
     cards['havok'] = _deploy_havok(adj_matrix, token_list)
 
     # 🟡 DoWhy+CF
@@ -680,9 +714,20 @@ def render_six_panel_report(cards: dict) -> str:
     n_fallback = sum(1 for c in cards.values() if c.status == 'fallback')
     n_unavailable = sum(1 for c in cards.values() if c.status == 'unavailable')
 
+    # 元审计 P0 修缮: 按等级汇总，让"四真算法 + 二启发式诊断"显式化
+    n_tier_a = sum(1 for c in cards.values() if getattr(c, 'tier', 'A') == 'A')
+    n_tier_b = sum(1 for c in cards.values() if getattr(c, 'tier', 'A') == 'B')
+    tier_a_deployed = sum(1 for c in cards.values()
+                          if getattr(c, 'tier', 'A') == 'A' and c.status == 'deployed')
+    tier_b_diagnostic = sum(1 for c in cards.values()
+                            if getattr(c, 'tier', 'A') == 'B'
+                            and c.status in ('deployed', 'fallback'))
+
     lines.append("─" * 60)
     lines.append(f"  合体诊断: {n_deployed} deployed, {n_fallback} fallback, {n_unavailable} unavailable")
-    lines.append(f"  口号: \"不是投票，是测绘\"")
+    lines.append(f"  架构等级: Tier-A 真算法 {n_tier_a} 名 (deployed {tier_a_deployed})"
+                 f"  |  Tier-B 启发式诊断 {n_tier_b} 名 (诊断 {tier_b_diagnostic})")
+    lines.append(f"  口号: \"不是投票，是测绘\" — Tier-B 降级是诊断信号，不是失败")
     lines.append("═" * 60)
 
     return "\n".join(lines)

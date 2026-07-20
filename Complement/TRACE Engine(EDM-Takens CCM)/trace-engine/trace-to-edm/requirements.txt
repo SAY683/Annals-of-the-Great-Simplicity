@@ -1,0 +1,10 @@
+# trace-to-edm 依赖
+# 根据 README.md "技术依赖" 章节创建
+# Python 3.10+
+
+numpy>=1.24
+pandas>=2.0
+scikit-learn>=1.3
+torch>=2.1
+transformers>=4.36
+bitsandbytes>=0.41  # 可选，4-bit 量化需要

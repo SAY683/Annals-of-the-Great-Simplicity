@@ -237,6 +237,15 @@ modelscope download say101/TRACE-Engine-EDM-Takens-CCM-shehui-llama-27m
 > *魔搭（ModelScope）提供稳定快速的国内下载。*
 > *`shehui-llama-v4-archive/` 为旧版社会归档，仅保留配置供参考。*
 
+### 基础模型
+
+`Models/` 目录存放 Qwen2.5 基础模型，用于 TRACE 引擎推理。权重文件因过大不随 GitHub 仓库上传，请自行通过魔搭下载：
+
+| 模型 | 魔搭下载 |
+| :--- | :--- |
+| Qwen2.5-1.5B-Instruct | [🧩 modelscope download qwen/Qwen2.5-1.5B-Instruct](https://modelscope.cn/models/qwen/Qwen2.5-1.5B-Instruct) |
+| Qwen2.5-3B-Instruct | [🧩 modelscope download qwen/Qwen2.5-3B-Instruct](https://modelscope.cn/models/qwen/Qwen2.5-3B-Instruct) |
+
 ### TRACE 引擎（EDM-Takens CCM）
 
 以 **Takens 嵌入定理**与**收敛交叉映射（CCM）**为数学基础，构建自然语言处理与非线性时间序列分析之间的桥梁：

@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>trace-to-edm 操纵台</title>
+  <link rel="stylesheet" href="/css/main.css" />
+</head>
+<body>
+  <div id="app">
+    <!-- 特摄防卫队氛围: CRT 扫描线 -->
+    <div class="crt-overlay" aria-hidden="true"></div>
+
+    <header>
+      <div class="header-left">
+        <h1>trace-to-edm <span class="muted">元因果控制论桥接系统</span></h1>
+        <p>TRACE 工作目录 → 数据集 → 三层提取 → 轨迹 CSV → EDM-Takens 动力学预测</p>
+      </div>
+      <div class="header-right">
+        <div class="mission-clock">
+          <span class="clock-label">MISSION TIME</span>
+          <span class="clock-value" id="missionClock">--:--:--</span>
+        </div>
+        <div class="mode-badge" id="modeBadge">MODE: LIGHT</div>
+      </div>
+    </header>
+
+    <main>
+      <!-- 特摄防卫队氛围: 顶部状态看板 -->
+      <section class="status-bar" id="statusBar">
+        <div class="stat"><span class="stat-label">项目</span><span class="stat-value" id="statProject">--</span></div>
+        <div class="stat"><span class="stat-label">数据集</span><span class="stat-value" id="statDS">--</span></div>
+        <div class="stat"><span class="stat-label">轨迹行数</span><span class="stat-value" id="statRows">--</span></div>
+        <div class="stat"><span class="stat-label">EDM</span><span class="stat-value" id="statEdm">--</span></div>
+        <div class="stat"><span class="stat-label">L1/L2/L3</span><span class="stat-value" id="statLayers">--</span></div>
+        <div class="stat"><span class="stat-label">CORE</span><span class="stat-value" id="statCore">Qwen1.5B</span></div>
+      </section>
+
+      <!-- 项目选择 -->
+      <section class="panel">
+        <div class="project-bar">
+          <label>项目:</label>
+          <select id="projectSelect"></select>
+          <input type="text" id="newProjectName" placeholder="新建项目名..." />
+          <button id="btnCreateProject" class="btn-mini">+新建</button>
+          <button id="btnRefreshProjects" class="btn-mini">刷新</button>
+          <span id="projectDetail" style="font-size:0.6rem;color:var(--muted);margin-left:12px"></span>
+        </div>
+      </section>
+
+      <!-- 模型选择 -->
+      <section class="panel">
+        <div class="project-bar">
+          <label>模型:</label>
+          <select id="modelSelect" style="flex:0 0 auto;width:240px"></select>
+          <span id="modelInfo" style="font-size:0.6rem;color:var(--muted);margin-left:12px"></span>
+          <button id="btnRefreshModels" class="btn-mini">刷新</button>
+        </div>
+      </section>
+
+      <!-- 双栏布局: 数据源 | 数据集 + 管线 -->
+      <div class="two-col">
+
+        <!-- 左栏: 数据源 -->
+        <div class="col-left">
+
+          <!-- 数据源 1: TRACE 工作扫描器 -->
+          <section class="panel">
+            <h2><span class="panel-icon">◈</span> 数据源: TRACE 工作目录
+              <button id="btnScanWork" class="btn-mini">扫描</button>
+            </h2>
+            <div id="workScanResult" class="dim" style="max-height:320px;overflow-y:auto">
+              点击"扫描"查看可用 UUID...
+            </div>
+            <div style="margin-top:8px;display:flex;gap:6px">
+              <button id="btnAddSelected" class="btn btn-replay" style="flex:1" disabled>+ 将选中项加入数据集</button>
+              <button id="btnCleanOrphans" class="btn-mini" style="color:var(--warn)">清理孤儿</button>
+              <button id="btnCleanInvalid" class="btn-mini" style="color:var(--danger)">清理无效</button>
+            </div>
+          </section>
+
+          <!-- 数据源 2: 文本输入 -->
+          <section class="panel">
+            <h2><span class="panel-icon">◈</span> 数据源: 文本输入</h2>
+            <div class="form-row">
+              <label>CSV 文件:</label>
+              <select id="textCsvSelect">
+                <option value="">-- 项目 inputs/ 中的文件 --</option>
+              </select>
+            </div>
+            <div style="margin-top:6px">
+              <textarea id="textDirect" placeholder="或直接粘贴文本 (多段用 --- 分隔)..." rows="4" style="width:100%;background:var(--bg);color:var(--text);border:1px solid var(--border);font-family:inherit;font-size:0.7rem;padding:6px;resize:vertical"></textarea>
+            </div>
+            <button id="btnAddText" class="btn btn-run" style="margin-top:6px">+ 将文本加入数据集</button>
+          </section>
+
+        </div>
+
+        <!-- 右栏: 数据集 + 管线 -->
+        <div class="col-right">
+
+          <!-- 数据集面板 -->
+          <section class="panel">
+            <h2><span class="panel-icon">◉</span> 数据集 <span id="dsSummary" style="font-size:0.65rem;color:var(--muted)"></span>
+              <button id="btnRefreshDS" class="btn-mini">刷新</button>
+              <button id="btnClearProcessed" class="btn-mini">清除已完成</button>
+              <button id="btnResetAll" class="btn-mini">重置全部</button>
+              <button id="btnSpreadTime" class="btn-mini">均匀分布时间</button>
+              <button id="btnClearTrajectory" class="btn-mini" style="color:var(--danger)">清空轨迹CSV</button>
+            </h2>
+            <div id="datasetTable" class="dim" style="max-height:280px;overflow-y:auto">
+              数据集为空。从左侧数据源添加条目。
+            </div>
+            <div style="margin-top:10px;display:flex;gap:8px">
+              <button id="btnRunPipeline" class="btn btn-run" style="flex:1" disabled>▶ 运行管线 (处理所有待处理条目)</button>
+            </div>
+          </section>
+
+          <!-- EDM 触发 -->
+          <section class="panel">
+            <h2><span class="panel-icon">◉</span> EDM 触发 <span id="edmStatus" style="font-size:0.65rem;color:var(--warn)">需≥15行</span></h2>
+            <div class="form-row">
+              <label>预测目标:</label>
+              <select id="edmTarget">
+                <option value="ate">[L1] ate — 因果效应强度</option>
+              </select>
+            </div>
+            <div class="form-row">
+              <label>数据范围:</label>
+              <span id="edmDataRange" style="color:var(--muted);font-size:0.65rem;flex:1">加载中...</span>
+            </div>
+            <div class="form-row">
+              <label>预测窗口:</label>
+              <select id="edmPredictWindow" style="flex:1">
+                <option value="1">预测下 1 步</option>
+                <option value="3" selected>预测下 3 步</option>
+                <option value="5">预测下 5 步</option>
+                <option value="10">预测下 10 步</option>
+              </select>
+            </div>
+            <button id="btnEDM" class="btn btn-edm" disabled>▶ 触发 EDM 分析 (含反馈检测)</button>
+          </section>
+
+          <!-- 实时终端 -->
+          <section class="panel">
+            <h2><span class="panel-icon">▶</span> 实时终端
+              <span class="log-toolbar">
+                <label class="log-filter"><input type="checkbox" id="filterProgress" checked /> <span class="badge-stage">▶ STAGE</span></label>
+                <label class="log-filter"><input type="checkbox" id="filterInfo" checked /> <span class="badge-info">◉ INFO</span></label>
+                <label class="log-filter"><input type="checkbox" id="filterWarn" checked /> <span class="badge-warn">▲ WARN</span></label>
+                <label class="log-filter"><input type="checkbox" id="filterError" checked /> <span class="badge-error">✖ ERROR</span></label>
+                <label class="log-filter"><input type="checkbox" id="filterDone" checked /> <span class="badge-done">✓ DONE</span></label>
+                <button id="btnLogPause" class="btn-mini">⏸ 暂停</button>
+                <button id="btnClearTerm" class="btn-mini">清空</button>
+              </span>
+              <span class="log-stats">total <b id="logCountTotal">0</b></span>
+            </h2>
+            <div class="terminal" id="terminal">
+              <div class="terminal-line dim">就绪。从数据源添加条目到数据集，然后运行管线。</div>
+            </div>
+          </section>
+
+          <!-- 轨迹预览 -->
+          <section class="panel">
+            <h2><span class="panel-icon">▶</span> 趋势图 <button id="btnRefreshChart" class="btn-mini">刷新</button></h2>
+            <canvas id="trendChart" width="750" height="280" style="width:100%;height:auto"></canvas>
+            <div style="font-size:0.5rem;color:var(--muted);margin-top:4px;display:flex;gap:12px">
+              <span style="color:var(--accent)">■ ATE (因果强度)</span>
+              <span style="color:var(--warn)">■ adj_density (图密度)</span>
+              <span style="color:var(--accent2)">■ z_pca_1 (世俗主轴)</span>
+              <span style="color:#c084fc">■ z_存在 (本体论距离)</span>
+              <span style="color:#e0a0ff">■ entropy (话语多样性)</span>
+            </div>
+          </section>
+
+          <!-- 轨迹数据表 -->
+          <section class="panel">
+            <h2><span class="panel-icon">◉</span> 轨迹数据 <button id="btnRefreshTable" class="btn-mini">刷新</button></h2>
+            <div class="table-wrap" id="tableWrap">
+              <p class="dim">点击刷新加载...</p>
+            </div>
+          </section>
+
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="/js/logCockpit.js"></script>
+  <script src="/js/app.js"></script>
+</body>
+</html>

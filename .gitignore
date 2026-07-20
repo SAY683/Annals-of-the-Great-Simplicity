@@ -1,2 +1,3 @@
 *.safetensors
 .ms_upload_cache
+Complement/TRACE Engine(EDM-Takens CCM)/Models/Qwen*/

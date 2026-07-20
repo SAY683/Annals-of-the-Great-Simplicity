@@ -2,6 +2,25 @@
 
 > 参照: EDM-Takens `secret_adoption_audit.md`
 > 更新: 2026-07-10
+> 元审计 P1 修缮 (2026-07-20): 补充 §6 引用范围说明
+
+## 引用范围说明 (元审计 P1 修缮)
+
+本审计文档描述的是 **TRACE 主项目**（含训练脚本）的设计规则采纳状态，
+而非 Skill 目录（`trace-engine/`）内的文件。下表"实现位置"列引用的文件
+位于 TRACE 主项目根目录，不在 Skill 中：
+
+| 引用文件 | 实际位置 | 说明 |
+|---------|---------|------|
+| `trace_plus.py` | TRACE 主项目 | 主流水线（非 Skill） |
+| `pipeline_zhihu.py` | TRACE 主项目 | 知乎共识案例流水线 |
+| `early_stop.py` | TRACE 主项目 | 多维动态早停 |
+| `train_shenji_llama.py` | TRACE 主项目 | 神机 LLaMA 训练脚本 |
+| `run_tests.py` | 待创建 | 标注为 ❌ DEFERRED |
+
+Skill 目录内的对应实现见 [ALGORITHM_AUDIT.md](ALGORITHM_AUDIT.md)。
+
+---
 
 ## 核心设计规则采纳状态
 

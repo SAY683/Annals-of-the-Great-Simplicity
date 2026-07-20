@@ -1,0 +1,14 @@
+{
+  "name": "trace-to-edm-web",
+  "version": "0.1.0",
+  "description": "元因果控制论桥接系统 Web 面板 — TRACE → EDM-Takens 可视化操纵台",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "express": "^4.21.0",
+    "multer": "^1.4.5-lts.2"
+  }
+}
