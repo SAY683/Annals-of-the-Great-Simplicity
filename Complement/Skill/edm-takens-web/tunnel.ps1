@@ -77,27 +77,48 @@ Write-Host "[1/2] 启动 EDM-Takens 后端 (backend:8000, frontend:5173)..." -Fo
 $serverJob = Start-Process -FilePath "python" -ArgumentList "start_mvp.py" `
     -WorkingDirectory $scriptDir -PassThru -WindowStyle Normal
 
-# 3. 轮询检查前端是否监听 5173（最多等待 30 秒）
+# 3. 轮询 HTTP health check Vite 前端 (5173)，最多等待 40 秒
+# P1-1: HTTP health check 替代 TCP 端口检测，确认服务真正就绪
 $port = 5173
+$backendPort = 8000
 $waited = 0
-$maxWait = 30
-Write-Host "      轮询检测端口 $port (最多等待 $maxWait 秒)..." -ForegroundColor Gray
-$inUse = $null
+$maxWait = 40
+Write-Host "      轮询 HTTP health check 前端 $port + 后端 $backendPort (最多 $maxWait 秒)..." -ForegroundColor Gray
+$frontendOk = $false
+$backendOk = $false
 while ($waited -lt $maxWait) {
-    $inUse = Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue
-    if ($inUse) { break }
+    if (-not $frontendOk) {
+        try {
+            $resp = Invoke-WebRequest -Uri "http://127.0.0.1:$port" -Method GET -TimeoutSec 2 -ErrorAction Stop
+            if ($resp.StatusCode -eq 200) { $frontendOk = $true }
+        } catch { }
+    }
+    if (-not $backendOk) {
+        try {
+            $resp = Invoke-WebRequest -Uri "http://127.0.0.1:$backendPort/api/health" -Method GET -TimeoutSec 2 -ErrorAction Stop
+            if ($resp.StatusCode -eq 200) { $backendOk = $true }
+        } catch { }
+    }
+    if ($frontendOk -and $backendOk) { break }
     Start-Sleep 2
     $waited += 2
-    if ($waited % 10 -eq 0) { Write-Host "      已等待 $waited 秒..." -ForegroundColor Gray }
+    if ($waited % 10 -eq 0) {
+        $status = @()
+        if ($frontendOk) { $status += "frontend✓" } else { $status += "frontend…" }
+        if ($backendOk)  { $status += "backend✓" } else { $status += "backend…" }
+        Write-Host "      已等待 ${waited}s: $($status -join ' ')" -ForegroundColor Gray
+    }
 }
-if (-not $inUse) {
-    Write-Host "[ERROR] 端口 $port 在 ${maxWait} 秒内无监听，后端可能启动失败。" -ForegroundColor Red
-    Write-Host "       请检查 start_mvp.py 输出和日志。" -ForegroundColor Gray
+if (-not $frontendOk) {
+    Write-Host "[ERROR] Vite 前端端口 $port 在 ${maxWait}s 内未就绪。" -ForegroundColor Red
     if ($serverJob -and -not $serverJob.HasExited) { Stop-Process -Id $serverJob.Id -Force -ErrorAction SilentlyContinue }
     Read-Host "按 Enter 退出"
     exit 1
 }
-Write-Host "      检测到前端监听端口: $port (等待了 $waited 秒)" -ForegroundColor Green
+if (-not $backendOk) {
+    Write-Host "[WARN] 后端 $backendPort 未就绪（前端可用，隧道继续）" -ForegroundColor Yellow
+}
+Write-Host "      前端 $port + 后端 $backendPort 就绪 ✓ (等待了 ${waited}s)" -ForegroundColor Green
 
 Write-Host ""
 Write-Host "[2/2] 启动 Cloudflare 隧道到 :$port ..." -ForegroundColor Cyan
@@ -114,8 +135,12 @@ Write-Host "      隧道日志: $cfOut / $cfErr" -ForegroundColor Gray
 
 $cfJob = $null
 try {
+    # P1-1/P2-fix: cloudflared 1033 fix —
+    #   1. Remove --protocol http2 (forces HTTP/2 to local dev server → 1033)
+    #   2. --edge-ip-version 4 avoids IPv6 TLS timeout chain (~15s → instant)
+    #   3. --no-chunked-encoding improves local dev server compatibility
     $cfJob = Start-Process -FilePath "cloudflared" `
-        -ArgumentList "tunnel", "--protocol", "http2", "--url", "http://localhost:$port" `
+        -ArgumentList "tunnel", "--edge-ip-version", "4", "--no-chunked-encoding", "--url", "http://localhost:$port" `
         -WorkingDirectory $scriptDir -PassThru -WindowStyle Hidden `
         -RedirectStandardOutput $cfOut -RedirectStandardError $cfErr
 

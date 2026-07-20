@@ -86,7 +86,11 @@ Write-Host "      按 Ctrl+C 关闭隧道，服务进程将自动清理。" -For
 Write-Host ""
 
 try {
-    & cloudflared tunnel --url "http://localhost:$port"
+    # P1-1/P2-fix: cloudflared 1033 fix —
+    #   --edge-ip-version 4 avoids IPv6 TLS timeout chain (~15s → instant)
+    #   --no-chunked-encoding improves local dev server compatibility
+    #   No --protocol http2 (default auto negotiates best protocol)
+    & cloudflared tunnel --edge-ip-version 4 --no-chunked-encoding --url "http://localhost:$port"
 } finally {
     # 隧道关闭后清理服务进程
     if ($serverJob -and -not $serverJob.HasExited) {

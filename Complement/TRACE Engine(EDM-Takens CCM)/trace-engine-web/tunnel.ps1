@@ -120,8 +120,12 @@ Write-Host "      隧道日志: $cfOut / $cfErr" -ForegroundColor Gray
 
 $cfJob = $null
 try {
+    # P1-1/P2-fix: cloudflared 1033 fix —
+    #   1. Remove --protocol http2 (forces HTTP/2 to local dev server → 1033)
+    #   2. --edge-ip-version 4 avoids IPv6 TLS timeout chain (~15s → instant)
+    #   3. --no-chunked-encoding improves local dev server compatibility
     $cfJob = Start-Process -FilePath "cloudflared" `
-        -ArgumentList "tunnel", "--protocol", "http2", "--url", "http://localhost:$port" `
+        -ArgumentList "tunnel", "--edge-ip-version", "4", "--no-chunked-encoding", "--url", "http://localhost:$port" `
         -WorkingDirectory $scriptDir -PassThru -WindowStyle Hidden `
         -RedirectStandardOutput $cfOut -RedirectStandardError $cfErr
 

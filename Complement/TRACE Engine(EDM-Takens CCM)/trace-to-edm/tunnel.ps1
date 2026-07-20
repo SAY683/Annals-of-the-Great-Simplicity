@@ -70,17 +70,23 @@ Write-Host "[1/2] 启动 trace-to-edm server (端口 3100)..." -ForegroundColor 
 $serverJob = Start-Process -FilePath "node" -ArgumentList "server.js" `
     -WorkingDirectory $scriptDir -PassThru -WindowStyle Normal
 
-# 4. 轮询探测实际监听端口（最多等待 20 秒）
+# 4. 轮询 HTTP health check（最多等待 20 秒）。
+# P1-1: HTTP health check 替代 Get-NetTCPConnection，确认服务真正就绪。
+# trace-to-edm 无 /api/health 端点，用 /api/status 替代。
 $port = 0
 $maxPort = 3120
 $waited = 0
-$maxWait = 20
-Write-Host "      轮询检测端口 3100~$maxPort (最多等待 $maxWait 秒)..." -ForegroundColor Gray
+$maxWait = 30
+Write-Host "      轮询 HTTP health check 端口 3100~$maxPort (最多等待 $maxWait 秒)..." -ForegroundColor Gray
 while ($waited -lt $maxWait) {
     $p = 3100
     while ($p -le $maxPort) {
-        $inUse = Get-NetTCPConnection -LocalPort $p -State Listen -ErrorAction SilentlyContinue
-        if ($inUse) { $port = $p; break }
+        try {
+            $resp = Invoke-WebRequest -Uri "http://127.0.0.1:$p/api/status" -Method GET -TimeoutSec 2 -ErrorAction Stop
+            if ($resp.StatusCode -eq 200) { $port = $p; break }
+        } catch {
+            # silently skip — service not ready on this port yet
+        }
         $p++
     }
     if ($port -gt 0) { break }
@@ -109,8 +115,12 @@ Write-Host "      隧道日志: $cfOut / $cfErr" -ForegroundColor Gray
 
 $cfJob = $null
 try {
+    # P1-1/P2-fix: cloudflared 1033 fix —
+    #   1. Remove --protocol http2 (forces HTTP/2 to local dev server → 1033)
+    #   2. --edge-ip-version 4 avoids IPv6 TLS timeout chain (~15s → instant)
+    #   3. --no-chunked-encoding improves local dev server compatibility
     $cfJob = Start-Process -FilePath "cloudflared" `
-        -ArgumentList "tunnel", "--protocol", "http2", "--url", "http://localhost:$port" `
+        -ArgumentList "tunnel", "--edge-ip-version", "4", "--no-chunked-encoding", "--url", "http://localhost:$port" `
         -WorkingDirectory $scriptDir -PassThru -WindowStyle Hidden `
         -RedirectStandardOutput $cfOut -RedirectStandardError $cfErr
 
