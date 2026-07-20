@@ -194,7 +194,8 @@ Annals-of-the-Great-Simplicity/
 │       ├── trace-engine/   ←    TRACE 引擎核心
 │       │   ├── models/     ←      模型配置（权重 → 魔搭托管）
 │       │   ├── examples/   ←      分析示例
-│       │   └── references/ ←      参考文档
+│       │   ├── references/ ←      参考文档
+│       │   └── trace-to-edm/←      TRACE → EDM 桥接（文本 → 相空间映射）
 │       └── trace-engine-web/ ←  TRACE Web 接口
 ├── Miscellanies/           ← 杂集 · 经文附录
 ├── Remarks/                ← 札记 · 比修斯书
