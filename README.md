@@ -206,7 +206,7 @@ Annals-of-the-Great-Simplicity/
 
 ## 🤖 模型训练：神机与社会 — TRACE 引擎 (Model Training)
 
-本仓库 `Complement/TRACE Engine(EDM-Takens CCM)/trace-engine/models/` 目录下提供基于 **LLaMA** 架构微调训练的专用语言模型配置文件，作为体系在自然语言处理领域的实证探索。
+本仓库 `Complement/TRACE Engine(EDM-Takens CCM)/Models/` 目录下提供基于 **LLaMA** 架构微调训练的专用语言模型配置与基础模型副本，作为体系在自然语言处理领域的实证探索。此为对外约定的默认模型位置（`trace-engine/Models/` 为引擎内部副本）。
 
 ### 模型体系
 
@@ -218,7 +218,7 @@ Annals-of-the-Great-Simplicity/
 
 ### 模型获取
 
-模型权重文件因超出 GitHub 文件大小限制（100MB），托管于 **魔搭（ModelScope）**。本地测试目录 `trace-engine/models/` 中保留模型配置文件（`.json`、`.vocab`），权重文件可通过以下方式获取：
+模型权重文件因超出 GitHub 文件大小限制（100MB），托管于 **魔搭（ModelScope）**。成品根 `Models/` 中保留模型配置文件（`.json`、`.vocab`），权重下载后放置于对应目录：
 
 ```bash
 # 安装魔搭 CLI
@@ -231,8 +231,8 @@ modelscope download say101/TRACE-Engine-EDM-Takens-CCM-shenji-llama-470m
 modelscope download say101/TRACE-Engine-EDM-Takens-CCM-shehui-llama-27m
 
 # 将下载的模型文件 (.safetensors) 放置于对应目录：
-# trace-engine/models/shenji-llama/
-# trace-engine/models/shehui-llama/
+# Models/shenji-llama/
+# Models/shehui-llama/
 ```
 
 > *魔搭（ModelScope）提供稳定快速的国内下载。*
