@@ -1,0 +1,4 @@
+[2026-07-20T15:22:54.321Z] [info] 已从 presets.yaml 加载桥接参数 Schema (llama)，共 12 项
+[2026-07-20T15:23:13.698Z] [warn] TRACE_API_KEY 未设置，API 鉴权已禁用（开发模式）。生产环境请设置 TRACE_API_KEY 与 TRACE_ADMIN_KEY。
+[2026-07-20T15:23:13.704Z] [info] 服务启动 port=3000 work=G:\git\Annals-of-the-Great-Simplicity-main\Annals-of-the-Great-Simplicity\Complement\TRACE Engine(EDM-Takens CCM)\trace-engine-web\work skill=G:\git\Annals-of-the-Great-Simplicity-main\Annals-of-the-Great-Simplicity\Complement\TRACE Engine(EDM-Takens CCM)\trace-engine\examples\counterfactual_hybrid
+[2026-07-20T15:22:54.150Z] [info] 已从 presets.yaml 加载桥接参数 Schema (default)，共 12 项

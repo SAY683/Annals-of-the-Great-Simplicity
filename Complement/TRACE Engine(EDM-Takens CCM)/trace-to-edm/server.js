@@ -6,14 +6,15 @@
  * 架构:
  *   Browser ←→ Express (port 3100) ←→ Python bridge.py (child_process)
  *
- * 端点 (共 25 个 API 端点 + 静态前端 /，详见 README.md §API 端点表):
- *   GET  /                 前端面板 (express.static, 不计入 25)
+ * 端点 (共 26 个 API 端点 + 静态前端 /，详见 README.md §API 端点表):
+ *   GET  /                 前端面板 (express.static, 不计入 26)
  *   GET  /api/status       L1  轨迹状态 + EDM 就绪度
  *   POST /api/run          L3  提交文本管线任务 (Mode A, SSE)
  *   POST /api/replay       L3  提交回填任务 (Mode B, SSE；replay_all=true 复用此端点)
+ *   GET  /api/edm/poll/:id L3  EDM轮询代理（避免CORS — P2修复）
  *   POST /api/edm/trigger  L3  触发 EDM 分析
  *   GET  /api/jobs         L4  任务历史
- *   …其余 19 个端点（dataset/projects/work/models 等）见 README.md 表
+ *   …其余 20 个端点（dataset/projects/work/models 等）见 README.md 表
  */
 
 const express = require('express');
@@ -547,6 +548,46 @@ app.post('/api/edm/trigger', (req, res) => {
 
   proc.on('error', (err) => {
     res.status(500).json({ success: false, error: err.message });
+  });
+});
+
+// ── API: EDM 轮询代理 (P2-fix: 避免浏览器 CORS) ──────────
+// 前端不能直接从 localhost:3100 fetch 到 localhost:8000
+// (不同端口 = 跨域，edm-takens-web 的 CORS 白名单不含 localhost:3100)。
+// 此后端端点代理转发轮询请求，服务器端 HTTP 无 CORS 限制。
+
+const EDM_POLL_URL = process.env.EDM_API_URL || 'http://127.0.0.1:8000';
+
+app.get('/api/edm/poll/:jobId', (req, res) => {
+  const { jobId } = req.params;
+  const mod = EDM_POLL_URL.startsWith('https') ? require('https') : require('http');
+  const url = `${EDM_POLL_URL}/api/analyze/jobs/${encodeURIComponent(jobId)}`;
+
+  reqLog(req, 'info', `EDM poll proxy → ${url}`);
+
+  const upstream = mod.get(url, { timeout: 5000 }, (upRes) => {
+    let body = '';
+    upRes.on('data', chunk => body += chunk);
+    upRes.on('end', () => {
+      try {
+        res.json(JSON.parse(body));
+      } catch {
+        res.status(502).json({ error: 'invalid upstream response', raw: body.slice(0, 200) });
+      }
+    });
+  });
+
+  upstream.on('error', (err) => {
+    reqLog(req, 'warn', `EDM poll failed: ${err.message}`);
+    res.status(502).json({
+      error: `edm-takens-web unreachable: ${err.message}`,
+      hint: '请确保 edm-takens-web 后端已启动 (python run_backend.py, 端口 8000)'
+    });
+  });
+
+  upstream.setTimeout(5000, () => {
+    upstream.destroy();
+    res.status(504).json({ error: 'edm-takens-web timeout' });
   });
 });
 

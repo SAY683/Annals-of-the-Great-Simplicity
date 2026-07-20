@@ -79,9 +79,9 @@ start.bat
 4. 轨迹积累 ≥15 行 → EDM 触发 → 选择预测目标 → 动力学分析
 ```
 
-## API 端点表（共 25 端点）
+## API 端点表（共 26 端点）
 
-> 元审计 Q5 同步 (2026-07-20)：之前任务卡曾误列 13 端点，实际盘点为 25 端点（含数据集 / 项目 / 工作目录 / 模型管理）。下表与 `server.js` 中的 `app.<method>(...)` 路由 1:1 对应，行号与 `MICROSERVICE_API_DESIGN.md` 附录 A.3 一致。
+> 元审计 Q8+ 同步 (2026-07-20)：新增 `GET /api/edm/poll/:id` 代理端点（P2修复：避免浏览器 CORS 阻拦 trace-to-edm:3100 → edm-takens-web:8000 的跨域请求）。
 
 | # | 方法 | 端点 | 说明 | server.js 行号 |
 |---|------|------|------|----------------|
@@ -91,27 +91,28 @@ start.bat
 | 4 | POST | `/api/run` | 提交文本管线任务 (Mode A, SSE) | 226 |
 | 5 | POST | `/api/replay` | 提交回填任务 (Mode B, SSE) | 316 |
 | 6 | POST | `/api/edm/trigger` | 触发 EDM 分析 | 402 |
-| 7 | GET | `/api/jobs` | 任务历史 (active + 50 条) | 456 |
-| 8 | GET | `/api/dataset` | 当前项目数据集 entries + summary | 491 |
-| 9 | POST | `/api/dataset/add` | 批量加入 replay UUID 条目 | 500 |
-| 10 | POST | `/api/dataset/add-text` | 批量加入文本条目（含 EDM 反馈环） | 510 |
-| 11 | POST | `/api/dataset/remove` | 删除单条条目 | 529 |
-| 12 | POST | `/api/dataset/clear-processed` | 清理已处理标记 | 534 |
-| 13 | POST | `/api/dataset/reset` | 重置全部为 pending | 539 |
-| 14 | POST | `/api/dataset/update-ts` | 更新条目 timestamp | 544 |
-| 15 | POST | `/api/pipeline/run` | 统一管线（聚合回填+文本, SSE） | 665 |
-| 16 | GET | `/api/models` | 列出可选 Qwen 模型 | 739 |
-| 17 | POST | `/api/models/activate` | 激活 Qwen 模型（白名单校验） | 747 |
-| 18 | GET | `/api/projects` | 列出项目 | 774 |
-| 19 | POST | `/api/projects` | 创建项目 | 783 |
-| 20 | PUT | `/api/projects/activate` | 切换激活项目 | 794 |
-| 21 | DELETE | `/api/projects/:name` | 删除项目 | 805 |
-| 22 | GET | `/api/work-scan` | 扫描 TRACE 工作目录 | 816 |
-| 23 | DELETE | `/api/work-uuid/:uuid` | 删除指定 UUID 工作目录 | 825 |
-| 24 | POST | `/api/work-clean` | 清理孤儿/无效工作目录 | 843 |
-| 25 | POST | `/api/replay-uuids` | 选定 UUID 回填到当前项目 (SSE) | 864 |
+| **7** | **GET** | **`/api/edm/poll/:id`** | **EDM 轮询代理（避免 CORS）** | **553** |
+| 8 | GET | `/api/jobs` | 任务历史 (active + 50 条) | 456 |
+| 9 | GET | `/api/dataset` | 当前项目数据集 entries + summary | 491 |
+| 10 | POST | `/api/dataset/add` | 批量加入 replay UUID 条目 | 500 |
+| 11 | POST | `/api/dataset/add-text` | 批量加入文本条目（含 EDM 反馈环） | 510 |
+| 12 | POST | `/api/dataset/remove` | 删除单条条目 | 529 |
+| 13 | POST | `/api/dataset/clear-processed` | 清理已处理标记 | 534 |
+| 14 | POST | `/api/dataset/reset` | 重置全部为 pending | 539 |
+| 15 | POST | `/api/dataset/update-ts` | 更新条目 timestamp | 544 |
+| 16 | POST | `/api/pipeline/run` | 统一管线（聚合回填+文本, SSE） | 665 |
+| 17 | GET | `/api/models` | 列出可选 Qwen 模型 | 739 |
+| 18 | POST | `/api/models/activate` | 激活 Qwen 模型（白名单校验） | 747 |
+| 19 | GET | `/api/projects` | 列出项目 | 774 |
+| 20 | POST | `/api/projects` | 创建项目 | 783 |
+| 21 | PUT | `/api/projects/activate` | 切换激活项目 | 794 |
+| 22 | DELETE | `/api/projects/:name` | 删除项目 | 805 |
+| 23 | GET | `/api/work-scan` | 扫描 TRACE 工作目录 | 816 |
+| 24 | DELETE | `/api/work-uuid/:uuid` | 删除指定 UUID 工作目录 | 825 |
+| 25 | POST | `/api/work-clean` | 清理孤儿/无效工作目录 | 843 |
+| 26 | POST | `/api/replay-uuids` | 选定 UUID 回填到当前项目 (SSE) | 864 |
 
-> 注：根 `/`（express.static 托管前端面板）不计入 25 个 API 端点之列。`POST /api/replay-all` 在文档中常被提及，但代码实现上由 `/api/replay` 以 `replay_all=true` 复用，并非独立路由，故不单列。
+> 注：根 `/`（express.static 托管前端面板）不计入 26 个 API 端点之列。`POST /api/replay-all` 由 `/api/replay` 以 `replay_all=true` 复用。
 
 ## CLI 命令
 
@@ -168,9 +169,18 @@ python bridge.py --status                  # 轨迹状态
 ## EDM 反馈环
 
 点击「触发 EDM 分析」后:
-1. 提交 EDM 任务到 `edm-takens-web` API
-2. 每 3 秒轮询任务状态
-3. 完成后检测结果中的非线性信号
+1. 提交 EDM 任务到 `edm-takens-web` API（通过 trace-to-edm 后端 Python 子进程）
+2. 浏览器通过 `/api/edm/poll/:id` 代理轮询（P2 修复：避免 localhost:3100→8000 CORS 阻拦）
+3. 每 3 秒轮询任务状态
+4. 完成后检测结果中的非线性信号
+
+### 故障排查
+
+| 症状 | 原因 | 解决 |
+|------|------|------|
+| `Failed to fetch` | CORS：浏览器从 :3100 直接请求 :8000 | 改为通过 `/api/edm/poll/` 代理（需重启 trace-to-edm） |
+| `edm-takens-web unreachable` | edm-takens-web 后端未启动 | `python run_backend.py` (端口 8000) |
+| 隧道连接 1033 | `--protocol http2` 强制 HTTP/2 到本地 dev server | 改用 `--edge-ip-version 4 --no-chunked-encoding`（需 cloudflared ≥2026.7） |
 4. 如发现相变 → 提示用户将异常时间点文本加入数据集 (DEEP 模式再分析)
 
 **前置条件**: `edm-takens-web` 后端必须运行 (`cd .skills/edm-takens-web && python run_backend.py`)

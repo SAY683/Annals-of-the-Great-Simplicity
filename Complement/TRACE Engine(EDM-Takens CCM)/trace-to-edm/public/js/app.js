@@ -859,7 +859,9 @@ async function triggerEDMWithFeedback() {
       await new Promise(r => setTimeout(r, 3000));
       attempts++;
       try {
-        const sr = await fetch(`http://localhost:8000/api/analyze/jobs/${jobId}`);
+        // P2-fix: 通过 trace-to-edm 后端代理轮询 (避免浏览器 CORS)
+        // 之前直接 fetch http://localhost:8000 → 跨域被浏览器阻拦 (CORS)
+        const sr = await fetch(`/api/edm/poll/${jobId}`);
         const sd = await sr.json();
         status = sd.status || 'unknown';
         t(`  [${attempts}] status=${status}`, 'dim');
@@ -875,7 +877,7 @@ async function triggerEDMWithFeedback() {
 
       // 尝试拉取结果摘要
       try {
-        const rr = await fetch(`http://localhost:8000/api/analyze/jobs/${jobId}`);
+        const rr = await fetch(`/api/edm/poll/${jobId}`);
         const rd = await rr.json();
         t(`结果: ${JSON.stringify(rd).slice(0, 200)}`, 'log');
 
