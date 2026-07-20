@@ -204,6 +204,21 @@ Annals-of-the-Great-Simplicity/
 
 ---
 
+### 📦 Complement 项目总览
+
+| 项目 | 路径 | 说明 |
+| :--- | :--- | :--- |
+| **EDM-Takens 引擎** | `Skill/edm-takens/` | 收敛交叉映射（CCM）因果推断核心计算模块 |
+| **EDM-Takens Web** | `Skill/edm-takens-web/` | EDM 引擎的 Web 后端与前端 |
+| **TRACE 引擎** | `TRACE Engine/trace-engine/` | LLaMA 微调推理 + 反事实因果分析管道 |
+| **TRACE Web** | `TRACE Engine/trace-engine-web/` | TRACE 引擎的 Web 接口与服务 |
+| **trace-to-edm** | `TRACE Engine/trace-to-edm/` | 文本 → 相空间映射桥接（连接 TRACE 与 EDM）|
+| **模型仓库** | `TRACE Engine/Models/` | 模型配置与权重（权重 → 魔搭托管）|
+
+> **Skill/** 下的两个项目独立于 TRACE Engine，可直接复用；其余项目位于 `TRACE Engine(EDM-Takens CCM)/` 目录下，构成完整的因果分析与语言模型推理管线。
+
+---
+
 ## 🤖 模型训练：神机与社会 — TRACE 引擎 (Model Training)
 
 本仓库 `Complement/TRACE Engine(EDM-Takens CCM)/Models/` 目录下提供基于 **LLaMA** 架构微调训练的专用语言模型配置与基础模型副本，作为体系在自然语言处理领域的实证探索。此为对外约定的默认模型位置（`trace-engine/Models/` 为引擎内部副本）。
