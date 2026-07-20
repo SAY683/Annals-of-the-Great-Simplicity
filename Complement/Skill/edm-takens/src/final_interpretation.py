@@ -594,6 +594,7 @@ def interpret_game_data(data_path_override: str = None,
     print("─" * 72)
 
     for var in variables:
+      try:
         print(f"\n  [{var_labels[var]}]")
         data = df[var].values.astype(float)
 
@@ -601,6 +602,11 @@ def interpret_game_data(data_path_override: str = None,
         rho_E = EmbedDimension(
             data=df, lib=lib, pred=pred, maxE=8, Tp=1,
             columns=var, target=var, showPlot=False, numProcess=1)
+        # P0 fix: guard against all-NA rho (idxmax() returns NaN → KeyError on .loc)
+        if not rho_E['rho'].notna().any():
+            print(f"    [SKIPPED] Variable '{var}': EmbedDimension returned all-NA rho")
+            skipped_vars.append(var)
+            continue
         E_opt = int(rho_E.loc[rho_E['rho'].idxmax(), 'E'])
 
         sx = Simplex(
@@ -711,8 +717,19 @@ def interpret_game_data(data_path_override: str = None,
             'spike_count': len(spike_idx), 'spike_idx': spike_idx,
             'lyap': lyap, 'lyap_lower': lyap_lower, 'ccm': ccm_result,
         }
+      except Exception as _e:
+        # P0 fix: catch any per-variable failure so one bad variable doesn't
+        # abort the whole interpretation (KeyError on all-NA rho, SVD
+        # degeneracy, etc.). Skip and continue; surfaced in final report.
+        print(f"    [SKIPPED] Variable '{var}' failed: {type(_e).__name__}: {_e}")
+        skipped_vars.append(var)
+        continue
 
     available_variables = list(all_data.keys())
+
+    # P0 fix: explicitly surface skipped variables in the final report.
+    if skipped_vars:
+        print(f"\n  [NOTE] Skipped variables (all-NA rho or per-variable error): {skipped_vars}")
 
     # ── Phase 2: CCM Causality Report ──
     print(f"\n{'─' * 72}")
@@ -1081,7 +1098,8 @@ def _plot_interpretation(df, all_data, variables=None, var_labels=None,
             theta = np.linspace(0, 2*np.pi, 100)
             ax2.plot(np.cos(theta), np.sin(theta), 'k--', alpha=0.3, linewidth=1)
             ax2.axhline(0, color='gray', alpha=0.2); ax2.axvline(0, color='gray', alpha=0.2)
-            ax2.set_title(f'Koopman spectrum (max|eig_d|={np.max(np.abs(sh.eigenvalues_d_)):.3f})',
+            _max_eig_str = f"{float(np.max(np.abs(sh.eigenvalues_d_))):.3f}" if len(sh.eigenvalues_d_) else "N/A"
+            ax2.set_title(f'Koopman spectrum (max|eig_d|={_max_eig_str})',
                          fontsize=10)
             ax2.set_aspect('equal')
             ax2.grid(True, alpha=0.2)

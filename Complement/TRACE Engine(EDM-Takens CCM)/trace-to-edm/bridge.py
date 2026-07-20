@@ -120,9 +120,9 @@ def _run_semantic_layers(
         l2_coords = proj2.add_and_project(embedding)
         row.update(l2_coords)
 
-        # Layer 3: 八正道投影
+        # Layer 3: 八正道投影 (P0-3: default to modified_gs for numerical stability)
         proj3 = _get_layer3()
-        l3_coords = proj3.project(text)
+        l3_coords = proj3.project_with_orthogonalization(text, method="modified_gs")
         row.update(l3_coords)
 
         # Layer 3 差分（支持非均匀时间采样）

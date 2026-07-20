@@ -235,23 +235,32 @@ async function startAnalysis() {
   // 使用 POST + fetch + ReadableStream 消费 SSE，避免长文本 URL 超限
   streamAbort = new AbortController();
   // debt-11：构建请求头，重连时携带 Last-Event-ID（lastSseEventId 由 sse.js 维护）
-  const reqHeaders = { 'Content-Type': 'application/json' };
-  if (lastSseEventId != null) {
-    reqHeaders['Last-Event-ID'] = String(lastSseEventId);
-  }
-  try {
-    const response = await fetch('/api/analyze-stream', {
+  // P0 修缮：把 fetch 封装为 doFetch，首次与重连共用；重连时重新构建 headers 以携带最新 lastSseEventId
+  const doFetch = async () => {
+    const reqHeaders = { 'Content-Type': 'application/json' };
+    if (lastSseEventId != null) {
+      reqHeaders['Last-Event-ID'] = String(lastSseEventId);
+    }
+    const resp = await fetch('/api/analyze-stream', {
       method: 'POST',
       headers: reqHeaders,
       body: JSON.stringify({ id: currentJobId, text: payloadText, mode, config: lastConfig }),
       signal: streamAbort.signal,
     });
-    if (!response.ok) {
-      const errData = await response.json().catch(() => ({}));
+    if (!resp.ok) {
+      const errData = await resp.json().catch(() => ({}));
       const code = errData.code ? `[${errData.code}] ` : '';
-      throw new Error(code + (errData.error || `HTTP ${response.status}`));
+      throw new Error(code + (errData.error || `HTTP ${resp.status}`));
     }
-    await readSSEStream(response.body);
+    return resp;
+  };
+  try {
+    const response = await doFetch();
+    // P0 修缮：传入 reconnectFactory + signal，readSSEStream 在网络中断时自动重连 3 次（1s/2s/4s）
+    await readSSEStream(response.body, {
+      reconnectFactory: doFetch,
+      signal: streamAbort.signal,
+    });
   } catch (err) {
     if (err.name !== 'AbortError') {
       log('error', err.message || '分析请求失败');

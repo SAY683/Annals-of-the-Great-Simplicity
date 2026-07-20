@@ -394,6 +394,38 @@ class Auditor:
                 "Both cross-map skills are near zero. No causation detectable.",
                 details={"forward": fwd, "reverse": rev}
             )
+        elif fwd > 0.3 and rev > 0.3 and abs(delta) <= 0.1:
+            # P0-2: bidirectional causation — both directions show high rho
+            # with small delta. This is a distinct diagnostic signal
+            # (genuine bidirectional causation, or strong common driver)
+            # that was previously lumped into the catch-all else branch.
+            fwd_ok = fwd_converges is None or fwd_converges
+            rev_ok = rev_converges is None or rev_converges
+            if fwd_converges and rev_converges and fwd_ok and rev_ok:
+                return AuditFinding(
+                    "CCM Direction Check", "Secret 2: CCM Victim Mirror",
+                    "WARN",
+                    f"Bidirectional: both forward (fwd={fwd:.3f}) and reverse "
+                    f"(rev={rev:.3f}) show high, converging CCM skill "
+                    f"(delta={delta:+.3f}). This suggests either genuine "
+                    f"bidirectional causation or a strong common driver "
+                    f"(see Secret 11).",
+                    "Check for common external driver (Secret 10/11). "
+                    "If bidirectional is genuine, both directions are real.",
+                    details={"forward": fwd, "reverse": rev, "delta": delta,
+                             "fwd_converges": fwd_converges, "rev_converges": rev_converges}
+                )
+            else:
+                return AuditFinding(
+                    "CCM Direction Check", "Secret 2: CCM Victim Mirror",
+                    "WARN",
+                    f"Bidirectional signal (fwd={fwd:.3f}, rev={rev:.3f}, "
+                    f"delta={delta:+.3f}) but convergence evidence is "
+                    f"incomplete.",
+                    "Run CCM with full library size sweep for both directions.",
+                    details={"forward": fwd, "reverse": rev, "delta": delta,
+                             "fwd_converges": fwd_converges, "rev_converges": rev_converges}
+                )
         elif fwd > 0.3 and delta > 0.1:
             if fwd_converges is None:
                 # 缺失收敛数据：不再静默假定收敛通过，降级为 WARN。

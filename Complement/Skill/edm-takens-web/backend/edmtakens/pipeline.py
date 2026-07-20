@@ -447,71 +447,105 @@ def run_pipeline(config: PipelineConfig = None,
         window_length=wl, poly_order=2, basis="V")
     sh.fit(data)
 
+    # P1-3: 可选 IAAFT surrogate 显著性检验 — 验证 HAVOK 强迫项的非线性
+    # 是否在统计上显著。仅在数据量足够 (N>=50) 且 pyEDM/scipy 可用时执行，
+    # 且需要 EDM_HAVOK_SURROGATE=1 环境变量显式开启（计算昂贵：99 surrogates
+    # × HAVOK fit, 对大 N 可能耗时数十秒）。
+    # 注意: _havok_degenerate 在上方初始化，此处在同一作用域内使用。
+    _havok_surrogate_result = None
+    if not _havok_degenerate and n >= 50 and os.environ.get("EDM_HAVOK_SURROGATE") == "1":
+        try:
+            from surrogate_test import havok_surrogate_check
+            print(f"\n  [HAVOK Surrogate Test] Running IAAFT (99 surrogates, q={config.q})...")
+            _havok_surrogate_result = havok_surrogate_check(
+                data, q=config.q, n_surrogates=99)
+            _sig = _havok_surrogate_result.get('is_significant')
+            _p = _havok_surrogate_result.get('exact_p', 'N/A')
+            _real_k = _havok_surrogate_result.get('real_value', 'N/A')
+            _surr_k = _havok_surrogate_result.get('surrogate_mean', 'N/A')
+            print(f"    Real kurtosis={_real_k:.3f}, Surrogate mean kurtosis={_surr_k:.3f}")
+            if _sig is True:
+                print(f"    ✓ Significant (exact p={_p:.4f}): forcing is genuinely nonlinear")
+            elif _sig is False:
+                print(f"    ✗ NOT significant (exact p={_p:.4f}): forcing may be linear noise")
+            else:
+                print(f"    Surrogate test unavailable: {_havok_surrogate_result.get('note', 'unknown')}")
+        except Exception as e:
+            print(f"    Surrogate test failed: {type(e).__name__}: {e}")
+
     # Pipeline-layer decision on HAVOK degeneracy: sovereign_havok.fit()
     # sets is_degenerate_=True for near-constant / zero-energy input where
     # SVD is rank-1 and kurtosis/eigenvalue diagnostics are meaningless.
     # Annotate loudly so downstream interpretation knows not to trust the
     # dynamics, rather than silently producing garbage numbers.
-    if getattr(sh, 'is_degenerate_', False):
+    _havok_degenerate = getattr(sh, 'is_degenerate_', False)
+    if _havok_degenerate:
         print("\n  [WARN] HAVOK degenerate input detected (is_degenerate_=True): "
               "near-constant or zero-energy signal. SVD rank ~1; "
               "kurtosis/eigenvalue/stability diagnostics are NOT meaningful. "
               "Interpretation will be annotated as degenerate.")
-        # 跳过 eigenvalue-dependent 输出（空数组会导致 np.max 崩溃）
-        return  # 其余 HAVOK 输出无意义
-
-    print(f"\n  [HAVOK Results]")
-    print(f"    Rank r:              {sh.r_}")
-    print(f"    Explained variance:  {sh.explained_var_:.1%}")
-    print(f"    Regression R^2:      {sh.regression_r2_:.4f}")
-    print(f"    Kurtosis (v_r):      {sh.kurtosis_vr_:.3f}")
-    print(f"    Max |eigenvalue_d|:    {np.max(np.abs(sh.eigenvalues_d_)):.4f}")
-
-    # Forcing type
-    k = sh.kurtosis_vr_
-    if k > 3.0:
-        ftype = "HEAVY-TAILED: strong intermittent phase transitions"
-    elif k > 1.5:
-        ftype = "Moderate tails: intermittent components present"
-    elif k > 0.5:
-        ftype = "Light tails: weak non-Gaussian"
-    elif k > -0.5:
-        ftype = "Near-Gaussian: system in stable orbit"
+        # DO NOT return here — CCM + post-audit + config artifact below are
+        # independent of HAVOK quality, and blocking them turns one module's
+        # degenerate-input signal into a silent loss of all downstream results.
+        # Instead, skip only the HAVOK eigenvalue/forcing-dependent output
+        # block and let CCM/config proceed normally.  (P0-1 fix)
+        _havok_skip_eigen = True
     else:
-        ftype = "Sub-Gaussian (platykurtic): bounded/constrained dynamics"
-    print(f"    Forcing type:        {ftype}")
+        _havok_skip_eigen = False
 
-    # Stability — use discrete-time eigenvalues (|λ_d| vs 1).
-    # Delegates to the shared classify_havok_stability() (sovereign_havok.py)
-    # so this label can never drift out of sync with diagnose() or
-    # enhanced_cross_validate.py's copy of the same 1.05/0.90 thresholds.
-    max_ev = np.max(np.abs(sh.eigenvalues_d_))
-    stab_tier = classify_havok_stability(max_ev)
-    if stab_tier.startswith("Divergent"):
-        stab = "DIVERGENT (unstable modes exist)"
-    elif stab_tier.startswith("Highly dissipative"):
-        stab = f"Highly dissipative (half-life ~{np.log(2)/(1-max_ev+1e-12):.1f} games)"
-    else:
-        stab = "Near-critical / stable"
-    print(f"    Stability:           {stab}")
+    if not _havok_skip_eigen:
+        print(f"\n  [HAVOK Results]")
+        print(f"    Rank r:              {sh.r_}")
+        print(f"    Explained variance:  {sh.explained_var_:.1%}")
+        print(f"    Regression R^2:      {sh.regression_r2_:.4f}")
+        print(f"    Kurtosis (v_r):      {sh.kurtosis_vr_:.3f}")
+        print(f"    Max |eigenvalue_d|:    {np.max(np.abs(sh.eigenvalues_d_)):.4f}")
 
-    # Forcing spikes
-    forcing = sh.forcing_
-    th = 1.5 * np.std(forcing)
-    spike_idx = np.where(np.abs(forcing) > th)[0]
-    if len(spike_idx) > 0:
-        print(f"\n  Phase transition events ({len(spike_idx)} spikes):")
-        for si in spike_idx[:8]:
-            gi = si + sh.q
-            if gi < len(df):
-                row = df.iloc[gi]
-                fs = forcing[si]
-                direction = "UP" if fs > 0 else "DOWN"
-                res = 'W' if row['result'] == 1 else 'L'
-                kd = ""
-                if 'kills' in df.columns and 'deaths' in df.columns:
-                    kd = f", K/D={int(row['kills'])}/{int(row['deaths'])}"
-                print(f"    Game {gi+1:2d}: v_r={fs:+.3f} ({direction}){kd}, {res}")
+        # Forcing type
+        k = sh.kurtosis_vr_
+        if k > 3.0:
+            ftype = "HEAVY-TAILED: strong intermittent phase transitions"
+        elif k > 1.5:
+            ftype = "Moderate tails: intermittent components present"
+        elif k > 0.5:
+            ftype = "Light tails: weak non-Gaussian"
+        elif k > -0.5:
+            ftype = "Near-Gaussian: system in stable orbit"
+        else:
+            ftype = "Sub-Gaussian (platykurtic): bounded/constrained dynamics"
+        print(f"    Forcing type:        {ftype}")
+
+        # Stability — use discrete-time eigenvalues (|λ_d| vs 1).
+        # Delegates to the shared classify_havok_stability() (sovereign_havok.py)
+        # so this label can never drift out of sync with diagnose() or
+        # enhanced_cross_validate.py's copy of the same 1.05/0.90 thresholds.
+        max_ev = np.max(np.abs(sh.eigenvalues_d_))
+        stab_tier = classify_havok_stability(max_ev)
+        if stab_tier.startswith("Divergent"):
+            stab = "DIVERGENT (unstable modes exist)"
+        elif stab_tier.startswith("Highly dissipative"):
+            stab = f"Highly dissipative (half-life ~{np.log(2)/(1-max_ev+1e-12):.1f} games)"
+        else:
+            stab = "Near-critical / stable"
+        print(f"    Stability:           {stab}")
+
+        # Forcing spikes
+        forcing = sh.forcing_
+        th = 1.5 * np.std(forcing)
+        spike_idx = np.where(np.abs(forcing) > th)[0]
+        if len(spike_idx) > 0:
+            print(f"\n  Phase transition events ({len(spike_idx)} spikes):")
+            for si in spike_idx[:8]:
+                gi = si + sh.q
+                if gi < len(df):
+                    row = df.iloc[gi]
+                    fs = forcing[si]
+                    direction = "UP" if fs > 0 else "DOWN"
+                    res = 'W' if row['result'] == 1 else 'L'
+                    kd = ""
+                    if 'kills' in df.columns and 'deaths' in df.columns:
+                        kd = f", K/D={int(row['kills'])}/{int(row['deaths'])}"
+                    print(f"    Game {gi+1:2d}: v_r={fs:+.3f} ({direction}){kd}, {res}")
 
     # CCM check across candidate causes (Secret 2/7 convergence + Secret 13
     # multiple-comparison correction). K=3 candidate->target pairs tested
@@ -581,11 +615,15 @@ def run_pipeline(config: PipelineConfig = None,
             best_cause = max(ccm_rhos, key=ccm_rhos.get)
             ccm_result = ccm_details[best_cause]
             fwd, rev = ccm_result['forward'], ccm_result['reverse']
+            # P0-1: guard havok_kurtosis against degenerate (NaN) input —
+            # post-audit Secret 6 needs a real number, and NaN comparisons
+            # are always False, silently breaking the cross-validation check.
+            _havok_k = sh.kurtosis_vr_ if not _havok_degenerate else None
             post_audit = _post_audit(
                 n=n, E=config.q, tau=config.tau,
                 target_col=config.target_col, columns=config.columns,
                 is_binary=config.is_binary,
-                havok_kurtosis=sh.kurtosis_vr_,
+                havok_kurtosis=_havok_k,
                 ccm_forward=fwd['final_rho'], ccm_reverse=rev['final_rho'],
                 ccm_forward_total_rise=fwd['total_rise'],
                 ccm_forward_spearman_rho=fwd['spearman_rho'],
@@ -595,7 +633,10 @@ def run_pipeline(config: PipelineConfig = None,
                 ccm_reverse_spearman_p=rev['spearman_p'],
             )
             print(f"\n  [Post-Computation Audit Feedback]")
-            print(f"    HAVOK kurtosis fed back: {sh.kurtosis_vr_:+.3f}")
+            if _havok_k is not None:
+                print(f"    HAVOK kurtosis fed back: {_havok_k:+.3f}")
+            else:
+                print(f"    HAVOK kurtosis: N/A (degenerate — Secret 6 skipped)")
             print(f"    CCM {best_cause}: fwd={fwd['final_rho']:+.3f} "
                   f"(converging={fwd['is_converging']}) "
                   f"rev={rev['final_rho']:+.3f} (converging={rev['is_converging']})")

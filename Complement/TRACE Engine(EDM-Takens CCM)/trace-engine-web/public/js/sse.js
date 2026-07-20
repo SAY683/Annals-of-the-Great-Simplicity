@@ -5,7 +5,7 @@
  * debt-11：SSE 重连支持
  *   - parseSSEBlock 解析 `id:` 行，更新 lastSseEventId
  *   - 重连时通过 Last-Event-ID 请求头携带最后接收的事件 ID
- *   - 服务端 sendSSE 已为每个事件写入递增 id + retry:5000
+ *   - 服务端 sendSSE 已为每个事件写入递增 id + retry:30000（30 秒重连间隔，跨项目契约对齐 trace-to-edm/server.js）
  *
  * 依赖（运行时由 app.js / render.js 提供）：
  *   - log(level, message)         由 render.js 提供
@@ -22,9 +22,59 @@ let lastSseEventId = null;
 
 /**
  * 读取 SSE 流。debt-11：解析 id: 行并更新 lastSseEventId。
+ *
+ * P0 修缮（跨项目 SSE 一致性）：支持 3 次手动重连 + 指数退避 1s/2s/4s。
+ * 参考实现：trace-to-edm/public/js/app.js streamJob。
+ *
+ * 向后兼容：第二个参数 options 可省略，省略时与原行为一致（仅消费 body，不重连）。
+ *
  * @param {ReadableStream} body fetch response body
+ * @param {object} [options] 可选参数
+ * @param {function} [options.reconnectFactory] 重连时重新发起 fetch 的工厂函数，返回 Response；
+ *                                              未提供则不重连（保持向后兼容）
+ * @param {AbortSignal} [options.signal] AbortSignal，触发时立即停止重连（保持 AbortError 语义）
  */
-async function readSSEStream(body) {
+async function readSSEStream(body, options = {}) {
+  const { reconnectFactory, signal } = options;
+  const maxRetries = 3;
+  let attempt = 0;
+  let currentBody = body;
+
+  while (true) {
+    try {
+      await consumeSSEBody(currentBody);
+      return;
+    } catch (err) {
+      // 用户主动 abort：直接抛出（保持原 AbortError 语义，由 app.js catch 跳过提示）
+      if (signal && signal.aborted) throw err;
+      // 未提供 reconnectFactory：保持向后兼容，直接抛出
+      if (!reconnectFactory) throw err;
+      // 已达最大重试次数：抛出明确错误
+      if (attempt >= maxRetries) {
+        const exhausted = new Error(`SSE 连接中断，已重连 ${maxRetries} 次仍失败: ${err.message || err}`);
+        throw exhausted;
+      }
+      attempt++;
+      // 指数退避：1000ms → 2000ms → 4000ms
+      const delayMs = 1000 * Math.pow(2, attempt - 1);
+      try { log('warn', `⟲ 连接中断，第 ${attempt}/${maxRetries} 次重连（${delayMs}ms 后）...`); } catch (_) {}
+      await sleepCancellable(delayMs, signal);
+      // 退避期间用户可能 abort，再次检查
+      if (signal && signal.aborted) throw err;
+      const response = await reconnectFactory();
+      if (!response.ok || !response.body) {
+        throw new Error(`重连失败: HTTP ${response.status}`);
+      }
+      currentBody = response.body;
+    }
+  }
+}
+
+/**
+ * 消费单个 SSE body 流（原 readSSEStream 主体逻辑）。
+ * body 正常结束（done=true）时返回；读取过程中抛错则向上传播给 readSSEStream 触发重连。
+ */
+async function consumeSSEBody(body) {
   const reader = body.getReader();
   const decoder = new TextDecoder();
   let buffer = '';
@@ -44,6 +94,26 @@ async function readSSEStream(body) {
     const event = parseSSEBlock(buffer);
     if (event) dispatchSSEEvent(event);
   }
+}
+
+/**
+ * 可取消的 sleep。signal 触发时立即 reject(AbortError)。
+ * 用于重连退避期间响应用户主动取消。
+ */
+function sleepCancellable(ms, signal) {
+  return new Promise((resolve, reject) => {
+    if (signal && signal.aborted) {
+      reject(new DOMException('Aborted', 'AbortError'));
+      return;
+    }
+    const timer = setTimeout(resolve, ms);
+    if (signal) {
+      signal.addEventListener('abort', () => {
+        clearTimeout(timer);
+        reject(new DOMException('Aborted', 'AbortError'));
+      }, { once: true });
+    }
+  });
 }
 
 /**

@@ -44,9 +44,9 @@ function sendSSE(res, event, data) {
   res.write(`data: ${JSON.stringify(data)}\n\n`);
 }
 
-// 在 SSE 响应头之后发送 retry: 5000（5 秒重连间隔，debt-11）
+// 在 SSE 响应头之后发送 retry: 30000（30 秒重连间隔，debt-11；跨项目契约对齐 trace-to-edm/server.js）
 function sendSSERetryHeader(res) {
-  try { res.write('retry: 5000\n\n'); } catch (_) {}
+  try { res.write('retry: 30000\n\n'); } catch (_) {}
 }
 
 /**
@@ -126,9 +126,14 @@ function runPythonAnalysisStream(text, outputId, mode, bridgeConfig, res, schema
       finished = true;
       cleanupTimeout();
       killProcessWithFallback(py);
-      recordJob(outputId, mode, 'cancelled', '客户端断开连接且 30s 内未重连');
-      activeJobs.delete(outputId);
-      processJobQueue();
+      // 仅当 activeJobs 仍指向当前 py 时才清理共享状态
+      // （前端 sse.js 3 次指数退避重连可能已用新 py 覆盖 activeJobs[outputId]，
+      //   此时若误删会导致新进程无法被取消，且 recordJob 会覆盖新任务状态）
+      if (activeJobs.get(outputId) === py) {
+        recordJob(outputId, mode, 'cancelled', '客户端断开连接且 30s 内未重连');
+        activeJobs.delete(outputId);
+        processJobQueue();
+      }
     }, 30000);
 
     // 若进程在宽限期内完成，清理定时器
@@ -189,16 +194,24 @@ function runPythonAnalysisStream(text, outputId, mode, bridgeConfig, res, schema
   py.on('close', (code) => {
     finished = true;
     cleanupTimeout();
-    activeJobs.delete(outputId);
-    activeJobResponses.delete(outputId);
-    if (code !== 0) {
+    // 仅当 activeJobs 仍指向当前 py 时才清理共享状态
+    // （前端重连可能已用新 py 覆盖 activeJobs[outputId]，此时旧进程的
+    //   close 事件不应误删新进程或覆盖新任务的 job 记录）
+    const isCurrent = activeJobs.get(outputId) === py;
+    if (isCurrent) {
+      activeJobs.delete(outputId);
+      activeJobResponses.delete(outputId);
+    }
+    if (code !== 0 && isCurrent) {
       const msg = `Python 进程异常退出 (code=${code})`;
       sendSSE(res, 'error', { message: msg });
       recordJob(outputId, mode, 'error', msg);
       logToFile('error', `Python 异常退出 job=${outputId} code=${code}`);
     }
-    sendSSE(res, 'done', { code });
-    res.end();
+    if (isCurrent) {
+      sendSSE(res, 'done', { code });
+      res.end();
+    }
     processJobQueue();
   });
 

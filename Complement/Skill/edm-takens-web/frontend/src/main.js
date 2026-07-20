@@ -24,15 +24,25 @@ async function apiJson(url, opts = {}) {
 }
 
 async function refreshDatasets() {
-  const { datasets } = await apiJson('/datasets')
-  const sel = $('#datasetSelect')
-  sel.innerHTML = '<option value="">-- 选择数据集 --</option>'
-  datasets.forEach((name) => {
-    const opt = document.createElement('option')
-    opt.value = name
-    opt.textContent = name
-    sel.appendChild(opt)
-  })
+  try {
+    const { datasets } = await apiJson('/datasets')
+    const sel = $('#datasetSelect')
+    sel.innerHTML = '<option value="">-- 选择数据集 --</option>'
+    if (!datasets || datasets.length === 0) {
+      console.warn('No datasets found')
+      return
+    }
+    datasets.forEach((name) => {
+      const opt = document.createElement('option')
+      opt.value = name
+      opt.textContent = name
+      sel.appendChild(opt)
+    })
+  } catch (e) {
+    console.error('refreshDatasets:', e)
+    const sel = $('#datasetSelect')
+    if (sel) sel.innerHTML = '<option value="">加载失败</option>'
+  }
 }
 
 async function loadDatasetColumns(filename) {

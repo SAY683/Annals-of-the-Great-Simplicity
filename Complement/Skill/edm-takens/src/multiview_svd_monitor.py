@@ -318,9 +318,12 @@ def run_secrets_4_and_5(df, columns, target, lib, pred, q=3, r=2):
     results['multiview'] = mv_results
 
     if 'error' not in mv_results:
-        print(f"  Best single-variable Simplex rho: "
-              f"{max((v['rho'] for v in mv_results['single_var'].values()
-                     if v['rho'] is not None), default='N/A')}")
+        best_single_rho = max(
+            (v['rho'] for v in mv_results['single_var'].values()
+             if v['rho'] is not None),
+            default='N/A'
+        )
+        print(f"  Best single-variable Simplex rho: {best_single_rho}")
         print(f"  Best Multiview rho: {mv_results['multiview'].get('best_rho', 'N/A')}")
         print(f"  Verdict: {mv_results['verdict']} "
               f"(delta_rho={mv_results.get('delta_rho', 0):+.3f})")

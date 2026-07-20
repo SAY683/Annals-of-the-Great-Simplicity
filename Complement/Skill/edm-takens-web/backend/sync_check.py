@@ -22,10 +22,10 @@ _CORE_SRC = os.path.abspath(
 )
 
 # 副本中独有的文件（核心库不存在），跳过检查
-WEB_ONLY_FILES = {
-    "data_quality.py",
-    "analysis_profiles.py",
-}
+# 修缮 A4 已将 data_quality.py 和 analysis_profiles.py 回迁到核心库 src/，
+# 两份副本现在完全一致，不再属于 web 独有文件；移出白名单后由 sync_check
+# 持续监控一致性，防止未来再次漂移。
+WEB_ONLY_FILES: set = set()
 
 # 有意差异的文件（副本因 web 环境需求做了定制），不视为同步失败
 EXPECTED_DIFFERS = {

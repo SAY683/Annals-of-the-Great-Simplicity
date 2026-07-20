@@ -91,7 +91,7 @@ function handleAnalyzeStream(req, res) {
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
   res.setHeader('X-Accel-Buffering', 'no');
-  // debt-11：发送 retry: 5000，告知客户端 5 秒重连间隔
+  // debt-11：发送 retry: 30000，告知客户端 30 秒重连间隔（跨项目契约对齐 trace-to-edm/server.js）
   sendSSERetryHeader(res);
 
   if (activeJobs.size >= CONFIG.maxConcurrentJobs) {

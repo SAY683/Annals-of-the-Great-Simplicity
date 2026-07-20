@@ -186,6 +186,54 @@ class PersistentJobStore(JobStore):
         self._lock = threading.Lock()
         self._active_jobs: Dict[str, Job] = {}
         self._ensure_schema()
+        # P0 修复: 后端进程崩溃后重启时，将所有遗留的 running 状态任务
+        # 标记为 error，避免任务永久卡在 running 状态。该操作幂等：
+        # 仅影响 status='running' 的行，重复调用无副作用。
+        self.recover()
+
+    def recover(self) -> int:
+        """将所有遗留的 running 状态任务标记为 error。
+
+        后端进程崩溃后重启时调用。崩溃前处于 running 的任务无法继续执行，
+        会被永久卡住；本方法将它们一次性标记为 error，错误信息标注为
+        "Backend process restarted while task was running"。
+
+        幂等性：仅更新 status='running' 的行，已为 error/done 的行不受影响，
+        因此多次调用不会产生副作用。
+
+        Returns:
+            被恢复（标记为 error）的任务数量。
+        """
+        recovered = 0
+        with self._connect() as conn:
+            cur = conn.execute(
+                "SELECT job_id FROM jobs WHERE status = ?",
+                ("running",),
+            )
+            stuck_ids = [row[0] for row in cur.fetchall()]
+            if not stuck_ids:
+                return 0
+            conn.execute(
+                """
+                UPDATE jobs
+                SET status = ?, error = ?, updated_at = ?
+                WHERE status = ?
+                """,
+                (
+                    "error",
+                    "Backend process restarted while task was running",
+                    time.time(),
+                    "running",
+                ),
+            )
+            conn.commit()
+            recovered = len(stuck_ids)
+        if recovered:
+            print(
+                f"[JobStore] recover(): marked {recovered} stuck 'running' "
+                f"job(s) as 'error' (Backend process restarted while task was running)."
+            )
+        return recovered
 
     # NEW-4: 统一的 SQLite 连接工厂。timeout=30 让 SQLite 在遇到 BUSY
     # 锁时内部等待最多 30 秒；若仍超时则进入 _busy_retry 的指数退避重试。

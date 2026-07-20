@@ -14,8 +14,8 @@
 $ErrorActionPreference = "Stop"
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 
-# 加入 cloudflared 默认安装路径
-$env:Path += ";C:\Program Files (x86)\cloudflared"
+# Constraint #2: 使用相对路径，无硬编码绝对路径
+# cloudflared 必须由用户自行加入 PATH（参见 https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/）
 
 # 使用脚本所在目录（相对路径，便携式兼容）
 # $PSScriptRoot 在 PS 3.0+ 自动可用（包括 -File 调用）
@@ -29,12 +29,13 @@ Write-Host " trace-to-edm + Cloudflare Tunnel" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 
-# 1. 检查 cloudflared
+# 1. 检查 cloudflared (Constraint #3: 预检查 + 官方安装链接)
 $cf = Get-Command cloudflared -ErrorAction SilentlyContinue
 if (-not $cf) {
     Write-Host "[ERROR] 未找到 cloudflared。" -ForegroundColor Red
-    Write-Host "请安装: https://github.com/cloudflare/cloudflared/releases"
-    Write-Host "或将其加入 PATH 或 C:\Program Files (x86)\cloudflared\"
+    Write-Host "请安装: https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/"
+    Write-Host "或下载二进制: https://github.com/cloudflare/cloudflared/releases"
+    Write-Host "安装后请确保 cloudflared.exe 已加入系统 PATH。"
     Read-Host "按 Enter 退出"
     exit 1
 }
@@ -48,8 +49,12 @@ if (-not $node) {
 }
 
 # 3. 检查 npm 依赖
+# Constraint #6: node_modules 缺失时自动 npm install，并清除 HTTP_PROXY/HTTPS_PROXY
 if (-not (Test-Path (Join-Path $scriptDir "node_modules"))) {
     Write-Host "[WARN] node_modules 缺失，正在 npm install..." -ForegroundColor Yellow
+    # 清除代理环境变量以避免 npm install 失败
+    Remove-Item Env:HTTP_PROXY -ErrorAction SilentlyContinue
+    Remove-Item Env:HTTPS_PROXY -ErrorAction SilentlyContinue
     Push-Location $scriptDir
     npm install
     if ($LASTEXITCODE -ne 0) {

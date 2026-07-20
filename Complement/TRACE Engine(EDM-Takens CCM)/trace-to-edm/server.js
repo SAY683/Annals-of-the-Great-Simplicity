@@ -141,6 +141,14 @@ app.use((req, _res, next) => {
   next();
 });
 
+// P1-4: API Key 认证中间件（通过 CROSS_PROJECT_API_KEY 环境变量启用）
+try {
+  const sharedAuth = require('../shared/auth_middleware');
+  app.use(sharedAuth.createAuthMiddleware({ excludePaths: ['/api/health'] }));
+} catch (_) {
+  console.warn('[auth] ../shared/auth_middleware not found — API routes are PUBLIC');
+}
+
 // 通用输入路径校验（自动处理 body.csv_path）
 app.use(validateInputPathMiddleware);
 

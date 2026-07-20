@@ -160,8 +160,10 @@ def test_auditor():
 
         # Should FAIL: Hankel ratio p/q < 3
         r_bad = audit_pipeline(n=32, E=15, target_col='result', is_binary=True)
-        check(r_bad.verdict in ('FAIL', 'WARN', 'BLOCKED'),
-              f"Hankel E=15: verdict={r_bad.verdict} (expected FAIL/WARN/BLOCKED)")
+        # P0 fix: accept INCONCLUSIVE too — >50% SKIP (e.g. statsmodels missing)
+        # still means the bad config was not waved through as PASS.
+        check(r_bad.verdict in ('FAIL', 'WARN', 'BLOCKED', 'INCONCLUSIVE'),
+              f"Hankel E=15: verdict={r_bad.verdict} (expected FAIL/WARN/BLOCKED/INCONCLUSIVE)")
         check(r_bad.failures >= 1 or r_bad.warnings >= 1 or r_bad.verdict == 'BLOCKED',
               "Blocked or warned on p/q < 3")
 
@@ -172,7 +174,10 @@ def test_auditor():
             tau=1, pred_horizon=5, lyap_lambda=0.1,
             edm_nonlinear=False, havok_kurtosis=0.0,
         )
-        check(r_ok.verdict in ('PASS', 'WARN'), f"Safe E=3: verdict={r_ok.verdict}")
+        # P0 fix: include PASS_WITH_NOTES — advisory notes on a safe config
+        # are still a pass, not a failure.
+        check(r_ok.verdict in ('PASS', 'PASS_WITH_NOTES', 'WARN'),
+              f"Safe E=3: verdict={r_ok.verdict}")
 
         # Should WARN: binary target
         r_bin = audit_pipeline(n=32, E=3, target_col='result', is_binary=True)
@@ -332,7 +337,10 @@ def test_game_data():
             sh = SovereignHAVOK(q_delays=E, window_length=wl, poly_order=2).fit(data)
             check(sh.is_valid_, f"HAVOK {var}: fit OK (r={sh.r_}, kurt={sh.kurtosis_vr_:.3f})")
             check(sh.r_ >= 1, f"HAVOK {var}: rank r={sh.r_} >= 1")
-            check(abs(sh.kurtosis_vr_) < 10, f"HAVOK {var}: kurtosis bounded")
+            # P0 fix: align with sovereign_havok.py heavy-tailed threshold (>3.0).
+            # Old <10 was too loose to catch heavy-tailed forcing; <3 matches the
+            # "Heavy-tailed: strong intermittent phase transitions" tier boundary.
+            check(abs(sh.kurtosis_vr_) < 3, f"HAVOK {var}: kurtosis bounded (|kurt|<3)")
 
 
 # ── Layer 6: End-to-End Interpretation (slow) ────────────

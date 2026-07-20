@@ -33,7 +33,10 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 import numpy as np
-import torch
+# torch 改为延迟导入 (在 _get_device / _load_model / encode_text 内部),
+# 以便在未安装 torch 的环境中仍可加载本模块的元数据函数
+# (list_models / get_active_model / set_active_model), 让 /api/models 端点
+# 能正常返回模型列表, 而不会因 ModuleNotFoundError 导致前端显示"无可用模型"。
 
 from config import (
     QWEN_MODEL_PATH, QWEN_MODEL_PATH_3B, SACRED_TEXTS_DIR, SACRED_BOOKS,
@@ -120,6 +123,7 @@ _SACRED_VECTORS: Optional[Dict[str, np.ndarray]] = None  # 缓存的八正道方
 
 def _get_device() -> str:
     """检测可用设备"""
+    import torch
     if torch.cuda.is_available():
         return "cuda"
     return "cpu"
@@ -132,6 +136,7 @@ def _load_model():
     if _MODEL is not None:
         return _MODEL, _TOKENIZER, _DEVICE
 
+    import torch
     from transformers import AutoModel, AutoTokenizer
 
     _DEVICE = _get_device()
@@ -190,6 +195,7 @@ def encode_text(text: str) -> np.ndarray:
         np.ndarray shape=(hidden_size,), 已 L2 归一化
     """
     model, tokenizer, device = _load_model()
+    import torch
     cfg = MODEL_REGISTRY.get(_ACTIVE_MODEL, MODEL_REGISTRY["qwen2.5-1.5b"])
     middle_layer = cfg.get("middle_layer", 14)
     max_len = model.config.max_position_embeddings

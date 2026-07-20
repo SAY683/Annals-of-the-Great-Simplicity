@@ -29,3 +29,34 @@ def create_job_store() -> JobStore:
 
 
 _JOB_STORE: JobStore = create_job_store()
+
+# P1-2: 启动时自动同步检查（副本一致性）
+# 在模块首次导入时检查 backend/edmtakens/ 是否与 edm-takens/src/ 一致。
+# 非零退出会终止服务启动（ERROR），但生产环境也可通过
+# EDM_SKIP_SYNC_CHECK=1 环境变量绕过（如 CI 已验证一致性）。
+def _auto_sync_check():
+    import subprocess, sys
+    if os.environ.get("EDM_SKIP_SYNC_CHECK") == "1":
+        return
+    _sync_script = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "sync_check.py")
+    if not os.path.exists(_sync_script):
+        return
+    try:
+        result = subprocess.run(
+            [sys.executable, _sync_script, "--quiet"],
+            capture_output=True, text=True, timeout=15,
+            cwd=os.path.dirname(_sync_script))
+        if result.returncode != 0:
+            print(f"[CRITICAL] 副本同步检查失败 (exit {result.returncode}):\n{result.stdout}\n{result.stderr}")
+            print("[CRITICAL] 请手动运行 python sync_check.py 查看详情。")
+            print("[CRITICAL] 若确认无风险，设置环境变量 EDM_SKIP_SYNC_CHECK=1 跳过。")
+            # 不主动 exit — 让调用方决定策略；仅打印 CRITICAL 级日志
+        else:
+            if result.stdout.strip():
+                print(f"[sync_check] {result.stdout.strip()}")
+    except FileNotFoundError:
+        pass
+    except Exception as e:
+        print(f"[sync_check] 自动同步检查异常: {e}")
+
+_auto_sync_check()

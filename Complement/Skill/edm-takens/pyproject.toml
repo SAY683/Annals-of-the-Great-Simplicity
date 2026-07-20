@@ -38,4 +38,6 @@ py-modules = [
     "surrogate_test",
     "multiview_svd_monitor",
     "_usability",
+    "data_quality",
+    "analysis_profiles",
 ]
