@@ -601,6 +601,11 @@ def interpret_game_data(data_path_override: str = None,
         rho_E = EmbedDimension(
             data=df, lib=lib, pred=pred, maxE=8, Tp=1,
             columns=var, target=var, showPlot=False, numProcess=1)
+        if not rho_E['rho'].notna().any():
+            print(f"    [SKIP] EmbedDimension returned all-NA rho — "
+                  f"'{var}' is too sparse/constant for this library/pred split.")
+            skipped_vars.append(var)
+            continue
         E_opt = int(rho_E.loc[rho_E['rho'].idxmax(), 'E'])
 
         sx = Simplex(

@@ -11,12 +11,15 @@ prediction skill in pyEDM (the prediction set collapses to a single
 value), so they are filtered out before the pipeline sees them.
 """
 import pandas as pd
+import numpy as np
 
 
 def is_usable_for_edm(series) -> bool:
     """Return True if a numeric column has enough variation for EDM/HAVOK.
 
     A column is considered usable when:
+      0. It contains no NaN or Inf values — SovereignHAVOK.fit() rejects
+         non-finite data with ValueError, so we must flag it here first.
       1. Its standard deviation is non-negligible (>= 1e-12), ruling out
          constant columns.
       2. If it is binary (<= 2 unique values), the minority class has at
@@ -26,6 +29,14 @@ def is_usable_for_edm(series) -> bool:
     # 兼容 numpy 数组输入
     if not isinstance(series, pd.Series):
         series = pd.Series(series)
+    # 深度复审修复：NaN/Inf 检查必须先于其他检查，与 SovereignHAVOK.fit() 一致
+    if series.isna().any():
+        return False
+    try:
+        if not np.isfinite(series.values).all():
+            return False
+    except (TypeError, ValueError):
+        return False
     if series.std(skipna=True) < 1e-12:
         return False
     unique_vals = series.dropna().unique()

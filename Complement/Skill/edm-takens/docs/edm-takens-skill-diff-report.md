@@ -1,3 +1,5 @@
+> ⚠️ DEPRECATED (2026-07-20 元审计 P2): 本文档已由 CHANGELOG.md 取代，仅保留作为历史记录
+
 > **⚠️ 历史文档。** 本报告记录 Skill 从 7 条规则演进到 14 条规则的迭代历程。当前算法实现、审计结论与最新修复请以 [`docs/ALGORITHM_AUDIT.md`](ALGORITHM_AUDIT.md) 和 [`CHANGELOG.md`](CHANGELOG.md) 为准。保留本文件仅作为演进历史参考。
 
 # edm-takens.skill 演进对比报告

@@ -136,7 +136,9 @@ def ccm_causality_test(df, cause_var, effect_var, E, lib_sizes=None,
     """
     n = len(df)
     if lib_sizes is None:
-        lib_sizes = f'5 {max(n - 2, 6)} 3'
+        # 深度复审修复：pyEDM 要求 libSize >= E+2，原默认起始值 5 对 E>=4 无效
+        min_lib = E + 2
+        lib_sizes = f'{min_lib} {max(n - 2, min_lib)} 3'
     if sample is None:
         sample = min(50, n)
 

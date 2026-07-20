@@ -155,15 +155,23 @@ def test_core_engine():
 
 def test_auditor():
     with test("Layer 2: Auditor Firewall — Blocking invalid configs"):
+        import numpy as np
         from edm_auditor import audit_pipeline, Auditor
 
         # Should FAIL: Hankel ratio p/q < 3
         r_bad = audit_pipeline(n=32, E=15, target_col='result', is_binary=True)
-        check(r_bad.verdict in ('FAIL', 'WARN'), f"Hankel E=15: verdict={r_bad.verdict} (expected FAIL/WARN)")
-        check(r_bad.failures >= 1 or r_bad.warnings >= 1, "Blocked or warned on p/q < 3")
+        check(r_bad.verdict in ('FAIL', 'WARN', 'BLOCKED'),
+              f"Hankel E=15: verdict={r_bad.verdict} (expected FAIL/WARN/BLOCKED)")
+        check(r_bad.failures >= 1 or r_bad.warnings >= 1 or r_bad.verdict == 'BLOCKED',
+              "Blocked or warned on p/q < 3")
 
-        # Should PASS: safe config
-        r_ok = audit_pipeline(n=32, E=3)
+        # Should PASS: safe config (provide enough inputs so audit is conclusive)
+        _rng_audit = np.random.RandomState(42)
+        r_ok = audit_pipeline(
+            n=32, E=3, data=_rng_audit.randn(32),
+            tau=1, pred_horizon=5, lyap_lambda=0.1,
+            edm_nonlinear=False, havok_kurtosis=0.0,
+        )
         check(r_ok.verdict in ('PASS', 'WARN'), f"Safe E=3: verdict={r_ok.verdict}")
 
         # Should WARN: binary target
@@ -317,7 +325,8 @@ def test_game_data():
         import numpy as np
         for var in ['result', 'kills', 'damage', 'deaths']:
             data = df[var].values.astype(float)
-            E = {'result': 3, 'kills': 2, 'damage': 6, 'deaths': 3}[var]
+            # E=2 for kills degenerates (q<3 -> r=2 -> constant forcing -> kurtosis NaN)
+            E = {'result': 3, 'kills': 3, 'damage': 6, 'deaths': 3}[var]
             wl = min(7, max(5, (len(data) - E) // 4))
             if wl % 2 == 0: wl -= 1
             sh = SovereignHAVOK(q_delays=E, window_length=wl, poly_order=2).fit(data)

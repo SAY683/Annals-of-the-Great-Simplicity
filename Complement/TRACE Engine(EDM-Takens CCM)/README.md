@@ -10,58 +10,17 @@
 ├── verify_portable.py        # 独立运行性审计脚本
 ├── trace-engine/             # Python 因果推断引擎
 │   ├── health_check.py       # 引擎健康检查
-│   ├── build_bridge_schema.py # 桥接参数 Schema 生成（含 --presets-only 模式）
 │   ├── examples/
 │   │   └── counterfactual_hybrid/  # 六战士因果分析核心
-│   │       ├── _causallearn_utils.py    # causallearn 工具集
-│   │       ├── _config.py               # 配置
-│   │       ├── _logging.py              # 日志
-│   │       ├── _token_filters.py        # token 过滤
-│   │       ├── causallearn_validator.py # causallearn 校验器
-│   │       ├── compound_diagnostic.py   # 复合诊断引擎
-│   │       ├── counterfactual_bridge.py # TRACE↔DoWhy 桥接
-│   │       ├── dowhy_adapter.py         # DoWhy 适配器
-│   │       ├── dowhy_auditor.py         # DoWhy 审计
-│   │       ├── minimal_dataframe.py     # 最小数据框工具
-│   │       ├── pearl_counterfactual.py  # Pearl 反事实
-│   │       ├── pipeline_helpers.py      # 流水线辅助
-│   │       ├── simulation_model.py      # 仿真模型
-│   │       ├── six_warriors.py          # 六战士装配
-│   │       └── ...
 │   ├── models/               # 训练好的 LLaMA 模型（SUPER 模式使用）
 │   ├── tests/test_skill.py   # 引擎自检测试
 │   └── date/                 # 训练/测试数据
 └── trace-engine-web/         # Node.js Web 服务
     ├── start.ps1             # 启动脚本
     ├── stop_servers.ps1      # 停止 stale 服务
-    ├── server.js             # Express 初始化与路由挂载（232 行，模块化拆分）
-    ├── py_bridge.py          # Python 桥接（LIGHT / DEEP）
-    ├── llama_worker.py       # 常驻 LLaMA Worker（SUPER）
-    ├── lib/                  # 状态管理（state.js）+ 工具函数（utils.js）
-    ├── middleware/           # 鉴权（auth.js）+ CORS/安全头（index.js）
-    ├── routes/               # API 路由（analysis.js, jobs.js, system.js, admin.js）
-    ├── services/             # 分析服务（analysis.js）+ LLaMA Worker 管理（llamaWorker.js）
-    ├── schema/               # result_schema.json + bridge_schema.json
-    ├── public/
-    │   ├── css/              # main.css + theme.css
-    │   ├── js/               # app.js + sse.js + render.js + schema.js + jobs.js
-    │   └── index.html        # 前端页面
-    └── tests/
-        ├── test_api.py
-        └── test_upload.py
+    ├── server.js             # HTTP + SSE 服务端
+    └── public/index.html     # 前端页面
 ```
-
-## 架构概览
-
-- **trace-engine**：六战士因果分析框架，含复合诊断引擎（`compound_diagnostic.py`）。`examples/counterfactual_hybrid/` 下汇集了 TRACE↔DoWhy 桥接（`dowhy_adapter.py`、`counterfactual_bridge.py`）、causallearn 校验（`causallearn_validator.py`、`_causallearn_utils.py`）、Pearl 反事实（`pearl_counterfactual.py`）、最小数据框工具（`minimal_dataframe.py`）、仿真模型（`simulation_model.py`）与流水线辅助（`pipeline_helpers.py`），由 `six_warriors.py` 装配为六合一深度诊断流程。
-- **trace-engine-web**：模块化 Express 服务（`server.js` 232 行，仅负责 Express 初始化与路由挂载），具体逻辑分散到 `lib/`（状态/工具）、`middleware/`（鉴权层 `auth.js`、CORS/helmet 安全中间件）、`routes/`（API 路由）、`services/`（分析服务、LLaMA Worker 管理）、`schema/`（result schema 契约）。前端拆分为 `public/css/` 与 `public/js/`（含 SSE 重连 `sse.js`、渲染 `render.js`、Schema 校验 `schema.js`）。
-
-## 安全特性
-
-- **鉴权分级**：`TRACE_API_KEY`（普通用户，保护分析/结果/任务端点）+ `TRACE_ADMIN_KEY`（管理员，保护 `/api/admin/cleanup`、`/api/jobs/clear`），分级保护。未设置时鉴权自动禁用（开发模式兼容）。
-- **安全头**：`helmet` 中间件统一注入安全响应头。
-- **限流**：`express-rate-limit` 对 `/api/analyze-*` 端点限流（默认 10 次/分钟）。
-- **CORS**：默认拒绝通配符，需通过 `TRACE_CORS_ORIGIN` 显式配置白名单。
 
 ## 环境要求
 
@@ -141,16 +100,12 @@ python run_cli.py --text "你的因果分析文本"
 | `TRACE_PYTHON_CMD` | Python 命令 | `python` 或 `python3` |
 | `PORT` | Web 服务端口 | `3000` |
 | `TRACE_STAGE_TIMEOUT_MS` | SUPER 模式阶段性进度看门狗超时（毫秒），无 stage 更新则判定 hang | `900000` |
-| `TRACE_API_KEY` | 普通用户鉴权密钥，保护分析/结果/任务等端点；未设置时鉴权自动禁用 | `your-strong-api-key` |
-| `TRACE_ADMIN_KEY` | 管理员密钥，保护 `/api/admin/cleanup`、`/api/jobs/clear`；需与 `TRACE_API_KEY` 配合使用 | `your-strong-admin-key` |
-| `TRACE_CORS_ORIGIN` | CORS 允许来源，默认拒绝通配符，需显式配置白名单 | `http://localhost:5173` |
 
 ## 维护说明
 
 - 运行时产物（`outputs/`、`__pycache__/`、`*.log`）已被 `.gitignore` 排除
 - 同步源目录到本成品目录请使用源端的 `sync_product.py`
 - 遇到目录锁定时，运行 `trace-engine-web/stop_servers.ps1` 清理 stale 进程后再同步
-- **桥接 Schema 生成**：`trace-engine/build_bridge_schema.py --presets-only` 仅供 Web 端 `loadPresets()` 调用，生成预设白名单（不重建全量 schema）。完整重建使用不带参数的 `build_bridge_schema.py`。
 
 ## 支持与故障排查
 

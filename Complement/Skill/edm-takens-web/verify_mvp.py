@@ -54,11 +54,16 @@ TEST_TARGET = "太姬"
 TEST_VARIABLES = "美姬,希姬,祈姬,妙姬"
 
 
+# 强制直连，避免环境中的 HTTP_PROXY/HTTPS_PROXY（尤其格式错误的代理）
+# 将本地健康检查误判为外部请求并导致 getaddrinfo failed。
+_NO_PROXY_OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+
+
 def _fetch(url: str, timeout: float = 10.0):
     """返回 (status_code, body_bytes)"""
     req = urllib.request.Request(url, method="GET")
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
+        with _NO_PROXY_OPENER.open(req, timeout=timeout) as resp:
             return resp.status, resp.read()
     except urllib.error.HTTPError as e:
         return e.code, e.read()
@@ -70,7 +75,7 @@ def _post(url: str, data: bytes = b""):
     if data:
         req.add_header("Content-Type", "application/x-www-form-urlencoded")
     try:
-        with urllib.request.urlopen(req, timeout=10.0) as resp:
+        with _NO_PROXY_OPENER.open(req, timeout=10.0) as resp:
             return resp.status, resp.read()
     except urllib.error.HTTPError as e:
         return e.code, e.read()
@@ -168,7 +173,7 @@ def main():
     req.add_header("Content-Type", f"multipart/form-data; boundary={boundary}")
 
     try:
-        with urllib.request.urlopen(req, timeout=600.0) as resp:
+        with _NO_PROXY_OPENER.open(req, timeout=600.0) as resp:
             result = json.loads(resp.read().decode("utf-8"))
     except Exception as e:
         result = {"error": str(e)}
@@ -277,7 +282,7 @@ def main():
             cd = ""
             code = 0
             try:
-                with urllib.request.urlopen(req, timeout=10.0) as resp:
+                with _NO_PROXY_OPENER.open(req, timeout=10.0) as resp:
                     code = resp.status
                     cd = resp.headers.get("Content-Disposition", "")
                     body_len = len(resp.read())
@@ -297,7 +302,7 @@ def main():
             headers={"Content-Type": "application/json"},
         )
         try:
-            with urllib.request.urlopen(req, timeout=30.0) as resp:
+            with _NO_PROXY_OPENER.open(req, timeout=30.0) as resp:
                 batch_body = resp.read()
                 batch_ok = resp.status == 200 and batch_body.startswith(b"PK")
         except urllib.error.HTTPError as e:

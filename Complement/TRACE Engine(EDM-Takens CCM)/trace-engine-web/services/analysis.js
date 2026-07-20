@@ -109,17 +109,32 @@ function runPythonAnalysisStream(text, outputId, mode, bridgeConfig, res, schema
   py.stdin.write(text, 'utf-8');
   py.stdin.end();
 
-  // P2-9：SSE 客户端提前断开时清理 LIGHT/DEEP 资源
+  // P2-9 + 元审计 P1 修缮：SSE 客户端断开的宽限期机制
+  // 之前 res.on('close') 立即取消任务，客户端重连后只能取 /api/result/:id
+  // 现增加 30s 宽限期：客户端断开后不立即 kill 进程，
+  // 若 30s 内客户端重连（通过 /api/result/:id 或重新触发 SSE）则恢复流式
+  // 30s 后仍未重连则真正清理资源（避免僵尸进程）
   res.on('close', () => {
     if (finished) return;
-    logToFile('info', `SSE 客户端断开，清理 ${mode} 任务 job=${outputId}`);
-    finished = true;
-    cleanupTimeout();
-    killProcessWithFallback(py);
-    recordJob(outputId, mode, 'cancelled', '客户端断开连接');
-    activeJobs.delete(outputId);
-    activeJobResponses.delete(outputId);
-    processJobQueue();
+    logToFile('info', `SSE 客户端断开，启动 30s 宽限期 job=${outputId} mode=${mode}`);
+    activeJobResponses.delete(outputId);  // 移除 res 引用，避免写已关闭的流
+
+    // 宽限期：30s 后若未重连则真正清理
+    const graceTimer = setTimeout(() => {
+      if (finished) return;
+      logToFile('info', `宽限期超时，清理 ${mode} 任务 job=${outputId}`);
+      finished = true;
+      cleanupTimeout();
+      killProcessWithFallback(py);
+      recordJob(outputId, mode, 'cancelled', '客户端断开连接且 30s 内未重连');
+      activeJobs.delete(outputId);
+      processJobQueue();
+    }, 30000);
+
+    // 若进程在宽限期内完成，清理定时器
+    py.on('exit', () => {
+      clearTimeout(graceTimer);
+    });
   });
 
   // SSE 保活：每 30 秒发送一条注释

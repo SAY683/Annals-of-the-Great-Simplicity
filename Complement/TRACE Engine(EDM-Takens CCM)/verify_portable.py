@@ -196,8 +196,14 @@ def check_web_health(root: Path) -> dict:
         text=True,
     )
 
+    # 强制直连，避免环境中的 HTTP_PROXY/HTTPS_PROXY（尤其格式错误的代理）
+    # 将本地健康检查误判为外部请求并导致 getaddrinfo failed。
+    _no_proxy_opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+
     def fetch_json(path: str, timeout: int = 2):
-        with urllib.request.urlopen(f'http://127.0.0.1:{port}{path}', timeout=timeout) as resp:
+        url = f'http://127.0.0.1:{port}{path}'
+        req = urllib.request.Request(url)
+        with _no_proxy_opener.open(req, timeout=timeout) as resp:
             return resp.status, json.loads(resp.read().decode('utf-8'))
 
     try:
