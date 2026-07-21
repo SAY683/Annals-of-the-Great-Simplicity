@@ -8,9 +8,27 @@
 </head>
 <body>
   <div id="app">
+    <!-- 特摄防卫队氛围: CRT 扫描线 -->
+    <div class="crt-overlay" aria-hidden="true"></div>
+
     <header>
-      <h1>EDM-Takens Web</h1>
-      <p>上传 CSV，自动运行 EDM + HAVOK + CCM 动力学分析</p>
+      <div class="header-left">
+        <h1>EDM-Takens Web</h1>
+        <p>上传 CSV，自动运行 EDM + HAVOK + CCM 动力学分析</p>
+      </div>
+      <div class="header-right">
+        <div class="status-board" id="statusBoard" title="当前运行模式与驱动核心">
+          <span class="sb-label">MODE</span>
+          <span class="sb-value" id="sbMode">AUTO</span>
+          <span class="sb-label">CORE</span>
+          <span class="sb-value" id="sbCore">EDM-Takens</span>
+        </div>
+        <div class="mission-clock" id="missionClock" title="任务时钟">
+          <span class="clock-label">MISSION TIME</span>
+          <span class="clock-value" id="clockValue">--:--:--</span>
+        </div>
+        <div class="status-dot"><span></span>SYSTEM ONLINE</div>
+      </div>
     </header>
 
     <main>

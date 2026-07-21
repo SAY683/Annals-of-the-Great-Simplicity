@@ -18,6 +18,7 @@ import sys
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 # ── sys.path 设置 ─────────────────────────────────────────
 # debt-17: 推荐通过 `pip install -e .`（edm-takens/pyproject.toml）
@@ -144,3 +145,11 @@ from routes.history import (
     export_task_json,
     export_task_csv,
 )
+
+# ── Static frontend serving (debt-Q9): backend now serves the Vite-built frontend
+# so that http://localhost:8000 works directly, not only via the Vite dev server.
+# API routes are registered above and take precedence; unmatched paths fall back
+# to index.html for the SPA.
+_FRONTEND_DIR = os.path.join(_BACKEND_DIR, "..", "frontend")
+if os.path.isdir(_FRONTEND_DIR):
+    app.mount("/", StaticFiles(directory=_FRONTEND_DIR, html=True), name="static")

@@ -447,11 +447,15 @@ def run_pipeline(config: PipelineConfig = None,
         window_length=wl, poly_order=2, basis="V")
     sh.fit(data)
 
+    # HAVOK degeneracy 必须在 surrogate 检查之前判定：surrogate 检查引用
+    # _havok_degenerate，若 degenerate 则跳过昂贵的 IAAFT 计算。
+    # （Q9 P0-1 修复：原代码在 line 481 才赋值，导致 NameError）
+    _havok_degenerate = getattr(sh, 'is_degenerate_', False)
+
     # P1-3: 可选 IAAFT surrogate 显著性检验 — 验证 HAVOK 强迫项的非线性
     # 是否在统计上显著。仅在数据量足够 (N>=50) 且 pyEDM/scipy 可用时执行，
     # 且需要 EDM_HAVOK_SURROGATE=1 环境变量显式开启（计算昂贵：99 surrogates
     # × HAVOK fit, 对大 N 可能耗时数十秒）。
-    # 注意: _havok_degenerate 在上方初始化，此处在同一作用域内使用。
     _havok_surrogate_result = None
     if not _havok_degenerate and n >= 50 and os.environ.get("EDM_HAVOK_SURROGATE") == "1":
         try:
@@ -459,17 +463,21 @@ def run_pipeline(config: PipelineConfig = None,
             print(f"\n  [HAVOK Surrogate Test] Running IAAFT (99 surrogates, q={config.q})...")
             _havok_surrogate_result = havok_surrogate_check(
                 data, q=config.q, n_surrogates=99)
-            _sig = _havok_surrogate_result.get('is_significant')
-            _p = _havok_surrogate_result.get('exact_p', 'N/A')
+            _sig = _havok_surrogate_result.get('significant')
+            _p = _havok_surrogate_result.get('p_value', 'N/A')
             _real_k = _havok_surrogate_result.get('real_value', 'N/A')
             _surr_k = _havok_surrogate_result.get('surrogate_mean', 'N/A')
-            print(f"    Real kurtosis={_real_k:.3f}, Surrogate mean kurtosis={_surr_k:.3f}")
+            # 类型安全: real_value/surrogate_mean 理论上必为 float，但容错
+            _real_k_fmt = f"{_real_k:.3f}" if isinstance(_real_k, (int, float)) else str(_real_k)
+            _surr_k_fmt = f"{_surr_k:.3f}" if isinstance(_surr_k, (int, float)) else str(_surr_k)
+            _p_fmt = f"{_p:.4f}" if isinstance(_p, (int, float)) else str(_p)
+            print(f"    Real kurtosis={_real_k_fmt}, Surrogate mean kurtosis={_surr_k_fmt}")
             if _sig is True:
-                print(f"    ✓ Significant (exact p={_p:.4f}): forcing is genuinely nonlinear")
+                print(f"    ✓ Significant (p={_p_fmt}): forcing is genuinely nonlinear")
             elif _sig is False:
-                print(f"    ✗ NOT significant (exact p={_p:.4f}): forcing may be linear noise")
+                print(f"    ✗ NOT significant (p={_p_fmt}): forcing may be linear noise")
             else:
-                print(f"    Surrogate test unavailable: {_havok_surrogate_result.get('note', 'unknown')}")
+                print(f"    Surrogate test verdict: {_havok_surrogate_result.get('verdict', 'unknown')}")
         except Exception as e:
             print(f"    Surrogate test failed: {type(e).__name__}: {e}")
 
@@ -478,7 +486,6 @@ def run_pipeline(config: PipelineConfig = None,
     # SVD is rank-1 and kurtosis/eigenvalue diagnostics are meaningless.
     # Annotate loudly so downstream interpretation knows not to trust the
     # dynamics, rather than silently producing garbage numbers.
-    _havok_degenerate = getattr(sh, 'is_degenerate_', False)
     if _havok_degenerate:
         print("\n  [WARN] HAVOK degenerate input detected (is_degenerate_=True): "
               "near-constant or zero-energy signal. SVD rank ~1; "

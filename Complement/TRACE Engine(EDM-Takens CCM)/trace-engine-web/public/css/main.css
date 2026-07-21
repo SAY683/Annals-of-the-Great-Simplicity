@@ -93,10 +93,10 @@ header {
     var(--panel);
   backdrop-filter: blur(8px);
   border-bottom: 1px solid var(--border);
-  padding: clamp(0.9rem, 2.2vw, 1.6rem) clamp(1rem, 3vw, 2rem);
+  padding: clamp(0.55rem, 1.4vw, 1rem) clamp(0.8rem, 2.2vw, 1.4rem);
   display: flex;
   align-items: center;
-  gap: clamp(0.7rem, 1.6vw, 1.1rem);
+  gap: clamp(0.45rem, 1.1vw, 0.8rem);
   position: relative;
   overflow: hidden;
   flex-wrap: wrap;
@@ -142,24 +142,24 @@ header::before {
 }
 
 .logo {
-  width: clamp(44px, 5vw, 60px);
-  height: clamp(44px, 5vw, 60px);
+  width: clamp(40px, 4.6vw, 54px);
+  height: clamp(40px, 4.6vw, 54px);
   border: 2px solid var(--accent-tokusatsu);
   border-radius: 10px 4px 10px 4px;
   display: grid;
   place-items: center;
   font-family: var(--font-mono);
   font-weight: 800;
-  font-size: clamp(1.3rem, 2.4vw, 1.9rem);
+  font-size: clamp(1.15rem, 2.1vw, 1.65rem);
   color: var(--accent-tokusatsu);
   text-shadow: 0 0 10px rgba(255, 159, 67, 0.45);
   background: rgba(255, 159, 67, 0.06);
   box-shadow: 0 0 18px rgba(255, 159, 67, 0.1), inset 0 0 12px rgba(255, 159, 67, 0.05);
   flex-shrink: 0;
-  margin-top: 0.6rem;
+  margin-top: 0.3rem;
 }
 
-.brand { flex: 1 1 200px; min-width: 0; margin-top: 0.6rem; }
+.brand { flex: 1 1 200px; min-width: 0; margin-top: 0.3rem; }
 .brand h1 {
   margin: 0;
   font-size: clamp(1.1rem, 2.8vw, 1.65rem);
@@ -185,7 +185,7 @@ header::before {
 .header-controls {
   display: flex;
   align-items: center;
-  gap: clamp(0.6rem, 1.5vw, 1rem);
+  gap: clamp(0.4rem, 1vw, 0.7rem);
   flex-shrink: 0;
   flex-wrap: wrap;
 }
@@ -193,14 +193,14 @@ header::before {
 .scale-control {
   display: flex;
   align-items: center;
-  gap: 0.45rem;
+  gap: 0.35rem;
   font-family: var(--font-mono);
-  font-size: clamp(0.72rem, 1.05vw, 0.82rem);
+  font-size: clamp(0.68rem, 1vw, 0.78rem);
   color: var(--muted);
   background: var(--panel-2);
   border: 1px solid var(--border);
   border-radius: 6px;
-  padding: 0.4rem 0.6rem;
+  padding: 0.25rem 0.45rem;
 }
 .scale-control input[type=range] {
   width: clamp(90px, 11vw, 130px);
@@ -233,13 +233,13 @@ header::before {
 .status-board {
   display: flex;
   align-items: center;
-  gap: 0.35rem;
+  gap: 0.25rem;
   background: var(--panel-2);
   border: 1px solid var(--border);
   border-radius: 6px;
-  padding: 0.35rem 0.65rem;
+  padding: 0.22rem 0.45rem;
   font-family: var(--font-mono);
-  font-size: clamp(0.65rem, 0.95vw, 0.78rem);
+  font-size: clamp(0.62rem, 0.9vw, 0.74rem);
 }
 .status-board .sb-label { color: var(--muted); }
 .status-board .sb-value {
@@ -250,12 +250,12 @@ header::before {
 }
 .mission-clock {
   font-family: var(--font-mono);
-  font-size: clamp(0.78rem, 1.1vw, 0.92rem);
+  font-size: clamp(0.72rem, 1vw, 0.86rem);
   color: var(--accent);
   background: var(--panel-2);
   border: 1px solid var(--border);
   border-radius: 6px;
-  padding: 0.35rem 0.7rem;
+  padding: 0.25rem 0.5rem;
   letter-spacing: 0.08em;
   text-shadow: 0 0 8px var(--glow-accent);
 }
@@ -264,10 +264,10 @@ main {
   width: min(1700px, 96vw);
   min-width: 320px;
   margin: 0 auto;
-  padding: clamp(1rem, 2.2vw, 1.8rem);
+  padding: clamp(0.7rem, 1.6vw, 1.3rem);
   display: grid;
   grid-template-columns: minmax(0, 1.55fr) minmax(420px, 1fr);
-  gap: clamp(1rem, 2.2vw, 1.8rem);
+  gap: clamp(0.8rem, 1.8vw, 1.4rem);
 }
 
 @media (max-width: 1200px) {
@@ -279,7 +279,7 @@ main {
   border: 1px solid var(--border);
   border-radius: 12px;
   overflow: hidden;
-  margin-bottom: clamp(1rem, 2.2vw, 1.6rem);
+  margin-bottom: clamp(0.7rem, 1.6vw, 1.2rem);
   box-shadow: 0 6px 28px rgba(0,0,0,0.35);
   position: relative;
   transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
@@ -305,14 +305,14 @@ main {
     linear-gradient(90deg, rgba(255,159,67,0.06), transparent 30%),
     var(--panel-2);
   border-bottom: 1px solid var(--border);
-  padding: 0.75rem 1rem 0.75rem 1.3rem;
+  padding: 0.55rem 0.85rem 0.55rem 1.1rem;
   font-family: var(--font-mono);
-  font-size: clamp(0.74rem, 1.15vw, 0.88rem);
+  font-size: clamp(0.72rem, 1.05vw, 0.84rem);
   color: var(--accent);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.6rem;
+  gap: 0.5rem;
   flex-wrap: wrap;
 }
 .panel.alert {
@@ -331,29 +331,33 @@ main {
   background: linear-gradient(90deg, rgba(255,159,67,0.14), transparent 35%), var(--panel-2);
   color: var(--accent-tokusatsu);
 }
-.panel-body { padding: clamp(0.9rem, 1.7vw, 1.25rem); }
+.panel-body {
+  padding: clamp(0.7rem, 1.3vw, 1.05rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
 
 label {
   display: block;
-  font-size: clamp(0.78rem, 1.15vw, 0.88rem);
+  font-size: clamp(0.74rem, 1.05vw, 0.84rem);
   color: var(--muted);
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.35rem;
   font-family: var(--font-mono);
 }
 
 textarea {
   width: 100%;
-  min-height: clamp(180px, 24vh, 300px);
+  min-height: clamp(92px, 13vh, 160px);
   background: var(--bg-elevated);
   border: 1px solid var(--border);
   border-radius: 8px;
   color: var(--text);
-  padding: 0.9rem;
+  padding: 0.65rem;
   font-family: var(--font-ui);
-  font-size: clamp(0.92rem, 1.3vw, 1.05rem);
+  font-size: clamp(0.88rem, 1.2vw, 1rem);
   resize: vertical;
   outline: none;
-  line-height: 1.75;
+  line-height: 1.6;
   transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
 }
 textarea::placeholder { color: var(--muted); opacity: 0.7; }
@@ -365,13 +369,13 @@ textarea:focus {
 
 input[type="file"] {
   width: 100%;
-  padding: 0.65rem;
+  padding: 0.5rem;
   background: var(--bg-elevated);
   border: 1px dashed var(--border);
   border-radius: 6px;
   color: var(--muted);
-  margin-bottom: 1rem;
-  font-size: clamp(0.82rem, 1.15vw, 0.92rem);
+  margin-bottom: 0.75rem;
+  font-size: clamp(0.78rem, 1.05vw, 0.88rem);
 }
 input[type="file"]::file-selector-button {
   background: var(--panel-2);
@@ -390,7 +394,7 @@ input[type="file"]::file-selector-button:hover {
 
 .actions {
   display: flex;
-  gap: clamp(0.55rem, 1.3vw, 0.9rem);
+  gap: clamp(0.45rem, 1vw, 0.7rem);
   flex-wrap: wrap;
   align-items: center;
 }
@@ -399,11 +403,11 @@ button {
   background: transparent;
   border: 1px solid var(--accent);
   color: var(--accent);
-  padding: clamp(0.5rem, 1.1vw, 0.7rem) clamp(0.9rem, 1.7vw, 1.3rem);
+  padding: clamp(0.42rem, 0.95vw, 0.6rem) clamp(0.75rem, 1.4vw, 1.1rem);
   border-radius: 6px;
   cursor: pointer;
   font-family: var(--font-mono);
-  font-size: clamp(0.78rem, 1.15vw, 0.88rem);
+  font-size: clamp(0.74rem, 1.05vw, 0.84rem);
   transition: all 0.15s;
   flex-shrink: 0;
   position: relative;
@@ -440,14 +444,14 @@ button.danger:hover:not(:disabled) { background: rgba(255, 77, 77, 0.08); }
   border-radius: 999px;
   overflow: hidden;
   font-family: var(--font-mono);
-  font-size: clamp(0.72rem, 1.05vw, 0.82rem);
+  font-size: clamp(0.68rem, 1vw, 0.78rem);
   background: var(--panel-2);
   box-shadow: inset 0 0 10px rgba(0,0,0,0.4);
-  padding: 3px;
+  padding: 2px;
 }
 .mode-toggle label {
   margin: 0;
-  padding: 0.45rem 0.9rem;
+  padding: 0.38rem 0.75rem;
   cursor: pointer;
   color: var(--muted);
   background: transparent;
@@ -467,12 +471,12 @@ button.danger:hover:not(:disabled) { background: rgba(255, 77, 77, 0.08); }
 .model-device {
   display: flex;
   align-items: center;
-  gap: 0.7rem;
-  padding: 0.55rem 0.85rem;
+  gap: 0.55rem;
+  padding: 0.4rem 0.65rem;
   background: linear-gradient(135deg, rgba(255,159,67,0.08), rgba(102,252,241,0.04));
   border: 1px solid var(--accent-tokusatsu);
   border-radius: 8px;
-  margin-bottom: 1rem;
+  margin-bottom: 0.75rem;
   box-shadow: 0 0 14px rgba(255, 159, 67, 0.08);
 }
 .model-device .k {
@@ -507,7 +511,7 @@ button.danger:hover:not(:disabled) { background: rgba(255, 77, 77, 0.08); }
 .model-badge.speed { color: var(--success); background: rgba(3, 201, 136, 0.1); border: 1px solid rgba(3, 201, 136, 0.3); }
 .model-badge.egg { color: var(--accent-tokusatsu); background: rgba(255, 159, 67, 0.1); border: 1px solid rgba(255, 159, 67, 0.3); }
 
-.progress-wrap { margin-top: 1rem; display: none; }
+.progress-wrap { margin-top: 0.75rem; display: none; }
 .progress-bar {
   height: 10px;
   background: var(--bg-elevated);
@@ -925,11 +929,11 @@ details > div { padding: 0.75rem; }
 .mode-note {
   background: var(--panel-2);
   border-left: 3px solid var(--warn);
-  padding: 0.65rem 0.9rem;
+  padding: 0.55rem 0.8rem;
   border-radius: 0 6px 6px 0;
-  font-size: clamp(0.75rem, 1.05vw, 0.85rem);
+  font-size: clamp(0.72rem, 1vw, 0.82rem);
   color: var(--text);
-  margin-bottom: 1rem;
+  margin-bottom: 0.75rem;
 }
 .mode-note strong { color: var(--warn); }
 

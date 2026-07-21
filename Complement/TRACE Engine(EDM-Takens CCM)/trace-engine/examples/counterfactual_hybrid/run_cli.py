@@ -31,12 +31,52 @@ import sys
 import os
 import logging
 import subprocess
+from datetime import datetime
 from pathlib import Path
 
 from _config import setup_graphviz
 from project_paths import resolve_paths
 from presets import load_presets
 from pipeline_helpers import run_full_pipeline
+
+# ══════════════════════════════════════════════════════════════════════
+# 昭和/平成特摄防卫队基地终端氛围
+# ══════════════════════════════════════════════════════════════════════
+
+class T:
+    RESET = '\033[0m'
+    BOLD = '\033[1m'
+    DIM = '\033[2m'
+    GREEN = '\033[38;5;82m'
+    CYAN = '\033[38;5;51m'
+    YELLOW = '\033[38;5;220m'
+    RED = '\033[38;5;196m'
+    BLUE = '\033[38;5;75m'
+    ORANGE = '\033[38;5;208m'
+    BG_DARK = '\033[48;5;232m'
+
+
+def _supports_color():
+    return sys.stdout.isatty() and os.environ.get('TERM') not in (None, 'dumb')
+
+
+def _colorize(s, color):
+    return f"{color}{s}{T.RESET}" if _supports_color() else s
+
+
+def _print_header(title):
+    if not _supports_color():
+        print("═" * 58)
+        print(f"  {title}")
+        print("═" * 58)
+        return
+    now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    print(f"{T.BG_DARK}{T.CYAN}╔══════════════════════════════════════════════════════════╗{T.RESET}")
+    print(f"{T.BG_DARK}{T.CYAN}║{T.RESET} {T.GREEN}{T.BOLD}SENTAI CAUSAL BASE TERMINAL{T.RESET}  {T.DIM}[MISSION CLOCK] {now}{T.RESET}{' ' * 15}{T.CYAN}║{T.RESET}")
+    print(f"{T.BG_DARK}{T.CYAN}║{T.RESET} {title}{' ' * (56 - len(title))}{T.CYAN}║{T.RESET}")
+    print(f"{T.BG_DARK}{T.CYAN}╚══════════════════════════════════════════════════════════╝{T.RESET}")
+    print()
+
 
 # ══════════════════════════════════════════════════════════════════════
 # 路径配置
@@ -67,12 +107,10 @@ def _setup_graphviz():
 
 def cmd_env():
     """打印环境状态"""
-    print("═" * 50)
-    print("  因果战队 CLI · 环境状态")
-    print("═" * 50)
+    _print_header("因果战队 CLI · 环境状态 (Sentai Environment)")
 
     # Python
-    print(f"\n  Python: {sys.version.split()[0]}")
+    print(f"  Python: {sys.version.split()[0]}")
 
     # Graphviz
     gv = _setup_graphviz()
@@ -80,20 +118,20 @@ def cmd_env():
         try:
             result = subprocess.run(['dot', '-V'], capture_output=True, text=True, timeout=5)
             ver = result.stderr.strip() if result.stderr else result.stdout.strip()
-            print(f"  Graphviz: ✓ ({ver})  [{gv}]")
+            print(f"  Graphviz: {_colorize('✓', T.GREEN)} ({ver})  [{gv}]")
         except Exception:
-            print(f"  Graphviz: ⚠ bin found but dot -V failed  [{gv}]")
+            print(f"  Graphviz: {_colorize('⚠', T.YELLOW)} bin found but dot -V failed  [{gv}]")
     else:
-        print(f"  Graphviz: ✗ 未找到 (下载: https://graphviz.org/download/)")
+        print(f"  Graphviz: {_colorize('✗', T.RED)} 未找到 (下载: https://graphviz.org/download/)")
 
     # Core deps
     for mod, name in [('numpy', 'NumPy'), ('torch', 'PyTorch'), ('transformers', 'Transformers')]:
         try:
             m = __import__(mod)
             ver = getattr(m, '__version__', '?')
-            print(f"  {name}: ✓ {ver}")
+            print(f"  {name}: {_colorize('✓', T.GREEN)} {ver}")
         except ImportError:
-            print(f"  {name}: ✗ 未安装")
+            print(f"  {name}: {_colorize('✗', T.RED)} 未安装")
 
     # Causal deps
     for mod, name in [('dowhy', 'DoWhy'), ('causallearn', 'causal-learn'),
@@ -103,9 +141,9 @@ def cmd_env():
         try:
             m = __import__(mod)
             ver = getattr(m, '__version__', '?')
-            print(f"  {name}: ✓ {ver}")
+            print(f"  {name}: {_colorize('✓', T.GREEN)} {ver}")
         except ImportError:
-            print(f"  {name}: ✗ 未安装")
+            print(f"  {name}: {_colorize('✗', T.RED)} 未安装")
 
     # Models (通过 _paths 解析，支持 TRACE_ROOT 环境变量)
     try:
@@ -115,16 +153,16 @@ def cmd_env():
             if model_dir.exists():
                 safetensors = list(model_dir.glob("model.safetensors"))
                 size_mb = safetensors[0].stat().st_size / 1e6 if safetensors else 0
-                print(f"  {model_name}: ✓ ({size_mb:.0f}MB)")
+                print(f"  {model_name}: {_colorize('✓', T.GREEN)} ({size_mb:.0f}MB)")
             else:
-                print(f"  {model_name}: ✗ 未找到")
+                print(f"  {model_name}: {_colorize('✗', T.RED)} 未找到")
     except FileNotFoundError as e:
-        print(f"  模型检测: ✗ {e}")
+        print(f"  模型检测: {_colorize('✗', T.RED)} {e}")
 
     # Outputs
     for label, d in [('demo', DEMO_DIR), ('real', REAL_DIR), ('cache', CACHE_DIR)]:
         files = list(d.glob('*'))
-        print(f"  outputs/{label}: {len(files)} files")
+        print(f"  outputs/{label}: {_colorize(str(len(files)), T.CYAN)} files")
 
     print()
 
@@ -135,9 +173,7 @@ def cmd_env():
 
 def cmd_demo():
     """运行模拟数据演示管线"""
-    print("═" * 50)
-    print("  因果战队 · 模拟数据演示")
-    print("═" * 50)
+    _print_header("因果战队 · 模拟数据演示 (Demo Simulation)")
 
     _setup_graphviz()
 
@@ -209,7 +245,7 @@ def cmd_demo():
     (DEMO_DIR / "report.md").write_text(report, encoding='utf-8')
     print(f"  报告: {DEMO_DIR / 'report.md'} ({len(report)} chars)")
 
-    print(f"\n✅ 完成 — 输出在 {DEMO_DIR}")
+    print(f"\n{_colorize('✅ 完成', T.GREEN)} — 输出在 {DEMO_DIR}")
 
 
 def cmd_real(preset="llama"):
@@ -236,10 +272,9 @@ def cmd_real(preset="llama"):
         logger.warning(f"加载预设 {preset} 失败: {e}，回退到 llama")
         p = load_presets("llama")
 
-    print("═" * 50)
-    print("  因果战队 · 真实 TRACE 数据管线")
-    print(f"  Preset: {preset} | threshold={p.trace2dowhy.threshold}")
-    print("═" * 50)
+    _print_header(f"因果战队 · 真实 TRACE 数据管线 | Preset: {preset}")
+    print(f"  threshold={p.trace2dowhy.threshold}")
+    print()
 
     _setup_graphviz()
 

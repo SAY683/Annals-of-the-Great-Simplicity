@@ -13,7 +13,7 @@ TRACE Skill 案例文本上运行完整的六合一管线（TRACE → DoWhy → 
 路径解析: 自动检测项目根目录（无需硬编码路径）
 """
 
-import sys, os, time, gc, json, math, re, warnings
+import sys, os, time, gc, json, math, warnings
 from pathlib import Path
 from collections import defaultdict
 
@@ -332,6 +332,35 @@ def main():
     report_path = OUTPUT_DIR / "real_data_report.md"
     report_path.write_text(report_text, encoding='utf-8')
     log(f"  Report: {report_path} ({len(report_text)} chars)")
+
+    # ═══════════════════════════════════════════════════════════════
+    # Step 5.5: result.json (供 trace-to-edm work_scanner 解析)
+    # ═══════════════════════════════════════════════════════════════
+    try:
+        result_json = {
+            "mode": bridge.mode_name,
+            "tokens": int(T),
+            "concepts": list(bridge.concept_names),
+            "edges": [
+                {"source": str(e[0]), "target": str(e[1]),
+                 "delta_nll": float(e[2]) if len(e) > 2 and e[2] is not None else None}
+                for e in bridge.significant_edges
+            ],
+            "max_delta_nll": float(max_dnl),
+            "auditor": {
+                "verdict": str(report.verdict),
+                "n_fail": int(report.n_fail),
+                "n_warn": int(report.n_warn),
+            },
+            "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S"),
+        }
+        result_path = OUTPUT_DIR / "result.json"
+        result_path.write_text(
+            json.dumps(result_json, ensure_ascii=False, indent=2),
+            encoding='utf-8')
+        log(f"  result.json: {result_path} ({len(bridge.significant_edges)} edges)")
+    except Exception as e:
+        log(f"  result.json: ERROR — {e}")
 
     # ═══════════════════════════════════════════════════════════════
     # Summary

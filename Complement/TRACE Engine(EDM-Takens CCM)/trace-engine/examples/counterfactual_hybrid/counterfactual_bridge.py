@@ -29,7 +29,6 @@ v2 新增: DoWhy 0.14 兼容 + causallearn (PC/GES) + Graphviz 可视化。
 """
 
 import functools
-import re
 import sys
 import warnings
 from collections import Counter

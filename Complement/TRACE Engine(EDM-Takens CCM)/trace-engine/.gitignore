@@ -10,6 +10,7 @@ __pycache__/
 outputs/
 work/
 *.log
+tunnel_url.txt
 
 # 模型文件（通常较大，不纳入版本控制）
 *.safetensors

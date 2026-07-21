@@ -990,7 +990,28 @@ document.addEventListener('keydown', (e) => {
   }
 })
 
+// 特摄防卫队氛围: 任务时钟与状态看板
+function startMissionClock() {
+  const update = () => {
+    const now = new Date();
+    const timeStr = now.toLocaleTimeString('zh-CN', { hour12: false });
+    const clockEl = document.getElementById('clockValue');
+    if (clockEl) clockEl.textContent = timeStr;
+  };
+  update();
+  setInterval(update, 1000);
+}
+
+function updateStatusBoard() {
+  const intensity = $('#intensitySelect')?.value?.toUpperCase() || 'AUTO';
+  const modeEl = document.getElementById('sbMode');
+  if (modeEl) modeEl.textContent = intensity;
+}
+
 // Init
 refreshDatasets()
 loadHistory()
 loadArchives()
+startMissionClock()
+updateStatusBoard()
+$('#intensitySelect')?.addEventListener('change', updateStatusBoard)

@@ -12,7 +12,7 @@ const router = express.Router();
 const state = require('../lib/state');
 const utils = require('../lib/utils');
 const { OUTPUT_DIR, activeJobs, jobHistory, resultCache } = state;
-const { persistJobHistory } = utils;
+const { persistJobHistory, isValidId } = utils;
 
 // ── 任务历史列表 ────────────────────────────────────────────────────
 router.get('/', (_req, res) => {
@@ -41,6 +41,10 @@ router.post('/clear', (_req, res) => {
 // ── 单任务查询 ──────────────────────────────────────────────────────
 router.get('/:id', (req, res) => {
   const id = req.params.id;
+  // Q9 P0-3 修复：校验 UUID 格式，防止 path.join(OUTPUT_DIR, id, ...) 路径遍历
+  if (!isValidId(id)) {
+    return res.status(400).json({ success: false, error: '非法的任务 ID', code: 'ERROR' });
+  }
   const active = activeJobs.has(id);
   const history = jobHistory.find((j) => j.id === id);
   const outputExists = fs.existsSync(path.join(OUTPUT_DIR, id, 'result.json'));

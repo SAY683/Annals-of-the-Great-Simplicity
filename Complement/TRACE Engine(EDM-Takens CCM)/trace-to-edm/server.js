@@ -239,6 +239,12 @@ function readTrajectoryCSV() {
   }
 }
 
+// ── API: 健康检查 ─────────────────────────────────────────
+
+app.get('/api/health', (_req, res) => {
+  res.json({ status: 'ok', service: 'trace-to-edm', time: new Date().toISOString() });
+});
+
 // ── API: 状态查询 ─────────────────────────────────────────
 
 app.get('/api/status', (_req, res) => {
@@ -292,6 +298,28 @@ app.get('/api/status', (_req, res) => {
   });
 });
 
+// ── API: 八正道正交性报告 ─────────────────────────────────
+
+app.get('/api/orthogonality', async (_req, res) => {
+  try {
+    // Q9 P1-11: 暴露 Frobenius 距离等元审计数据
+    const script = `
+import sys, json; sys.path.insert(0, '.')
+from layer3_sacred import SacredProjector
+sp = SacredProjector()
+loaded = sp.load_sacred_texts()
+if not loaded:
+    print(json.dumps({"available": False, "error": "sacred texts not loaded"}))
+else:
+    report = sp.get_orthogonality_report()
+    print(json.dumps(report, ensure_ascii=False, default=str))
+    `.trim();
+    const { out } = await pyScript(script, 30000);
+    try { res.json(JSON.parse(out)); }
+    catch { res.status(500).json({ error: 'invalid response', raw: out.slice(0, 500) }); }
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // ── API: 轨迹数据 ─────────────────────────────────────────
 
 app.get('/api/trajectory', (_req, res) => {
@@ -321,18 +349,21 @@ print('{"success":true,"rows":0}')
 // ── API: 提交文本管线任务 (Mode A) ────────────────────────
 
 app.post('/api/run', (req, res) => {
-  const { mode } = req.body;
+  const { mode, text, source, ts } = req.body;
   const jobId = createJobId();
-  const inputPath = req.resolvedInputPath || path.join(ROOT, 'data', 'inputs', 'example_input.csv');
   const traceMode = mode || 'light';
 
-  // 构建 Python 命令
-  const args = [
-    BRIDGE_SCRIPT,
-    '--input', inputPath,
-    '--mode', traceMode,
-    '--verbose',
-  ];
+  // P1 修复：/api/run 原先忽略 text 参数，总是跑示例 CSV；现在支持单条文本。
+  const args = [BRIDGE_SCRIPT];
+  if (text && typeof text === 'string') {
+    args.push('--text', text);
+    if (source) args.push('--source', String(source));
+    if (ts) args.push('--ts', String(ts));
+  } else {
+    const inputPath = req.resolvedInputPath || path.join(ROOT, 'data', 'inputs', 'example_input.csv');
+    args.push('--input', inputPath);
+  }
+  args.push('--mode', traceMode, '--verbose');
 
   const proc = spawn(PYTHON_CMD, args, {
     cwd: ROOT,
@@ -709,16 +740,20 @@ app.post('/api/dataset/update-ts', async (req, res) => {
   try {
     const { id, timestamp } = req.body;
     if (!id || !timestamp) return res.status(400).json({ error: 'id and timestamp required' });
-    // 直接操作 dataset.json
+    // Q9 P0-4 修复：原代码字符串拼接 id/timestamp 进 Python 代码，存在注入风险。
+    // 改为 JSON 序列化传参，Python 侧用 json.loads 解码（与 pyDS 同模式）。
+    const argsJson = JSON.stringify([String(id), String(timestamp)]);
     const script = `
 import sys, json; sys.path.insert(0, '.')
 from project_manager import get_project_manager
 from dataset_manager import DatasetManager
 pm = get_project_manager()
 dm = DatasetManager(pm.current_dir)
+_args = json.loads('${argsJson.replace(/'/g, "\\'")}')
+_target_id, _target_ts = _args
 for e in dm.entries:
-    if e['id'] == '${id.replace(/'/g, "\\'")}':
-        e['timestamp'] = '${timestamp.replace(/'/g, "\\'")}'
+    if e['id'] == _target_id:
+        e['timestamp'] = _target_ts
         dm._save()
         print('{"success":true}')
         break
@@ -915,7 +950,7 @@ app.post('/api/models/activate', async (req, res) => {
   // 元审计 P1 修缮: Python 注入防护
   // 之前用字符串拼接 + replace(/'/g, '') 不够健壮
   // 现采用白名单校验 + JSON 参数传递，彻底消除注入
-  const ALLOWED_MODELS = ['qwen2.5-1.5b', 'qwen2.5-3b'];
+  const ALLOWED_MODELS = ['qwen2.5-1.5b', 'qwen2.5-3b', 'shehui-llama', 'shenji-llama'];
   if (!ALLOWED_MODELS.includes(model)) {
     return res.status(400).json({
       error: `invalid model key: ${model}`,

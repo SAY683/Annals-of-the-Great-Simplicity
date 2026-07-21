@@ -39,7 +39,7 @@ if __name__ == "__main__":
     uvicorn.run(
         "api:app",
         app_dir="backend",
-        host="0.0.0.0",
+        host="127.0.0.1",  # Q9 P1-23 修复：仅绑定本地回环，避免暴露到所有网络接口
         port=8000,
         reload=False,
     )

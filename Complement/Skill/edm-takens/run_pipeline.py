@@ -8,6 +8,7 @@ project root without manually adding `src/` to PYTHONPATH.
 import sys
 import os
 import tempfile
+from datetime import datetime
 
 _ROOT = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(_ROOT, 'src'))
@@ -20,6 +21,40 @@ os.environ['OMP_NUM_THREADS'] = '1'
 os.environ['MKL_NUM_THREADS'] = '1'
 
 from pipeline import run_pipeline, run_full_analysis, PipelineConfig, data_path
+
+
+# ── 昭和/平成特摄防卫队基地终端氛围 ───────────────────────────────────
+class T:
+    RESET = '\033[0m'
+    BOLD = '\033[1m'
+    DIM = '\033[2m'
+    GREEN = '\033[38;5;82m'
+    CYAN = '\033[38;5;51m'
+    YELLOW = '\033[38;5;220m'
+    RED = '\033[38;5;196m'
+    BLUE = '\033[38;5;75m'
+    MAGENTA = '\033[38;5;201m'
+    BG_DARK = '\033[48;5;232m'
+
+
+def _supports_color():
+    return sys.stdout.isatty() and os.environ.get('TERM') not in (None, 'dumb')
+
+
+def _print_header():
+    now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    if not _supports_color():
+        print("=" * 66)
+        print(f"  EDM-TAKENS BASE TERMINAL  [MISSION CLOCK] {now}")
+        print("  Empirical Dynamic Modeling · Takens Embedding · CCM Causality")
+        print("=" * 66)
+        print()
+        return
+    print(f"{T.BG_DARK}{T.CYAN}╔══════════════════════════════════════════════════════════════╗{T.RESET}")
+    print(f"{T.BG_DARK}{T.CYAN}║{T.RESET} {T.GREEN}{T.BOLD}EDM-TAKENS BASE TERMINAL{T.RESET}  {T.DIM}[MISSION CLOCK] {now}{T.RESET}{' ' * 22}{T.CYAN}║{T.RESET}")
+    print(f"{T.BG_DARK}{T.CYAN}║{T.RESET} Empirical Dynamic Modeling · Takens Embedding · CCM Causality{T.RESET}{' ' * 3}{T.CYAN}║{T.RESET}")
+    print(f"{T.BG_DARK}{T.CYAN}╚══════════════════════════════════════════════════════════════╝{T.RESET}")
+    print()
 
 
 def main():
@@ -43,6 +78,8 @@ def main():
                         help='Maximum embedding dimension to search')
 
     args = parser.parse_args()
+
+    _print_header()
 
     config = PipelineConfig(
         data_path=args.data,

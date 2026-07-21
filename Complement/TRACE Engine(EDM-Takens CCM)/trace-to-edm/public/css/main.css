@@ -113,9 +113,10 @@ header p { color: var(--muted); font-size: 0.8rem; margin-top: 4px; }
 /* ── Status Bar ─────────────────────────── */
 .status-bar {
   display: flex;
-  gap: 12px;
+  gap: 10px;
   flex-wrap: wrap;
   margin-bottom: 20px;
+  align-items: stretch;
 }
 .stat {
   background: var(--panel);
@@ -124,7 +125,9 @@ header p { color: var(--muted); font-size: 0.8rem; margin-top: 4px; }
   border-radius: 4px;
   display: flex;
   flex-direction: column;
-  min-width: 90px;
+  min-width: 80px;
+  flex: 1 1 100px;
+  max-width: 100%;
 }
 .stat-label { font-size: 0.65rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
 .stat-value { font-size: 1.1rem; color: var(--accent); font-weight: 700; }
@@ -145,8 +148,22 @@ header p { color: var(--muted); font-size: 0.8rem; margin-top: 4px; }
   font-size: 0.7rem;
 }
 .project-bar label { color: var(--muted); white-space: nowrap; }
-.project-bar select { flex: 1 1 140px; min-width: 140px; background: var(--panel); color: var(--text); border: 1px solid var(--border); padding: 4px 8px; font-family: inherit; font-size: 0.7rem; }
-.project-bar input { flex: 1 1 120px; min-width: 120px; background: var(--panel); color: var(--text); border: 1px solid var(--border); padding: 4px 8px; font-family: inherit; font-size: 0.7rem; }
+.project-bar select, .project-bar input {
+  flex: 1 1 120px;
+  min-width: 0;
+  max-width: 100%;
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--border);
+  padding: 4px 8px;
+  font-family: inherit;
+  font-size: 0.7rem;
+  border-radius: 3px;
+}
+.project-bar .btn-mini {
+  flex: 0 0 auto;
+  margin-left: 0;
+}
 
 /* ── Work Scan ──────────────────────────── */
 .work-scan-table { width: 100%; font-size: 0.6rem; max-height: 240px; overflow-y: auto; }
@@ -365,9 +382,24 @@ tr:hover td { background: #151d28; }
 }
 
 /* ── Two-Column Layout ──────────────────── */
-.two-col { display: grid; grid-template-columns: minmax(320px, 420px) 1fr; gap: 16px; align-items: start; }
-.col-left, .col-right { min-width: 0; max-width: 100%; }
+.two-col {
+  display: grid;
+  grid-template-columns: minmax(260px, 420px) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+.col-left, .col-right {
+  min-width: 0;
+  max-width: 100%;
+  min-height: 0;
+  overflow-x: hidden;
+}
 .col-left textarea, .col-right textarea { max-width: 100%; }
+.two-col > .panel {
+  height: auto;
+  max-height: none;
+  overflow: visible;
+}
 
 /* ── Dataset Table ──────────────────────── */
 .ds-row { display: flex; align-items: center; gap: 8px; padding: 4px 6px; border-bottom: 1px solid var(--border); font-size: 0.65rem; }
@@ -387,15 +419,27 @@ tr:hover td { background: #151d28; }
 .ws-row:hover { background: #151d28; }
 .ws-row input[type=checkbox] { accent-color: var(--accent); }
 
-@media (max-width: 1000px) { .two-col { grid-template-columns: 1fr; } }
+/* 窄屏：两栏变为单栏，状态栏自动换行 */
+@media (max-width: 900px) {
+  .two-col { grid-template-columns: 1fr; }
+}
+@media (max-width: 720px) {
+  .status-bar { gap: 8px; }
+  .stat { flex: 1 1 calc(50% - 8px); min-width: 0; }
+}
 @media (max-width: 520px) {
+  #app { padding: 10px; }
   .project-bar, .form-row { gap: 6px; }
   .project-bar select, .project-bar input,
   .form-row select, .form-row input { flex: 1 1 100%; min-width: 0; width: 100%; }
   .status-bar { gap: 6px; }
-  .stat { flex: 1 1 calc(50% - 6px); min-width: 0; }
+  .stat { flex: 1 1 100%; min-width: 0; }
+  .two-col { grid-template-columns: 1fr; }
   header { flex-direction: column; align-items: stretch; }
   .header-right { align-items: flex-start; }
+  .btn { width: 100%; }
+  .terminal { height: 200px; }
+  #trendChart { max-height: 220px; }
 }
 
 /* ── Table Layer Headers ────────────────── */

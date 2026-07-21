@@ -1,0 +1,51 @@
+2026-07-21T00:45:57Z INF Thank you for trying Cloudflare Tunnel. Doing so, without a Cloudflare account, is a quick way to experiment and try it out. However, be aware that these account-less Tunnels have no uptime guarantee, are subject to the Cloudflare Online Services Terms of Use (https://www.cloudflare.com/website-terms/), and Cloudflare reserves the right to investigate your use of Tunnels for violations of such terms. If you intend to use Tunnels in production you should use a pre-created named tunnel by following: https://developers.cloudflare.com/cloudflare-one/connections/connect-apps
+2026-07-21T00:45:57Z INF Requesting new quick Tunnel on trycloudflare.com...
+2026-07-21T00:46:01Z INF +--------------------------------------------------------------------------------------------+
+2026-07-21T00:46:01Z INF |  Your quick Tunnel has been created! Visit it at (it may take some time to be reachable):  |
+2026-07-21T00:46:01Z INF |  https://painting-occasionally-vcr-agents.trycloudflare.com                                |
+2026-07-21T00:46:01Z INF +--------------------------------------------------------------------------------------------+
+2026-07-21T00:46:01Z INF Cannot determine default configuration path. No file [config.yml config.yaml] in [~/.cloudflared ~/.cloudflare-warp ~/cloudflare-warp]
+2026-07-21T00:46:01Z INF Version 2026.7.2 (Checksum cdb5d4432f6ae1595654a692a51308b69d2bf7af961f5578d9391837cf072df9)
+2026-07-21T00:46:01Z INF GOOS: windows, GOVersion: go1.26.4, GoArch: amd64
+2026-07-21T00:46:01Z INF Settings: map[edge-ip-version:4 ha-connections:1 no-chunked-encoding:true protocol:quic url:http://localhost:5173]
+2026-07-21T00:46:01Z INF cloudflared will not automatically update on Windows systems.
+2026-07-21T00:46:08Z ERR Failed to fetch features, default to disable error="lookup cfd-features.argotunnel.com: dnsquery: This operation returned because the timeout period expired."
+2026-07-21T00:46:08Z INF Generated Connector ID: 11aa6307-373d-42a7-b210-deb564c07085
+2026-07-21T00:46:08Z WRN Unable to lookup protocol percentage.
+2026-07-21T00:46:08Z INF Initial protocol quic
+2026-07-21T00:46:08Z INF ICMP proxy will use 192.168.10.2 as source for IPv4
+2026-07-21T00:46:08Z INF ICMP proxy will use 2409:8a70:5021:fca4:72c7:c505:bb5c:790b in zone WLAN as source for IPv6
+2026-07-21T00:46:08Z INF cloudflared does not support loading the system root certificate pool on Windows. Please use --origin-ca-pool <PATH> to specify the path to the certificate pool
+2026-07-21T00:46:08Z INF ICMP proxy will use 192.168.10.2 as source for IPv4
+2026-07-21T00:46:08Z INF Tunnel connection curve preferences: [X25519MLKEM768 CurveID(65074) CurveP256] connIndex=0 event=0 ip=198.41.200.1132026-07-21T00:46:08Z INF ICMP proxy will use 2409:8a70:5021:fca4:72c7:c505:bb5c:790b in zone WLAN as source for IPv6
+2026-07-21T00:46:08Z INF Starting metrics server on 127.0.0.1:20243/metrics
+22026-07-21T00:46:09Z INF Registered tunnel connection connIndex=0 connection=20fb667a-bef7-4efb-b3e7-c5ab1128c6e8 event=0 ip=198.41.200.113 location=lax01 protocol=qui202026-07-21T00:46:09Z INF +-------------------------------------------------------------------------------------+
+2026-07-21T00:46:09Z INF |                               CONNECTIVITY PRE-CHECKS                               |
+2026-07-21T00:46:09Z INF +-------------------------------------------------------------------------------------+
+2026-07-21T00:46:09Z INF |  COMPONENT         TARGET                     STATUS  DETAILS                       |
+2026-07-21T00:46:09Z INF |  DNS Resolution    region1.v2.argotunnel.com  PASS    DNS Resolved successfully     |
+2026-07-21T00:46:09Z INF |  DNS Resolution    region2.v2.argotunnel.com  PASS    DNS Resolved successfully     |
+2026-07-21T00:46:09Z INF |  UDP Connectivity  region1.v2.argotunnel.com  PASS    QUIC connection successful    |
+2026-07-21T00:46:09Z INF |  UDP Connectivity  region2.v2.argotunnel.com  PASS    QUIC connection successful    |
+2026-07-21T00:46:09Z INF |  TCP Connectivity  region1.v2.argotunnel.com  PASS    HTTP/2 connection successful  |
+2026-07-21T00:46:09Z INF |  TCP Connectivity  region2.v2.argotunnel.com  PASS    HTTP/2 connection successful  |
+2026-07-21T00:46:09Z INF |  Cloudflare API    api.cloudflare.com:443     PASS    API is reachable              |
+2026-07-21T00:46:09Z INF |                                                                                     |
+2026-07-21T00:46:09Z INF |  SUMMARY: Environment is healthy. cloudflared will use 'quic' as primary protocol.  |
+2026-07-21T00:46:09Z INF +-------------------------------------------------------------------------------------+
+2026-07-21T00:46:09Z INF precheck component="DNS Resolution" details="DNS Resolved successfully" run_id=4ec2bede-e1f2-4a50-b26c-138912355bf1 status=pass target=region1.v2.argotunnel.com
+2026-07-21T00:46:09Z INF precheck component="DNS Resolution" details="DNS Resolved successfully" run_id=4ec2bede-e1f2-4a50-b26c-138912355bf1 status=pass target=region2.v2.argotunnel.com
+2026-07-21T00:46:09Z INF precheck component="UDP Connectivity" details="QUIC connection successful" run_id=4ec2bede-e1f2-4a50-b26c-138912355bf1 status=pass target=region1.v2.argotunnel.com
+2026-07-21T00:46:09Z INF precheck component="UDP Connectivity" details="QUIC connection successful" run_id=4ec2bede-e1f2-4a50-b26c-138912355bf1 status=pass target=region2.v2.argotunnel.com
+2026-07-21T00:46:09Z INF precheck component="TCP Connectivity" details="HTTP/2 connection successful" run_id=4ec2bede-e1f2-4a50-b26c-138912355bf1 status=pass target=region1.v2.argotunnel.com
+2026-07-21T00:46:09Z INF precheck component="TCP Connectivity" details="HTTP/2 connection successful" run_id=4ec2bede-e1f2-4a50-b26c-138912355bf1 status=pass target=region2.v2.argotunnel.com
+2026-07-21T00:46:09Z INF precheck component="Cloudflare API" details="API is reachable" run_id=4ec2bede-e1f2-4a50-b26c-138912355bf1 status=pass target=api.cloudflare.com:443
+2026-07-21T00:46:09Z INF precheck complete hard_fail=false run_id=4ec2bede-e1f2-4a50-b26c-138912355bf1 suggested_protocol=qui2026-07-21T01:46:19Z ERR Failed to refresh feature selector error="lookup cfd-features.argotunnel.com: dnsquery: This operation returned because the timeout period expired."
+2026-07-21T02:46:19Z ERR Failed to refresh feature selector error="lookup cfd-features.argotunnel.com: dnsquery: This operation returned because the timeout period expired."
+onnectex: No connection could be made because the target machine actively refused it." connIndex=0 event=1 ingressRule=0 originService=http://localhost:5173
+2026-07-21T01:54:54Z ERR Request failed error="Unable to reach the origin service. The service may be down or it may not be responding to traffic from cloudflared: dial tcp [::1]:5173: connectex: No connection could be made because the target machine actively refused it." connIndex=0 dest=https://surely-sheriff-coupon-stakeholders.trycloudflare.com/ event=0 ip=198.41.200.113 type=http
+2026-07-21T01:54:55Z ERR  error="Unable to reach the origin service. The service may be down or it may not be responding to traffic from cloudflared: dial tcp [::1]:5173: connectex: No connection could be made because the target machine actively refused it." connIndex=0 event=1 ingressRule=0 originService=http://localhost:5173
+2026-07-21T01:54:55Z ERR Request failed error="Unable to reach the origin service. The service may be down or it may not be responding to traffic from cloudflared: dial tcp [::1]:5173: connectex: No connection could be made because the target machine actively refused it." connIndex=0 dest=https://surely-sheriff-coupon-stakeholders.trycloudflare.com/ event=0 ip=198.41.200.113 type=http
+2026-07-21T01:54:55Z ERR  error="Unable to reach the origin service. The service may be down or it may not be responding to traffic from cloudflared: dial tcp [::1]:5173: connectex: No connection could be made because the target machine actively refused it." connIndex=0 event=1 ingressRule=0 originService=http://localhost:5173
+2026-07-21T01:54:55Z ERR Request failed error="Unable to reach the origin service. The service may be down or it may not be responding to traffic from cloudflared: dial tcp [::1]:5173: connectex: No connection could be made because the target machine actively refused it." connIndex=0 dest=https://surely-sheriff-coupon-stakeholders.trycloudflare.com/@vite/client event=0 ip=198.41.200.113 type=http
+2026-07-21T02:46:19Z ERR Failed to refresh feature selector error="lookup cfd-features.argotunnel.com: dnsquery: This operation returned because the timeout period expired."

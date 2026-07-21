@@ -39,7 +39,9 @@ import numpy as np
 # 能正常返回模型列表, 而不会因 ModuleNotFoundError 导致前端显示"无可用模型"。
 
 from config import (
-    QWEN_MODEL_PATH, QWEN_MODEL_PATH_3B, SACRED_TEXTS_DIR, SACRED_BOOKS,
+    QWEN_MODEL_PATH, QWEN_MODEL_PATH_3B,
+    SHEHUI_MODEL_PATH, SHENJI_MODEL_PATH,
+    SACRED_TEXTS_DIR, SACRED_BOOKS,
     CACHE_DIR, VERBOSE,
 )
 
@@ -71,6 +73,20 @@ MODEL_REGISTRY["qwen2.5-3b"] = {
     "name": "Qwen2.5-3B-Instruct", "path": str(QWEN_MODEL_PATH_3B),
     "hidden_size": 2048, "num_layers": 36, "middle_layer": 18,
     "description": "3B 精度 (4-bit量化, ~2.8GB显存)", "quantize": True,
+}
+
+# TRACE LLaMA 模型：仅注册供下拉展示，实际加载仍走 Qwen 路径
+MODEL_REGISTRY["shehui-llama"] = {
+    "name": "shehui-llama (TRACE)", "path": str(SHEHUI_MODEL_PATH),
+    "hidden_size": 384, "num_layers": 28, "middle_layer": 14,
+    "description": "TRACE LLaMA 社会模型 (仅展示)", "quantize": False,
+    "trace_model": True,
+}
+MODEL_REGISTRY["shenji-llama"] = {
+    "name": "shenji-llama (TRACE)", "path": str(SHENJI_MODEL_PATH),
+    "hidden_size": 896, "num_layers": 36, "middle_layer": 18,
+    "description": "TRACE LLaMA 审计模型 (仅展示)", "quantize": False,
+    "trace_model": True,
 }
 
 _ACTIVE_MODEL = "qwen2.5-1.5b"
@@ -105,11 +121,12 @@ _load_model_config()  # 启动时恢复上次的选择
 
 def get_active_model(): return _ACTIVE_MODEL
 def set_active_model(key):
-    global _ACTIVE_MODEL, _MODEL, _TOKENIZER, _DEVICE
+    global _ACTIVE_MODEL, _MODEL, _TOKENIZER, _DEVICE, _SACRED_VECTORS
     if key in MODEL_REGISTRY:
         _ACTIVE_MODEL = key
         _save_model_config()   # 持久化到磁盘
         _MODEL = None; _TOKENIZER = None
+        _SACRED_VECTORS = None  # Q9 P1-15 修复：切换模型时重置八正道向量缓存，防止 1.5B↔3B 维度不匹配
         return True
     return False
 def list_models(): return [{"key": k, **v} for k, v in MODEL_REGISTRY.items()]
@@ -559,13 +576,18 @@ class SacredProjector:
         max_off = max(off_diag) if off_diag else 0.0
         mean_off = float(np.mean(off_diag)) if off_diag else 0.0
 
-        # 数学严谨性: 报告 Q^T Q 与单位矩阵的 Frobenius 距离
-        # 对神圣向量矩阵 W 做 QR 得到正交基 Q，量化"不正交程度"
+        # 数学严谨性: 报告原始神圣向量矩阵 W 的 Gram 矩阵与单位矩阵的 Frobenius 距离
+        # Q9 算法审视修复: 原代码计算 Q^T Q - I，但 QR 分解的 Q 本身就是正交的
+        # (Q^T Q = I 严格成立，仅数值精度误差 ~1e-15)，导致 frobenius_distance 几乎
+        # 总是 ~0，完全无诊断价值。应测量原始 W 的不正交程度。
         try:
             W = np.stack([self.sacred_vectors[n] for n in names], axis=1)
-            Q, _ = np.linalg.qr(W)
-            qtq = Q.T @ Q
-            frobenius_distance = float(np.linalg.norm(qtq - np.eye(n), ord='fro'))
+            # 列归一化后再算 Gram 矩阵，消除向量长度差异的影响
+            W_norms = np.linalg.norm(W, axis=0, keepdims=True)
+            W_norms[W_norms == 0] = 1.0  # 防止除零
+            W_normalized = W / W_norms
+            gram = W_normalized.T @ W_normalized
+            frobenius_distance = float(np.linalg.norm(gram - np.eye(n), ord='fro'))
         except Exception:
             frobenius_distance = None
 

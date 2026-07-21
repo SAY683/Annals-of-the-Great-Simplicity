@@ -35,7 +35,6 @@ Six Warriors Integration — 六战士统一编排器
     for card in cards: print(card.render())
 """
 
-import re
 import warnings
 import numpy as np
 from pathlib import Path
@@ -342,7 +341,7 @@ def _deploy_edm(token_list) -> WarriorCard:
 
 def _deploy_havok(adj_matrix, token_list=None) -> WarriorCard:
     adj_matrix = np.asarray(adj_matrix)
-    card = WarriorCard("HAVOK", "混沌暗杀者", "X光机", color="⚫")
+    card = WarriorCard("HAVOK", "混沌暗杀者", "X光机", color="⚫", tier="A")
 
     T = adj_matrix.shape[0]
     token_len = len(token_list) if token_list else T
@@ -473,7 +472,7 @@ def _deploy_havok(adj_matrix, token_list=None) -> WarriorCard:
 
 def _deploy_dowhy_cf(bridge) -> WarriorCard:
     from counterfactual_bridge import DoWhy14Adapter
-    card = WarriorCard("DoWhy+CF", "反事实造物主", "思想实验引擎", color="🟡")
+    card = WarriorCard("DoWhy+CF", "反事实造物主", "思想实验引擎", color="🟡", tier="A")
 
     est = bridge.estimate_result
     if est is None:
@@ -524,7 +523,7 @@ def _deploy_dowhy_cf(bridge) -> WarriorCard:
 # ══════════════════════════════════════════════════════════════════════
 
 def _deploy_causallearn(bridge) -> WarriorCard:
-    card = WarriorCard("causallearn", "独立验证者", "PC/GES", color="⬜")
+    card = WarriorCard("causallearn", "独立验证者", "PC/GES", color="⬜", tier="A")
 
     try:
         # 只对 top-12 高频概念运行（PC/GES 在全量概念上极慢）

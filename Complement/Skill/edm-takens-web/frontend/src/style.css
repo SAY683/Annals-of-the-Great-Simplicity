@@ -5,11 +5,13 @@
   --muted: #94a3b8;
   --accent: #00d9a3;
   --accent-hover: #00b889;
+  --accent2: #4da6ff;
   --danger: #ff4d4d;
   --border: #1f2a36;
   --terminal-bg: #05080a;
   --terminal-green: #00ff9d;
   --terminal-dim: #5f7d8b;
+  --super: #ff7a00;
 }
 
 * {
@@ -30,6 +32,20 @@ body {
   min-width: 320px;
 }
 
+/* CRT scanline overlay — 统一三大 WEB 项目特摄防卫队氛围 */
+.crt-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  pointer-events: none;
+  z-index: 1;
+  background:
+    linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.12) 50%),
+    linear-gradient(90deg, rgba(255, 0, 0, 0.03), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.03));
+  background-size: 100% 3px, 3px 100%;
+  opacity: 0.45;
+}
+#app > *:not(.crt-overlay) { position: relative; z-index: 2; }
+
 #app {
   width: min(96vw, 1600px);
   max-width: 100%;
@@ -38,22 +54,113 @@ body {
 }
 
 header {
-  text-align: center;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: clamp(12px, 2vw, 24px);
   margin-bottom: clamp(20px, 3vw, 36px);
+  padding-bottom: clamp(14px, 2vw, 22px);
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+
+.header-left {
+  flex: 1 1 280px;
+  min-width: 0;
+  text-align: left;
+}
+
+.header-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  flex: 0 0 auto;
 }
 
 header h1 {
   margin: 0;
-  font-size: clamp(1.8rem, 5vw, 3rem);
-  letter-spacing: -0.03em;
+  font-size: clamp(1.5rem, 4vw, 2.4rem);
+  letter-spacing: -0.02em;
   color: var(--terminal-green);
   text-shadow: 0 0 clamp(8px, 1vw, 16px) rgba(0, 255, 157, 0.25);
 }
 
 header p {
   color: var(--muted);
-  margin-top: 0.5rem;
-  font-size: clamp(0.9rem, 1.6vw, 1.2rem);
+  margin-top: 0.4rem;
+  font-size: clamp(0.8rem, 1.4vw, 1rem);
+}
+
+/* Status board + mission clock — 统一特摄防卫队基地头部 */
+.status-board {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 0.7rem;
+}
+
+.sb-label {
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.sb-value {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.mission-clock {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent2);
+  padding: 6px 12px;
+  border-radius: 6px;
+  text-align: right;
+}
+
+.mission-clock .clock-label {
+  display: block;
+  font-size: 0.55rem;
+  color: var(--muted);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.mission-clock .clock-value {
+  display: block;
+  font-size: 1rem;
+  color: var(--accent2);
+  font-weight: 700;
+}
+
+.status-dot {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.65rem;
+  color: var(--accent);
+  letter-spacing: 0.5px;
+}
+
+.status-dot span {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--accent);
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
 }
 
 main {
@@ -740,6 +847,22 @@ footer {
 @media (max-width: 768px) {
   #app {
     padding: 12px;
+  }
+
+  header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .header-left {
+    text-align: center;
+  }
+
+  .header-right {
+    flex-direction: row;
+    justify-content: center;
+    flex-wrap: wrap;
+    align-items: center;
   }
 
   header h1 {

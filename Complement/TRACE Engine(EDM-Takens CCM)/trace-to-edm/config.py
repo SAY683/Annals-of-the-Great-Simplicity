@@ -66,6 +66,17 @@ else:
 QWEN_MODEL_PATH = Path(os.environ.get("QWEN_MODEL_PATH_1_5B", _DEFAULT_QWEN_1_5B))
 QWEN_MODEL_PATH_3B = Path(os.environ.get("QWEN_MODEL_PATH_3B", _DEFAULT_QWEN_3B))
 
+# TRACE LLaMA 模型路径（便携式 Models/ 目录或开发布局的 sibling Models/）
+if _IS_PORTABLE_LAYOUT:
+    _DEFAULT_SHEHUI = str(_PORTABLE_MODELS_DIR / "shehui-llama")
+    _DEFAULT_SHENJI = str(_PORTABLE_MODELS_DIR / "shenji-llama")
+else:
+    _DEFAULT_SHEHUI = str(PROJECT_ROOT.parent.parent / "Models" / "shehui-llama")
+    _DEFAULT_SHENJI = str(PROJECT_ROOT.parent.parent / "Models" / "shenji-llama")
+
+SHEHUI_MODEL_PATH = Path(os.environ.get("SHEHUI_MODEL_PATH", _DEFAULT_SHEHUI))
+SHENJI_MODEL_PATH = Path(os.environ.get("SHENJI_MODEL_PATH", _DEFAULT_SHENJI))
+
 # 便携式布局标志（供外部模块查询当前布局）
 IS_PORTABLE_LAYOUT = _IS_PORTABLE_LAYOUT
 

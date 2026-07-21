@@ -582,8 +582,12 @@ def plot_enhanced_report(df, all_results, safeguards, output_path):
         lines.append(f"Rank r = {sh.r_}  |  R^2 = {sh.regression_r2_:.3f}")
         lines.append(f"Kurtosis = {sh.kurtosis_vr_:.3f}")
         lines.append(f"Expl. var = {sh.explained_var_:.1%}")
-        ev_max = np.max(np.abs(sh.eigenvalues_d_))
-        lines.append(f"Max |eig_d| = {ev_max:.3f}")
+        # P0 修复：退化 HAVOK（近常量信号）的 eigenvalues_d_ 为空，跳过 max 计算
+        if len(sh.eigenvalues_d_) > 0:
+            ev_max = np.max(np.abs(sh.eigenvalues_d_))
+            lines.append(f"Max |eig_d| = {ev_max:.3f}")
+        else:
+            lines.append("Max |eig_d| = N/A (degenerate HAVOK)")
 
         # Safeguard status
         lines.append("")

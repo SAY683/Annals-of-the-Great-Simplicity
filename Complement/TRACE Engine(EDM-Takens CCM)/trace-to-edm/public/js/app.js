@@ -289,7 +289,15 @@ async function refreshModels() {
       });
       if (info) info.textContent = (d.active || '') + ' | 切换后首次编码需重载模型 (~60-90s)';
       const coreEl = document.getElementById('statCore');
-      if (coreEl) coreEl.textContent = d.active === 'qwen2.5-3b' ? 'Qwen3B' : 'Qwen1.5B';
+      if (coreEl) {
+        const coreMap = {
+          'qwen2.5-3b': 'Qwen3B',
+          'qwen2.5-1.5b': 'Qwen1.5B',
+          'shehui-llama': 'Shehui-LLaMA',
+          'shenji-llama': 'Shenji-LLaMA'
+        };
+        coreEl.textContent = coreMap[d.active] || d.active;
+      }
     } else {
       sel.innerHTML = '<option value="">无可用模型</option>';
       if (info) info.textContent = '未找到模型，请检查 Models 目录';

@@ -560,9 +560,10 @@ def interpret_game_data(data_path_override: str = None,
     lib = f'1 {n-7}'; pred = f'{n-6} {n}'
 
     variables = list(variables) if variables else ['result', 'kills', 'damage', 'deaths']
-    missing = [v for v in variables if v not in df.columns]
-    if missing:
-        raise ValueError(f"Requested variables not in DataFrame: {missing}")
+    # Q9 修复：仅保留实际存在的列，避免用户上传列数不足时抛出硬错误
+    variables = [v for v in variables if v in df.columns]
+    if not variables:
+        variables = [target_col] if target_col and target_col in df.columns else [df.columns[0]]
     var_labels = dict(var_labels) if var_labels else {}
     for v in variables:
         var_labels.setdefault(v, v.replace('_', ' ').title())

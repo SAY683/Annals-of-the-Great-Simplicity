@@ -376,22 +376,34 @@ async function runSuperAnalysisStream(text, outputId, bridgeConfig, res) {
       }
     };
 
-    // P1-3：SSE 客户端断开连接时清理 SUPER 资源
+    // P1-3 + P1-19：SUPER 模式 SSE 客户端断开的宽限期机制（与 LIGHT/DEEP 一致）
+    // 之前 res.on('close') 立即取消任务，现增加 30s 宽限期：
+    // 客户端断开后不立即清理，若 30s 内重连则恢复流式，30s 后才真正清理
     res.on('close', () => {
       if (finished) return;
-      logToFile('info', `SSE 客户端断开，清理 SUPER 任务 job=${outputId}`);
-      try {
-        worker.stdin.write(JSON.stringify({ type: 'cancel', id: outputId }) + '\n', 'utf-8');
-      } catch (_) {}
-      recordJob(outputId, 'super', 'cancelled', '客户端断开连接');
-      finished = true;
-      cleanupTimeout();
-      if (keepAlive) clearInterval(keepAlive);
-      llamaState.currentHandler = null;
-      llamaWorkerSvc.releaseLlamaWorker();
-      activeJobs.delete(outputId);
-      activeJobResponses.delete(outputId);
-      processJobQueue();
+      logToFile('info', `SSE 客户端断开，启动 30s 宽限期 job=${outputId} mode=super`);
+      activeJobResponses.delete(outputId);  // 移除 res 引用，避免写已关闭的流
+
+      const graceTimer = setTimeout(() => {
+        if (finished) return;
+        logToFile('info', `宽限期超时，清理 super 任务 job=${outputId}`);
+        finished = true;
+        cleanupTimeout();
+        if (keepAlive) clearInterval(keepAlive);
+        try {
+          worker.stdin.write(JSON.stringify({ type: 'cancel', id: outputId }) + '\n', 'utf-8');
+        } catch (_) {}
+        recordJob(outputId, 'super', 'cancelled', '客户端断开连接且 30s 内未重连');
+        llamaState.currentHandler = null;
+        llamaWorkerSvc.releaseLlamaWorker();
+        activeJobs.delete(outputId);
+        processJobQueue();
+      }, 30000);
+
+      // 若进程在宽限期内完成，清理定时器
+      worker.on('exit', () => {
+        clearTimeout(graceTimer);
+      });
     });
 
     // P2-8：使用背压感知写入
