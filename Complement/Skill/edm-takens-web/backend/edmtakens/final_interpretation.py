@@ -354,7 +354,7 @@ def interpret_data(df, target_col, columns, causality_pairs=None,
             data = df[var].values.astype(float)
 
             rho_E = EmbedDimension(
-                data=df, lib=lib, pred=pred, maxE=8, Tp=1,
+                data=df, lib=lib, pred=pred, maxE=min(8, max(2, n // 5)), Tp=1,
                 columns=var, target=var, showPlot=False, numProcess=1)
             if not rho_E['rho'].notna().any():
                 raise ValueError("EmbedDimension returned all-NA rho")
@@ -601,7 +601,7 @@ def interpret_game_data(data_path_override: str = None,
 
         # EDM
         rho_E = EmbedDimension(
-            data=df, lib=lib, pred=pred, maxE=8, Tp=1,
+            data=df, lib=lib, pred=pred, maxE=min(8, max(2, n // 5)), Tp=1,
             columns=var, target=var, showPlot=False, numProcess=1)
         # P0 fix: guard against all-NA rho (idxmax() returns NaN → KeyError on .loc)
         if not rho_E['rho'].notna().any():
@@ -738,39 +738,88 @@ def interpret_game_data(data_path_override: str = None,
     print("  Reviewer improvement #2: convergence slope required")
     print("─" * 72)
 
-    E_ref = all_data[target_col]['E']
+    # P0 fix: 当 PHASE 1 所有变量都失败（样本量不足/数据退化）时，
+    # all_data 为空字典，访问 all_data[target_col] 会 KeyError 导致整个
+    # interpretation 崩溃。改为友好提示并跳过 CCM 阶段。
+    if target_col not in all_data:
+        print(f"\n  [SKIPPED] CCM causality analysis cannot proceed.")
+        print(f"    Reason: target variable '{target_col}' failed in PHASE 1")
+        print(f"    (likely due to insufficient samples, all-NA rho, or")
+        print(f"    degenerate HAVOK). Collect more data points (>=30 recommended)")
+        print(f"    or check data quality before re-running.")
+        _phase2_skipped = True
+    else:
+        _phase2_skipped = False
+        E_ref = all_data[target_col]['E']
 
-    _significant_directions = {
-        'forward', 'reverse', 'forward_dominant', 'reverse_dominant',
-        'bidirectional',
-    }
-    n_significant_ccm_pairs = 0
-    for cause_h, effect_h in causality_pairs:
-        ccm_r = ccm_with_convergence(df, cause_h, effect_h, E_ref)
-        fwd = ccm_r['forward']; rev = ccm_r['reverse']
-        print(f"\n    {cause_h:>8s} <-> {effect_h:<8s}:")
-        print(f"      Forward  (M_{effect_h} -> {cause_h}): "
-              f"rho={fwd['final_rho']:+.3f}" if fwd.get('final_rho') is not None else
-              f"      Forward: FAILED",
-              f", rise={fwd['total_rise']:+.4f}"
-              if fwd.get('total_rise') is not None else "",
-              f", converging={fwd['is_converging']}"
-              if fwd.get('is_converging') is not None else "")
-        print(f"      Reverse  (M_{cause_h} -> {effect_h}): "
-              f"rho={rev['final_rho']:+.3f}" if rev.get('final_rho') is not None else
-              f"      Reverse: FAILED",
-              f", rise={rev['total_rise']:+.4f}"
-              if rev.get('total_rise') is not None else "",
-              f", converging={rev['is_converging']}"
-              if rev.get('is_converging') is not None else "")
-        print(f"      => {ccm_r['verdict']}")
-        if ccm_r.get('direction') in _significant_directions:
-            n_significant_ccm_pairs += 1
-    if causality_pairs:
-        print(f"\n    [Secret 11 disclaimer] "
-              f"{common_driver_disclaimer(n_significant_ccm_pairs)}")
+        _significant_directions = {
+            'forward', 'reverse', 'forward_dominant', 'reverse_dominant',
+            'bidirectional',
+        }
+        n_significant_ccm_pairs = 0
+        for cause_h, effect_h in causality_pairs:
+            ccm_r = ccm_with_convergence(df, cause_h, effect_h, E_ref)
+            fwd = ccm_r['forward']; rev = ccm_r['reverse']
+            print(f"\n    {cause_h:>8s} <-> {effect_h:<8s}:")
+            print(f"      Forward  (M_{effect_h} -> {cause_h}): "
+                  f"rho={fwd['final_rho']:+.3f}" if fwd.get('final_rho') is not None else
+                  f"      Forward: FAILED",
+                  f", rise={fwd['total_rise']:+.4f}"
+                  if fwd.get('total_rise') is not None else "",
+                  f", converging={fwd['is_converging']}"
+                  if fwd.get('is_converging') is not None else "")
+            print(f"      Reverse  (M_{cause_h} -> {effect_h}): "
+                  f"rho={rev['final_rho']:+.3f}" if rev.get('final_rho') is not None else
+                  f"      Reverse: FAILED",
+                  f", rise={rev['total_rise']:+.4f}"
+                  if rev.get('total_rise') is not None else "",
+                  f", converging={rev['is_converging']}"
+                  if rev.get('is_converging') is not None else "")
+            print(f"      => {ccm_r['verdict']}")
+            if ccm_r.get('direction') in _significant_directions:
+                n_significant_ccm_pairs += 1
+        if causality_pairs:
+            print(f"\n    [Secret 11 disclaimer] "
+                  f"{common_driver_disclaimer(n_significant_ccm_pairs)}")
 
     # ── Phase 3: Integrated Dynamical Interpretation ──
+    # P0 fix: 当 PHASE 1 所有变量都失败（样本量不足/数据退化）时，
+    # available_variables 为空，Phase 3 大量依赖 all_data[v] 和 E_ref
+    # （Phase 2 跳过时未定义），会抛 KeyError/NameError 导致整个
+    # interpretation 崩溃。改为友好提示并返回最小化结果，让上层
+    # run_full_analysis 仍能正常返回（标记为 degenerate）。
+    if not available_variables:
+        print(f"\n{'=' * 72}")
+        print("  PHASE 3: INTEGRATED DYNAMICAL INTERPRETATION")
+        print("  (What the game data actually tells us through HAVOK)")
+        print("=" * 72)
+        print(f"\n  [SKIPPED] Integrated dynamical interpretation cannot proceed.")
+        print(f"    Reason: all variables failed in PHASE 1 (no available_variables).")
+        print(f"    This typically indicates:")
+        print(f"      - Insufficient samples (N={n} < 30 recommended minimum)")
+        print(f"      - Near-constant or all-NA input data")
+        print(f"      - Embedding dimension E too large for N (try auto_fix=True)")
+        print(f"    Suggested actions:")
+        print(f"      1. Collect more data points (>=30, ideally >=100 for Lyapunov)")
+        print(f"      2. Check data quality (no constant/sparse/Inf columns)")
+        print(f"      3. Re-run with auto_fix=True to auto-correct E and q")
+        print(f"      4. Reduce max_E if N is small (E <= N/5 is required)")
+        print(f"\n{'=' * 72}")
+        return {
+            'n_samples': n,
+            'unit': unit,
+            'stability_tier': 'N/A (insufficient data — all variables failed)',
+            'heavy_tailed_variables': [],
+            'ccm_results': [],
+            'n_ccm_significant': 0,
+            'lyapunov_reliable_variables': [],
+            'output_path': None,
+            'available_variables': [],
+            'skipped_variables': skipped_vars,
+            'degenerate': True,
+            'reason': 'all_variables_failed_phase1',
+        }
+
     print(f"\n{'=' * 72}")
     print("  PHASE 3: INTEGRATED DYNAMICAL INTERPRETATION")
     print("  (What the game data actually tells us through HAVOK)")
@@ -888,17 +937,24 @@ def interpret_game_data(data_path_override: str = None,
     print(f"  CCM with convergence check reveals:")
     _n_sig = 0
     _ccm_results = []
-    for cause_h, effect_h in causality_pairs[:4]:
-        ccm_r = ccm_with_convergence(df, cause_h, effect_h, E_ref)
-        print(f"    {cause_h:>8s} -> {effect_h:<8s}: {ccm_r['verdict']}")
-        _ccm_results.append({
-            'cause': cause_h, 'effect': effect_h,
-            'direction': ccm_r.get('direction'), 'verdict': ccm_r.get('verdict'),
-        })
-        if ccm_r.get('direction') in {
-            'forward', 'reverse', 'forward_dominant', 'reverse_dominant',
-            'bidirectional'}:
-            _n_sig += 1
+    # P0 fix: 当 Phase 2 被跳过（target_col 失败）时 E_ref 未定义，
+    # 此处 CCM 重计算会 NameError。改为跳过并打印友好提示；
+    # _ccm_results/_n_sig 已初始化为空/0，下游代码安全。
+    if _phase2_skipped:
+        print(f"    [SKIPPED] CCM re-test unavailable: target variable failed in PHASE 1")
+        print(f"    (E_ref undefined — cannot re-run convergence check here.)")
+    else:
+        for cause_h, effect_h in causality_pairs[:4]:
+            ccm_r = ccm_with_convergence(df, cause_h, effect_h, E_ref)
+            print(f"    {cause_h:>8s} -> {effect_h:<8s}: {ccm_r['verdict']}")
+            _ccm_results.append({
+                'cause': cause_h, 'effect': effect_h,
+                'direction': ccm_r.get('direction'), 'verdict': ccm_r.get('verdict'),
+            })
+            if ccm_r.get('direction') in {
+                'forward', 'reverse', 'forward_dominant', 'reverse_dominant',
+                'bidirectional'}:
+                _n_sig += 1
     print(f"\n    [Secret 11 disclaimer] {common_driver_disclaimer(_n_sig)}")
 
     # CRITICAL INSIGHT: built from the ACTUAL CCM results above, not

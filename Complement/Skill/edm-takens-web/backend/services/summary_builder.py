@@ -51,19 +51,32 @@ def _build_summary(
         summary["interpretation"] = f"error: {interp['error']}"
 
     # Pull HAVOK diagnostics if available
+    # P0 fix: 当 HAVOK 退化（近常量信号、样本量不足）时 eigenvalues_d_
+    # 为空数组，max(abs(...)) 会抛 ValueError(max of empty sequence)。
+    # 之前 pipeline.py 中已通过 _havok_skip_eigen 跳过打印，但 summary
+    # 仍然无条件访问 eigenvalues_d_，导致整个任务崩溃为 KeyError。
     havok = pipe.get("havok")
     if havok:
         import numpy as np
         from sovereign_havok import classify_havok_stability
-        max_ev = float(max(abs(havok.eigenvalues_d_)))
+        _eig = getattr(havok, 'eigenvalues_d_', None)
+        _is_degenerate = bool(getattr(havok, 'is_degenerate_', False))
+        if _eig is not None and len(_eig) > 0 and not _is_degenerate:
+            max_ev = float(np.max(np.abs(_eig)))
+            stab_tier = classify_havok_stability(max_ev)
+        else:
+            # 退化或空特征值：标记为 N/A，不再崩溃
+            max_ev = None
+            stab_tier = "N/A (degenerate HAVOK — insufficient or near-constant data)"
         summary["havok"] = {
             "rank": int(havok.r_),
             "explained_variance": float(havok.explained_var_),
             "regression_r2": float(havok.regression_r2_),
             "kurtosis": float(havok.kurtosis_vr_),
             "max_eigenvalue": max_ev,
-            "stability_tier": classify_havok_stability(max_ev),
+            "stability_tier": stab_tier,
             "sampling_adequacy": getattr(havok, "sampling_adequacy_", None),
+            "is_degenerate": _is_degenerate,
         }
 
     # Per-variable EDM skill metrics from cross-validation

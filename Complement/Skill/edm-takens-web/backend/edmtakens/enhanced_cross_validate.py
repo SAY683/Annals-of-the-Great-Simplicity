@@ -285,9 +285,15 @@ def edm_pipeline_full(df, target_col, lib, pred, max_E=8):
     """Run EDM pipeline: EmbedDimension, Simplex, S-Map."""
     results = {}
 
+    # P1 fix: 小样本时 maxE 过大会导致 EmbedDimension 搜索到退化区域
+    # (E > N/5 时吸引子稀疏)。与 pipeline.py 的 auto-E-detection 保持
+    # 一致，动态限制 maxE。
+    _n = len(df)
+    _maxE_effective = min(max_E, max(2, _n // 5))
+
     rho_E = _bridge_EmbedDimension(
         data=df, lib=lib, pred=pred,
-        maxE=max_E, Tp=1, columns=target_col, target=target_col,
+        maxE=_maxE_effective, Tp=1, columns=target_col, target=target_col,
         showPlot=False, numProcess=1)
     if not rho_E['rho'].notna().any():
         raise ValueError(
@@ -689,6 +695,26 @@ def run_enhanced_validation(csv_path=data_path('game_log.csv'),
     else:
         print(f"  Games: {n}  |  target '{target_col}' not found for win-rate summary")
     print()
+
+    # P0 fix: 样本量预检查 — 与 pipeline.py 保持一致。
+    # 当 N < 10 时 lib 范围退化为 <=3 个点，pyEDM 的 EmbedDimension/
+    # Simplex 会崩溃或返回全 NA。提前返回友好错误，避免下游 3 个
+    # safeguard 在退化数据上浪费计算。
+    if n < 10:
+        print(f"  [FATAL] Insufficient samples: N={n} < 10 (absolute minimum).")
+        print(f"    Cross-validation requires >= 10 time points (>= 30 recommended).")
+        print(f"    With N={n}, EmbedDimension lib='1 {n-7}' is degenerate.")
+        print(f"    Collect more data before re-running.")
+        return {
+            'error': 'insufficient_samples',
+            'n_samples': n,
+            'min_required': 10,
+            'recommended': 30,
+        }
+    elif n < 30:
+        print(f"  [WARN] Small sample size: N={n} < 30 (recommended minimum).")
+        print(f"    Results exploratory only — Lyapunov/Hankel safeguards limited.")
+        print()
 
     default_variables = ['result', 'kills', 'damage', 'deaths']
     variables = list(variables) if variables else default_variables
