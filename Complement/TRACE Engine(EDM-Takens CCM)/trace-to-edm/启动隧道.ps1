@@ -1,4 +1,4 @@
-#Requires -Version 5.0
+﻿#Requires -Version 5.0
 <#
   trace-to-edm + Cloudflare Tunnel (中文入口薄包装)
   ================================================
@@ -12,7 +12,12 @@
 #>
 
 $ErrorActionPreference = "Stop"
-[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+# 仅在非 UTF-8 控制台时设置编码，避免与 cmd chcp 65001 重复编码导致中文重影
+$currentOut = [Console]::OutputEncoding
+if ($currentOut -isnot [System.Text.Encoding] -or $currentOut.WebName -ne 'utf-8') {
+    [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+    [Console]::InputEncoding = [System.Text.Encoding]::UTF8
+}
 
 # 定位同目录下的 tunnel.ps1
 $scriptDir = if ($PSScriptRoot) { $PSScriptRoot } else { Split-Path -Parent $MyInvocation.MyCommand.Path }

@@ -74,8 +74,13 @@ if (-not (Test-Path (Join-Path $frontendDir "node_modules"))) {
 }
 
 Write-Host "[1/2] 启动 EDM-Takens 后端 (backend:8000, frontend:5173)..." -ForegroundColor Cyan
+# 服务在隐藏窗口中运行，输出重定向到日志文件，避免弹出多余窗口
+$serverOut = Join-Path $scriptDir "mvp_out.log"
+$serverErr = Join-Path $scriptDir "mvp_err.log"
 $serverJob = Start-Process -FilePath "python" -ArgumentList "start_mvp.py" `
-    -WorkingDirectory $scriptDir -PassThru -WindowStyle Normal
+    -WorkingDirectory $scriptDir -PassThru -WindowStyle Hidden `
+    -RedirectStandardOutput $serverOut -RedirectStandardError $serverErr
+Write-Host "      服务日志: $serverOut / $serverErr" -ForegroundColor Gray
 
 # 3. 轮询 HTTP health check Vite 前端 (5173)，最多等待 40 秒
 # P1-1: HTTP health check 替代 TCP 端口检测，确认服务真正就绪
@@ -111,6 +116,10 @@ while ($waited -lt $maxWait) {
 }
 if (-not $frontendOk) {
     Write-Host "[ERROR] Vite 前端端口 $port 在 ${maxWait}s 内未就绪。" -ForegroundColor Red
+    Write-Host "       --- 服务日志尾部 (mvp_out.log) ---" -ForegroundColor Gray
+    if (Test-Path $serverOut) { Get-Content $serverOut -Tail 20 -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "  $_" -ForegroundColor Gray } }
+    Write-Host "       --- 服务错误日志尾部 (mvp_err.log) ---" -ForegroundColor Gray
+    if (Test-Path $serverErr) { Get-Content $serverErr -Tail 20 -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "  $_" -ForegroundColor Red } }
     if ($serverJob -and -not $serverJob.HasExited) { Stop-Process -Id $serverJob.Id -Force -ErrorAction SilentlyContinue }
     Read-Host "按 Enter 退出"
     exit 1
@@ -126,12 +135,30 @@ Write-Host "      按 Ctrl+C 关闭隧道，服务进程将自动清理。" -For
 Write-Host ""
 
 $urlFile = Join-Path $scriptDir "tunnel_url.txt"
-$cfOut = Join-Path $scriptDir "tunnel_cloudflared_out.log"
-$cfErr = Join-Path $scriptDir "tunnel_cloudflared_err.log"
-if (Test-Path $cfOut) { Remove-Item $cfOut -Force -ErrorAction SilentlyContinue }
-if (Test-Path $cfErr) { Remove-Item $cfErr -Force -ErrorAction SilentlyContinue }
+# 隧道日志归档到专用子目录，避免污染项目根目录
+$logDir = Join-Path $scriptDir "tunnel_logs"
+if (-not (Test-Path $logDir)) { New-Item -ItemType Directory -Path $logDir -Force | Out-Null }
 
-Write-Host "      隧道日志: $cfOut / $cfErr" -ForegroundColor Gray
+# 使用时间戳命名日志文件，避免被其他 cloudflared 进程锁定
+$timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
+$cfOut = Join-Path $logDir "cf_out_$timestamp.log"
+$cfErr = Join-Path $logDir "cf_err_$timestamp.log"
+
+# 重要：不清理其他 cloudflared 进程！
+# 用户可能已经启动了其他隧道的 cloudflared（分开启动模式），
+# 全局 Stop-Process 会误杀其他隧道的监听进程。
+# 时间戳日志文件已避免文件锁定问题，无需清理。
+
+# 清理 tunnel_logs 目录中的旧日志文件（只保留最新一次启动的日志）
+$oldCfLogs = Get-ChildItem -Path $logDir -Filter "cf_*_*.log" -ErrorAction SilentlyContinue | Where-Object { $_.Name -notlike "*_$timestamp.log" }
+if ($oldCfLogs) {
+    foreach ($old in $oldCfLogs) {
+        Remove-Item -LiteralPath $old.FullName -Force -ErrorAction SilentlyContinue
+    }
+    Write-Host "      [清理] 删除 $($oldCfLogs.Count) 个旧日志文件" -ForegroundColor DarkGray
+}
+
+Write-Host "      隧道日志目录: $logDir" -ForegroundColor Gray
 
 $cfJob = $null
 try {
@@ -171,23 +198,33 @@ try {
         Write-Host "  已保存至: $urlFile" -ForegroundColor Green
         Write-Host "========================================" -ForegroundColor Green
         Write-Host ""
-        $tunnelUrl | Out-File -FilePath $urlFile -Encoding UTF8 -Force
+        # 无 BOM 写入 UTF-8，避免用户复制 URL 时带入不可见 BOM 字符
+        $utf8NoBom = New-Object System.Text.UTF8Encoding $false
+        [System.IO.File]::WriteAllText($urlFile, $tunnelUrl, $utf8NoBom)
         Write-Host "      隧道运行中。按 Ctrl+C 关闭。" -ForegroundColor Gray
         while (-not $cfJob.HasExited) {
             Start-Sleep 1
+        }
+        Write-Host "[WARN] cloudflared 进程已退出 (退出码: $($cfJob.ExitCode))" -ForegroundColor Yellow
+        if (Test-Path $cfErr) {
+            Write-Host "       --- cloudflared 日志尾部 ---" -ForegroundColor Gray
+            Get-Content $cfErr -Tail 10 -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "  $_" -ForegroundColor Gray }
         }
     } else {
         Write-Host "[ERROR] 未能在 ${maxWait} 秒内建立隧道，请检查 $cfOut / $cfErr" -ForegroundColor Red
     }
 } finally {
-    if ($cfJob -and -not $cfJob.HasExited) {
-        Write-Host "[清理] 关闭 Cloudflare 隧道 (PID $($cfJob.Id.ToString()))..." -ForegroundColor Yellow
-        Stop-Process -Id $cfJob.Id -Force -ErrorAction SilentlyContinue
-    }
-    if ($serverJob -and -not $serverJob.HasExited) {
-        Write-Host "[清理] 关闭 EDM-Takens 后端 (PID $($serverJob.Id.ToString()))..." -ForegroundColor Yellow
-        Stop-Process -Id $serverJob.Id -Force -ErrorAction SilentlyContinue
-    }
+    try {
+        if ($cfJob -and -not $cfJob.HasExited) {
+            Write-Host "[清理] 关闭 Cloudflare 隧道 (PID $($cfJob.Id.ToString()))..." -ForegroundColor Yellow
+            Stop-Process -Id $cfJob.Id -Force -ErrorAction SilentlyContinue
+        }
+    } catch { }
+    try {
+        if ($serverJob -and -not $serverJob.HasExited) {
+            Write-Host "[清理] 关闭 EDM-Takens 后端 (PID $($serverJob.Id.ToString()))..." -ForegroundColor Yellow
+            Stop-Process -Id $serverJob.Id -Force -ErrorAction SilentlyContinue
+        }
+    } catch { }
+    Read-Host "按 Enter 退出"
 }
-
-Read-Host "按 Enter 退出"

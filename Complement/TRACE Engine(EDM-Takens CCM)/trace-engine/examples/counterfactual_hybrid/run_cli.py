@@ -189,7 +189,7 @@ def cmd_demo():
         [0,0,0,0,6.50,2.10,0],[0,0,0,0,0,4.33,0],[0,0,2.95,0,0,0,0],[0,0,3.10,0,1.20,2.80,0]])
     TOKENS = (['算法推荐']*3+['用户行为']*2+['信息茧房']*5+['观点极化']*4+
               ['社会共识']*3+['公共讨论']*4+['透明度']*3+['的']*3+['导致']*2+['从而']*1)
-    T=len(TOKENS); adj=np.zeros((T,T))
+    n_tokens=len(TOKENS); adj=np.zeros((n_tokens,n_tokens))
     pos={c:[i for i,t in enumerate(TOKENS) if t==c] for c in CONCEPTS}
     for ci,cs in enumerate(CONCEPTS):
         for cj,cd in enumerate(CONCEPTS):

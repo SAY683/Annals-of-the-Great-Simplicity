@@ -26,13 +26,18 @@ try:
     from matplotlib.patches import FancyBboxPatch
     # CJK 字体支持
     import matplotlib.font_manager as fm
-    _CJK_FONTS = [f for f in fm.fontManager.ttflist
-                  if any(k in f.name.lower() for k in
-                         ['simhei', 'microsoft yahei', 'noto sans cjk',
-                          'simsun', 'stfangsong', 'fangsong'])]
+    _CJK_PRIORITY = ['microsoft yahei', 'simhei', 'noto sans cjk',
+                     'simsun', 'stfangsong', 'fangsong']
+    _CJK_FONTS = sorted(
+        [f for f in fm.fontManager.ttflist
+         if any(k in f.name.lower() for k in _CJK_PRIORITY)
+         and 'extg' not in f.name.lower()],  # 排除字形不全的 SimSun-ExtG
+        key=lambda f: next(i for i, k in enumerate(_CJK_PRIORITY) if k in f.name.lower())
+    )
     if _CJK_FONTS:
         _CJK_FAMILY = _CJK_FONTS[0].name
         plt.rcParams['font.family'] = _CJK_FAMILY
+        plt.rcParams['axes.unicode_minus'] = False
     _MPL_AVAILABLE = True
 except ImportError:
     _MPL_AVAILABLE = False

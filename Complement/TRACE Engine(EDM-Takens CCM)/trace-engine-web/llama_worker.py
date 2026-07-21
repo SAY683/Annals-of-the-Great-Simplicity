@@ -84,6 +84,7 @@ import torch
 import torch.nn.functional as F
 from transformers import LlamaForCausalLM
 
+from _token_filters import is_valid_concept
 from counterfactual_bridge import TRACE2DoWhy, DoWhy14Adapter
 from dowhy_auditor import DoWhyAuditor
 from presets import load_presets

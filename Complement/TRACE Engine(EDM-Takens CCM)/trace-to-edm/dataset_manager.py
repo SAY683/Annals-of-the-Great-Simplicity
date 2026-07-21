@@ -216,6 +216,7 @@ class DatasetManager:
         """将 replay 类型的 pending 条目导出为回填 CSV"""
         replay_pending = [e for e in self.pending if e["type"] == "replay"]
         output_path = self.project_dir / "outputs" / "_replay_pending.csv"
+        output_path.parent.mkdir(parents=True, exist_ok=True)
 
         with open(output_path, "w", encoding="utf-8", newline="") as f:
             writer = csv.DictWriter(f, fieldnames=["timestamp", "source", "result_uuid"])
@@ -233,6 +234,7 @@ class DatasetManager:
         """将 text 类型的 pending 条目导出为文本 CSV"""
         text_pending = [e for e in self.pending if e["type"] == "text"]
         output_path = self.project_dir / "outputs" / "_text_pending.csv"
+        output_path.parent.mkdir(parents=True, exist_ok=True)
 
         with open(output_path, "w", encoding="utf-8", newline="") as f:
             writer = csv.DictWriter(f, fieldnames=["timestamp", "text", "source"])

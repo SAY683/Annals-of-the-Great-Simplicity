@@ -41,6 +41,9 @@ def main():
     print("  EDM-Takens Web MVP 启动器")
     print("=" * 60)
 
+    # P1 fix: 先启动后端并等待就绪，再启动前端。
+    # 后端启动时会运行 sync_check 等导入逻辑，耗时较长；
+    # 若前端先就绪，浏览器会立即请求 /api/* 导致 ECONNREFUSED。
     backend = subprocess.Popen(
         _BACKEND_CMD,
         cwd=_PROJECT_ROOT,
@@ -48,6 +51,18 @@ def main():
         stderr=None,
     )
     print(f"[+] 后端 PID {backend.pid}: {' '.join(_BACKEND_CMD)}")
+    print("[*] 等待后端就绪 (sync_check + 导入可能需要数秒)...")
+
+    ready_be = _wait_for_port("127.0.0.1", 8000, timeout=60.0)
+    if not ready_be:
+        print("[!] 后端未能在预期时间内就绪，请检查端口 8000 是否被占用。")
+        if backend.poll() is None:
+            backend.terminate()
+        return
+    if backend.poll() is not None:
+        print("[!] 后端进程已意外退出。")
+        return
+    print("[OK] 后端已就绪: http://localhost:8000")
 
     frontend = subprocess.Popen(
         _FRONTEND_CMD,
@@ -56,27 +71,12 @@ def main():
         stderr=None,
     )
     print(f"[+] 前端 PID {frontend.pid}: {' '.join(_FRONTEND_CMD)}")
+    print("[*] 等待前端就绪...")
 
-    print("[*] 等待服务就绪...")
-    ready_be = False
-    ready_fe = False
-    deadline = time.time() + 60.0
-    while time.time() < deadline:
-        if not ready_be and _wait_for_port("127.0.0.1", 8000, timeout=1.0):
-            print("[OK] 后端已就绪: http://localhost:8000")
-            ready_be = True
-        if not ready_fe and _wait_for_port("127.0.0.1", 5173, timeout=1.0):
-            print("[OK] 前端已就绪: http://localhost:5173")
-            ready_fe = True
-        if ready_be and ready_fe:
-            break
-        if backend.poll() is not None or frontend.poll() is not None:
-            break
-        time.sleep(0.3)
-
-    if not ready_be:
-        print("[!] 后端未能在预期时间内就绪，请检查端口 8000 是否被占用。")
-    if not ready_fe:
+    ready_fe = _wait_for_port("127.0.0.1", 5173, timeout=30.0)
+    if ready_fe:
+        print("[OK] 前端已就绪: http://localhost:5173")
+    else:
         print("[!] 前端未能在预期时间内就绪（若 5173 被占，Vite 会自动换端口）。")
 
     print("\n[*] 按 Ctrl+C 停止所有服务\n")

@@ -883,8 +883,9 @@ app.post('/api/pipeline/run', async (req, res) => {
       emitSSE(res, 'log', { message: '准备数据集...' });
       const exports = await getDatasetExports();
 
-      if (exports.error) {
-        emitSSE(res, 'warn', { message: exports.error });
+      if (exports.error || exports.pending_replay === undefined || exports.pending_text === undefined) {
+        const reason = exports.error || exports || '数据集导出异常';
+        emitSSE(res, 'warn', { message: String(reason) || 'no pending entries' });
         emitSSE(res, 'done', { job_id: jobId, success: true, message: 'no pending entries' });
         return;
       }

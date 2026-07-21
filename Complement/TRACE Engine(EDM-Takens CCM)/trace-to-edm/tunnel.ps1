@@ -12,7 +12,12 @@
 #>
 
 $ErrorActionPreference = "Stop"
-[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+# 仅在非 UTF-8 控制台时设置编码，避免与 cmd chcp 65001 重复编码导致中文重影
+$currentOut = [Console]::OutputEncoding
+if ($currentOut -isnot [System.Text.Encoding] -or $currentOut.WebName -ne 'utf-8') {
+    [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+    [Console]::InputEncoding = [System.Text.Encoding]::UTF8
+}
 
 # Constraint #2: 使用相对路径，无硬编码绝对路径
 # cloudflared 必须由用户自行加入 PATH（参见 https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/）
@@ -67,8 +72,13 @@ if (-not (Test-Path (Join-Path $scriptDir "node_modules"))) {
 }
 
 Write-Host "[1/2] 启动 trace-to-edm server (端口 3100)..." -ForegroundColor Cyan
+# 服务在隐藏窗口中运行，输出重定向到日志文件，避免弹出多余窗口
+$serverOut = Join-Path $scriptDir "server_out.log"
+$serverErr = Join-Path $scriptDir "server_err.log"
 $serverJob = Start-Process -FilePath "node" -ArgumentList "server.js" `
-    -WorkingDirectory $scriptDir -PassThru -WindowStyle Normal
+    -WorkingDirectory $scriptDir -PassThru -WindowStyle Hidden `
+    -RedirectStandardOutput $serverOut -RedirectStandardError $serverErr
+Write-Host "      服务日志: $serverOut / $serverErr" -ForegroundColor Gray
 
 # 4. 轮询 HTTP health check（最多等待 20 秒）。
 # P1-1: HTTP health check 替代 Get-NetTCPConnection，确认服务真正就绪。
@@ -96,6 +106,10 @@ while ($waited -lt $maxWait) {
 }
 if ($port -eq 0) {
     Write-Host "[ERROR] 端口范围 3100~$maxPort 在 ${maxWait} 秒内均无监听，服务可能启动失败。" -ForegroundColor Red
+    Write-Host "       --- 服务日志尾部 (server_out.log) ---" -ForegroundColor Gray
+    if (Test-Path $serverOut) { Get-Content $serverOut -Tail 20 -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "  $_" -ForegroundColor Gray } }
+    Write-Host "       --- 服务错误日志尾部 (server_err.log) ---" -ForegroundColor Gray
+    if (Test-Path $serverErr) { Get-Content $serverErr -Tail 20 -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "  $_" -ForegroundColor Red } }
     if ($serverJob -and -not $serverJob.HasExited) { Stop-Process -Id $serverJob.Id -Force -ErrorAction SilentlyContinue }
     Read-Host "按 Enter 退出"
     exit 1
@@ -106,12 +120,30 @@ Write-Host ""
 Write-Host "[2/2] 启动 Cloudflare 隧道到 :$port ..." -ForegroundColor Cyan
 Write-Host "      按 Ctrl+C 关闭隧道，服务进程将自动清理。" -ForegroundColor Gray
 $urlFile = Join-Path $scriptDir "tunnel_url.txt"
-$cfOut = Join-Path $scriptDir "tunnel_cloudflared_out.log"
-$cfErr = Join-Path $scriptDir "tunnel_cloudflared_err.log"
-if (Test-Path $cfOut) { Remove-Item $cfOut -Force -ErrorAction SilentlyContinue }
-if (Test-Path $cfErr) { Remove-Item $cfErr -Force -ErrorAction SilentlyContinue }
+# 隧道日志归档到专用子目录，避免污染项目根目录
+$logDir = Join-Path $scriptDir "tunnel_logs"
+if (-not (Test-Path $logDir)) { New-Item -ItemType Directory -Path $logDir -Force | Out-Null }
 
-Write-Host "      隧道日志: $cfOut / $cfErr" -ForegroundColor Gray
+# 使用时间戳命名日志文件，避免被其他 cloudflared 进程锁定
+$timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
+$cfOut = Join-Path $logDir "cf_out_$timestamp.log"
+$cfErr = Join-Path $logDir "cf_err_$timestamp.log"
+
+# 重要：不清理其他 cloudflared 进程！
+# 用户可能已经启动了其他隧道的 cloudflared（分开启动模式），
+# 全局 Stop-Process 会误杀其他隧道的监听进程。
+# 时间戳日志文件已避免文件锁定问题，无需清理。
+
+# 清理 tunnel_logs 目录中的旧日志文件（只保留最新一次启动的日志）
+$oldCfLogs = Get-ChildItem -Path $logDir -Filter "cf_*_*.log" -ErrorAction SilentlyContinue | Where-Object { $_.Name -notlike "*_$timestamp.log" }
+if ($oldCfLogs) {
+    foreach ($old in $oldCfLogs) {
+        Remove-Item -LiteralPath $old.FullName -Force -ErrorAction SilentlyContinue
+    }
+    Write-Host "      [清理] 删除 $($oldCfLogs.Count) 个旧日志文件" -ForegroundColor DarkGray
+}
+
+Write-Host "      隧道日志目录: $logDir" -ForegroundColor Gray
 
 $cfJob = $null
 try {
@@ -152,24 +184,38 @@ try {
         Write-Host "  已保存至: $urlFile" -ForegroundColor Green
         Write-Host "========================================" -ForegroundColor Green
         Write-Host ""
-        $tunnelUrl | Out-File -FilePath $urlFile -Encoding UTF8 -Force
+        # 无 BOM 写入 UTF-8，避免用户复制 URL 时带入不可见 BOM 字符
+        $utf8NoBom = New-Object System.Text.UTF8Encoding $false
+        [System.IO.File]::WriteAllText($urlFile, $tunnelUrl, $utf8NoBom)
         Write-Host "      隧道运行中。按 Ctrl+C 关闭。" -ForegroundColor Gray
         while (-not $cfJob.HasExited) {
             Start-Sleep 1
         }
+        Write-Host "[WARN] cloudflared 进程已退出 (退出码: $($cfJob.ExitCode))" -ForegroundColor Yellow
+        if (Test-Path $cfErr) {
+            Write-Host "       --- cloudflared 日志尾部 ---" -ForegroundColor Gray
+            Get-Content $cfErr -Tail 10 -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "  $_" -ForegroundColor Gray }
+        }
     } else {
         Write-Host "[ERROR] 未能在 ${maxWait} 秒内建立隧道，请检查 $cfOut / $cfErr" -ForegroundColor Red
     }
+} catch {
+    Write-Host ""
+    Write-Host "[ERROR] 脚本执行失败: $_" -ForegroundColor Red
+    Write-Host $_.ScriptStackTrace -ForegroundColor DarkGray
 } finally {
-    if ($cfJob -and -not $cfJob.HasExited) {
-        Write-Host "[清理] 关闭 Cloudflare 隧道 (PID $($cfJob.Id.ToString()))..." -ForegroundColor Yellow
-        Stop-Process -Id $cfJob.Id -Force -ErrorAction SilentlyContinue
-    }
-    # 隧道关闭后清理服务进程
-    if ($serverJob -and -not $serverJob.HasExited) {
-        Write-Host "[清理] 关闭 trace-to-edm server (PID $($serverJob.Id.ToString()))..." -ForegroundColor Yellow
-        Stop-Process -Id $serverJob.Id -Force -ErrorAction SilentlyContinue
-    }
+    try {
+        if ($cfJob -and -not $cfJob.HasExited) {
+            Write-Host "[清理] 关闭 Cloudflare 隧道 (PID $($cfJob.Id.ToString()))..." -ForegroundColor Yellow
+            Stop-Process -Id $cfJob.Id -Force -ErrorAction SilentlyContinue
+        }
+    } catch { }
+    try {
+        # 隧道关闭后清理服务进程
+        if ($serverJob -and -not $serverJob.HasExited) {
+            Write-Host "[清理] 关闭 trace-to-edm server (PID $($serverJob.Id.ToString()))..." -ForegroundColor Yellow
+            Stop-Process -Id $serverJob.Id -Force -ErrorAction SilentlyContinue
+        }
+    } catch { }
+    Read-Host "按 Enter 退出"
 }
-
-Read-Host "按 Enter 退出"

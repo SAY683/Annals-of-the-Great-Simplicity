@@ -48,3 +48,4 @@
 2026-07-21T00:47:00Z INF Registered tunnel connection connIndex=0 connection=40b28d9a-9bcf-4260-9350-e9f1cdd0bc37 event=0 ip=198.41.200.53 location=lax01 protocol=quic
 2026-07-21T01:47:04Z ERR Failed to refresh feature selector error="lookup cfd-features.argotunnel.com: dnsquery: This operation returned because the timeout period expired."
 2026-07-21T02:47:04Z ERR Failed to refresh feature selector error="lookup cfd-features.argotunnel.com: dnsquery: This operation returned because the timeout period expired."
+2026-07-21T03:47:04Z ERR Failed to refresh feature selector error="lookup cfd-features.argotunnel.com: dnsquery: This operation returned because the timeout period expired."
