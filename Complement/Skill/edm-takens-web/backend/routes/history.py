@@ -31,6 +31,9 @@ router = APIRouter()
 @router.get("/api/history")
 def list_history(limit: int = 50):
     """List completed analysis task directories under ``results/``."""
+    # P0 fix: 防御性创建 results/ 目录 — 同步脚本或外部操作可能
+    # 在后端运行期间删除该目录，导致 os.listdir 失败（HTTP 500）。
+    os.makedirs(RESULTS_DIR, exist_ok=True)
     tasks = []
     for name in os.listdir(RESULTS_DIR):
         task_dir = os.path.join(RESULTS_DIR, name)

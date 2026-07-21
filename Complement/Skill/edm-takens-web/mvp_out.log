@@ -2,97 +2,16 @@
 > edm-takens-web-frontend@0.1.0 dev
 > vite
 
-Port 5173 is in use, trying another one...
-Port 5174 is in use, trying another one...
-Port 5175 is in use, trying another one...
-Port 5176 is in use, trying another one...
-Port 5177 is in use, trying another one...
-Port 5178 is in use, trying another one...
-
-  [32m[1mVITE[22m v5.4.21[39m  [2mready in [0m[1m437[22m[2m[0m ms[22m
-
-  [32mâžœ[39m  [1mLocal[22m:   [36mhttp://localhost:[1m5179[22m/[39m
-  [32mâžœ[39m  [1mNetwork[22m: [36mhttp://26.154.158.92:[1m5179[22m/[39m
-  [32mâžœ[39m  [1mNetwork[22m: [36mhttp://192.168.230.1:[1m5179[22m/[39m
-  [32mâžœ[39m  [1mNetwork[22m: [36mhttp://192.168.174.1:[1m5179[22m/[39m
-  [32mâžœ[39m  [1mNetwork[22m: [36mhttp://192.168.10.2:[1m5179[22m/[39m
-[2m[32m  âžœ[39m[22m[2m  press [22m[1mh + enter[22m[2m to show help[22m
-[sync_check] »ã×Ü: 18 Ò»ÖÂ / 3 Ô¤ÆÚ²îÒì / 0 ²»Ò»ÖÂ / 0 ¸±±¾È±Ê§
 ============================================================
   EDM-Takens Web MVP Æô¶¯Æ÷
-========================================================INFO:     2a02:6ea0:d331:1::1:0 - "GET /api/history HTTP/1.1" 200 OK
-INFO:     2a02:6ea0:d331:1::1:0[2m14:46:09[22m [36m[1m[vite][22m[39m[2m14:46:09[22m [36m[1m[vite][22m[39m[2m14:46:09[22m [36m[1m[vite][22m[39m[2m14:46:09[22m [36m[1m[vite][22m[39m[2m14:55:03[22m [36m[1m[vite][22m[39m[2m14:55:03[22m [36m[1m[vite][22m[39m[2m14:55:03[22m [36m[1m[vite][22m[39m[2m14:55:03[22m [36m[1m[vite][22m[39m[2m14:55:16[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mindex.html[22m
-[2m14:55:16[22m [36m[1m[vite][22m[39m[2m14:55:16[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mindex.html[22m
-o[2m14:55:16[22m [36m[1m[[2m14:55:16[22m [36m[1m[vite][22m[39m [32mpage relo[2m14:55:16[22m [36m[1m[[2m14:55:16[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mindex.html[22m
-[32mpage reload [39m[2mindex.html[22m
- 200 OK
-INFO:     2a02:6ea0:d331:1::1:0 - "GET /api/datasets HTTP/1.1" 200 OK
-INFO:     2a02:6ea0:d331:1::1:0 - "GET /api/history HTTP/1.1" 200 OK
-[2m14:46:09[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mindex.html[22m
-[2m14:46:09[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mindex.html[22m
-[2m14:55:03[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mindex.html[22m
-[2m14:55:03[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mindex.html[22m
-[2m14:55:16[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mindex.html[22m
-[2m14:55:16[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mindex.html[22m
-.0.0.1:65065 - "GET /api/analyze/jobs/job_1784614881_a2d6723a HTTP/1.1" 200 OK
-INFO:     127.0.0.1:65065 - "GET /api/analyze/jobs/job_1784614881_a2d6723a HTTP/1.1" 200 OK
-INFO:     127.0.0.1:65065 - "GET /api/analyze/jobs/job_1784614881_a2d6723a HTTP/1.1" 200 OK
-INFO:     127.0.0.1:65065 - "GET /api/analyze/jobs/job_1784614881_a2d6723a HTTP/1.1" 200 OK
-INFO:     127.0.0.1:65065 - "GET /api/analyze/jobs/job_1784614881_a2d6723a HTTP/1.1" 200 OK
-INFO:     127.0.0.1:65065 - "GET /api/analyze/jobs/job_1784614881_a2d6723a HTTP/1.1" 200 OK
-INFO:     127.0.0.1:65065 - "GET /api/analyze/jobs/job_1784614881_a2d6723a HTTP/1.1" 200 OK
-INFO:     127.0.0.1:65065 - "GET /api/analyze/jobs/job_1784614881_a2d6723a HTTP/1.1" 200 OK
-INFO:     127.0.0.1:65065 - "GET /api/analyze/jobs/job_1784614881_a2d6723a HTTP/1.1" 200 OK
-INFO:     127.0.0.1:65065 - "GET /api/analyze/jobs/job_1784614881_a2d6723a HTTP/1.1" 200 OK
-INFO:     127.0.0.1:65065 - "GET /api/analyze/jobs/job_1784614881_a2d6723a HTTP/1.1" 200 OK
-INFO:     127.0.0.1:65065 - "GET /api/analyze/jobs/job_1784614881_a2d6723a HTTP/1.1" 200 OK
-INFO:     2a02:6ea0:d331:1::1:0 - "GET /api/archives HTTP/1.1" 200 OK
-INFO:     2a02:6ea0:d331:1::1:0 - "GET /api/history HTTP/1.1" 200 OK
-INFO:     2a02:6ea0:d331:1::1:0 - "GET /api/datasets HTTP/1.1" 200 OK
-INFO:     2a02:6ea0:d331:1::1:0 - "GET /api/results/1784614881_93e82af4/enhanced_cross_validation.png HTTP/1.1" 200 OK
-INFO:     2a02:6ea0:d331:1::1:0 - "GET /api/results/1784614200_fda31396/enhanced_cross_validation.png HTTP/1.1" 200 OK
-INFO:     2a02:6ea0:d331:1::1:0 - "GET /api/datasets HTTP/1.1" 200 OK
-INFO:     2a02:6ea0:d331:1::1:0 - "GET /api/history HTTP/1.1" 200 OK
-INFO:     2a02:6ea0:d331:1::1:0 - "GET /api/archives HTTP/1.1" 200 OK
-[2m14:46:09[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mindex.html[22m
-[2m14:46:09[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mindex.html[22m
-INFO:     127.0.0.1:52924 - "GET /api/datasets HTTP/1.1" 200 OK
-INFO:     127.0.0.1:52925 - "GET /api/history HTTP/1.1" 500 Internal Server Error
-INFO:     127.0.0.1:52926 - "GET /api/archives HTTP/1.1" 200 OK
-INFO:     127.0.0.1:52928 - "GET /api/datasets HTTP/1.1" 200 OK
-INFO:     127.0.0.1:52932 - "GET /api/history HTTP/1.1" 500 Internal Server Error
-INFO:     127.0.0.1:52933 - "GET /api/archives HTTP/1.1" 200 OK
-INFO:     127.0.0.1:52941 - "GET /api/history HTTP/1.1" 500 Internal Server Error
-INFO:     127.0.0.1:52940 - "GET /api/datasets HTTP/1.1" 200 OK
-INFO:     127.0.0.1:52942 - "GET /api/archives HTTP/1.1" 200 OK
-INFO:     2a02:6ea0:d331:1::1:0 - "GET /api/history HTTP/1.1" 500 Internal Server Error
-INFO:     2a02:6ea0:d331:1::1:0 - "GET /api/archives HTTP/1.1" 200 OK
-INFO:     2a02:6ea0:d331:1::1:0 - "GET /api/datasets HTTP/1.1" 200 OK
-[2m14:55:03[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mindex.html[22m
-[2m14:55:03[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mindex.html[22m
-INFO:     127.0.0.1:54371 - "GET /api/datasets HTTP/1.1" 200 OK
-INFO:     127.0.0.1:54372 - "GET /api/history HTTP/1.1" 500 Internal Server Error
-INFO:     127.0.0.1:54373 - "GET /api/archives HTTP/1.1" 200 OK
-INFO:     127.0.0.1:54378 - "GET /api/datasets HTTP/1.1" 200 OK
-INFO:     127.0.0.1:54379 - "GET /api/history HTTP/1.1" 500 Internal Server Error
-INFO:     127.0.0.1:54380 - "GET /api/archives HTTP/1.1" 200 OK
-INFO:     127.0.0.1:54390 - "GET /api/history HTTP/1.1" 500 Internal Server Error
-INFO:     127.0.0.1:54391 - "GET /api/archives HTTP/1.1" 200 OK
-INFO:     127.0.0.1:54389 - "GET /api/datasets HTTP/1.1" 200 OK
-INFO:     2a02:6ea0:d331:1::1:0 - "GET /api/history HTTP/1.1" 500 Internal Server Error
-INFO:     2a02:6ea0:d331:1::1:0 - "GET /api/datasets HTTP/1.1" 200 OK
-INFO:     2a02:6ea0:d331:1::1:0 - "GET /api/archives HTTP/1.1" 200 OK
-[2m14:55:16[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mindex.html[22m
-[2m14:55:16[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2mindex.html[22m
-INFO:     127.0.0.1:54434 - "GET /api/datasets HTTP/1.1" 200 OK
-INFO:     127.0.0.1:54435 - "GET /api/history HTTP/1.1" 500 Internal Server Error
-INFO:     127.0.0.1:54436 - "GET /api/archives HTTP/1.1" 200 OK
-INFO:     127.0.0.1:54439 - "GET /api/datasets HTTP/1.1" 200 OK
-INFO:     127.0.0.1:54441 - "GET /api/history HTTP/1.1" 500 Internal Server Error
-INFO:     127.0.0.1:54442 - "GET /api/archives HTTP/1.1" 200 OK
-INFO:     127.0.0.1:54454 - "GET /api/history HTTP/1.1" 500 Internal Server Error
-INFO:     127.0.0.1:54455 - "GET /api/archives HTTP/1.1" 200 OK
-INFO:     127.0.0.1:54453 - "GET /api/datasets HTTP/1.1" 200 OK
-INFO:     2a02:6ea0:d331:1::1:0 - "GET /api/history HTTP/1.1" 500 Internal Server Error
-INFO:     2a02:6ea0:d331:1::1:0 - "GET /api/datasets HTTP/1.1" 200 OK
-INFO:     2a02:6ea0:d331:1::1:0 - "GET /api/archives HTTP/1.1" 200 OK
+============================================================
+[+] ºó¶Ë PID 25016: G:\Python\python.exe run_backend.py
+[*] µÈ´ýºó¶Ë¾ÍÐ÷ (sync_check + µ¼Èë¿ÉÄÜÐèÒªÊýÃë)...
+[OK] ºó¶ËÒÑ¾ÍÐ÷: http://localhost:8000
+[+] Ç°¶Ë PID 29976: G:\Linux\Node\npm.CMD run dev
+[*] µÈ´ýÇ°¶Ë¾ÍÐ÷...
+[OK] Ç°¶ËÒÑ¾ÍÐ÷: http://localhost:5173
+
+[*] °´ Ctrl+C Í£Ö¹ËùÓÐ·þÎñ
+
+[-] ºó¶Ë ÒÑÍ£Ö¹

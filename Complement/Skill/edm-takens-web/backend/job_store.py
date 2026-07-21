@@ -13,6 +13,7 @@ When ``JOBS_DB`` is set, it is used as the SQLite database path. Otherwise a
 import abc
 import asyncio
 import json
+import math
 import os
 import queue
 import sqlite3
@@ -26,6 +27,25 @@ from typing import Any, AsyncIterator, Dict, List, Optional
 # ═══════════════════════════════════════════════════════════════════════════════
 # Abstract + In-memory implementations (mirrors backend/api.py)
 # ═══════════════════════════════════════════════════════════════════════════════
+
+
+def _sanitize_json(obj):
+    """递归清理 JSON 不兼容的浮点值（NaN, Infinity, -Infinity）。
+
+    EDM 结果中常出现这些值（HAVOK 退化、除零、log(0) 等），
+    标准 JSON 序列化器会抛 ValueError。将它们替换为 None（JSON null）
+    以确保 API 响应可以正常序列化。
+    """
+    if isinstance(obj, float):
+        if math.isnan(obj) or math.isinf(obj):
+            return None
+        return obj
+    if isinstance(obj, dict):
+        return {k: _sanitize_json(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [_sanitize_json(v) for v in obj]
+    return obj
+
 
 class Job:
     """A single asynchronous analysis job."""
@@ -72,6 +92,10 @@ class Job:
                 pass
 
     def to_public_dict(self, limit_logs: int = 200) -> dict:
+        # P0 fix: EDM 结果中可能包含 NaN/Infinity 浮点数（来自 HAVOK 退化、
+        # 除零、log(0) 等数学运算），这些值在 JSON 序列化时会抛
+        # ValueError: Out of range float values are not JSON compliant。
+        # 使用 _sanitize_json 递归清理，将 NaN/Inf 替换为 None。
         return {
             "job_id": self.id,
             "status": self.status,
@@ -79,7 +103,7 @@ class Job:
             "updated_at": self.updated_at,
             "logs": self.logs[-limit_logs:],
             "log_count": self.log_count,
-            "result": self.result,
+            "result": _sanitize_json(self.result),
             "error": self.error,
         }
 
@@ -252,6 +276,18 @@ class PersistentJobStore(JobStore):
         raise last_err  # type: ignore[misc]
 
     def _ensure_schema(self):
+        # P0 fix: 如果数据库文件存在但为 0 字节（空文件，可能由同步脚本
+        # 或崩溃残留创建），sqlite3.connect() 不会自动初始化 SQLite 文件头，
+        # 后续 CREATE TABLE 可能静默失败。先检查并删除 0 字节文件，
+        # 让 SQLite 重新创建有效的数据库文件。
+        try:
+            if (os.path.exists(self._db_path)
+                    and os.path.getsize(self._db_path) == 0):
+                os.remove(self._db_path)
+                print(f"[JobStore] Removed 0-byte database file: {self._db_path}")
+        except OSError as e:
+            print(f"[JobStore] WARNING: cannot remove 0-byte db file: {e}")
+
         with self._connect() as conn:
             conn.execute(
                 """
@@ -281,29 +317,52 @@ class PersistentJobStore(JobStore):
             )
             conn.commit()
 
-    def _insert_job(self, job: Job):
+        # P0 fix: 验证表确实已创建（防御性编程，防止某些 SQLite 边缘情况
+        # 下 CREATE TABLE 静默失败）
         with self._connect() as conn:
-            conn.execute(
-                """
-                INSERT OR REPLACE INTO jobs
-                (job_id, status, params, logs, result, error,
-                 created_at, updated_at, log_count)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    job.id,
-                    job.status,
-                    json.dumps(job.params, ensure_ascii=False),
-                    # P2-5: 仅持久化日志尾部摘要，完整日志保留在内存。
-                    json.dumps(job.logs[-_PERSISTED_LOG_TAIL:], ensure_ascii=False),
-                    json.dumps(job.result, ensure_ascii=False) if job.result else None,
-                    job.error,
-                    job.created_at,
-                    job.updated_at,
-                    len(job.logs),
-                ),
+            cur = conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='jobs'"
             )
-            conn.commit()
+            if not cur.fetchone():
+                raise RuntimeError(
+                    f"_ensure_schema() failed: jobs table not created in {self._db_path}"
+                )
+
+    def _insert_job(self, job: Job):
+        # P0 fix: 如果 jobs 表不存在（数据库被外部清空或损坏），
+        # 自动重新创建 schema 后重试。这防止了 "no such table: jobs"
+        # 错误导致整个 EDM 任务失败。
+        for _attempt in range(2):
+            try:
+                with self._connect() as conn:
+                    conn.execute(
+                        """
+                        INSERT OR REPLACE INTO jobs
+                        (job_id, status, params, logs, result, error,
+                         created_at, updated_at, log_count)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        (
+                            job.id,
+                            job.status,
+                            json.dumps(job.params, ensure_ascii=False),
+                            # P2-5: 仅持久化日志尾部摘要，完整日志保留在内存。
+                            json.dumps(job.logs[-_PERSISTED_LOG_TAIL:], ensure_ascii=False),
+                            json.dumps(job.result, ensure_ascii=False) if job.result else None,
+                            job.error,
+                            job.created_at,
+                            job.updated_at,
+                            len(job.logs),
+                        ),
+                    )
+                    conn.commit()
+                return  # 成功，退出重试循环
+            except sqlite3.OperationalError as e:
+                if "no such table" in str(e) and _attempt == 0:
+                    print(f"[JobStore] WARNING: {e} — auto-recreating schema and retrying...")
+                    self._ensure_schema()
+                    continue
+                raise  # 第二次尝试仍失败，或非 "no such table" 错误，向上抛出
 
     def _persist(self, job: Job):
         self._insert_job(job)

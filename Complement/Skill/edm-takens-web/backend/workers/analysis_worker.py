@@ -67,6 +67,9 @@ def _job_worker(store: JobStore, job: Job):
             # 逐任务 os.chdir/restore，避免多线程下进程级 cwd 互相干扰。
             # 先对 results/ 做文件名快照，后续 _move_results_to_task 只迁移
             # 快照中不存在的新增文件，防止误移其它并发任务的产物。
+            # P0 fix: 防御性创建 results/ 目录 — 同步脚本或外部操作可能
+            # 在后端运行期间删除该目录，导致 os.listdir 失败。
+            os.makedirs(RESULTS_DIR, exist_ok=True)
             preexisting_files = set(os.listdir(RESULTS_DIR))
 
             csv_path, pipeline_target, pipeline_vars, original_target, display_map = _prepare_pipeline_data(

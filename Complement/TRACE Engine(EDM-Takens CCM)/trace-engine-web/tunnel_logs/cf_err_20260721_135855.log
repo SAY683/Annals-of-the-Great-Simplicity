@@ -45,3 +45,5 @@
 2026-07-21T05:59:20Z INF precheck component="Cloudflare API" details="API is reachable" run_id=560accb5-0623-4493-9265-f393d5571dc1 status=pass target=api.cloudflare.com:443
 2026-07-21T05:59:20Z INF precheck complete hard_fail=false run_id=560accb5-0623-4493-9265-f393d5571dc1 suggested_protocol=http2
 2026-07-21T06:59:21Z ERR Failed to refresh feature selector error="lookup cfd-features.argotunnel.com: dnsquery: This operation returned because the timeout period expired."
+2026-07-21T07:59:21Z ERR Failed to refresh feature selector error="lookup cfd-features.argotunnel.com: dnsquery: This operation returned because the timeout period expired."
+2026-07-21T08:04:15Z ERR Failed to refresh DNS local resolver error="lookup region1.v2.argotunnel.com: i/o timeout"

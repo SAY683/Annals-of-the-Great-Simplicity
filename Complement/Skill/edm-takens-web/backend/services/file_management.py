@@ -353,6 +353,8 @@ def _move_results_to_task(
     # NEW-3: 快照过滤 — 只迁移本任务运行期间新增的文件，避免误移其它
     # 并发/历史任务的产物。preexisting_files 为分析开始前 results/ 中
     # 已存在的文件名集合。
+    # P0 fix: 防御性创建 results/ 目录 — 同步脚本或外部操作可能删除它。
+    os.makedirs(RESULTS_DIR, exist_ok=True)
     existing = preexisting_files or set()
     moved_images = []
     for fname in os.listdir(RESULTS_DIR):

@@ -1,13 +1,16 @@
 {
-  "data_path": "C:\\Users\\SAY\\AppData\\Local\\Temp\\test_n15.csv",
-  "n_samples": 15,
-  "n_variables": 4,
+  "data_path": "C:\\Users\\SAY\\AppData\\Local\\Temp\\edmtakens_n3x3xjol.csv",
+  "n_samples": 31,
+  "n_variables": 7,
   "target_col": "result",
   "columns": [
     "result",
     "kills",
     "damage",
-    "deaths"
+    "deaths",
+    "concept_count",
+    "adj_density",
+    "concept_coverage"
   ],
   "E": 2,
   "tau": 1,
@@ -28,10 +31,10 @@
   "scipy_version": "1.15.3",
   "pandas_version": "2.3.3",
   "pyedm_version": "2.5.0",
-  "timestamp": "2026-07-21T14:55:53",
+  "timestamp": "2026-07-21T16:19:16",
   "analysis_type": "exploratory",
-  "random_seed": 6953,
+  "random_seed": 1956,
   "notes": "",
   "audit_verdict": "WARN",
-  "audit_findings_summary": "PASS:2 WARN:5 FAIL:0"
+  "audit_findings_summary": "PASS:4 WARN:3 FAIL:0"
 }
