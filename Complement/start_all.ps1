@@ -51,6 +51,38 @@ function Find-ProjectDir($name, $hints) {
     return $null
 }
 
+# 检查 node_modules 是否存在，缺失时自动运行 npm install。
+# 重启电脑后便携目录的 node_modules 可能被清理或从未安装，
+# 此函数确保 Node.js 项目在启动前依赖就绪。
+function Ensure-NpmDeps($projectDir, $label, $subDir = "") {
+    $targetDir = if ($subDir) { Join-Path $projectDir $subDir } else { $projectDir }
+    if (-not (Test-Path $targetDir)) {
+        Write-Host "  [ERROR] ${label}: 目录不存在 $targetDir" -ForegroundColor Red
+        return $false
+    }
+    $nodeModules = Join-Path $targetDir "node_modules"
+    if (Test-Path $nodeModules) { return $true }
+
+    $npm = Get-Command npm -ErrorAction SilentlyContinue
+    if (-not $npm) {
+        Write-Host "  [ERROR] ${label}: node_modules 缺失且未找到 npm，无法自动安装" -ForegroundColor Red
+        return $false
+    }
+    Write-Host "  [INFO] ${label}: node_modules 缺失，自动执行 npm install..." -ForegroundColor Yellow
+    Push-Location $targetDir
+    try {
+        & npm install --no-audit --no-fund 2>&1 | Out-Host
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "  [ERROR] ${label}: npm install 失败 (exit $LASTEXITCODE)" -ForegroundColor Red
+            return $false
+        }
+        Write-Host "  [OK] ${label}: npm 依赖已安装" -ForegroundColor Green
+    } finally {
+        Pop-Location
+    }
+    return $true
+}
+
 $edmDir   = Find-ProjectDir "edm-takens-web"   @("Skill\edm-takens-web", "edm-takens-web")
 $traceDir = Find-ProjectDir "trace-engine-web" @("TRACE Engine(EDM-Takens CCM)\trace-engine-web", "trace-engine-web")
 $bridgeDir = Find-ProjectDir "trace-to-edm"    @("TRACE Engine(EDM-Takens CCM)\trace-to-edm", "trace-to-edm")
@@ -103,6 +135,15 @@ Write-Host "项目路径:" -ForegroundColor Gray
 Write-Host "  edm-takens-web:   $edmDir" -ForegroundColor Gray
 Write-Host "  trace-engine-web: $traceDir" -ForegroundColor Gray
 Write-Host "  trace-to-edm:     $bridgeDir" -ForegroundColor Gray
+Write-Host ""
+
+# ═══════════════ NPM 依赖预检 ═══════════════
+# 重启电脑后 node_modules 可能缺失，此处自动检测并安装。
+# trace-engine-web 的 start.ps1 内部已有同类检查，此处仅为另外两个项目兜底。
+Write-Host "检查 npm 依赖..." -ForegroundColor Cyan
+$edmDepsOk   = Ensure-NpmDeps $edmDir    "edm-takens-web 前端" "frontend"
+$tewDepsOk   = Ensure-NpmDeps $traceDir  "trace-engine-web"
+$tteDepsOk   = Ensure-NpmDeps $bridgeDir "trace-to-edm"
 Write-Host ""
 
 # 保存所有进程引用，用于 finally 清理

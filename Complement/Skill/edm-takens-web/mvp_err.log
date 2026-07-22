@@ -1,2 +1,4 @@
-'vite' 不是内部或外部命令，也不是可运行的程序
-或批处理文件。
+INFO:     Started server process [16980]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)

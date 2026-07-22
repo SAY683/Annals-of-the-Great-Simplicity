@@ -2,16 +2,12 @@
 > edm-takens-web-frontend@0.1.0 dev
 > vite
 
-============================================================
-  EDM-Takens Web MVP Æô¶¯Æ÷
-============================================================
-[+] ºó¶Ë PID 25016: G:\Python\python.exe run_backend.py
-[*] µÈ´ýºó¶Ë¾ÍÐ÷ (sync_check + µ¼Èë¿ÉÄÜÐèÒªÊýÃë)...
-[OK] ºó¶ËÒÑ¾ÍÐ÷: http://localhost:8000
-[+] Ç°¶Ë PID 29976: G:\Linux\Node\npm.CMD run dev
-[*] µÈ´ýÇ°¶Ë¾ÍÐ÷...
-[OK] Ç°¶ËÒÑ¾ÍÐ÷: http://localhost:5173
 
-[*] °´ Ctrl+C Í£Ö¹ËùÓÐ·þÎñ
+  [32m[1mVITE[22m v5.4.21[39m  [2mready in [0m[1m549[22m[2m[0m ms[22m
 
-[-] ºó¶Ë ÒÑÍ£Ö¹
+  [32mâžœ[39m  [1mLocal[22m:   [36mhttp://localhost:[1m5173[22m/[39m
+  [32mâžœ[39m  [1mNetwork[22m: [36mhttp://26.154.158.92:[1m5173[22m/[39m
+  [32mâžœ[39m  [1mNetwork[22m: [36mhttp://192.168.230.1:[1m5173[22m/[39m
+  [32mâžœ[39m  [1mNetwork[22m: [36mhttp://192.168.174.1:[1m5173[22m/[39m
+  [32mâžœ[39m  [1mNetwork[22m: [36mhttp://192.168.10.2:[1m5173[22m/[39m
+[2m[32m  âžœ[39m[22m[2m  press [22m[1mh + enter[22m[2m to show help[22m

@@ -1,25 +1,23 @@
-[2026-07-21 16:23:02] [INFO] 启动脚本开始，目录: G:\git\Annals-of-the-Great-Simplicity-main\Annals-of-the-Great-Simplicity\Complement\TRACE Engine(EDM-Takens CCM)\trace-engine-web
-[2026-07-21 16:23:02] [INFO] Node: v22.14.0
-[2026-07-21 16:23:03] [INFO] npm:  11.17.0
-[2026-07-21 16:23:03] [INFO] 检查依�?..
-[2026-07-21 16:23:04] [WARN] 端口 3000 已被占用，尝试下一�?..
-[2026-07-21 16:23:04] [WARN] 端口 3001 已被占用，尝试下一�?..
-[2026-07-21 16:23:04] [WARN] 端口 3002 已被占用，尝试下一�?..
-[2026-07-21 16:23:04] [INFO] 工作目录: G:\git\Annals-of-the-Great-Simplicity-main\Annals-of-the-Great-Simplicity\Complement\TRACE Engine(EDM-Takens CCM)\trace-engine-web\work
-[2026-07-21 16:23:04] [INFO] 启动服务...
-[2026-07-21 16:23:04] [INFO] 打开浏览器访�?http://localhost:3003
-[2026-07-21 16:23:04] [INFO] 日志保存�?G:\git\Annals-of-the-Great-Simplicity-main\Annals-of-the-Great-Simplicity\Complement\TRACE Engine(EDM-Takens CCM)\trace-engine-web\work\start.log
+[2026-07-22 12:49:05] [INFO] 启动脚本开始，目录: G:\git\Annals-of-the-Great-Simplicity-main\Annals-of-the-Great-Simplicity\Complement\TRACE Engine(EDM-Takens CCM)\trace-engine-web
+[2026-07-22 12:49:05] [INFO] Node: v22.14.0
+[2026-07-22 12:49:05] [INFO] npm:  11.17.0
+[2026-07-22 12:49:05] [INFO] 检查依�?..
+[2026-07-22 12:49:06] [WARN] 端口 3000 已被占用，尝试下一�?..
+[2026-07-22 12:49:07] [INFO] 工作目录: G:\git\Annals-of-the-Great-Simplicity-main\Annals-of-the-Great-Simplicity\Complement\TRACE Engine(EDM-Takens CCM)\trace-engine-web\work
+[2026-07-22 12:49:07] [INFO] 启动服务...
+[2026-07-22 12:49:07] [INFO] 打开浏览器访�?http://localhost:3001
+[2026-07-22 12:49:07] [INFO] 日志保存�?G:\git\Annals-of-the-Great-Simplicity-main\Annals-of-the-Great-Simplicity\Complement\TRACE Engine(EDM-Takens CCM)\trace-engine-web\work\start.log
 
 > trace-engine-web@0.2.0 start
 > node server.js
 
-TRACE Engine Web MVP 运行在 http://localhost:3003
+TRACE Engine Web MVP 运行在 http://localhost:3001
 工作目录: G:\git\Annals-of-the-Great-Simplicity-main\Annals-of-the-Great-Simplicity\Complement\TRACE Engine(EDM-Takens CCM)\trace-engine-web\work
 Skill 目录: G:\git\Annals-of-the-Great-Simplicity-main\Annals-of-the-Great-Simplicity\Complement\TRACE Engine(EDM-Takens CCM)\trace-engine\examples\counterfactual_hybrid
 输出 TTL: 86400000ms
 最大并发任务: 2, 超时: 600000ms
 API 鉴权: 未启用（开发模式，TRACE_API_KEY 未设置）
-[2026-07-21T08:23:28.728Z] [info] 服务启动 port=3003 work=G:\git\Annals-of-the-Great-Simplicity-main\Annals-of-the-Great-Simplicity\Complement\TRACE Engine(EDM-Takens CCM)\trace-engine-web\work skill=G:\git\Annals-of-the-Great-Simplicity-main\Annals-of-the-Great-Simplicity\Complement\TRACE Engine(EDM-Takens CCM)\trace-engine\examples\counterfactual_hybrid
-[2026-07-21T08:23:28.721Z] [warn] TRACE_API_KEY 未设置，API 鉴权已禁用（开发模式）。生产环境请设置 TRACE_API_KEY 与 TRACE_ADMIN_KEY。
-[2026-07-21T08:23:05.913Z] [info] 已从 presets.yaml 加载桥接参数 Schema (default)，共 12 项
-[2026-07-21T08:23:06.085Z] [info] 已从 presets.yaml 加载桥接参数 Schema (llama)，共 12 项
+[2026-07-22T04:49:09.032Z] [info] 已从 presets.yaml 加载桥接参数 Schema (llama)，共 12 项
+[2026-07-22T04:49:38.530Z] [info] 服务启动 port=3001 work=G:\git\Annals-of-the-Great-Simplicity-main\Annals-of-the-Great-Simplicity\Complement\TRACE Engine(EDM-Takens CCM)\trace-engine-web\work skill=G:\git\Annals-of-the-Great-Simplicity-main\Annals-of-the-Great-Simplicity\Complement\TRACE Engine(EDM-Takens CCM)\trace-engine\examples\counterfactual_hybrid
+[2026-07-22T04:49:38.522Z] [warn] TRACE_API_KEY 未设置，API 鉴权已禁用（开发模式）。生产环境请设置 TRACE_API_KEY 与 TRACE_ADMIN_KEY。
+[2026-07-22T04:49:08.846Z] [info] 已从 presets.yaml 加载桥接参数 Schema (default)，共 12 项

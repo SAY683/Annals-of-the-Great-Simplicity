@@ -12,9 +12,23 @@ import shutil
 import subprocess
 
 _PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
+_FRONTEND_DIR = os.path.join(_PROJECT_ROOT, "frontend")
 _BACKEND_CMD = [sys.executable, "run_backend.py"]
 _NPM = shutil.which("npm") or "npm"
 _FRONTEND_CMD = [_NPM, "run", "dev"]
+
+
+def _ensure_frontend_deps():
+    """重启后 node_modules 可能缺失，启动前自动安装。"""
+    node_modules = os.path.join(_FRONTEND_DIR, "node_modules")
+    if os.path.isdir(node_modules):
+        return
+    if not _NPM or not shutil.which(_NPM):
+        print("[!] 未找到 npm，无法自动安装前端依赖，前端可能无法启动。")
+        return
+    print("[INFO] frontend/node_modules 缺失，自动执行 npm install...")
+    subprocess.run([_NPM, "install", "--no-audit", "--no-fund"], cwd=_FRONTEND_DIR, check=False)
+    print("[OK] 前端依赖安装完成。")
 
 
 def _wait_for_port(host: str, port: int, timeout: float = 30.0):
@@ -40,6 +54,9 @@ def main():
     print("=" * 60)
     print("  EDM-Takens Web MVP 启动器")
     print("=" * 60)
+
+    # 重启后 node_modules 可能缺失，提前检查安装
+    _ensure_frontend_deps()
 
     # P1 fix: 先启动后端并等待就绪，再启动前端。
     # 后端启动时会运行 sync_check 等导入逻辑，耗时较长；
