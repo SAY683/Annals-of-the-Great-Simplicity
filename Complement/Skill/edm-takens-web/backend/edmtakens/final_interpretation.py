@@ -1188,11 +1188,28 @@ def _plot_interpretation(df, all_data, variables=None, var_labels=None,
     # ── Bottom row: CCM convergence and Summary ──
     # CCM convergence
     ax_ccm = fig.add_subplot(gs[2, :2])
-    E_ref = all_data[target_col]['E']
+    # P0 fix: target_col 可能在 Phase 1 失败（不在 all_data 中），导致
+    # KeyError: 'result'。改为优先用 target_col，回退到第一个可用变量。
+    _available = [v for v in variables if v in all_data]
+    if target_col in all_data:
+        E_ref = all_data[target_col]['E']
+    elif _available:
+        E_ref = all_data[_available[0]]['E']
+        target_col = _available[0]  # 更新 target_col 以便后续使用
+    else:
+        # 无可用变量时无法绘制 CCM，跳过此子图
+        ax_ccm.axis('off')
+        ax_ccm.set_title('CCM Convergence (skipped — no available variables)', fontsize=11)
+        ax_sum = fig.add_subplot(gs[2, 2:])
+        ax_sum.axis('off')
+        fig.savefig(output_path, dpi=150, bbox_inches='tight')
+        plt.close()
+        print(f"  Visualization saved (minimal): {output_path}")
+        return
     pairs = [(r['cause'], r['effect']) for r in _ccm_results[:3]
              if r.get('cause') in variables and r.get('effect') in variables] if _ccm_results else []
     if not pairs:
-        pairs = [(v, target_col) for v in variables if v != target_col][:3]
+        pairs = [(v, target_col) for v in _available if v != target_col][:3]
     ccm_colors = ['#FF5722', '#9C27B0', '#4CAF50']
     for (cause, effect), cc in zip(pairs, ccm_colors):
         ccm_r = ccm_with_convergence(df, cause, effect, E_ref)
@@ -1222,7 +1239,7 @@ def _plot_interpretation(df, all_data, variables=None, var_labels=None,
     # pyEDM bootstrap sample of the SAME data (CCM's `sample` parameter
     # is stochastic — see ccm_causality.py). Found during a full-codebase
     # census; see docs/CHANGELOG.md.
-    max_ev_all = {v: all_data[v]['max_ev'] for v in variables}
+    max_ev_all = {v: all_data[v]['max_ev'] for v in variables if v in all_data}
     worst_stability_var = max(max_ev_all, key=max_ev_all.get)
     stability_tier = classify_havok_stability(max_ev_all[worst_stability_var])
     if stability_tier.startswith("Divergent"):
