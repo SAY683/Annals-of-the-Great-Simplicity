@@ -118,8 +118,9 @@ def estimate_lyapunov_robust(data, E, dt=1.0):
         t_fit * dt, div_mean[:len(t_fit)])
     fit_r2 = r_value ** 2
 
-    lambda_max = max(0.001, slope)
-    tau_L = 1.0 / lambda_max
+    # Q9 P1-17 修复: 允许负 Lyapunov 指数以正确表示稳定系统
+    lambda_max = slope
+    tau_L = 1.0 / abs(lambda_max) if abs(lambda_max) > 1e-10 else float('inf')
 
     # R^2 quality check (Reviewer improvement #1)
     reliable = fit_r2 >= 0.5
@@ -1131,7 +1132,11 @@ def _plot_interpretation(df, all_data, variables=None, var_labels=None,
                                poly_order=2, basis="V")
             sh.fit(data)
             forcing = sh.forcing_
-            t_f = np.arange(len(forcing)) + sh.q
+            # Q9 P1-17 修复: forcing_ 长度 = n - q + 1，索引 j 对应时刻 j + q - 1
+            # (Hankel 列 j 的状态窗口为 [data[j], ..., data[j+q-1]])
+            # 之前 t_f = np.arange(len(forcing)) + sh.q 导致末尾超出数据范围 (t_f[-1]=n)
+            # 现改为 t_f = np.arange(len(forcing)) + sh.q - 1，对齐到延迟窗口结束时刻
+            t_f = np.arange(len(forcing)) + sh.q - 1
 
             ax1 = fig.add_subplot(inner[0, 1])
             ax1.fill_between(t_f, forcing, alpha=0.2, color=color)
@@ -1139,8 +1144,9 @@ def _plot_interpretation(df, all_data, variables=None, var_labels=None,
             ax1.axhline(0, color='gray', alpha=0.3)
             th = 1.5 * np.std(forcing)
             for si in np.where(np.abs(forcing) > th)[0]:
-                gi = si + sh.q
-                if gi < len(df):
+                # Q9 P1-17 修复: si 是 forcing_ 索引，对应时刻 si + q - 1
+                gi = si + sh.q - 1
+                if 0 <= gi < len(df):
                     ax1.annotate(f'{gi+1}', (gi, forcing[si]),
                                 xytext=(0, 10 if forcing[si] > 0 else -10),
                                 textcoords='offset points', ha='center', fontsize=6,
@@ -1148,14 +1154,18 @@ def _plot_interpretation(df, all_data, variables=None, var_labels=None,
             ax1.set_title(f'Forcing v_r (kurt={sh.kurtosis_vr_:+.2f})', fontsize=10)
             ax1.grid(True, alpha=0.2)
 
-            # Koopman spectrum: continuous eigenvalues (Re(λ), Im(λ)) for spectral shape
+            # Koopman spectrum: discrete-time eigenvalues on unit circle
+            # Q9 P1-17 修复: 之前绘制连续时间特征值 sh.eigenvalues_ (来自 eig(A))
+            # 但参考线是单位圆 (离散时间稳定性边界 |λ_d|=1)，数学上不一致。
+            # 现改用离散时间特征值 sh.eigenvalues_d_ (来自 expm(A*dt))，
+            # 与单位圆参考线和 max|eig_d| 标题保持一致。
             ax2 = fig.add_subplot(inner[1, 0])
-            evals_cont = sh.eigenvalues_  # continuous-time for spectral visualization
-            ax2.scatter(np.real(evals_cont), np.imag(evals_cont), c=color, s=60, zorder=5)
+            evals_disc = sh.eigenvalues_d_
+            ax2.scatter(np.real(evals_disc), np.imag(evals_disc), c=color, s=60, zorder=5)
             theta = np.linspace(0, 2*np.pi, 100)
             ax2.plot(np.cos(theta), np.sin(theta), 'k--', alpha=0.3, linewidth=1)
             ax2.axhline(0, color='gray', alpha=0.2); ax2.axvline(0, color='gray', alpha=0.2)
-            _max_eig_str = f"{float(np.max(np.abs(sh.eigenvalues_d_))):.3f}" if len(sh.eigenvalues_d_) else "N/A"
+            _max_eig_str = f"{float(np.max(np.abs(evals_disc))):.3f}" if len(evals_disc) else "N/A"
             ax2.set_title(f'Koopman spectrum (max|eig_d|={_max_eig_str})',
                          fontsize=10)
             ax2.set_aspect('equal')

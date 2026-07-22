@@ -514,7 +514,10 @@ class SacredProjector:
         for key in latest:
             if key.startswith("z_"):
                 d_key = key.replace("z_", "dz_")
-                derivatives[d_key] = (latest[key] - prev[key]) / dt1
+                # Q9 P1-17 修复: 两端使用 float() 转换，避免 prev[key] 为空字符串导致 TypeError
+                val_latest = float(latest.get(key, 0.0) or 0.0)
+                val_prev = float(prev.get(key, 0.0) or 0.0)
+                derivatives[d_key] = (val_latest - val_prev) / dt1
 
         # 二阶差分 Δ²z/Δt²
         if len(history) >= 3:
@@ -523,8 +526,12 @@ class SacredProjector:
             for key in latest:
                 if key.startswith("z_"):
                     d2_key = key.replace("z_", "d2z_")
-                    dz_now = (latest[key] - prev[key]) / dt1
-                    dz_prev = (prev[key] - prev2[key]) / dt2
+                    # Q9 P1-17 修复: 两端使用 float() 转换，防止空值/字符串导致二阶差分计算失败
+                    val_latest = float(latest.get(key, 0.0) or 0.0)
+                    val_prev = float(prev.get(key, 0.0) or 0.0)
+                    val_prev2 = float(prev2.get(key, 0.0) or 0.0)
+                    dz_now = (val_latest - val_prev) / dt1
+                    dz_prev = (val_prev - val_prev2) / dt2
                     # 二阶差分对平均 Δt 归一化
                     avg_dt = (dt1 + dt2) / 2.0 if use_time else 1.0
                     derivatives[d2_key] = (dz_now - dz_prev) / avg_dt
@@ -674,7 +681,12 @@ class SacredProjector:
 
         # 5. 构造新的 coords dict
         new_coords = {f"z_{names[i]}": float(new_coords_vec[i]) for i in range(len(names))}
-        new_coords["_orthogonality_report"] = self.get_orthogonality_report()
+        import json as _json_module
+        report = self.get_orthogonality_report()
+        # Q9 P1-17 修复: 将正交性报告序列化为标准 JSON，避免 CSV DictWriter
+        # 调用 str(dict) 产生 Python 字面量（True/False），导致下游 JSON 解析失败。
+        # 现统一在源头输出 JSON 字符串，保证跨语言兼容性。
+        new_coords["_orthogonality_report"] = _json_module.dumps(report, ensure_ascii=False)
         new_coords["_method"] = method
         return new_coords
 

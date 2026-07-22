@@ -147,10 +147,12 @@ def estimate_lyapunov_exponent(data, E, dt=1.0, n_expand=20):
     if fit_end < 5:
         fit_end = len(div_mean) - 2
     coeffs = np.polyfit(t_div[:fit_end], div_mean[:fit_end], 1)
-    lambda_max = max(0.001, coeffs[0])  # ensure positive
+    # Q9 P1-17 修复: 允许负 Lyapunov 指数以正确表示稳定系统
+    # 之前 max(0.001, coeffs[0]) 强制为正，导致稳定系统也被报告为混沌
+    lambda_max = coeffs[0]
 
-    # Lyapunov time
-    tau_L = 1.0 / lambda_max if lambda_max > 0 else float('inf')
+    # Lyapunov time: 使用绝对值，稳定系统 lambda_max<=0 时 tau_L 为 inf
+    tau_L = 1.0 / abs(lambda_max) if abs(lambda_max) > 1e-10 else float('inf')
 
     # Prediction horizons (in original time units, i.e. games)
     horizon_1x = tau_L
@@ -489,7 +491,9 @@ def plot_enhanced_report(df, all_results, safeguards, output_path):
         # ── Col 1: HAVOK Forcing + Lyapunov Horizon ──
         ax1 = fig.add_subplot(gs[row, 1])
         forcing = sh.forcing_
-        t = np.arange(len(forcing)) + sh.q
+        # Q9 P1-17 修复: forcing_ 长度 = n - q + 1，索引 j 对应时刻 j + q - 1
+        # 之前 t = np.arange(len(forcing)) + sh.q 导致末尾超出数据范围
+        t = np.arange(len(forcing)) + sh.q - 1
         ax1.fill_between(t, forcing, alpha=0.2, color=color)
         ax1.plot(t, forcing, 'o-', color=color, markersize=4, linewidth=0.8)
         ax1.axhline(0, color='gray', alpha=0.3)
@@ -509,8 +513,9 @@ def plot_enhanced_report(df, all_results, safeguards, output_path):
         # Annotate spikes
         th = 1.5 * np.std(forcing)
         for si in np.where(np.abs(forcing) > th)[0]:
-            gi = si + sh.q
-            if gi < len(df):
+            # Q9 P1-17 修复: si 是 forcing_ 索引，对应时刻 si + q - 1
+            gi = si + sh.q - 1
+            if 0 <= gi < len(df):
                 # P0 回流：泛化 result 列检测——无 'result' 列时用中性标记，
                 # 避免对非游戏类数据抛 KeyError。
                 if 'result' in df.columns:
@@ -547,9 +552,12 @@ def plot_enhanced_report(df, all_results, safeguards, output_path):
                 if 0 <= j < len(dists): dists[j] = np.inf
             j = np.argmin(dists)
             if np.isinf(dists[j]): continue
-            div_ij = [np.log(np.sqrt(np.sum((X_div[min(i+k, N_div-1)] -
-                                             X_div[min(j+k, N_div-1)])**2)) + 1e-12)
-                      for k in range(min(20, N_div - max(i, j) - 1))]
+            # Q9 P1-17 修复: 限制循环范围避免截断伪影
+            # 之前使用 min(i+k, N_div-1) 导致当 i+k >= N_div 时比较自身，
+            # log(0 + 1e-12) ≈ -27.6 人为拉平发散曲线尾部，Lyapunov 估计偏低
+            max_k = min(20, N_div - max(i, j) - 1)
+            div_ij = [np.log(np.sqrt(np.sum((X_div[i+k] - X_div[j+k])**2)) + 1e-12)
+                      for k in range(max_k)]
             div_all.append(div_ij)
 
         if len(div_all) > 3:

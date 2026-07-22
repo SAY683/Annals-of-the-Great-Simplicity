@@ -502,6 +502,9 @@ class SovereignHAVOK:
         self.eigenvalues_d_ = eig(K_d_proper)[0]
 
         # 11. Regression quality
+        # Note: This is the "uncentered R²" (no intercept), appropriate for
+        # models without intercept. For derivative signals with mean ≈ 0,
+        # this is close to the standard R².
         dv_pred = Theta @ Xi
         self.regression_r2_ = float(
             1 - np.sum((dv_dt - dv_pred) ** 2) / (np.sum(dv_dt ** 2) + 1e-12)
@@ -668,7 +671,11 @@ class SovereignHAVOK:
             "spike_count": len(spike_indices),
             "spike_positions": spike_indices.tolist(),
             "basis": self.basis,
-            "condition_number": f"{float(np.linalg.cond(self.A_)):.2f}",
+            "condition_number": (
+                f"{float(np.linalg.cond(self.A_)):.2f}"
+                if np.isfinite(np.linalg.cond(self.A_))
+                else "Singular (inf)"
+            ),
             "sampling_adequacy": self.sampling_adequacy_,  # Secret 14
             # 数值版本字段（_raw）——格式化字符串字段旁附同名数值副本，
             # 便于程序化消费方直接读取 float/int，无需解析百分号/小数字符串。
