@@ -1,0 +1,47 @@
+2026-07-22T07:23:10Z INF Thank you for trying Cloudflare Tunnel. Doing so, without a Cloudflare account, is a quick way to experiment and try it out. However, be aware that these account-less Tunnels have no uptime guarantee, are subject to the Cloudflare Online Services Terms of Use (https://www.cloudflare.com/website-terms/), and Cloudflare reserves the right to investigate your use of Tunnels for violations of such terms. If you intend to use Tunnels in production you should use a pre-created named tunnel by following: https://developers.cloudflare.com/cloudflare-one/connections/connect-apps
+2026-07-22T07:23:10Z INF Requesting new quick Tunnel on trycloudflare.com...
+2026-07-22T07:23:15Z INF +--------------------------------------------------------------------------------------------+
+2026-07-22T07:23:15Z INF |  Your quick Tunnel has been created! Visit it at (it may take some time to be reachable):  |
+2026-07-22T07:23:15Z INF |  https://min-builder-cart-projector.trycloudflare.com                                      |
+2026-07-22T07:23:15Z INF +--------------------------------------------------------------------------------------------+
+2026-07-22T07:23:15Z INF Cannot determine default configuration path. No file [config.yml config.yaml] in [~/.cloudflared ~/.cloudflare-warp ~/cloudflare-warp]
+2026-07-22T07:23:15Z INF Version 2026.7.2 (Checksum cdb5d4432f6ae1595654a692a51308b69d2bf7af961f5578d9391837cf072df9)
+2026-07-22T07:23:15Z INF GOOS: windows, GOVersion: go1.26.4, GoArch: amd64
+2026-07-22T07:23:15Z INF Settings: map[edge-ip-version:4 ha-connections:1 no-chunked-encoding:true protocol:quic url:http://localhost:3000]
+2026-07-22T07:23:15Z INF cloudflared will not automatically update on Windows systems.
+2026-07-22T07:23:25Z ERR Failed to fetch features, default to disable error="lookup cfd-features.argotunnel.com: dnsquery: This operation returned because the timeout period expired."
+2026-07-22T07:23:25Z INF Generated Connector ID: 3367c5ba-742b-4168-a200-1fed41cc8693
+2026-07-22T07:23:25Z WRN Unable to lookup protocol percentage.
+2026-07-22T07:23:25Z INF Initial protocol quic
+2026-07-22T07:23:25Z INF ICMP proxy will use 192.168.10.2 as source for IPv4
+2026-07-22T07:23:25Z INF ICMP proxy will use 2409:8a70:5021:fca4:72c7:c505:bb5c:790b in zone WLAN as source for IPv6
+2026-07-22T07:23:26Z INF cloudflared does not support loading the system root certificate pool on Windows. Please use --origin-ca-pool <PATH> to specify the path to the certificate pool
+2026-07-22T07:23:26Z INF ICMP proxy will use 192.168.10.2 as source for IPv4
+2026-07-22T07:23:26Z INF Tunnel connection curve preferences: [X25519MLKEM768 CurveID(65074) CurveP256] connIndex=0 event=0 ip=198.41.192.47
+2026-07-22T07:23:26Z INF ICMP proxy will use 2409:8a70:5021:fca4:72c7:c505:bb5c:790b in zone WLAN as source for IPv6
+2026-07-22T07:23:26Z INF Starting metrics server on 127.0.0.1:58473/metrics
+2026-07-22T07:23:27Z INF Registered tunnel connection connIndex=0 connection=3b7094f2-eb75-4b5c-9a4e-65df303149f9 event=0 ip=198.41.192.47 location=lax05 protocol=quic
+2026-07-22T07:23:35Z INF +-----------------------------------------------------------------------------------------------+
+2026-07-22T07:23:35Z INF |                                    CONNECTIVITY PRE-CHECKS                                    |
+2026-07-22T07:23:35Z INF +-----------------------------------------------------------------------------------------------+
+2026-07-22T07:23:35Z INF |  COMPONENT         TARGET                     STATUS  DETAILS                                 |
+2026-07-22T07:23:35Z INF |  DNS Resolution    region1.v2.argotunnel.com  PASS    DNS Resolved successfully               |
+2026-07-22T07:23:35Z INF |  DNS Resolution    region2.v2.argotunnel.com  PASS    DNS Resolved successfully               |
+2026-07-22T07:23:35Z INF |  UDP Connectivity  region1.v2.argotunnel.com  PASS    QUIC connection successful              |
+2026-07-22T07:23:35Z INF |  UDP Connectivity  region2.v2.argotunnel.com  FAIL    QUIC connection failed                  |
+2026-07-22T07:23:35Z INF |  TCP Connectivity  region1.v2.argotunnel.com  PASS    HTTP/2 connection successful            |
+2026-07-22T07:23:35Z INF |  TCP Connectivity  region2.v2.argotunnel.com  PASS    HTTP/2 connection successful            |
+2026-07-22T07:23:35Z INF |  Cloudflare API    api.cloudflare.com:443     PASS    API is reachable                        |
+2026-07-22T07:23:35Z INF |  WARNING: Allow outbound QUIC traffic on port 7844 or use HTTP2.                              |
+2026-07-22T07:23:35Z INF |                                                                                               |
+2026-07-22T07:23:35Z INF |  SUMMARY: Environment ready with degraded transport. cloudflared will proceed using 'http2'.  |
+2026-07-22T07:23:35Z INF +-----------------------------------------------------------------------------------------------+
+2026-07-22T07:23:35Z INF precheck component="DNS Resolution" details="DNS Resolved successfully" run_id=a9f56929-ea73-440d-860f-67d416a60fc0 status=pass target=region1.v2.argotunnel.com
+2026-07-22T07:23:35Z INF precheck component="DNS Resolution" details="DNS Resolved successfully" run_id=a9f56929-ea73-440d-860f-67d416a60fc0 status=pass target=region2.v2.argotunnel.com
+2026-07-22T07:23:35Z INF precheck component="UDP Connectivity" details="QUIC connection successful" run_id=a9f56929-ea73-440d-860f-67d416a60fc0 status=pass target=region1.v2.argotunnel.com
+2026-07-22T07:23:35Z INF precheck component="UDP Connectivity" details="QUIC connection failed" run_id=a9f56929-ea73-440d-860f-67d416a60fc0 status=fail target=region2.v2.argotunnel.com
+2026-07-22T07:23:35Z INF precheck component="TCP Connectivity" details="HTTP/2 connection successful" run_id=a9f56929-ea73-440d-860f-67d416a60fc0 status=pass target=region1.v2.argotunnel.com
+2026-07-22T07:23:35Z INF precheck component="TCP Connectivity" details="HTTP/2 connection successful" run_id=a9f56929-ea73-440d-860f-67d416a60fc0 status=pass target=region2.v2.argotunnel.com
+2026-07-22T07:23:35Z INF precheck component="Cloudflare API" details="API is reachable" run_id=a9f56929-ea73-440d-860f-67d416a60fc0 status=pass target=api.cloudflare.com:443
+2026-07-22T07:23:35Z INF precheck complete hard_fail=false run_id=a9f56929-ea73-440d-860f-67d416a60fc0 suggested_protocol=http2
+2026-07-22T07:33:31Z ERR Failed to refresh DNS local resolver error="lookup region1.v2.argotunnel.com: i/o timeout"

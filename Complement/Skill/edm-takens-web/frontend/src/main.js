@@ -152,7 +152,7 @@ async function loadQuality(filename) {
           <td>${q.n}</td>
           <td>${(q.missing_ratio * 100).toFixed(1)}%</td>
           <td>${q.unique_count}</td>
-          <td>${q.std.toExponential(2)}</td>
+          <td>${q.std != null ? q.std.toExponential(2) : '-'}</td>
           <td>${q.lag1_autocorr != null ? q.lag1_autocorr.toFixed(2) : '-'}</td>
           <td>${q.trend_score != null ? q.trend_score.toFixed(2) : '-'}</td>
           <td>${warnings}</td>

@@ -333,7 +333,7 @@ def series_quality(series: pd.Series) -> Dict[str, Any]:
         "missing_ratio": round(missing_ratio, 4),
         "unique_count": unique_count,
         "unique_ratio": round(unique_ratio, 4),
-        "std": round(std, 6),
+        "std": round(std, 6) if std is not None else None,
         "sparsity": round(sparsity, 4) if sparsity is not None else None,
         "lag1_autocorr": round(lag1, 4) if np.isfinite(lag1) else None,
         "trend_score": round(trend, 4) if np.isfinite(trend) else None,

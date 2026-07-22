@@ -46,3 +46,8 @@
 2026-07-22T04:27:02Z INF Retrying connection in up to 2s connIndex=0 event=0 ip=198.41.200.73
 2026-07-22T04:27:03Z INF Tunnel connection curve preferences: [X25519MLKEM768 CurveID(65074) CurveP256] connIndex=0 event=0 ip=198.41.192.77
 2026-07-22T04:27:04Z INF Registered tunnel connection connIndex=0 connection=9cd52ecd-c6fd-4737-8224-234c43e6b0cc event=0 ip=198.41.192.77 location=lax07 protocol=quic
+2026-07-22T05:26:57Z ERR Failed to refresh feature selector error="lookup cfd-features.argotunnel.com: dnsquery: This operation returned because the timeout period expired."
+2026-07-22T05:37:03Z ERR Failed to refresh DNS local resolver error="lookup region1.v2.argotunnel.com: i/o timeout"
+2026-07-22T06:26:57Z ERR Failed to refresh feature selector error="lookup cfd-features.argotunnel.com: dnsquery: This operation returned because the timeout period expired."
+2026-07-22T07:26:57Z ERR Failed to refresh feature selector error="lookup cfd-features.argotunnel.com: dnsquery: This operation returned because the timeout period expired."
+2026-07-22T07:32:08Z ERR Failed to refresh DNS local resolver error="lookup region1.v2.argotunnel.com: i/o timeout"
