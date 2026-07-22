@@ -156,8 +156,31 @@ def data_quality(filename: str, target_col: Optional[str] = None, variables: Opt
     """Return per-column EDM readiness diagnostics (algorithmic soundness)."""
     csv_path, df, numeric_cols = _prepare_dataset(filename)
     target_col, selected_vars = _select_variables(df, numeric_cols, target_col, variables)
-    report = evaluate_dataframe(df, target_col, selected_vars, all_numeric_cols=numeric_cols)
-    return {"filename": filename, "target_col": target_col, "columns": report}
+    try:
+        report = evaluate_dataframe(df, target_col, selected_vars, all_numeric_cols=numeric_cols)
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=500,
+            detail=f"数据质量评估失败: {type(e).__name__}: {e}",
+        )
+    # P0 fix: 清理 NaN/Infinity，避免 FastAPI JSON 序列化失败
+    # (与 job_store.py 的 _sanitize_json 同类问题)
+    import math
+
+    def _sanitize(obj):
+        if isinstance(obj, float):
+            if math.isnan(obj) or math.isinf(obj):
+                return None
+            return obj
+        if isinstance(obj, dict):
+            return {k: _sanitize(v) for k, v in obj.items()}
+        if isinstance(obj, (list, tuple)):
+            return [_sanitize(v) for v in obj]
+        return obj
+
+    return {"filename": filename, "target_col": target_col, "columns": _sanitize(report)}
 
 
 @router.get("/api/datasets/{filename}/embed_curve")
@@ -173,14 +196,40 @@ def embed_curve(
         raise HTTPException(status_code=400, detail="Target column must be numeric")
 
     n = len(df)
-    lib = f"1 {n - 7}"
-    pred = f"{n - 6} {n}"
+
+    # P0 fix: 小样本预检 — 与 pipeline.py 的 MIN_SAMPLES_HARD 保持一致。
+    # N<10 时 lib 范围退化为 <=3 个点，EmbedDimension 数学上无法工作。
+    if n < 10:
+        raise HTTPException(
+            status_code=400,
+            detail=f"样本量 N={n} 不足，EmbedDimension 至少需要 10 个时间点"
+                   f"（推荐 ≥30）。请收集更多数据后重试。",
+        )
+
+    # P1 fix: 小样本时 maxE 过大会导致 EmbedDimension 搜索到退化区域
+    # (E=4, Tp=1, tau=-1 invalid for library)。与 pipeline.py 和
+    # enhanced_cross_validate.py 的 auto-E-detection 保持一致：
+    # maxE_effective = min(max_e, max(2, n // 5))
+    max_e_effective = min(max_e, max(2, n // 5))
+
+    # lib/pred 范围也需要根据 maxE_effective 动态调整，避免
+    # n-7 < maxE_effective 时 lib 太小。
+    lib_end = max(n - 7, max_e_effective + 2)
+    if lib_end >= n:
+        lib_end = n - 2
+    if lib_end < 3:
+        raise HTTPException(
+            status_code=400,
+            detail=f"样本量 N={n} 过小，无法构造有效的 lib/pred 分割",
+        )
+    lib = f"1 {lib_end}"
+    pred = f"{lib_end + 1} {n}"
     from _edm_bridge import EmbedDimension
 
     try:
         rho_E = EmbedDimension(
             data=df, lib=lib, pred=pred,
-            maxE=max_e, Tp=1,
+            maxE=max_e_effective, Tp=1,
             columns=target_col, target=target_col,
             showPlot=False, numProcess=1,
         )
@@ -202,7 +251,9 @@ def embed_curve(
     return {
         "filename": filename,
         "target_col": target_col,
-        "max_e": max_e,
+        "max_e": max_e_effective,
+        "max_e_requested": max_e,
+        "n_samples": n,
         "E_values": E_values,
         "rho_values": rho_values,
         "optimal_E": best_E,

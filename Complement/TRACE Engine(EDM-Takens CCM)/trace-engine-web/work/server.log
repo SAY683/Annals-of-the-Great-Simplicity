@@ -21,3 +21,15 @@ API 鉴权: 未启用（开发模式，TRACE_API_KEY 未设置）
 [2026-07-22T04:49:38.530Z] [info] 服务启动 port=3001 work=G:\git\Annals-of-the-Great-Simplicity-main\Annals-of-the-Great-Simplicity\Complement\TRACE Engine(EDM-Takens CCM)\trace-engine-web\work skill=G:\git\Annals-of-the-Great-Simplicity-main\Annals-of-the-Great-Simplicity\Complement\TRACE Engine(EDM-Takens CCM)\trace-engine\examples\counterfactual_hybrid
 [2026-07-22T04:49:38.522Z] [warn] TRACE_API_KEY 未设置，API 鉴权已禁用（开发模式）。生产环境请设置 TRACE_API_KEY 与 TRACE_ADMIN_KEY。
 [2026-07-22T04:49:08.846Z] [info] 已从 presets.yaml 加载桥接参数 Schema (default)，共 12 项
+[2026-07-22T06:55:12.058Z] [info] 已从 presets.yaml 加载预设 (5 套)
+[2026-07-22T06:55:11.837Z] [info] 已从 presets.yaml 加载预设 (5 套)
+[2026-07-22T06:55:12.269Z] [info] 已从 presets.yaml 加载预设 (5 套)
+[2026-07-22T06:57:18.255Z] [info] 已从 presets.yaml 加载预设 (5 套)
+[2026-07-22T06:57:18.454Z] [info] 已从 presets.yaml 加载预设 (5 套)
+[2026-07-22T06:57:18.059Z] [info] 已从 presets.yaml 加载预设 (5 套)
+[2026-07-22T06:57:56.900Z] [info] 已从 presets.yaml 加载预设 (5 套)
+[2026-07-22T06:57:57.120Z] [info] 已从 presets.yaml 加载预设 (5 套)
+[2026-07-22T06:57:57.320Z] [info] 已从 presets.yaml 加载预设 (5 套)
+[2026-07-22T07:04:20.233Z] [info] 已从 presets.yaml 加载预设 (5 套)
+[2026-07-22T07:04:20.629Z] [info] 已从 presets.yaml 加载预设 (5 套)
+[2026-07-22T07:04:20.448Z] [info] 已从 presets.yaml 加载预设 (5 套)
