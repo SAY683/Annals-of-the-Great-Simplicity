@@ -64,7 +64,7 @@ MODEL_REGISTRY = {
         "name": "Qwen2.5-1.5B-Instruct",
         "path": str(QWEN_MODEL_PATH),
         "hidden_size": 1536, "num_layers": 28, "middle_layer": 14,
-        "description": "1.5B 轻量 (~3GB显存)", "quantize": False,
+        "description": "1.5B 轻量 (~3GB 显存/内存)", "quantize": False,
     },
 }
 # 3B 模型直接从 config.QWEN_MODEL_PATH_3B 读取独立路径
@@ -72,7 +72,7 @@ MODEL_REGISTRY = {
 MODEL_REGISTRY["qwen2.5-3b"] = {
     "name": "Qwen2.5-3B-Instruct", "path": str(QWEN_MODEL_PATH_3B),
     "hidden_size": 2048, "num_layers": 36, "middle_layer": 18,
-    "description": "3B 精度 (4-bit量化, ~2.8GB显存)", "quantize": True,
+    "description": "3B 精度 (CUDA:4-bit量化 ~2.8GB | CPU:FP32 ~6GB)", "quantize": True,
 }
 
 # TRACE LLaMA 模型：仅注册供下拉展示，实际加载仍走 Qwen 路径
@@ -108,7 +108,13 @@ def _load_model_config():
             with open(p, 'r') as f:
                 saved = f.read().strip()
             if saved in MODEL_REGISTRY:
-                _ACTIVE_MODEL = saved
+                # Q9 P1-16 修复: 持久化配置若意外保存了 TRACE 展示模型，回退到默认 Qwen
+                if MODEL_REGISTRY[saved].get("trace_model", False):
+                    print(f"[L3] ⚠ 持久化配置 '{saved}' 为展示模型，已回退到默认模型")
+                    _ACTIVE_MODEL = "qwen2.5-1.5b"
+                    _save_model_config()
+                else:
+                    _ACTIVE_MODEL = saved
         except: pass
 
 def _save_model_config():
@@ -123,6 +129,11 @@ def get_active_model(): return _ACTIVE_MODEL
 def set_active_model(key):
     global _ACTIVE_MODEL, _MODEL, _TOKENIZER, _DEVICE, _SACRED_VECTORS
     if key in MODEL_REGISTRY:
+        cfg = MODEL_REGISTRY[key]
+        # Q9 P1-16 修复：TRACE LLaMA 模型在 L3 仅为展示用途，实际加载仍走 Qwen 路径
+        if cfg.get("trace_model", False):
+            print(f"[L3] ⚠ 模型 '{key}' 为 TRACE LLaMA 展示模型，不允许在 L3 直接激活")
+            return False
         _ACTIVE_MODEL = key
         _save_model_config()   # 持久化到磁盘
         _MODEL = None; _TOKENIZER = None
@@ -158,6 +169,10 @@ def _load_model():
 
     _DEVICE = _get_device()
     cfg = MODEL_REGISTRY.get(_ACTIVE_MODEL, MODEL_REGISTRY["qwen2.5-1.5b"])
+    # Q9 P1-16 防御: 若活动模型意外为 TRACE 展示模型，强制回退到默认 Qwen
+    if cfg.get("trace_model", False):
+        print(f"[L3] ⚠ 活动模型 '{_ACTIVE_MODEL}' 为展示模型，加载时回退到 qwen2.5-1.5b")
+        cfg = MODEL_REGISTRY["qwen2.5-1.5b"]
     model_path = cfg["path"]
     use_quantize = cfg.get("quantize", False)
 

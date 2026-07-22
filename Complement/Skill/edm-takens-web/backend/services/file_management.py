@@ -210,6 +210,13 @@ def _prepare_pipeline_data(
 
     display_map = {alias: orig for orig, alias in column_map.items()}
 
+    # Q9 P1-16 修缮: 增加变量映射透明度，便于追踪原始列与管道别名之间的对应关系
+    if column_map:
+        mapping_str = ", ".join(f"{orig}→{alias}" for orig, alias in column_map.items())
+        print(f"[API] 变量映射: {mapping_str}")
+    else:
+        print("[API] 变量映射: 无需重映射（CSV 已使用管道默认列名）")
+
     if target_col == "result" and not column_map:
         return csv_path, target_col, selected_vars, original_target, display_map
 

@@ -951,11 +951,13 @@ app.post('/api/models/activate', async (req, res) => {
   // 元审计 P1 修缮: Python 注入防护
   // 之前用字符串拼接 + replace(/'/g, '') 不够健壮
   // 现采用白名单校验 + JSON 参数传递，彻底消除注入
-  const ALLOWED_MODELS = ['qwen2.5-1.5b', 'qwen2.5-3b', 'shehui-llama', 'shenji-llama'];
+  // Q9 P1-16 修复: TRACE LLaMA 模型仅在前端展示，不允许在 L3 直接激活
+  const ALLOWED_MODELS = ['qwen2.5-1.5b', 'qwen2.5-3b'];
   if (!ALLOWED_MODELS.includes(model)) {
     return res.status(400).json({
       error: `invalid model key: ${model}`,
       allowed: ALLOWED_MODELS,
+      note: 'shehui-llama / shenji-llama 为 TRACE LLaMA 展示模型，请使用 trace-engine-web SUPER 模式',
     });
   }
 
@@ -964,7 +966,15 @@ app.post('/api/models/activate', async (req, res) => {
     const modelJson = JSON.stringify(model);
     const script = `import sys, json; sys.path.insert(0, '.'); from layer3_sacred import set_active_model, get_active_model; ok = set_active_model(json.loads('${modelJson}')); print(json.dumps({'success': ok, 'active': get_active_model()}, ensure_ascii=False))`;
     const result = await pyScript(script, 15000);
-    try { res.json(JSON.parse(result.out)); } catch { res.json({ success: false }); }
+    let payload;
+    try { payload = JSON.parse(result.out); } catch { payload = { success: false }; }
+    if (!payload.success) {
+      return res.status(400).json({
+        error: `model '${model}' cannot be activated (展示模型或未注册)`,
+        allowed: ALLOWED_MODELS.filter(k => !['shehui-llama','shenji-llama'].includes(k)),
+      });
+    }
+    res.json(payload);
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 

@@ -278,6 +278,23 @@ class PipelineConfig:
                 f'Prefer continuous covariates for embedding.',
                 'INFO'))
 
+        # Rule 6: Small-sample advisory (N < 30)
+        # P1 fix: 小样本下 E 和 q 的选择需要特别说明。auto-E-detection
+        # 已限制 maxE <= N/5，Rule 1/3 已降低 q，但用户需要明确的
+        # 顾问提示来理解结果可信度和建议动作。
+        if n < 30 and self.q is not None:
+            _small_n_reason = (
+                f'N={n} < 30 (recommended minimum). E={self.q} auto-capped '
+                f'at N/5={max(2, n // 5)}. Results are EXPLORATORY: '
+                f'Lyapunov/harmonic diagnostics unreliable, Hankel ratio '
+                f'constrained. Collect >= 30 (ideally >= 100) samples for '
+                f'confirmatory analysis.'
+            )
+            self.corrections.append(AutoCorrection(
+                'small_sample', n, f'E<={max(2, n // 5)}',
+                _small_n_reason,
+                'WARN'))
+
 
 # ============================================================
 # Layer 3: Orchestrated Pipeline
@@ -374,18 +391,54 @@ def run_pipeline(config: PipelineConfig = None,
                 'error': 'non_finite_covariate_data',
                 'columns': _cov_nonfinite_cols}
 
+    # ── Sample size pre-check ──
+    # P0 fix: 极小样本量会导致 EmbedDimension 的 lib 范围无效
+    # (lib=f'1 {n-7}' 当 n<8 时 n-7<1)，pyEDM 内部崩溃且无清晰错误。
+    # 在进入 Layer 2 之前提前返回友好提示，避免下游 HAVOK/CCM/Lyapunov
+    # 在退化数据上产生垃圾结果或崩溃。阈值依据：
+    #   - N<10: lib 范围退化为 <=3 个点，EDM 数学上无法工作
+    #   - N<30: 文献推荐最低样本量（Sugihara 1992, Hsieh 2008）
+    MIN_SAMPLES_HARD = 10
+    RECOMMENDED_MIN = 30
+    if n < MIN_SAMPLES_HARD:
+        print(f"\n  [FATAL] Insufficient samples: N={n} < {MIN_SAMPLES_HARD}.")
+        print(f"    EDM requires a minimum of {MIN_SAMPLES_HARD} time points to")
+        print(f"    construct a valid library/prediction split. With N={n}:")
+        _lib_end = n - 7
+        print(f"      - EmbedDimension lib='1 {_lib_end}' is "
+              f"{'invalid (end<1)' if _lib_end < 1 else 'degenerate (<=3 points)'}")
+        print(f"      - HAVOK Hankel matrix p/q ratio cannot reach >= 10")
+        print(f"      - Lyapunov estimation needs ~100+ points")
+        print(f"    Collect more data points (>= {RECOMMENDED_MIN} recommended,")
+        print(f"    >= {MIN_SAMPLES_HARD} absolute minimum) before re-running.")
+        return {'env': env, 'config': config, 'audit': None,
+                'error': 'insufficient_samples',
+                'n_samples': n, 'min_required': MIN_SAMPLES_HARD,
+                'recommended': RECOMMENDED_MIN}
+    elif n < RECOMMENDED_MIN:
+        print(f"\n  [WARN] Small sample size: N={n} < {RECOMMENDED_MIN} (recommended minimum).")
+        print(f"    Results will be exploratory only — Lyapunov estimation unreliable,")
+        print(f"    Hankel ratio constrained, phase transition detection limited.")
+        print(f"    Collect >= {RECOMMENDED_MIN} points (ideally >= 100) for robust analysis.")
+
     # ── Layer 2: Auto-Correction ──
     # Auto-detect E if not specified
     if config.q is None:
         from _edm_bridge import EmbedDimension
+        # P1 fix: 小样本时 maxE 过大会导致 EmbedDimension 搜索到退化区域
+        # (E > N/5 时吸引子稀疏，rho 估计不可靠)。根据 N 动态限制 maxE，
+        # 与 auto_correct Rule 3 (max_safe_E = N//5) 保持一致，避免
+        # auto-detect 选出过大的 E 后又被 Rule 3 强制降低（浪费计算且
+        # 可能引入数值噪声）。
+        _maxE_effective = min(config.max_E, max(2, n // 5))
         lib = f'1 {n - 7}'
         pred = f'{n - 6} {n}'
         rho_E = EmbedDimension(
-            data=df, lib=lib, pred=pred, maxE=config.max_E, Tp=1,
+            data=df, lib=lib, pred=pred, maxE=_maxE_effective, Tp=1,
             columns=config.target_col, target=config.target_col,
             showPlot=False, numProcess=1)
         config.q = int(rho_E.loc[rho_E['rho'].idxmax(), 'E'])
-        print(f"  E auto-detected: {config.q}")
+        print(f"  E auto-detected: {config.q} (maxE searched: {_maxE_effective})")
 
     config.auto_correct(n, n_columns)
     if config.corrections:
@@ -733,51 +786,74 @@ def run_full_analysis(config: 'PipelineConfig' = None,
         print(f"  Pipeline stage failed: {type(e).__name__}: {e}")
         results['pipeline'] = {'error': str(e)}
 
-    # Stage 2: cross-validation
-    if not skip_cross_validation:
-        print("\n" + "#" * 60)
-        print("#  STAGE 2/3: Enhanced Cross-Validation (3 safeguards)")
-        print("#" * 60)
-        try:
-            from enhanced_cross_validate import run_enhanced_validation
-            csv = (config.data_path if config and config.data_path
-                   else data_path('game_log.csv'))
-            cv_variables = config.columns if config else None
-            cv_target = config.target_col if config else 'result'
-            results['cross_validation'] = run_enhanced_validation(
-                csv_path=csv, variables=cv_variables, target_col=cv_target)
-        except Exception as e:
-            print(f"  Cross-validation stage failed: {type(e).__name__}: {e}")
-            results['cross_validation'] = {'error': str(e)}
+    # P0 fix: 如果 Stage 1 因样本量不足（insufficient_samples）或非有限值
+    # 数据（non_finite_*）失败，Stage 2/3 也会因同样的根因失败。提前跳过
+    # 并标记为 skipped，避免重复计算和重复错误信息，给用户更清晰的反馈。
+    _pipe_result = results['pipeline'] or {}
+    _fatal_pipeline_error = (
+        isinstance(_pipe_result, dict)
+        and _pipe_result.get('error') in (
+            'insufficient_samples',
+            'non_finite_target_data',
+            'non_finite_covariate_data',
+            'environment_not_ready',
+            'audit_blocked',
+        )
+    )
+    if _fatal_pipeline_error:
+        _skip_reason = _pipe_result.get('error', 'unknown')
+        print(f"\n  [SKIP] Stage 2/3 skipped: Stage 1 returned fatal error "
+              f"'{_skip_reason}'. Fix the underlying issue before re-running.")
+        results['cross_validation'] = {
+            'error': f'skipped: pipeline fatal error ({_skip_reason})'}
+        results['interpretation'] = {
+            'error': f'skipped: pipeline fatal error ({_skip_reason})'}
+    else:
+        # Stage 2: cross-validation
+        if not skip_cross_validation:
+            print("\n" + "#" * 60)
+            print("#  STAGE 2/3: Enhanced Cross-Validation (3 safeguards)")
+            print("#" * 60)
+            try:
+                from enhanced_cross_validate import run_enhanced_validation
+                csv = (config.data_path if config and config.data_path
+                       else data_path('game_log.csv'))
+                cv_variables = config.columns if config else None
+                cv_target = config.target_col if config else 'result'
+                results['cross_validation'] = run_enhanced_validation(
+                    csv_path=csv, variables=cv_variables, target_col=cv_target)
+            except Exception as e:
+                print(f"  Cross-validation stage failed: {type(e).__name__}: {e}")
+                results['cross_validation'] = {'error': str(e)}
 
-    # Stage 3: interpretation
-    if not skip_interpretation:
-        print("\n" + "#" * 60)
-        print("#  STAGE 3/3: Dynamical Interpretation")
-        print("#" * 60)
-        try:
-            from final_interpretation import interpret_game_data
-            import pandas as pd
-            csv = config.data_path if config else data_path('game_log.csv')
-            df_interp = pd.read_csv(csv)
-            variables = config.columns if config else None
-            target_col = config.target_col if config else None
-            causality_pairs = None
-            if config and config.columns and config.target_col:
-                causality_pairs = [(c, config.target_col)
-                                   for c in config.columns
-                                   if c != config.target_col and c in df_interp.columns]
-            results['interpretation'] = interpret_game_data(
-                df=df_interp,
-                variables=variables,
-                causality_pairs=causality_pairs,
-                target_col=target_col,
-                output_path='results/dynamics_interpretation.png',
-                title='HAVOK DYNAMICAL INTERPRETATION',
-                unit='samples')
-        except Exception as e:
-            print(f"  Interpretation stage failed: {type(e).__name__}: {e}")
-            results['interpretation'] = {'error': str(e)}
+        # Stage 3: interpretation
+        if not skip_interpretation:
+            print("\n" + "#" * 60)
+            print("#  STAGE 3/3: Dynamical Interpretation")
+            print("#" * 60)
+            try:
+                from final_interpretation import interpret_game_data
+                import pandas as pd
+                csv = config.data_path if config else data_path('game_log.csv')
+                df_interp = pd.read_csv(csv)
+                variables = config.columns if config else None
+                target_col = config.target_col if config else None
+                causality_pairs = None
+                if config and config.columns and config.target_col:
+                    causality_pairs = [(c, config.target_col)
+                                       for c in config.columns
+                                       if c != config.target_col and c in df_interp.columns]
+                results['interpretation'] = interpret_game_data(
+                    df=df_interp,
+                    variables=variables,
+                    causality_pairs=causality_pairs,
+                    target_col=target_col,
+                    output_path='results/dynamics_interpretation.png',
+                    title='HAVOK DYNAMICAL INTERPRETATION',
+                    unit='samples')
+            except Exception as e:
+                print(f"  Interpretation stage failed: {type(e).__name__}: {e}")
+                results['interpretation'] = {'error': str(e)}
 
     print("\n" + "=" * 60)
     print("  run_full_analysis complete.")

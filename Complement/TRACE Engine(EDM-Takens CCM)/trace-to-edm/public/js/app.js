@@ -280,13 +280,31 @@ async function refreshModels() {
     if (!sel) return;
     sel.innerHTML = '';
     if (d.models && d.models.length > 0) {
+      // Q9 P1-16 优化: 将可用模型与仅展示模型分组，避免误选
+      const usableOptGroup = document.createElement('optgroup');
+      usableOptGroup.label = '可用模型';
+      const displayOptGroup = document.createElement('optgroup');
+      displayOptGroup.label = '仅展示（需使用 trace-engine-web SUPER 模式）';
+
       d.models.forEach(m => {
         const o = document.createElement('option');
         o.value = m.key;
         o.textContent = m.name + ' (' + m.description + ')';
         if (m.key === d.active) o.selected = true;
-        sel.appendChild(o);
+        if (m.trace_model) {
+          o.disabled = true;
+          o.dataset.traceOnly = 'true';
+          o.textContent += ' [仅展示]';
+          displayOptGroup.appendChild(o);
+        } else {
+          usableOptGroup.appendChild(o);
+        }
       });
+
+      sel.appendChild(usableOptGroup);
+      if (displayOptGroup.children.length > 0) {
+        sel.appendChild(displayOptGroup);
+      }
       if (info) info.textContent = (d.active || '') + ' | 切换后首次编码需重载模型 (~60-90s)';
       const coreEl = document.getElementById('statCore');
       if (coreEl) {
@@ -310,13 +328,43 @@ async function refreshModels() {
 }
 
 document.getElementById('modelSelect').addEventListener('change', async (e) => {
-  if (!confirm('切换模型将清除缓存并重新加载。\n\n1.5B->3B: 需4-bit量化')) {
+  const target = e.target.options[e.target.selectedIndex];
+  const targetModelKey = target.value;
+  const targetText = target.textContent;
+
+  // Q9 P1-16 修复: 阻止选择仅展示模型，并给出明确提示
+  if (target.dataset.traceOnly === 'true') {
+    alert(`模型 "${targetText}" 为 TRACE LLaMA 展示模型，\n仅在 L3 显示，不可直接激活。\n如需使用 TRACE LLaMA，请切换至 trace-engine-web 的 SUPER 模式。`);
+    refreshModels();
+    return;
+  }
+
+  // Q9 P1-16 修复: 动态生成模型切换提示，避免所有模型都提示 4-bit 量化
+  const descMatch = targetText.match(/\(([^)]+)\)/);
+  const desc = descMatch ? descMatch[1] : '';
+  const isQuantizeModel = desc.includes('4-bit');
+  const quantNote = isQuantizeModel
+    ? '注意: 此模型在 CUDA 环境将启用 4-bit 量化以节省显存；CPU 环境回退 FP32。'
+    : '此模型不启用量化。';
+  const msg = `切换模型将清除缓存并重新加载。\n\n目标模型: ${targetText}\n${quantNote}`;
+
+  if (!confirm(msg)) {
     refreshModels(); return;
   }
-  await fetch('/api/models/activate', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model: e.target.value }),
-  });
+  try {
+    const r = await fetch('/api/models/activate', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: targetModelKey }),
+    });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      t(`✗ 模型切换失败: ${d.error || r.statusText}`, 'error');
+    } else {
+      t(`✓ 已切换模型: ${targetModelKey}`, 'done');
+    }
+  } catch (e) {
+    t(`✗ 模型切换请求失败: ${e.message}`, 'error');
+  }
   refreshModels();
 });
 
