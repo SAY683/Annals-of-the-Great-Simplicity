@@ -72,6 +72,20 @@ def _job_worker(store: JobStore, job: Job):
             os.makedirs(RESULTS_DIR, exist_ok=True)
             preexisting_files = set(os.listdir(RESULTS_DIR))
 
+            # P0 fix: 清理 results/ 根目录中上次任务残留的产物文件。
+            # 否则 pipeline 生成同名 png 时会覆盖残留文件，但
+            # _move_results_to_task 的快照过滤会因文件名已存在于
+            # preexisting_files 中而跳过移动，导致 images=[] 且
+            # 结果子目录为空。只清理根目录中的散落文件，不影响子目录。
+            for _stale in list(preexisting_files):
+                _stale_path = os.path.join(RESULTS_DIR, _stale)
+                if os.path.isfile(_stale_path):
+                    try:
+                        os.remove(_stale_path)
+                    except OSError:
+                        pass
+            preexisting_files = set()  # 清理后重置快照
+
             csv_path, pipeline_target, pipeline_vars, original_target, display_map = _prepare_pipeline_data(
                 params["csv_path"], params["target_col"], params["selected_vars"]
             )
