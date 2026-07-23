@@ -204,6 +204,18 @@ class SemanticProjector:
             return self._bg_components
         return None
 
+    def _get_active_mean(self) -> Optional[np.ndarray]:
+        """
+        获取当前活跃 PCA 的中心化均值。
+        sklearn PCA 在 fit() 时自动中心化数据并存储 mean_，
+        投影时必须减去该均值才能得到正确的 PCA 坐标。
+        """
+        if self.pca is not None and self.components is not None:
+            return self.pca.mean_
+        if self._bg_pca is not None and self._bg_components is not None:
+            return self._bg_pca.mean_
+        return None
+
     def project(self, embedding: np.ndarray) -> Dict[str, float]:
         result = {}
 
@@ -216,8 +228,13 @@ class SemanticProjector:
             return result
 
         n_axes = components.shape[0]
+        # Q9 P1-17 修复: PCA 投影必须中心化 (减去 mean_)，
+        # 否则 z_pca_* 包含常数偏移 mean·components[i]，
+        # 扭曲 secular_entropy 计算（基于 |z_pca_i| 的归一化熵）。
+        mean = self._get_active_mean()
+        centered = embedding - mean if mean is not None else embedding
         for i in range(n_axes):
-            result[f"z_pca_{i+1}"] = float(np.dot(embedding, components[i]))
+            result[f"z_pca_{i+1}"] = float(np.dot(centered, components[i]))
         for i in range(n_axes, LAYER2_N_COMPONENTS):
             result[f"z_pca_{i+1}"] = 0.0
 

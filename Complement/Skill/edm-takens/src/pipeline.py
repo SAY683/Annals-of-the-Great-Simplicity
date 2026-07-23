@@ -596,8 +596,9 @@ def run_pipeline(config: PipelineConfig = None,
         if len(spike_idx) > 0:
             print(f"\n  Phase transition events ({len(spike_idx)} spikes):")
             for si in spike_idx[:8]:
-                gi = si + sh.q
-                if gi < len(df):
+                # Q9 P1-17 修复: si 是 forcing_ 索引，对应时刻 si + q - 1
+                gi = si + sh.q - 1
+                if 0 <= gi < len(df):
                     row = df.iloc[gi]
                     fs = forcing[si]
                     direction = "UP" if fs > 0 else "DOWN"

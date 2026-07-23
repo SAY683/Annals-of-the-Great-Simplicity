@@ -805,8 +805,9 @@ def run_enhanced_validation(csv_path=data_path('game_log.csv'),
             spike_th = 1.5 * np.std(forcing)
             spike_idx = np.where(np.abs(forcing) > spike_th)[0]
             for si in spike_idx[:5]:
-                gi = si + hv.q
-                if gi < len(df):
+                # Q9 P1-17 修复: si 是 forcing_ 索引，对应时刻 si + q - 1
+                gi = si + hv.q - 1
+                if 0 <= gi < len(df):
                     # P0 回流：泛化 target_col 检测——无 target_col 列时标记 N/A。
                     if target_col in df.columns:
                         outcome = 'W' if df[target_col].iloc[gi] == 1 else 'L'

@@ -31,8 +31,6 @@ WEB_ONLY_FILES: set = set()
 EXPECTED_DIFFERS = {
     "_paths.py",                  # 副本支持 EDMTAKENS_DATA_DIR 环境变量
     "__init__.py",                # 副本为 backend 包说明注释，与核心库源码包注释不同
-    "enhanced_cross_validate.py", # 副本有 web 专用的数据路径适配
-    "environment_check.py",       # 副本有 web 专用的路径检查逻辑
 }
 
 

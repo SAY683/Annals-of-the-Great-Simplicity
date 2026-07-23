@@ -31,12 +31,14 @@ def compute_ami(series, max_lag, bins=16):
         x = series[:n - lag]
         y = series[lag:]
         joint, _, _ = np.histogram2d(x, y, bins=[edges, edges])
-        joint_p = joint / joint.sum() + 1e-12  # avoid log(0)
+        # Q9 P1-17 修复: epsilon 在归一化前添加，确保概率和严格为 1
+        joint_safe = joint + 1e-12
+        joint_p = joint_safe / joint_safe.sum()
         px = joint_p.sum(axis=1)
         py = joint_p.sum(axis=0)
         # I = sum p(x,y) * log(p(x,y) / (p(x) * p(y)))
-        outer = np.outer(px, py) + 1e-12
-        ami[lag] = np.sum(joint_p * np.log(joint_p / outer))
+        outer = np.outer(px, py)
+        ami[lag] = np.sum(joint_p * np.log(joint_p / (outer + 1e-12)))
     lags = np.arange(max_lag + 1)
     return lags, ami
 

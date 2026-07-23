@@ -75,31 +75,53 @@ class PearlCounterfactual:
                 'error': f'Variable not found: {treatment_var} or {outcome_var}'
             }
 
-        # 直接效应系数
-        beta = self._coeff[ti, oi]
+        # P0修复: 完整 Pearl 三步反事实 — 中介变量需递归传播 do(T=t')
+        # 原实现用 observed[p] 代替 p(t')，计算的是 CDE（受控直接效应）而非 Y(t')
+        # 修复: 按拓扑序对所有变量做 Abduction + Prediction，使中介变量取反事实值
 
-        # 其他父节点对 outcome 的效应
-        parent_effects = 0.0
-        for p in range(len(self._name_to_idx)):
-            if p != ti and self._coeff[p, oi] != 0:
-                parent_effects += self._coeff[p, oi] * observed[p]
+        # Step 1: Abduction — 推断所有外生噪声 U_X = X_obs - f(parents_obs)
+        # 按变量索引顺序（假设 _coeff 已按拓扑序可计算）
+        n_vars = len(self._name_to_idx)
+        noise = {}
+        cf_values = {}  # 反事实值 cf_values[var_idx] = X(t')
 
-        # Step 1: Abduction
-        y_obs = float(observed[oi])
-        x_obs = float(observed[ti])
-        y_pred_from_model = beta * x_obs + parent_effects
-        U = y_obs - y_pred_from_model
+        for v in range(n_vars):
+            v_obs = float(observed[v])
+            # 计算观测下的模型预测
+            pred_obs = 0.0
+            for p in range(n_vars):
+                if self._coeff[p, v] != 0:
+                    pred_obs += self._coeff[p, v] * float(observed[p])
+            noise[v] = v_obs - pred_obs
 
-        # Step 2 & 3: Action + Prediction
-        y_control = beta * control_value + parent_effects + U
-        y_treatment = beta * treatment_value + parent_effects + U
+        # Step 2: Action — do(T = treatment_value / control_value)
+        # Step 3: Prediction — 按拓扑序传播反事实值
+        # treatment 变量被干预，其他变量由反事实父节点值 + 噪声计算
+        def predict_cf(t_val):
+            for v in range(n_vars):
+                if v == ti:
+                    cf_values[v] = float(t_val)
+                else:
+                    pred = 0.0
+                    for p in range(n_vars):
+                        if self._coeff[p, v] != 0:
+                            pred += self._coeff[p, v] * cf_values.get(p, float(observed[p]))
+                    cf_values[v] = pred + noise[v]
+            return cf_values[oi]
+
+        y_treatment = predict_cf(treatment_value)
+        y_control = predict_cf(control_value)
         ite = y_treatment - y_control
+
+        # 兼容旧字段
+        beta = self._coeff[ti, oi]
+        y_obs = float(observed[oi])
 
         return {
             'observed_outcome': y_obs,
             'counterfactual_outcome': float(y_treatment),
             'causal_effect': float(ite),
-            'abduction_noise': {'U': float(U)},
+            'abduction_noise': {f'U_{k}': float(v) for k, v in noise.items()},
         }
 
 
@@ -131,27 +153,31 @@ def estimate_sem_from_data(adj_matrix, data, concept_names,
             continue
         X = data[:, parents]
         y = data[:, j]
+        # P1修复: 数据中心化以消除截距吸收偏差（等价于带 intercept 的回归）
+        X_centered = X - X.mean(axis=0)
+        y_centered = y - y.mean()
         try:
             if regularization == "ridge":
-                # β = (X'X + αI)^(-1) X'y
-                XtX = X.T @ X
+                # β = (X'X + αI)^(-1) X'y (中心化数据)
+                XtX = X_centered.T @ X_centered
                 reg = XtX + alpha * np.eye(len(parents))
-                beta = np.linalg.solve(reg, X.T @ y)
+                beta = np.linalg.solve(reg, X_centered.T @ y_centered)
             elif regularization == "lasso":
                 try:
                     from sklearn.linear_model import Lasso
                 except ImportError:
                     # sklearn 不可用时回退到 ridge
-                    XtX = X.T @ X
+                    XtX = X_centered.T @ X_centered
                     reg = XtX + alpha * np.eye(len(parents))
-                    beta = np.linalg.solve(reg, X.T @ y)
+                    beta = np.linalg.solve(reg, X_centered.T @ y_centered)
                 else:
-                    model = Lasso(alpha=alpha, fit_intercept=False, max_iter=5000)
+                    # P1修复: fit_intercept=True 让 sklearn 处理截距
+                    model = Lasso(alpha=alpha, fit_intercept=True, max_iter=5000)
                     model.fit(X, y)
                     beta = model.coef_
             else:
-                # OLS: β = (X'X)^(-1) X'y
-                beta = np.linalg.lstsq(X, y, rcond=None)[0]
+                # OLS: β = (X'X)^(-1) X'y (中心化数据，等价于带 intercept)
+                beta = np.linalg.lstsq(X_centered, y_centered, rcond=None)[0]
             for k, pi in enumerate(parents):
                 coeff[pi, j] = float(beta[k])
         except np.linalg.LinAlgError as e:

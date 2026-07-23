@@ -64,7 +64,7 @@ Key differences from the `standard` default preset:
 
 | Parameter | `standard` default | `llama` preset | Reason |
 |-----------|-------------------|----------------|--------|
-| `threshold` | 0.3 | **0.01** | V4 ΔNLL range is ~0–0.16 |
+| `threshold` | 0.03 | **0.01** | V4 ΔNLL range is ~0–0.16 (standard默认P0修复: 0.3→0.03) |
 | `window_size` | 64 | **128** | V4 was trained with seq_len=1024 |
 | `max_segments` | 4 | **3** | Limits runtime on consumer GPUs |
 | `concept_min_freq` | 3 | **1** | Domain tokens are sparse |

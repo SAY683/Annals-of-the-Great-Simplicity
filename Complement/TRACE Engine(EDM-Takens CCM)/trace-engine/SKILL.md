@@ -91,7 +91,7 @@ Unified presets live in [`examples/counterfactual_hybrid/presets.yaml`](examples
 | Preset | Use Case | Threshold | Max Edges | Notes |
 |--------|----------|-----------|-----------|-------|
 | demo | Simulated data demo | 0.03 | 8 | Zero external deps |
-| standard | Standard six-in-one | 0.3 | 8 | General purpose |
+| standard | Standard six-in-one | 0.03 | 8 | General purpose (P0修复: 0.3→0.03) |
 | deep | Deep causal analysis | 0.2 | 15 | Stability checks on |
 | archival | Archival precision | 0.1 | 20 | Strictest rules |
 | llama | Shehui/Shenji-LLaMA | 0.01 | 12 | For overfitted TRACE LLaMA models (27M/469M/470M) with low ΔNLL |

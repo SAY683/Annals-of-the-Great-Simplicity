@@ -683,6 +683,9 @@ def _card_to_dict(card):
         "instrument": card.instrument,
         "status": card.status,
         "color": card.color,
+        # P0修复: 同步 WarriorCard.tier 字段（six_warriors.py P0-1 修缮）
+        # tier: "A"=真算法层(可追溯因果证据), "B"=启发式诊断层(文本特征启发式)
+        "tier": getattr(card, "tier", "A"),
         "findings": card.findings,
         "metrics": card.metrics,
         "verdict": card.verdict,
@@ -744,7 +747,8 @@ def _run_stability_analysis(bridge, tokens, concept_names, window_size, threshol
 
 
     rng = np.random.default_rng(42)
-    n_bootstrap = 30
+    n_bootstrap = 1000  # P0修复: 30→1000, 确保百分位法 CI 可靠 (Efron & Tibshirani 1993)
+    n_permutation = 1000  # P0修复: 20→1000, 确保置换检验 p 值精度
     edge_stability = {}
     ate_bootstrap = []
 
@@ -792,6 +796,7 @@ def _run_stability_analysis(bridge, tokens, concept_names, window_size, threshol
         pass
 
     # 数据重采样 bootstrap ATE：直接在原始数据行上 bootstrap，估计 ATE 的抽样波动
+    # P1修复: 增加 intercept 列，避免非中心化数据的系数偏差
     if df is not None and treatment_col in df.columns and outcome_col in df.columns:
         try:
             n_rows = df.shape[0]
@@ -801,55 +806,99 @@ def _run_stability_analysis(bridge, tokens, concept_names, window_size, threshol
                 boot_df = df.iloc[idx]
                 X = boot_df[[treatment_col] + covariates].values
                 y = boot_df[outcome_col].values
-                coef = np.linalg.lstsq(X, y, rcond=None)[0][0]
+                # P1修复: 添加 intercept 列 (全1)，treatment 系数索引变为 1
+                X_intercept = np.hstack([np.ones((X.shape[0], 1)), X])
+                coef = np.linalg.lstsq(X_intercept, y, rcond=None)[0][1]
                 ate_bootstrap.append(float(coef))
         except Exception:
             pass
 
     # 置换检验（Permutation test）：打乱 treatment 列看 ATE 是否显著
+    # P0修复: (1) 次数 20→1000 (2) p值 +1 修正避免 p=0 (Phipson & Smyth 2010) (3) 加 intercept
     permutation_ates = []
     if df is not None and treatment_col in df.columns and outcome_col in df.columns:
         orig_ate = float(estimate.value)
-        for _ in range(20):
+        for _ in range(n_permutation):
             perm_df = df.copy()
             perm_df[treatment_col] = rng.permutation(perm_df[treatment_col].values)
             try:
-                # 快速线性回归估计
+                # 快速线性回归估计 (P1修复: 加 intercept 列)
                 X = perm_df[[treatment_col] + [c for c in df.columns if c not in (treatment_col, outcome_col)]].values
                 y = perm_df[outcome_col].values
-                coef = np.linalg.lstsq(X, y, rcond=None)[0][0]
+                X_intercept = np.hstack([np.ones((X.shape[0], 1)), X])
+                coef = np.linalg.lstsq(X_intercept, y, rcond=None)[0][1]
                 permutation_ates.append(float(coef))
             except Exception:
                 pass
-        p_value = np.mean([abs(a) >= abs(orig_ate) for a in permutation_ates]) if permutation_ates else None
+        # P0修复: +1 修正公式 (count+1)/(n+1)，避免 p=0 且确保零假设下 p 均匀分布
+        if permutation_ates:
+            count_extreme = int(np.sum([abs(a) >= abs(orig_ate) for a in permutation_ates]))
+            p_value = (count_extreme + 1) / (len(permutation_ates) + 1)
+        else:
+            p_value = None
     else:
         p_value = None
 
     # K-fold CV 估计 ATE 稳定性
+    # P0修复: (1) 用 array_split 避免漏样本 (2) 加 intercept (3) 在测试折上评估 ATE
     cv_ates = []
     n_folds = 3
     n_rows = df.shape[0] if df is not None else 0
     if df is not None and n_rows >= n_folds * 2:
-        fold_size = n_rows // n_folds
-        for fold in range(n_folds):
+        all_indices = np.arange(n_rows)
+        fold_indices = np.array_split(all_indices, n_folds)  # P0修复: 不漏样本
+        for test_idx in fold_indices:
             mask = np.ones(n_rows, dtype=bool)
-            mask[fold * fold_size:(fold + 1) * fold_size] = False
+            mask[test_idx] = False
             try:
                 train_df = df.iloc[mask]
-                X = train_df[[treatment_col] + [c for c in df.columns if c not in (treatment_col, outcome_col)]].values
-                y = train_df[outcome_col].values
-                coef = np.linalg.lstsq(X, y, rcond=None)[0][0]
-                cv_ates.append(float(coef))
+                test_df = df.iloc[~mask]
+                X_train = train_df[[treatment_col] + [c for c in df.columns if c not in (treatment_col, outcome_col)]].values
+                y_train = train_df[outcome_col].values
+                # P1修复: 加 intercept 列
+                X_train_int = np.hstack([np.ones((X_train.shape[0], 1)), X_train])
+                coef = np.linalg.lstsq(X_train_int, y_train, rcond=None)[0]
+                # P0修复: 在测试折上计算 ATE (out-of-fold 评估)
+                X_test = test_df[[treatment_col] + [c for c in df.columns if c not in (treatment_col, outcome_col)]].values
+                y_test = test_df[outcome_col].values
+                X_test_int = np.hstack([np.ones((X_test.shape[0], 1)), X_test])
+                # P0修复: ATE = E[Y|do(T=1)] - E[Y|do(T=0)]
+                # 对线性模型 Y = β0 + β1·T + Σγ·X，ATE = β1（treatment 系数）
+                # 原代码 np.mean(y_pred) 计算的是 Y 预测均值，非 ATE
+                # 显式反事实: 对测试折设置 T=1 和 T=0，取预测差均值
+                X_test_t1 = X_test.copy()
+                X_test_t1[:, 0] = 1.0  # treatment=1
+                X_test_t0 = X_test.copy()
+                X_test_t0[:, 0] = 0.0  # treatment=0
+                X_test_t1_int = np.hstack([np.ones((X_test_t1.shape[0], 1)), X_test_t1])
+                X_test_t0_int = np.hstack([np.ones((X_test_t0.shape[0], 1)), X_test_t0])
+                y1_pred = X_test_t1_int @ coef
+                y0_pred = X_test_t0_int @ coef
+                cv_ates.append(float(np.mean(y1_pred - y0_pred)))
             except Exception:
                 pass
 
     per_edge = {k: float(np.mean(v)) for k, v in edge_stability.items() if v}
+    # P0修复: 增加 bootstrap 百分位法 CI (2.5% 和 97.5% 分位数)
+    ate_bootstrap_ci = None
+    if ate_bootstrap:
+        ate_bootstrap_ci = [
+            float(np.percentile(ate_bootstrap, 2.5)),
+            float(np.percentile(ate_bootstrap, 97.5)),
+        ]
     return {
         "edge_stability_mean": float(np.mean(list(per_edge.values()))) if per_edge else 0.0,
         "edge_stability_std": float(np.std(list(per_edge.values()))) if per_edge else 0.0,
         "edge_stability_per_edge": per_edge,
         "ate_bootstrap_std": float(np.std(ate_bootstrap)) if ate_bootstrap else None,
+        "ate_bootstrap_ci": ate_bootstrap_ci,  # P0修复: 百分位法 95% CI
+        "ate_bootstrap_method": "percentile" if ate_bootstrap_ci else None,
+        # P1修复: 标注 bootstrap 估计的语义类型
+        # "unadjusted_ols" = 未调整 OLS 系数 (dY/dT)，与 DoWhy backdoor 调整后 ATE 语义不同
+        # 两者符号可相反（Simpson 悖论），数值差异反映混杂偏倚
+        "ate_bootstrap_type": "unadjusted_ols" if ate_bootstrap else None,
         "permutation_p_value": float(p_value) if p_value is not None else None,
+        "permutation_n": n_permutation,  # P0修复: 记录置换次数供诊断
         "cv_folds": n_folds,
         "cv_ate_mean": float(np.mean(cv_ates)) if cv_ates else None,
         "cv_ate_std": float(np.std(cv_ates)) if cv_ates else None,

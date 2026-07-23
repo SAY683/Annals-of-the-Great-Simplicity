@@ -584,9 +584,12 @@ def _deploy_causallearn(bridge) -> WarriorCard:
                 ges_edges.add((sub_names[ni], sub_names[nj]))
 
         # 交叉比较
+        # P0修复: causallearn 返回的边可能方向不一致(PC无向边/GES的CPDAG)，
+        # 需双向匹配避免 Agree 偏低 (与 causallearn_validator.compare_with_trace 一致)
         trace_sub_edges = {(e[0], e[1]) for e in bridge.significant_edges
                           if e[0] in sub_names and e[1] in sub_names}
-        cl_all = pc_edges | ges_edges
+        cl_directed = pc_edges | ges_edges
+        cl_all = cl_directed | {(t, s) for s, t in cl_directed}  # P0修复: 双向集合
         agree = trace_sub_edges & cl_all
 
         card.metrics = {

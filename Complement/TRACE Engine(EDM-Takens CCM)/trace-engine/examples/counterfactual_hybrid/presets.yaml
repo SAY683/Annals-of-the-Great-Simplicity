@@ -88,7 +88,7 @@ presets:
 
   standard:                # 标准六合一分析
     trace2dowhy:
-      threshold: 0.3
+      threshold: 0.03       # P0修复: 0.3→0.03, 与顶层默认值和模型文档推荐一致 (原0.3疑似笔误)
       concept_min_freq: 3
       max_edges_for_dowhy: 8
     counterfactual:

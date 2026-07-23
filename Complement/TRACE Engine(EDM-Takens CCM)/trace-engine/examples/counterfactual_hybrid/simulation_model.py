@@ -81,7 +81,8 @@ class SimulationModel:
         direct = self._coeff[ti, oi]
         effect = direct if direct > 0 else self.rng.uniform(0.1, 0.5)
         se = effect * 0.15
-        ci_lower = max(0, effect - 1.96 * se)
+        # P1修复: 移除 CI 下界截断 max(0,...)，置信区间不应被截断
+        ci_lower = effect - 1.96 * se
         ci_upper = effect + 1.96 * se
 
         return SimulationEstimate(effect, ci_lower, ci_upper)
@@ -94,7 +95,8 @@ class SimulationModel:
             return SimulationRefutation(estimate.value + perturbation, refuted)
         elif method_name == "placebo_treatment_refuter":
             placebo = abs(self.rng.normal(0, estimate.value * 0.1))
-            return SimulationRefutation(placebo, placebo > estimate.value * 0.2, is_placebo=True)
+            # P2修复: 用 abs(estimate.value) 避免负效应时恒 refuted
+            return SimulationRefutation(placebo, placebo > abs(estimate.value) * 0.2, is_placebo=True)
         elif method_name == "data_subset_refuter":
             subset_effect = estimate.value * self.rng.uniform(0.8, 1.1)
             refuted = abs(subset_effect - estimate.value) > estimate.value * 0.3

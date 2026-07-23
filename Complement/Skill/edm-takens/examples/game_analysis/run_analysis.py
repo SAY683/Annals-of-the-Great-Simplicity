@@ -325,7 +325,8 @@ def main():
         ax2 = fig.add_subplot(gs[row, 2])
         if 'forcing' in hv:
             forcing = hv['forcing']; sh = hv['sh']
-            t_f = np.arange(len(forcing)) + sh.q
+            # Q9 P1-17 修复: forcing_ 长度 = n - q + 1，索引 j 对应时刻 j + q - 1
+            t_f = np.arange(len(forcing)) + sh.q - 1
             markerline, stemlines, baseline = ax2.stem(
                 t_f, forcing, linefmt=f'{c}', markerfmt='o', basefmt='gray')
             markerline.set_markersize(3); markerline.set_markerfacecolor(c)

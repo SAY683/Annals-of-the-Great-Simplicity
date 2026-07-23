@@ -223,7 +223,7 @@ class EDMTrigger:
             if VERBOSE:
                 print(f"[EDM]   job={job_id} status={status} ({time.time()-start:.0f}s)")
 
-            if status in ("completed", "failed", "error"):
+            if status in ("done", "error", "completed", "failed"):
                 return result
 
             time.sleep(current_interval)

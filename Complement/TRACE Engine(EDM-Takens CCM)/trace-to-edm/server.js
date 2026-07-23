@@ -36,7 +36,8 @@ const PYTHON_CMD = process.env.TRACE_PYTHON_CMD || 'python';
 const TRAJECTORY_CSV = path.join(ROOT, 'data', 'outputs', 'narrative_meta_trajectories.csv');
 const PROJECTS_DIR = path.join(ROOT, 'projects');
 const LOG_FILE = path.join(ROOT, 'data', 'logs', 'server.log');
-const CORS_ORIGIN = process.env.TRACE_CORS_ORIGIN || '*';
+// P1修复: 默认 CORS 限制为本地回环，避免生产环境通配符风险 (原默认 '*')
+const CORS_ORIGIN = process.env.TRACE_CORS_ORIGIN || 'http://localhost:3100';
 
 // 确保日志目录存在
 (function ensureLogDir() {

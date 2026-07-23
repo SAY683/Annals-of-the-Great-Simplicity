@@ -508,8 +508,9 @@ def _plot_generic(df, all_data, variables, label_map, output_path, target_col):
         ax0.grid(True, alpha=0.2)
         ax1 = axes[row, 1]
         forcing = sh.forcing_
-        ax1.fill_between(np.arange(len(forcing)) + sh.q, forcing, alpha=0.2, color=color)
-        ax1.plot(np.arange(len(forcing)) + sh.q, forcing, 'o-', color=color, markersize=3)
+        # Q9 P1-17 修复: forcing_ 长度 = n - q + 1，索引 j 对应时刻 j + q - 1
+        ax1.fill_between(np.arange(len(forcing)) + sh.q - 1, forcing, alpha=0.2, color=color)
+        ax1.plot(np.arange(len(forcing)) + sh.q - 1, forcing, 'o-', color=color, markersize=3)
         ax1.axhline(0, color='gray', alpha=0.3)
         ax1.set_title(f'Forcing (kurt={sh.kurtosis_vr_:+.2f}, r={sh.r_})', fontsize=10)
         ax1.grid(True, alpha=0.2)
@@ -695,8 +696,9 @@ def interpret_game_data(data_path_override: str = None,
         if len(spike_idx) > 0:
             print(f"    Phase-transition events (spikes):")
             for si in spike_idx[:6]:
-                gi = si + sh.q
-                if gi < len(df):
+                # Q9 P1-17 修复: si 是 forcing_ 索引，对应时刻 si + q - 1
+                gi = si + sh.q - 1
+                if 0 <= gi < len(df):
                     fs = forcing[si]
                     direction = "UP" if fs > 0 else "DOWN"
                     extras = []

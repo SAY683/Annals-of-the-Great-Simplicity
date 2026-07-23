@@ -50,8 +50,8 @@ const _OFFLINE_FALLBACK_SUPER_SCHEMA = Object.assign({}, _OFFLINE_FALLBACK_SCHEM
 const _OFFLINE_PRESETS = {
   demo: { threshold: 0.03, window_size: 8, max_segments: 4, min_valid_tokens: 10 },
   default: { threshold: 0.03, window_size: 8, max_segments: 4, min_valid_tokens: 10 },
-  standard: { threshold: 0.3, window_size: 6, max_concepts: 16, concept_min_freq: 2, max_segments: 3, min_valid_tokens: 8 },
-  sensitive: { threshold: 0.3, window_size: 6, max_concepts: 16, concept_min_freq: 2, max_segments: 3, min_valid_tokens: 8 },
+  standard: { threshold: 0.03, window_size: 6, max_concepts: 16, concept_min_freq: 2, max_segments: 3, min_valid_tokens: 8 },
+  sensitive: { threshold: 0.03, window_size: 6, max_concepts: 16, concept_min_freq: 2, max_segments: 3, min_valid_tokens: 8 },
   archival: { threshold: 0.8, window_size: 12, max_concepts: 24, max_segments: 6, min_valid_tokens: 12 },
   broad: { threshold: 0.8, window_size: 12, max_concepts: 24, max_segments: 6, min_valid_tokens: 12 },
   deep: { threshold: 0.2, window_size: 8, max_concepts: 24, max_edges_for_dowhy: 15, filter_mode: 'percentile', filter_percentile: 80, max_segments: 4, min_valid_tokens: 10 },
