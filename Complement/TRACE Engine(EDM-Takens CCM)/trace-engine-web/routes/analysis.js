@@ -222,7 +222,13 @@ router.post('/cancel/:id', (req, res) => {
   const queueIdx = jobQueue.findIndex((j) => j.id === id);
   if (queueIdx >= 0) {
     const removed = jobQueue.splice(queueIdx, 1)[0];
-    try { removed.res.end(); } catch (_) {}
+    // P1-e 修缮：队列取消时补发 SSE error + done 事件，与其他三条取消路径对齐
+    // 之前仅 res.end() 导致前端看不到终止信号，可能触发自动重连
+    try {
+      sendSSE(removed.res, 'error', { message: '任务在队列中被取消' });
+      sendSSE(removed.res, 'done', { code: 125 });
+      removed.res.end();
+    } catch (_) {}
     utils.recordJob(id, removed.mode, 'cancelled', '任务在队列中被取消');
     reqLog(req, 'info', `任务在队列中取消 job=${id}`);
     return res.json({ success: true, cancelled: true, reason: 'removed_from_queue' });

@@ -87,8 +87,9 @@ def _check_vram_budget(n_params_m: float, device: torch.device):
             log("  建议: 关闭其它 GPU 程序、启用 FP16 量化（设置环境变量 TRACE_MODEL_DTYPE=fp16，本文件 run_real_pipeline.py 会读取），或减少 window_size/max_segments")
         else:
             log(f"VRAM 预算 OK: 空闲 {free_gb:.1f}GB / 建议 {required_gb:.1f}GB")
-    except Exception:
-        pass
+    except Exception as e:
+        # debt-12.13: mem_get_info 在某些 GPU 驱动下不可用，记录后跳过
+        log(f"  [debug] VRAM 预算检查跳过: {e}")
 
 
 def main():

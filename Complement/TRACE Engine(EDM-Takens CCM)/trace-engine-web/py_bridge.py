@@ -33,6 +33,12 @@ from pathlib import Path
 if 'TQDM_DISABLE' not in os.environ:
     os.environ['TQDM_DISABLE'] = '1'
 
+# P2: 抑制 pandas 可选依赖版本警告 (numexpr/bottleneck)
+# 这些警告不影响功能，但会在 Web UI 实时日志中显示为噪声
+import warnings as _warnings
+_warnings.filterwarnings('ignore', message=r".*Pandas requires version.*")
+_warnings.filterwarnings('ignore', category=UserWarning, module=r"pandas\..*")
+
 import numpy as np
 
 # 轻量 OLS 置信区间（用于 LIGHT 模式替代 DoWhy bootstrap）
@@ -230,7 +236,19 @@ def _load_config(arg_json: str) -> dict:
 
 
 def _tokenize(text: str) -> list:
-    """中文分词：优先使用 jieba（加载领域词），否则回退到简单正则。"""
+    """中文分词：使用 jieba（加载领域词）。
+
+    P0 修缮 (2026-07-25 元审计 Round 12.12):
+    原实现将 jieba 标记为"可选依赖"，缺失时静默回退到
+    `re.findall(r'[\\u4e00-\\u9fff]{2,}', text)`。该回退有两个致命缺陷:
+      1. 只匹配连续中文字符，英文/数字/标点全部被丢弃
+      2. 中文连续片段被当成单个 token，无法正确切词
+    导致中英混排文本的"有效概念数"严重低估，触发
+    "有效词数不足"错误——历史上 0/2/3/5/6/7/8/9 个有效词的
+    失败任务全部源于此。
+
+    修复: jieba 是核心依赖（非可选），缺失时明确报错并提示安装。
+    """
     try:
         import jieba
         import logging
@@ -242,8 +260,13 @@ def _tokenize(text: str) -> list:
         for w in _DOMAIN_WORDS:
             jieba.add_word(w, freq=1000)
         return list(jieba.lcut(text))
-    except ImportError:
-        return re.findall(r'[\u4e00-\u9fff]{2,}', text)
+    except ImportError as e:
+        # P0 修缮: 不再静默回退到无效的正则模式
+        raise RuntimeError(
+            "jieba 是核心依赖（用于中文分词），但未安装。"
+            "请运行: pip install jieba  "
+            "（正则回退模式无法处理中英混排文本，会导致有效概念数严重不足）"
+        ) from e
 
 
 def _write_error(out_dir: Path, message: str):
@@ -394,7 +417,11 @@ def main():
 
     timer.start("tokenize")
     _stage("tokenize", "正在进行中文分词与概念过滤...", 0.12)
-    tokens = _tokenize(text)
+    try:
+        tokens = _tokenize(text)
+    except RuntimeError as e:
+        _write_error(out_dir, str(e))
+        return
     valid_tokens = [t for t in tokens if _is_valid_concept_web(t)]
     _log("info", f"原始 token 数: {len(tokens)}, 有效概念 token 数: {len(valid_tokens)}")
     timer.end("tokenize")

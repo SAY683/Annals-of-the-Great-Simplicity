@@ -6,24 +6,37 @@
   <meta name="theme-color" content="#08090d">
   <title>TRACE Engine // Causal Inference Terminal</title>
   <!-- debt-09：CSS 拆分为 theme.css（主题变量）+ main.css（样式） -->
-  <link rel="stylesheet" href="/css/theme.css">
-  <link rel="stylesheet" href="/css/main.css">
+  <!-- 共享特摄防卫队基地主题 -->
+  <link rel="stylesheet" href="shared/themes/tokusatsu.css?v=20260725f">
+  <link rel="stylesheet" href="/css/theme.css?v=20260725f">
+  <link rel="stylesheet" href="/css/main.css?v=20260725f">
 </head>
 <body>
-  <header>
-    <div class="logo">T</div>
-    <div class="brand">
-      <h1>TRACE <span>ENGINE</span> // Causal Inference Terminal</h1>
-      <p>TRACE + DoWhy + Counterfactual · Six-Warrior Web Interface</p>
+  <div class="crt-overlay" aria-hidden="true"></div>
+
+  <div id="app">
+  <header class="base-header">
+    <div class="header-left">
+      <h1>TRACE ENGINE <span class="dept-tag">COMMAND</span></h1>
+      <p>因果推断特装型 // Six-Warrior Web Interface</p>
     </div>
-    <div class="header-controls">
+    <div class="header-right">
+      <nav class="base-nav">
+        <span class="nav-label">BASE</span>
+        <a class="active" href="http://127.0.0.1:3000"><span class="nav-dot"></span>CMD</a>
+        <a href="http://127.0.0.1:3100"><span class="nav-dot" style="color:#f2c94c"></span>RELAY</a>
+        <a href="http://127.0.0.1:8000"><span class="nav-dot" style="color:#00ff9d"></span>OBS</a>
+      </nav>
       <div class="status-board" id="statusBoard" title="当前运行模式与驱动核心">
         <span class="sb-label">MODE</span>
         <span class="sb-value" id="sbMode">LIGHT</span>
         <span class="sb-label">CORE</span>
         <span class="sb-value" id="sbCore">—</span>
       </div>
-      <div class="mission-clock" id="missionClock" title="任务时钟">00:00:00</div>
+      <div class="mission-clock" id="missionClock" title="任务时钟">
+        <span class="clock-label">MISSION CLOCK</span>
+        <span class="clock-value">00:00:00</span>
+      </div>
       <div class="scale-control" title="调整整体 UI 缩放">
         <span>SCALE</span>
         <input type="range" id="uiScale" min="75" max="150" value="105" step="5">
@@ -35,26 +48,41 @@
   </header>
 
   <main>
-    <div class="left-col">
-      <section class="panel" id="inputPanel">
-        <div class="panel-header">
-          <span>◈ $ input_payload.txt</span>
-          <div class="mode-toggle" title="Light: 快速 jieba 概念图；Deep: 完整六战士（jieba）；Super: LLaMA TRACE 模型驱动">
-            <input type="radio" name="mode" id="modeLight" value="light" checked>
-            <label for="modeLight">LIGHT</label>
-            <input type="radio" name="mode" id="modeDeep" value="deep">
-            <label for="modeDeep">DEEP</label>
-            <input type="radio" name="mode" id="modeSuper" value="super">
-            <label for="modeSuper">SUPER</label>
+    <div class="command-grid">
+      <div class="left-col">
+        <section class="status-wall awaiting-data" id="statusWall">
+          <div class="status-card"><span class="stat-label">CONCEPTS</span><span class="stat-value" id="mConcepts"></span></div>
+          <div class="status-card"><span class="stat-label">EDGES</span><span class="stat-value" id="mEdges"></span></div>
+          <div class="status-card"><span class="stat-label">ATE</span><span class="stat-value" id="mATE"></span></div>
+          <div class="status-card"><span class="stat-label">IDENTIFIABLE</span><span class="stat-value" id="mIdentifiable"></span></div>
+          <div class="status-card"><span class="stat-label">REFUTED</span><span class="stat-value" id="mRefuted"></span></div>
+          <div class="status-card"><span class="stat-label">MODE</span><span class="stat-value" id="mMode"></span></div>
+        </section>
+
+        <section class="panel" id="inputPanel">
+          <span class="hud-corner tl"></span>
+          <span class="hud-corner tr"></span>
+          <span class="hud-corner bl"></span>
+          <span class="hud-corner br"></span>
+          <span class="sector-label">SECTOR-A1</span>
+          <div class="panel-header">
+            <span>◈ $ input_payload.txt</span>
+            <div class="mode-toggle" title="Light: 快速 jieba 概念图；Deep: 完整六战士（jieba）；Super: LLaMA TRACE 模型驱动">
+              <input type="radio" name="mode" id="modeLight" value="light" checked>
+              <label for="modeLight">LIGHT</label>
+              <input type="radio" name="mode" id="modeDeep" value="deep">
+              <label for="modeDeep">DEEP</label>
+              <input type="radio" name="mode" id="modeSuper" value="super">
+              <label for="modeSuper">SUPER</label>
+            </div>
           </div>
-        </div>
-        <div class="panel-body">
-          <div class="mode-note" id="modeNote">
-            <strong>LIGHT 模式：</strong>仅执行 TRACE + DoWhy 核心因果推断（识别、估计、反驳、反事实扫描），约 1–3 秒完成。此模式跳过 causallearn、完整 CCM/EDM/HAVOK 深度诊断，因此“快”是设计行为，不是缺陷。
-          </div>
+          <div class="panel-body">
+            <div class="mode-note" id="modeNote">
+              <strong>LIGHT 模式：</strong>仅执行 TRACE + DoWhy 核心因果推断（识别、估计、反驳、反事实扫描），约 1–3 秒完成。此模式跳过 causallearn、完整 CCM/EDM/HAVOK 深度诊断，因此“快”是设计行为，不是缺陷。
+            </div>
 
           <div class="model-device" id="superModelWrap" style="display:none;">
-            <span class="k" title="SUPER 模式使用哪个训练好的 LLaMA 模型执行 token-level TRACE">// CORE_DRIVER</span>
+            <span class="k driver-label" title="SUPER 模式使用哪个训练好的 LLaMA 模型执行 token-level TRACE">// CORE_DRIVER</span>
             <select id="superModelSelect">
               <option value="shehui-llama">Shehui-LLaMA TYPE-S (27M / FAST)</option>
               <option value="shenji-llama">Shenji-LLaMA TYPE-X (469M / 神学)</option>
@@ -63,36 +91,44 @@
             <span id="modelBadge" class="model-badge speed">SPEED</span>
           </div>
 
-          <label for="textInput">TEXT INPUT</label>
-          <textarea id="textInput" placeholder="// 输入描述因果关系的文本，例如：&#10;算法推荐导致信息茧房，信息茧房加剧观点极化，观点极化侵蚀社会共识……"></textarea>
-
-          <label for="fileInput">OR UPLOAD FILE <span style="color:var(--muted);font-size:0.78rem;">(支持拖拽上传 · Ctrl+Enter 运行)</span></label>
-          <div id="dropZone">
-            <input type="file" id="fileInput" accept=".txt,.md,text/plain,text/markdown" style="display:none;">
-            <div id="dropText">点击选择或拖拽文本文件到此处</div>
-            <div id="fileName" style="color:var(--accent);margin-top:0.3rem;display:none;"></div>
+          <div class="input-section">
+            <label for="textInput" class="section-label">TEXT INPUT</label>
+            <textarea id="textInput" placeholder="// 输入描述因果关系的文本，例如：&#10;算法推荐导致信息茧房，信息茧房加剧观点极化，观点极化侵蚀社会共识……"></textarea>
           </div>
 
-          <details style="margin-bottom:1rem;">
-            <summary>ADVANCED_PARAMETERS // 高级参数</summary>
-            <div class="param-grid" id="dynamicParams" style="margin-top:0.5rem;">
-              <div class="param"><span class="k">Loading schema...</span></div>
+          <div class="input-section">
+            <label for="fileInput" class="section-label">OR UPLOAD FILE <span class="section-hint">(支持拖拽上传 · Ctrl+Enter 运行)</span></label>
+            <div id="dropZone">
+              <input type="file" id="fileInput" accept=".txt,.md,text/plain,text/markdown" style="display:none;">
+              <div id="dropText">点击选择或拖拽文本文件到此处</div>
+              <div id="fileName" style="color:var(--accent);margin-top:0.3rem;display:none;"></div>
             </div>
-            <div style="margin-top:0.65rem;display:flex;gap:0.5rem;flex-wrap:wrap;align-items:center;">
-              <span style="color:var(--muted);font-family:var(--font-mono);font-size:0.72rem;">PRESETS:</span>
-              <button type="button" class="secondary preset-btn" data-preset="default" style="padding:0.3rem 0.55rem;font-size:0.72rem;">DEFAULT</button>
-              <button type="button" class="secondary preset-btn" data-preset="sensitive" style="padding:0.3rem 0.55rem;font-size:0.72rem;">SENSITIVE</button>
-              <button type="button" class="secondary preset-btn" data-preset="broad" style="padding:0.3rem 0.55rem;font-size:0.72rem;">BROAD</button>
-              <button type="button" class="secondary preset-btn" data-preset="deep" style="padding:0.3rem 0.55rem;font-size:0.72rem;">DEEP</button>
-              <button type="button" class="secondary preset-btn" data-preset="llama" style="padding:0.3rem 0.55rem;font-size:0.72rem;border-color:var(--accent-tokusatsu);color:var(--accent-tokusatsu);">LLAMA</button>
-            </div>
-          </details>
+          </div>
 
-          <div class="actions">
-            <button id="analyzeBtn">> RUN_ANALYSIS</button>
-            <button id="cancelBtn" class="danger">> ABORT</button>
-            <button id="loadSampleBtn" class="secondary">> LOAD_SAMPLE</button>
-            <button id="clearBtn" class="secondary">> CLEAR</button>
+          <div class="input-section">
+            <details class="advanced-details">
+              <summary>ADVANCED_PARAMETERS // 高级参数</summary>
+              <div class="param-grid" id="dynamicParams">
+                <div class="param"><span class="k">Loading schema...</span></div>
+              </div>
+              <div class="preset-bar">
+                <span class="preset-label">PRESETS:</span>
+                <button type="button" class="secondary preset-btn" data-preset="default">DEFAULT</button>
+                <button type="button" class="secondary preset-btn" data-preset="sensitive">SENSITIVE</button>
+                <button type="button" class="secondary preset-btn" data-preset="broad">BROAD</button>
+                <button type="button" class="secondary preset-btn" data-preset="deep">DEEP</button>
+                <button type="button" class="secondary preset-btn preset-llama" data-preset="llama">LLAMA</button>
+              </div>
+            </details>
+          </div>
+
+          <div class="input-section action-section">
+            <div class="actions">
+              <button id="analyzeBtn">> RUN_ANALYSIS</button>
+              <button id="cancelBtn" class="danger">> ABORT</button>
+              <button id="loadSampleBtn" class="secondary">> LOAD_SAMPLE</button>
+              <button id="clearBtn" class="secondary">> CLEAR</button>
+            </div>
           </div>
 
           <div class="progress-wrap" id="progressWrap">
@@ -111,82 +147,15 @@
           <div id="toast" class="toast"></div>
         </div>
       </section>
-
-      <section class="panel hidden" id="resultPanel">
-        <div class="panel-header">◉ $ result_summary.json</div>
-        <div class="panel-body">
-          <div class="metric-grid">
-            <div class="metric"><div class="value" id="mConcepts">-</div><div class="label">CONCEPTS</div></div>
-            <div class="metric"><div class="value" id="mEdges">-</div><div class="label">EDGES</div></div>
-            <div class="metric"><div class="value" id="mATE">-</div><div class="label">ATE</div></div>
-            <div class="metric"><div class="value" id="mCI">-</div><div class="label">95% CI</div></div>
-            <div class="metric"><div class="value" id="mIdentifiable">-</div><div class="label">IDENTIFIABLE</div></div>
-            <div class="metric"><div class="value" id="mRefuted">-</div><div class="label">REFUTED</div></div>
-            <div class="metric"><div class="value" id="mMode">-</div><div class="label">MODE</div></div>
-            <div class="metric"><div class="value" id="mDuration">-</div><div class="label">DURATION</div></div>
-          </div>
-
-          <h3 class="section-title">// CAUSAL PARAMETERS (MASS-SPECTROMETRY)</h3>
-          <div class="param-grid" id="paramGrid"></div>
-
-          <h3 class="section-title">// EXECUTION PROFILE</h3>
-          <div id="execProfile"></div>
-
-          <h3 class="section-title">// ENVIRONMENT & BRIDGE HEALTH</h3>
-          <div id="envDiagnostics"></div>
-
-          <h3 class="section-title">// DATA & MODEL DIAGNOSTICS</h3>
-          <div id="dataDiagnostics"></div>
-
-          <h3 class="section-title">// ALGORITHM SUFFICIENCY</h3>
-          <div id="sufficiencyPanel"></div>
-
-          <h3 class="section-title">// IDENTIFIABILITY & ESTIMATION BACKEND</h3>
-          <div id="identifiabilityPanel"></div>
-
-          <h3 class="section-title">// CONCEPT VOCABULARY & FREQUENCY</h3>
-          <table>
-            <thead><tr><th>CONCEPT</th><th>FREQ</th><th>RANK</th><th>CCM ELIGIBLE</th></tr></thead>
-            <tbody id="conceptFreqBody"></tbody>
-          </table>
-
-          <h3 class="section-title">// ADJACENCY MATRIX HEATMAP</h3>
-          <div id="adjMatrixWrap"></div>
-
-          <h3 class="section-title">// STABILITY & ROBUSTNESS</h3>
-          <div id="stabilityPanel"></div>
-
-          <h3 class="section-title">// TOP CAUSAL EDGES</h3>
-          <table>
-            <thead><tr><th>SOURCE</th><th>TARGET</th><th>STRENGTH</th><th>DIRECTION</th></tr></thead>
-            <tbody id="edgesBody"></tbody>
-          </table>
-
-          <h3 class="section-title">// COUNTERFACTUAL SCAN</h3>
-          <table>
-            <thead><tr><th>EDGE</th><th>ΔNLL</th><th>ITE</th><th>OBSERVED</th><th>COUNTERFACTUAL</th></tr></thead>
-            <tbody id="scanBody"></tbody>
-          </table>
-
-          <h3 class="section-title">// REFUTATION TESTS</h3>
-          <table>
-            <thead><tr><th>METHOD</th><th>ORIGINAL</th><th>NEW EFFECT</th><th>METRIC</th><th>VERDICT</th></tr></thead>
-            <tbody id="refuteBody"></tbody>
-          </table>
-
-          <h3 class="section-title">// SIX WARRIORS DIAGNOSIS</h3>
-          <div class="warrior-grid" id="warriorGrid"></div>
-
-          <div class="links" style="margin-top:1rem;">
-            <a id="reportLink" href="#" target="_blank">> OPEN_REPORT.md</a>
-            <a id="jsonLink" href="#" target="_blank">> OPEN_RESULT.json</a>
-          </div>
-        </div>
-      </section>
     </div>
 
     <div class="right-col">
       <section class="panel log-panel">
+        <span class="hud-corner tl"></span>
+        <span class="hud-corner tr"></span>
+        <span class="hud-corner bl"></span>
+        <span class="hud-corner br"></span>
+        <span class="sector-label">SECTOR-B1</span>
         <div class="panel-header" style="justify-content:space-between;">
           <span style="display:flex;align-items:center;"><span class="live-dot"></span> $ realtime_log.stream</span>
           <span id="logStageBadge" class="log-stage-badge">IDLE</span>
@@ -202,11 +171,16 @@
           <button type="button" id="clearLogBtn" class="secondary">CLEAR</button>
         </div>
         <div class="panel-body" style="padding:0.55rem;">
-          <div class="terminal" id="terminal"></div>
+          <div class="terminal log-cockpit" id="terminal"></div>
         </div>
       </section>
 
       <section class="panel">
+        <span class="hud-corner tl"></span>
+        <span class="hud-corner tr"></span>
+        <span class="hud-corner bl"></span>
+        <span class="hud-corner br"></span>
+        <span class="sector-label">SECTOR-B2</span>
         <div class="panel-header" style="justify-content:space-between;">
           <span>◉ $ job_history.log</span>
           <div style="display:flex;gap:0.45rem;">
@@ -216,19 +190,99 @@
           </div>
         </div>
         <div class="panel-body" style="padding:0.55rem;">
-          <div class="terminal" id="jobHistoryTerminal" style="min-height:160px;max-height:260px;"></div>
+          <div class="terminal log-cockpit" id="jobHistoryTerminal" style="min-height:160px;max-height:260px;"></div>
         </div>
       </section>
     </div>
+    </div>
+
+    <section class="panel hidden result-fullwidth" id="resultPanel">
+      <span class="hud-corner tl"></span>
+      <span class="hud-corner tr"></span>
+      <span class="hud-corner bl"></span>
+      <span class="hud-corner br"></span>
+      <span class="sector-label">SECTOR-A2</span>
+      <div class="panel-header">◉ $ result_summary.json</div>
+      <div class="panel-body">
+        <div class="metric-grid">
+          <div class="metric"><div class="value" id="rConcepts">-</div><div class="label">CONCEPTS</div></div>
+          <div class="metric"><div class="value" id="rEdges">-</div><div class="label">EDGES</div></div>
+          <div class="metric"><div class="value" id="rATE">-</div><div class="label">ATE</div></div>
+          <div class="metric"><div class="value" id="rCI">-</div><div class="label">95% CI</div></div>
+          <div class="metric"><div class="value" id="rIdentifiable">-</div><div class="label">IDENTIFIABLE</div></div>
+          <div class="metric"><div class="value" id="rRefuted">-</div><div class="label">REFUTED</div></div>
+          <div class="metric"><div class="value" id="rMode">-</div><div class="label">MODE</div></div>
+          <div class="metric"><div class="value" id="rDuration">-</div><div class="label">DURATION</div></div>
+        </div>
+
+        <h3 class="section-title">// CAUSAL PARAMETERS (MASS-SPECTROMETRY)</h3>
+        <div class="param-grid" id="paramGrid"></div>
+
+        <h3 class="section-title">// EXECUTION PROFILE</h3>
+        <div id="execProfile"></div>
+
+        <h3 class="section-title">// ENVIRONMENT & BRIDGE HEALTH</h3>
+        <div id="envDiagnostics"></div>
+
+        <h3 class="section-title">// DATA & MODEL DIAGNOSTICS</h3>
+        <div id="dataDiagnostics"></div>
+
+        <h3 class="section-title">// ALGORITHM SUFFICIENCY</h3>
+        <div id="sufficiencyPanel"></div>
+
+        <h3 class="section-title">// IDENTIFIABILITY & ESTIMATION BACKEND</h3>
+        <div id="identifiabilityPanel"></div>
+
+        <h3 class="section-title">// CONCEPT VOCABULARY & FREQUENCY</h3>
+        <table>
+          <thead><tr><th>CONCEPT</th><th>FREQ</th><th>RANK</th><th>CCM ELIGIBLE</th></tr></thead>
+          <tbody id="conceptFreqBody"></tbody>
+        </table>
+
+        <h3 class="section-title">// ADJACENCY MATRIX HEATMAP</h3>
+        <div id="adjMatrixWrap"></div>
+
+        <h3 class="section-title">// STABILITY & ROBUSTNESS</h3>
+        <div id="stabilityPanel"></div>
+
+        <h3 class="section-title">// TOP CAUSAL EDGES</h3>
+        <table>
+          <thead><tr><th>SOURCE</th><th>TARGET</th><th>STRENGTH</th><th>DIRECTION</th></tr></thead>
+          <tbody id="edgesBody"></tbody>
+        </table>
+
+        <h3 class="section-title">// COUNTERFACTUAL SCAN</h3>
+        <table>
+          <thead><tr><th>EDGE</th><th>ΔNLL</th><th>ITE</th><th>OBSERVED</th><th>COUNTERFACTUAL</th></tr></thead>
+          <tbody id="scanBody"></tbody>
+        </table>
+
+        <h3 class="section-title">// REFUTATION TESTS</h3>
+        <table>
+          <thead><tr><th>METHOD</th><th>ORIGINAL</th><th>NEW EFFECT</th><th>METRIC</th><th>VERDICT</th></tr></thead>
+          <tbody id="refuteBody"></tbody>
+        </table>
+
+        <h3 class="section-title">// SIX WARRIORS DIAGNOSIS</h3>
+        <div class="warrior-grid" id="warriorGrid"></div>
+
+        <div class="links" style="margin-top:1rem;">
+          <a id="reportLink" href="#" target="_blank">> OPEN_REPORT.md</a>
+          <a id="jsonLink" href="#" target="_blank">> OPEN_RESULT.json</a>
+        </div>
+      </div>
+    </section>
   </main>
 
   <!-- debt-09：JS 拆分为 5 个模块，按依赖顺序加载。
        schema.js 声明 Schema 状态与加载函数；sse.js 处理 SSE 流；render.js 提供日志与结果渲染；
        jobs.js 处理任务历史；app.js 最后加载，声明 DOM 引用、附加监听器、执行初始化。 -->
-  <script src="/js/schema.js"></script>
-  <script src="/js/sse.js"></script>
-  <script src="/js/render.js"></script>
-  <script src="/js/jobs.js"></script>
-  <script src="/js/app.js"></script>
+  </div>
+
+  <script src="/js/schema.js?v=20260725a"></script>
+  <script src="/js/sse.js?v=20260725a"></script>
+  <script src="/js/render.js?v=20260725a"></script>
+  <script src="/js/jobs.js?v=20260725a"></script>
+  <script src="/js/app.js?v=20260725f"></script>
 </body>
 </html>

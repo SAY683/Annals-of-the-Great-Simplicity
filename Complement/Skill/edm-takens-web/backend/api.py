@@ -16,8 +16,9 @@ api.py 现在只负责:
 import os
 import sys
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import RedirectResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 
 # ── sys.path 设置 ─────────────────────────────────────────
@@ -95,13 +96,23 @@ from workers.analysis_worker import _JobStream, _job_worker, _stream_from_job
 app = FastAPI(title="EDM-Takens Web", version="0.1.0")
 
 # P2 修复: CORS 生产环境收窄，通过 EDM_CORS_ORIGINS 环境变量配置
+# debt-12.13 收窄: allow_headers 从通配符 ["*"] 改为显式白名单，
+# 避免非预期自定义头（如 X-Forwarded-For 注入）穿透 CORS 检查。
 _EDM_CORS_ORIGINS = os.environ.get("EDM_CORS_ORIGINS", "http://localhost:5173,http://localhost:8000,http://127.0.0.1:5173,http://127.0.0.1:8000").split(",")
+_EDM_ALLOWED_HEADERS = [
+    "Content-Type",
+    "Authorization",
+    "X-Trace-Id",
+    "X-Request-Id",
+    "Accept",
+    "Accept-Language",
+]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_EDM_CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allow_headers=["*"],
+    allow_headers=_EDM_ALLOWED_HEADERS,
 )
 
 # ── Mount routers (debt-19) ──────────────────────────────
@@ -146,10 +157,22 @@ from routes.history import (
     export_task_csv,
 )
 
-# ── Static frontend serving (debt-Q9): backend now serves the Vite-built frontend
-# so that http://localhost:8000 works directly, not only via the Vite dev server.
-# API routes are registered above and take precedence; unmatched paths fall back
-# to index.html for the SPA.
+# ── Static frontend serving (debt-Q9):
+#   - 生产环境：优先服务 frontend/dist 构建产物。
+#   - 开发环境：若没有 dist，访问根路径自动重定向到 Vite 开发服务器
+#     (http://127.0.0.1:5173)，避免用户直接打开 8000 看到未构建的源码。
+#   - API 路由已在上方注册并优先匹配；未匹配路径才落到此处。
 _FRONTEND_DIR = os.path.join(_BACKEND_DIR, "..", "frontend")
-if os.path.isdir(_FRONTEND_DIR):
-    app.mount("/", StaticFiles(directory=_FRONTEND_DIR, html=True), name="static")
+_DIST_DIR = os.path.join(_FRONTEND_DIR, "dist")
+
+if os.path.isdir(_DIST_DIR):
+    app.mount("/", StaticFiles(directory=_DIST_DIR, html=True), name="static")
+elif os.path.isdir(_FRONTEND_DIR):
+    @app.get("/")
+    def _redirect_to_vite_dev(request: Request):
+        return RedirectResponse("http://127.0.0.1:5173")
+
+    @app.get("/{path:path}")
+    def _redirect_spa_paths_to_vite(path: str):
+        return RedirectResponse(f"http://127.0.0.1:5173/{path}")
+

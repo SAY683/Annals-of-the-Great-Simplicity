@@ -183,8 +183,12 @@ const startupCleanupTimer = setTimeout(adminCleanup.cleanupOldOutputs, 5000);
 const cacheTtlInterval = startCacheTtlSweeper();
 
 // ── 启动监听 ────────────────────────────────────────────────────────
-const server = app.listen(PORT, () => {
-  console.log(`TRACE Engine Web MVP 运行在 http://localhost:${PORT}`);
+// P1 修缮 (2026-07-25 元审计 Round 12.10): host 收窄到 127.0.0.1
+// 原实现 app.listen(PORT) 未指定 host，等价于隐式 0.0.0.0（暴露至 LAN/公网）
+// 默认仅本机访问；如需外部访问，显式设置 TRACE_HOST=0.0.0.0
+const HOST = process.env.TRACE_HOST || '127.0.0.1';
+const server = app.listen(PORT, HOST, () => {
+  console.log(`TRACE Engine Web MVP 运行在 http://${HOST}:${PORT}`);
   console.log(`工作目录: ${WORK_DIR}`);
   console.log(`Skill 目录: ${CONFIG.skillDir}`);
   console.log(`输出 TTL: ${CONFIG.outputTtlMs}ms`);

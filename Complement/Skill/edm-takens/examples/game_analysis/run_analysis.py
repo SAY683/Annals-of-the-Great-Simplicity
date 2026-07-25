@@ -16,11 +16,20 @@
 """
 
 import sys, os, json, warnings
+from pathlib import Path
 
 # ── Path setup ──
 _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 _SKILL_SRC = os.path.join(_SCRIPT_DIR, '..', '..', 'src')
 sys.path.insert(0, _SKILL_SRC)
+
+# ── Shared terminal theme ──
+SHARED_DIR = Path(__file__).resolve().parents[3] / "shared"
+sys.path.insert(0, str(SHARED_DIR))
+from terminal_theme import (
+    T, print_header, log_stage, log_info, log_warn, log_error, log_done,
+    stage_bar, verdict_panel, metric_line
+)
 
 # ── Windows UTF-8 ──
 if hasattr(sys.stdout, 'reconfigure'):
@@ -88,36 +97,39 @@ def simple_kpss(data):
 
 
 def main():
+    print_header("游戏数据 EDM-Takens 分析", dept="THEORY", subtitle="Defense-Team Theory Lab")
+
     # ═══════════════════════════════════════════════════════
     # 0. Load data
     # ═══════════════════════════════════════════════════════
+    stage_bar(["LOAD", "EMBED", "SIMPLEX", "SMAP", "CCM", "HAVOK", "KOOPMAN", "AUDIT"], current="LOAD")
+    log_stage("LOAD — 加载数据")
     data_path = os.path.join(_SCRIPT_DIR, 'data', 'game_log.csv')
     df = pd.read_csv(data_path, encoding='utf-8-sig')
     N = len(df)
     variables = ['result', 'kills', 'damage', 'deaths']
     lib = f'1 {N - 7}'
     pred = f'{N - 6} {N}'
-    print(f"游戏数据: N={N}, vars={variables}, win_rate={df['result'].mean():.0%}")
-    print(f"lib={lib} pred={pred}")
+    log_info(f"游戏数据: N={N}, vars={variables}, win_rate={df['result'].mean():.0%}")
+    log_info(f"lib={lib} pred={pred}")
 
     # ═══════════════════════════════════════════════════════
     # LAYER 2 — Audit
     # ═══════════════════════════════════════════════════════
-    print("\n" + "=" * 58)
-    print("  LAYER 2 — 前置审计")
-    print("=" * 58)
+    stage_bar(["LOAD", "EMBED", "SIMPLEX", "SMAP", "CCM", "HAVOK", "KOOPMAN", "AUDIT"], current="EMBED", completed=["LOAD"])
+    log_stage("LAYER 2 — 前置审计")
 
     # S3 Hankel (★★★★)
-    print("\n[S3 ★★★★] Hankel 纵横比 (maxE=6):")
+    log_info("[S3 ★★★★] Hankel 纵横比 (maxE=6)")
     hankel_checks = {}
     for var in variables:
         status, ratio, p, q_rec = classify_hankel_ratio(N, 6)
         icon = {'GOOD': 'OK', 'MARGINAL': '!!', 'DEGRADED': 'XX', 'BROKEN': 'XX'}[status]
         hankel_checks[var] = {'status': status, 'ratio': ratio, 'p': p, 'q_rec': q_rec}
-        print(f"  {var}: p/q={ratio:.1f} [{icon}] {status} (safe q≤{q_rec})")
+        log_info(f"  {var}: p/q={ratio:.1f} [{icon}] {status} (safe q≤{q_rec})")
 
     # S8 Stationarity (★★★★)
-    print("\n[S8 ★★★★] 平稳性 (ADF+KPSS):")
+    log_info("[S8 ★★★★] 平稳性 (ADF+KPSS)")
     stat_checks = {}
     for var in variables:
         data = df[var].values.astype(float)
@@ -128,10 +140,10 @@ def main():
         elif adf_p > 0.05 and kpss_p < 0.05: v = 'WARN — 差分平稳'
         else: v = 'WARN — 效力不足'
         stat_checks[var] = v
-        print(f"  {var}: ADF p={adf_p:.4f} KPSS p={kpss_p:.4f} → {v}")
+        log_info(f"  {var}: ADF p={adf_p:.4f} KPSS p={kpss_p:.4f} → {v}")
 
     # S9 Genericity (★★★)
-    print("\n[S9 ★★★] 观测泛型性:")
+    log_info("[S9 ★★★] 观测泛型性")
     gen_issues = {}
     for var in variables:
         vals = df[var].values
@@ -141,19 +153,18 @@ def main():
         if var == 'result' and n_uniq == 2:
             issues.append("二元目标 — ρ 天花板 ~0.87 (S9) — 优先用连续协变量")
         gen_issues[var] = issues
-        print(f"  {var}: {n_uniq}类 → {'PASS' if not issues else 'WARN: '+'; '.join(issues)}")
+        log_info(f"  {var}: {n_uniq}类 → {'PASS' if not issues else 'WARN: '+'; '.join(issues)}")
 
     # ═══════════════════════════════════════════════════════
     # EXECUTION: EDM + HAVOK + CCM
     # ═══════════════════════════════════════════════════════
-    print("\n" + "=" * 58)
-    print("  EXECUTION — EDM + HAVOK + CCM")
-    print("=" * 58)
+    stage_bar(["LOAD", "EMBED", "SIMPLEX", "SMAP", "CCM", "HAVOK", "KOOPMAN", "AUDIT"], current="SIMPLEX", completed=["LOAD", "EMBED"])
+    log_stage("EXECUTION — EDM + HAVOK + CCM")
 
     edm_results = {}
 
     for var in variables:
-        print(f"\n── [{var}] ──")
+        log_info(f"── [{var}] ──")
         data = df[var].values.astype(float)
 
         # EmbedDimension
@@ -166,14 +177,14 @@ def main():
             rho_E['rho'] = pd.to_numeric(rho_E['rho'], errors='coerce')
             E_opt = int(rho_E.loc[rho_E['rho'].idxmax(), 'E'])
         except Exception as e:
-            print(f"  EmbedDim 失败: {type(e).__name__}, fallback E=3")
+            log_warn(f"  EmbedDim 失败: {type(e).__name__}, fallback E=3")
 
         # S3 check on E_opt
         h_status, h_ratio, h_p, q_rec = classify_hankel_ratio(N, E_opt)
         if h_status in ('DEGRADED', 'BROKEN'):
             old_E = E_opt; E_opt = q_rec
-            print(f"  [S3] E {old_E}→{E_opt} (p/q={h_ratio:.1f})")
-        print(f"  E_opt = {E_opt}")
+            log_warn(f"  [S3] E {old_E}→{E_opt} (p/q={h_ratio:.1f})")
+        metric_line("E (嵌入维度)", E_opt)
 
         # Simplex
         rho_sx, mae_sx = np.nan, np.nan
@@ -186,9 +197,10 @@ def main():
             if mask.sum() > 3:
                 rho_sx = float(pearsonr(obs[mask], prd[mask])[0])
                 mae_sx = float(np.mean(np.abs(obs[mask] - prd[mask])))
-            print(f"  Simplex: ρ={rho_sx:.3f} MAE={mae_sx:.3f}")
+            metric_line("simplex_rho", f"{rho_sx:.3f}")
+            log_info(f"  Simplex: MAE={mae_sx:.3f}")
         except Exception as e:
-            print(f"  Simplex 失败: {e}")
+            log_error(f"  Simplex 失败: {e}")
 
         # S-Map
         is_nonlinear, theta_best, rho_smap = False, 0.0, 0.0
@@ -202,13 +214,15 @@ def main():
             rho_smap = float(sm.loc[peak_idx, 'rho'])
             rho_theta0 = float(sm.loc[sm['theta'].idxmin(), 'rho'])
             is_nonlinear = (rho_smap - rho_theta0) >= 0.05 and theta_best > 0
-            print(f"  S-Map: θ={theta_best:.0f} ρ={rho_smap:.3f} 非线性={'是' if is_nonlinear else '否'}")
+            metric_line("S-Map theta", f"{theta_best:.0f}")
+            log_info(f"  S-Map: ρ={rho_smap:.3f} 非线性={'是' if is_nonlinear else '否'}")
         except Exception as e:
-            print(f"  S-Map 失败: {e}")
+            log_error(f"  S-Map 失败: {e}")
 
         # CCM on result vs kills/damage/deaths
         ccm_results = {}
         if var == 'result':
+            stage_bar(["LOAD", "EMBED", "SIMPLEX", "SMAP", "CCM", "HAVOK", "KOOPMAN", "AUDIT"], current="CCM", completed=["LOAD", "EMBED", "SIMPLEX", "SMAP"])
             for cause in ['kills', 'damage', 'deaths']:
                 try:
                     r = ccm_causality_test(df, cause_var=cause, effect_var='result', E=E_opt)
@@ -218,9 +232,12 @@ def main():
                         'rev_rho': r['reverse']['final_rho'],
                         'fwd_conv': r['forward']['is_converging'],
                     }
-                    print(f"  CCM {cause}→result (E={E_opt}): {r['verdict']}")
+                    fwd_rho = r['forward']['final_rho']
+                    if fwd_rho is not None:
+                        metric_line(f"CCM rho ({cause}→result)", f"{fwd_rho:.3f}", threshold=0.0, mode="min")
+                    log_info(f"  CCM {cause}→result (E={E_opt}): {r['verdict']}")
                 except Exception as e:
-                    print(f"  CCM {cause}→result: 失败 ({e})")
+                    log_error(f"  CCM {cause}→result: 失败 ({e})")
 
         edm_results[var] = {
             'E_opt': E_opt, 'rho_sx': rho_sx, 'mae_sx': mae_sx,
@@ -232,9 +249,8 @@ def main():
     # ═══════════════════════════════════════════════════════
     # LAYER 3 — HAVOK
     # ═══════════════════════════════════════════════════════
-    print("\n" + "=" * 58)
-    print("  LAYER 3 — HAVOK 分解 + 交叉验证")
-    print("=" * 58)
+    stage_bar(["LOAD", "EMBED", "SIMPLEX", "SMAP", "CCM", "HAVOK", "KOOPMAN", "AUDIT"], current="HAVOK", completed=["LOAD", "EMBED", "SIMPLEX", "SMAP", "CCM"])
+    log_stage("LAYER 3 — HAVOK 分解 + 交叉验证")
 
     havok_results = {}
     try:
@@ -242,7 +258,7 @@ def main():
         HAS_HAVOK = True
     except ImportError:
         HAS_HAVOK = False
-        print("  [!] HAVOK 不可用")
+        log_warn("  [!] HAVOK 不可用")
 
     xv_results = {}
 
@@ -253,23 +269,23 @@ def main():
             wl = min(11, (N - E) // 2 * 2 - 1)
             if wl < 5: wl = 5
             if wl % 2 == 0: wl -= 1
-            print(f"\n── [{var}] HAVOK (q={E}, wl={wl}) ──")
+            log_info(f"── [{var}] HAVOK (q={E}, wl={wl}) ──")
             try:
                 sh = SovereignHAVOK(q_delays=E, dt=1.0, energy_threshold=0.99,
                                     poly_order=min(3, wl-1), window_length=wl, basis="V")
                 sh.fit(arr)
                 kurt_vr = float(sh.kurtosis_vr_)
-                print(f"  r={sh.r_} R²={sh.regression_r2_:.3f} kurtosis={kurt_vr:.3f} "
-                      f"expl_var={sh.explained_var_:.0%}")
+                metric_line("HAVOK kurtosis", f"{kurt_vr:.3f}", threshold=3.0, mode="max")
+                log_info(f"  r={sh.r_} R²={sh.regression_r2_:.3f} expl_var={sh.explained_var_:.0%}")
                 havok_results[var] = {
                     'r': sh.r_, 'r2': sh.regression_r2_, 'kurtosis': kurt_vr,
                     'expl_var': sh.explained_var_, 'forcing': sh.forcing_, 'sh': sh,
                 }
             except Exception as e:
-                print(f"  HAVOK 失败: {e}")
+                log_error(f"  HAVOK 失败: {e}")
 
         # S6 Cross-validation
-        print("\n[S6] EDM-HAVOK 交叉验证:")
+        log_info("[S6] EDM-HAVOK 交叉验证:")
         for var in variables:
             edm = edm_results[var]; hv = havok_results.get(var, {})
             if 'kurtosis' not in hv: continue
@@ -279,12 +295,12 @@ def main():
             elif not edm_nl and hv_kt > 1.5: s6 = 'DISCREPANCY — HAVOK 重尾，EDM 线性'
             else: s6 = 'CONSISTENT — 近线性/随机'
             xv_results[var] = {'s6_verdict': s6}
-            print(f"  {var}: EDM_nl={edm_nl} HAVOK_kurt={hv_kt:.3f} → {s6}")
+            log_info(f"  {var}: EDM_nl={edm_nl} HAVOK_kurt={hv_kt:.3f} → {s6}")
 
     # ═══════════════════════════════════════════════════════
     # Visualization
     # ═══════════════════════════════════════════════════════
-    print("\n生成图表...")
+    log_info("生成图表...")
     fig = plt.figure(figsize=(20, 14))
     gs = GridSpec(4, 5, figure=fig, hspace=0.5, wspace=0.4,
                   height_ratios=[1, 1, 1, 1], width_ratios=[1.0, 1.2, 1.3, 1.1, 1.0])
@@ -387,7 +403,7 @@ def main():
     out_path = os.path.join(_OUT_DIR, 'game_dashboard.png')
     plt.savefig(out_path, dpi=150, bbox_inches='tight', facecolor='white', pad_inches=0.3)
     plt.close()
-    print(f"  图表: {out_path}")
+    log_done(f"图表: {out_path}")
 
     # ═══════════════════════════════════════════════════════
     # Report
@@ -460,8 +476,14 @@ def main():
     report_path = os.path.join(_SCRIPT_DIR, 'game_report.md')
     with open(report_path, 'w', encoding='utf-8') as f:
         f.write('\n'.join(md))
-    print(f"  报告: {report_path}")
-    print("=" * 58)
+    log_done(f"报告: {report_path}")
+
+    # Audit / final status
+    stage_bar(["LOAD", "EMBED", "SIMPLEX", "SMAP", "CCM", "HAVOK", "KOOPMAN", "AUDIT"], current="AUDIT", completed=["LOAD", "EMBED", "SIMPLEX", "SMAP", "CCM", "HAVOK"])
+    n_warn = sum(1 for issues in gen_issues.values() if issues)
+    n_pass = len(variables) - n_warn
+    verdict_panel("WARN" if n_warn else "PASS", n_pass=n_pass, n_warn=n_warn, n_fail=0)
+    log_done("分析流程结束")
 
 
 if __name__ == '__main__':

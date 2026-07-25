@@ -58,6 +58,17 @@ function updateLogFilterButtons() {
 
 function log(level, message) {
   if (!terminal) return;
+  // 过滤无意义行：空行、纯分隔符行（ASCII #### ==== ---- **** 或 Unicode 制表符 ─━│┃═║ 等）
+  const trimmed = String(message).trim();
+  if (!trimmed) return;
+  // 去除空格后检测纯分隔符（如 "── ── ──" → "────────"）
+  const noSpaces = trimmed.replace(/\s+/g, '');
+  if (/^[#=\-*+_~─━│┃═║╔╗╚╝╠╣╦╩╬]+$/.test(noSpaces)) return;
+  // 过滤单字符重复 4 次以上的纯分隔行（如 ────── 或 ======）
+  if (/^(.)\1{4,}$/.test(noSpaces)) return;
+  // 过滤纯图标行（单个符号无实际内容）
+  if (/^[◉▶▲✖✓✦○●◇◆□■△▽☆★]+$/.test(noSpaces)) return;
+
   const normalized = LOG_LEVELS.includes(level) ? level : 'info';
   const line = document.createElement('div');
   line.className = `terminal-line ${normalized}`;
@@ -105,6 +116,10 @@ function renderResult(data) {
   if (!r) return;
   if (resultPanel) resultPanel.classList.remove('hidden');
 
+  // 有结果后显示顶部状态墙
+  const statusWall = document.getElementById('statusWall');
+  if (statusWall) statusWall.classList.remove('awaiting-data');
+
   // debt-10：基于 resultSchema 校验必需字段（仅记录缺失，不阻断渲染）
   const missingFields = [];
   if (RESULT_SCHEMA && RESULT_SCHEMA.required) {
@@ -118,21 +133,43 @@ function renderResult(data) {
     }
   }
 
-  document.getElementById('mConcepts').textContent = r.concepts ? r.concepts.length : '-';
-  document.getElementById('mEdges').textContent = r.n_significant_edges ?? '-';
-  document.getElementById('mATE').textContent = safeFmt(r.ate, 4);
-  document.getElementById('mCI').textContent = r.confidence_interval
+  // 状态墙（顶部）+ 结果面板（详情）双更新；使用独立 ID 避免冲突
+  function setMetric(id, value, styleFn) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = value;
+    if (styleFn) styleFn(el);
+  }
+
+  const conceptsVal = r.concepts ? r.concepts.length : '-';
+  const edgesVal = r.n_significant_edges ?? '-';
+  const ateVal = safeFmt(r.ate, 4);
+  const ciVal = r.confidence_interval
     ? `[${safeFmt(r.confidence_interval[0], 2)}, ${safeFmt(r.confidence_interval[1], 2)}]`
     : '-';
-  document.getElementById('mIdentifiable').textContent = r.identifiable ? 'YES' : 'NO';
-  document.getElementById('mIdentifiable').style.color = r.identifiable ? 'var(--success)' : 'var(--fail)';
-  document.getElementById('mRefuted').textContent = r.refutations
+  const identifiableVal = r.identifiable ? 'YES' : 'NO';
+  const refutedVal = r.refutations
     ? `${r.refutations.filter(x => x.refuted).length}/${r.refutations.length}`
     : '-';
-  document.getElementById('mMode').textContent = (r.analysis_mode || 'light').toUpperCase();
-  document.getElementById('mDuration').textContent = r.execution_profile && r.execution_profile.total_ms != null
+  const modeVal = (r.analysis_mode || 'light').toUpperCase();
+  const durationVal = r.execution_profile && r.execution_profile.total_ms != null
     ? `${safeFmt(r.execution_profile.total_ms / 1000, 2)}s`
     : '-';
+
+  setMetric('mConcepts', conceptsVal);
+  setMetric('rConcepts', conceptsVal);
+  setMetric('mEdges', edgesVal);
+  setMetric('rEdges', edgesVal);
+  setMetric('mATE', ateVal);
+  setMetric('rATE', ateVal);
+  setMetric('rCI', ciVal);
+  setMetric('mIdentifiable', identifiableVal, el => { el.style.color = r.identifiable ? 'var(--success)' : 'var(--fail)'; });
+  setMetric('rIdentifiable', identifiableVal, el => { el.style.color = r.identifiable ? 'var(--success)' : 'var(--fail)'; });
+  setMetric('mRefuted', refutedVal);
+  setMetric('rRefuted', refutedVal);
+  setMetric('mMode', modeVal);
+  setMetric('rMode', modeVal);
+  setMetric('rDuration', durationVal);
 
   // Parameters — 质谱级参数网格
   const paramGrid = document.getElementById('paramGrid');

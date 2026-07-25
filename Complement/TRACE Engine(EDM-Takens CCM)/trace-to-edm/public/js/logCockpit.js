@@ -16,12 +16,12 @@
     log: '◉ INFO',
   };
   const LOG_CLASSES = {
-    progress: 'progress',
+    progress: 'stage',
     info: 'info',
     warn: 'warn',
     error: 'error',
-    done: 'done',
-    log: 'log',
+    done: 'info',
+    log: 'info',
   };
 
   function escapeHtml(s) {
@@ -31,12 +31,24 @@
   function formatLogEntry(entry, filters) {
     const level = entry.level || 'log';
     if (filters && !filters.has(level)) return null;
+    // 过滤无意义行：空行、纯分隔符行（ASCII #### ==== ---- **** 或 Unicode 制表符 ─━│┃═║ 等）
+    const trimmed = String(entry.message).trim();
+    if (!trimmed) return null;
+    // 去除空格后检测纯分隔符（如 "── ── ──" → "────────"）
+    const noSpaces = trimmed.replace(/\s+/g, '');
+    if (/^[#=\-*+_~─━│┃═║╔╗╚╝╠╣╦╩╬]+$/.test(noSpaces)) return null;
+    // 过滤单字符重复 4 次以上的纯分隔行（如 ────── 或 ======）
+    if (/^(.)\1{4,}$/.test(noSpaces)) return null;
+    // 过滤纯图标行（单个符号无实际内容）
+    if (/^[◉▶▲✖✓✦○●◇◆□■△▽☆★]+$/.test(noSpaces)) return null;
     const icon = LOG_ICONS[level] || '◉ INFO';
-    const cls = LOG_CLASSES[level] || 'log';
+    const cls = LOG_CLASSES[level] || 'info';
     const ts = entry.time instanceof Date
       ? entry.time.toLocaleTimeString('zh-CN', { hour12: false })
       : '00:00:00';
-    return `<div class="terminal-line ${cls}" data-level="${level}"><span class="log-badge">${icon}</span><span class="log-ts">[${ts}]</span> ${escapeHtml(entry.message)}</div>`;
+    const iconChar = icon.split(' ')[0];
+    const levelText = icon.split(' ')[1] || '';
+    return `<div class="terminal-line ${cls}" data-level="${level}"><span class="log-icon">${iconChar}</span><span class="log-level">${levelText}</span><span class="log-ts">[${ts}]</span><span class="log-msg">${escapeHtml(entry.message)}</span></div>`;
   }
 
   function countByLevel(buffer) {

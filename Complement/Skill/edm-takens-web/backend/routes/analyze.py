@@ -12,6 +12,7 @@ from fastapi.responses import FileResponse, StreamingResponse
 
 from core.locks import _BLOCKING_ENDPOINT_SLOT, RESULTS_DIR
 from core.runtime import _JOB_STORE
+from job_store import _sanitize_json
 from services.file_management import (
     _prepare_dataset,
     _select_variables,
@@ -129,7 +130,7 @@ def analyze(
             raise HTTPException(status_code=500, detail=job.error)
 
         response = {
-            **job.result,
+            **_sanitize_json(job.result),
             "logs": "\n".join(job.logs),
         }
         if data_quality_warning:

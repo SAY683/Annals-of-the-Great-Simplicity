@@ -91,14 +91,23 @@ MODEL_REGISTRY["shenji-llama"] = {
 
 _ACTIVE_MODEL = "qwen2.5-1.5b"
 
-# 持久化: 将模型选择写入 cache 目录, 跨进程保持
+# 持久化: 将模型选择写入当前项目的 cache 目录, 跨进程保持 + 按项目隔离
+# P1-d 修缮：_active_model.txt 从全局共享改为按项目隔离
+# 之前所有项目共享同一个 data/cache/_active_model.txt，
+# 项目 A 切换模型后项目 B 也会受影响（但 sacred_vectors 缓存已按项目隔离）。
+# 现在改为 projects/<name>/cache/_active_model.txt，与 sacred_vectors 缓存目录一致。
 def _model_config_path():
     try:
-        from config import CACHE_DIR
-        return CACHE_DIR / "_active_model.txt"
-    except:
-        from pathlib import Path
-        return Path("data/cache/_active_model.txt")
+        from project_manager import get_project_manager
+        return get_project_manager().current_cache_dir / "_active_model.txt"
+    except Exception:
+        # 回退：项目上下文不可用时（如模块独立测试），使用全局 cache
+        try:
+            from config import CACHE_DIR
+            return CACHE_DIR / "_active_model.txt"
+        except Exception:
+            from pathlib import Path
+            return Path("data/cache/_active_model.txt")
 
 def _load_model_config():
     global _ACTIVE_MODEL
@@ -115,7 +124,12 @@ def _load_model_config():
                     _save_model_config()
                 else:
                     _ACTIVE_MODEL = saved
-        except: pass
+        except Exception as e:
+            # P1-d 修缮：不再静默吞没错误，打印诊断信息
+            print(f"[L3] ⚠ _active_model.txt 读取失败: {e}")
+    else:
+        # P1-d：项目目录下无配置文件时，使用默认模型并持久化
+        _ACTIVE_MODEL = "qwen2.5-1.5b"
 
 def _save_model_config():
     p = _model_config_path()

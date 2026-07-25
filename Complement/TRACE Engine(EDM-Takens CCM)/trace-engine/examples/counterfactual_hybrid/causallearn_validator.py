@@ -93,38 +93,160 @@ class CausalLearnValidator:
         except Exception as e:
             return {'error': str(e), 'edges': []}
 
-    # FCI 暂未实现，预留接口（如需支持隐藏混淆因子，可在此处添加 run_fci 方法）
+    def run_fci(self, alpha: float = 0.05, independence_test_method: str = 'fisherz',
+                depth: int = -1, **kwargs) -> dict:
+        """运行 FCI (Fast Causal Inference) 算法
+
+        FCI 与 PC 的关键区别: FCI 能够处理潜在混淆因子（latent confounders），
+        输出 PAG (Partial Ancestral Graph)，其边类型比 PC 的 CPDAG 更丰富:
+          X → Y : X 是 Y 的直接原因（无混淆）
+          X ↔ Y : X 和 Y 有共同潜在原因（关联但无直接因果）
+          X ⊙→ Y : X 可能是 Y 的原因（存在潜在混淆的不确定性）
+          X — Y : 关联方向不确定
+
+        这使得 FCI 在存在未观测混淆因子时仍能给出可靠的因果结论，
+        而 PC/GES 在此场景下可能产生虚假的因果方向判定。
+
+        Parameters
+        ----------
+        alpha : float
+            独立性检验显著性水平
+        independence_test_method : str
+            独立性检验方法 ('fisherz' / 'kci' / 'gsq' 等)
+        depth : int
+            搜索深度 (-1 = 无限制)
+        """
+        if not self._causallearn_available:
+            return {'error': 'causallearn not installed', 'edges': []}
+
+        try:
+            from causallearn.search.ConstraintBased.FCI import fci
+            # show_progress=False 避免污染日志输出
+            G, edges = fci(self.data, independence_test_method=independence_test_method,
+                           alpha=alpha, depth=depth, show_progress=False,
+                           node_names=self.concept_names, **kwargs)
+            parsed_edges = self._parse_causallearn_graph(G)
+
+            self.results['fci'] = {
+                'algorithm': 'FCI (constraint-based, latent-confounder-aware)',
+                'edges': parsed_edges,
+                'n_edges': len(parsed_edges),
+                'graph': G,
+                'raw_edges': edges,
+                'note': ('FCI 输出 PAG (Partial Ancestral Graph)，可识别潜在混淆。'
+                         '↔ 表示存在潜在共同原因，⊙→ 表示可能因果但存在不确定性。'),
+            }
+            return self.results['fci']
+        except Exception as e:
+            return {'error': str(e), 'edges': []}
 
     def _parse_causallearn_graph(self, G) -> list:
-        """将 causallearn 的 GeneralGraph 解析为边列表"""
+        """将 causallearn 的 GeneralGraph 解析为边列表
+
+        端点常量（causallearn.graph.Endpoint）:
+          TAIL   = -1  (无箭头，无圆圈)
+          ARROW  =  1  (箭头)
+          CIRCLE =  2  (圆圈，仅FCI的PAG中出现，表示方向不确定)
+
+        边类型映射:
+          PC/GES (CPDAG):
+            TAIL→ARROW  = → (直接因果)
+            ARROW→TAIL  = ← (反向因果)
+            TAIL→TAIL   = — (无方向，马蹄形)
+          FCI (PAG) 额外类型:
+            CIRCLE→ARROW = ⊙→ (可能因果，存在不确定性)
+            ARROW→CIRCLE = ←⊙ (反向可能因果)
+            CIRCLE→CIRCLE= ⊙—⊙ (方向完全不确定)
+            ARROW→ARROW  = ↔ (潜在共同原因)
+            CIRCLE→TAIL  = ⊙— (方向不确定，但非反向)
+            TAIL→CIRCLE  = —⊙ (方向不确定，但非正向)
+
+        P1 修缮 (两处bug):
+          1. 端点常量错误: 原代码 tail=1, arrow=2，与 causallearn 实际常量
+             (TAIL=-1, ARROW=1, CIRCLE=2) 不符，导致 PC/GES 边方向全部判反。
+             修复: 直接用 Endpoint 枚举对象比较，不提取 .value。
+          2. 节点索引偏移: causallearn 节点名 'X1','X2',... 是 1-based，
+             _node_index 返回 1,2,...，但 concept_names 列表是 0-based。
+             原代码直接用返回值索引 concept_names，导致所有节点名偏移1位
+             (X1→concept_names[1]=Y 而非 concept_names[0]=X)。
+             修复: i = _node_index(...) - 1 转为 0-based。
+        """
         edges = []
         try:
+            from causallearn.graph.Endpoint import Endpoint
+            TAIL = Endpoint.TAIL
+            ARROW = Endpoint.ARROW
+            CIRCLE = Endpoint.CIRCLE
+
             graph_edges = G.get_graph_edges()
             for edge in graph_edges:
-                i = _node_index(edge.get_node1())
-                j = _node_index(edge.get_node2())
+                # 节点索引: causallearn 1-based → Python 0-based
+                i = _node_index(edge.get_node1()) - 1
+                j = _node_index(edge.get_node2()) - 1
                 endpoint1 = edge.get_endpoint1()
                 endpoint2 = edge.get_endpoint2()
 
-                # ENDPOINT_TAIL = 1, ENDPOINT_ARROW = 2
-                tail, arrow = 1, 2
-                if endpoint1 == tail and endpoint2 == arrow:
+                # 端点组合 → 方向标记 (直接用 Endpoint 枚举对象比较)
+                if endpoint1 == TAIL and endpoint2 == ARROW:
                     direction = '→'
-                elif endpoint1 == arrow and endpoint2 == tail:
+                elif endpoint1 == ARROW and endpoint2 == TAIL:
                     direction = '←'
-                elif endpoint1 == arrow and endpoint2 == arrow:
-                    direction = '↔'
-                elif endpoint1 == tail and endpoint2 == tail:
+                elif endpoint1 == TAIL and endpoint2 == TAIL:
                     direction = '—'
+                elif endpoint1 == ARROW and endpoint2 == ARROW:
+                    direction = '↔'
+                elif endpoint1 == CIRCLE and endpoint2 == ARROW:
+                    direction = '⊙→'
+                elif endpoint1 == ARROW and endpoint2 == CIRCLE:
+                    direction = '←⊙'
+                elif endpoint1 == CIRCLE and endpoint2 == CIRCLE:
+                    direction = '⊙—⊙'
+                elif endpoint1 == CIRCLE and endpoint2 == TAIL:
+                    direction = '⊙—'
+                elif endpoint1 == TAIL and endpoint2 == CIRCLE:
+                    direction = '—⊙'
                 else:
                     direction = '?'
 
-                if i < len(self.concept_names) and j < len(self.concept_names):
+                if 0 <= i < len(self.concept_names) and 0 <= j < len(self.concept_names):
                     edges.append({
                         'source': self.concept_names[i],
                         'target': self.concept_names[j],
                         'direction': direction,
                     })
+                else:
+                    self._log(f"节点索引越界: i={i}, j={j}, concept_names长度={len(self.concept_names)}")
+        except ImportError:
+            # causallearn 不可用时，尝试用整数常量 fallback
+            TAIL, ARROW, CIRCLE = -1, 1, 2
+            try:
+                graph_edges = G.get_graph_edges()
+                for edge in graph_edges:
+                    i = _node_index(edge.get_node1()) - 1
+                    j = _node_index(edge.get_node2()) - 1
+                    ep1 = edge.get_endpoint1()
+                    ep2 = edge.get_endpoint2()
+                    # 提取 .value 用于整数比较
+                    v1 = ep1.value if hasattr(ep1, 'value') else ep1
+                    v2 = ep2.value if hasattr(ep2, 'value') else ep2
+                    if v1 == TAIL and v2 == ARROW:
+                        direction = '→'
+                    elif v1 == ARROW and v2 == TAIL:
+                        direction = '←'
+                    elif v1 == TAIL and v2 == TAIL:
+                        direction = '—'
+                    elif v1 == ARROW and v2 == ARROW:
+                        direction = '↔'
+                    else:
+                        direction = '?'
+                    if 0 <= i < len(self.concept_names) and 0 <= j < len(self.concept_names):
+                        edges.append({
+                            'source': self.concept_names[i],
+                            'target': self.concept_names[j],
+                            'direction': direction,
+                        })
+            except Exception as e:
+                self._log(f"causallearn 图解析失败(fallback): {e}")
         except Exception as e:
             self._log(f"causallearn 图解析失败: {e}")
         return edges

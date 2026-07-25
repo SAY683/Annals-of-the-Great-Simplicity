@@ -254,7 +254,7 @@ async function refreshInputs() {
       d.files.forEach(f => {
         const o = document.createElement('option');
         o.value = f.path;
-        o.textContent = `${f.name} (${(f.size/1024).toFixed(1)}KB)`;
+        o.textContent = `${f.path} (${(f.size/1024).toFixed(1)}KB)`;
         sel.appendChild(o);
       });
       if ([...sel.options].some(o => o.value === current)) sel.value = current;
@@ -389,7 +389,13 @@ async function scanWork() {
     html += `</div>`;
 
     if (d.complete && d.complete.length) {
-      html += `<div class="ws-row" style="font-weight:700;color:var(--muted)"><span style="width:20px"></span><span>UUID</span><span style="flex:1">预览</span><span>时间</span><span style="width:40px"></span></div>`;
+      html += `<div class="ws-toolbar">
+        <label class="ws-select-all"><input type="checkbox" id="wsSelectAll" onchange="toggleSelectAllUUIDs(this.checked)" /> <span>全选</span></label>
+        <span id="wsSelectedCount" class="ws-selected-count">已选 0 项</span>
+        <button class="btn-mini" onclick="deleteSelectedUUIDs()" style="color:var(--danger)" id="wsDeleteSelected" disabled>删除选中</button>
+      </div>`;
+      html += `<div class="ws-row ws-row-header"><span style="width:20px"></span><span>UUID</span><span style="flex:1">预览</span><span>时间</span><span style="width:40px"></span></div>`;
+      html += `<div class="ws-list">`;
       d.complete.forEach(e => {
         html += `<div class="ws-row">
           <input type="checkbox" value="${e.uuid}" onchange="toggleUUID('${e.uuid}', this.checked)" />
@@ -399,11 +405,7 @@ async function scanWork() {
           <button class="btn-mini" onclick="deleteWorkUUID('${e.uuid}')" style="color:var(--danger);padding:1px 4px;font-size:0.5rem">✕</button>
         </div>`;
       });
-      html += `<div style="margin-top:4px;display:flex;gap:6px">
-        <button class="btn-mini" onclick="selectAllUUIDs()">全选</button>
-        <button class="btn-mini" onclick="deselectAllUUIDs()">取消全选</button>
-        <button class="btn-mini" onclick="deleteSelectedUUIDs()" style="color:var(--danger)">删除选中</button>
-      </div>`;
+      html += `</div>`;
     }
     if (d.incomplete && d.incomplete.length) {
       html += `<div style="margin-top:4px;color:var(--warn);font-size:0.55rem">⚠ ${d.incomplete.length} 个不完整</div>`;
@@ -416,44 +418,75 @@ async function scanWork() {
 
 function toggleUUID(uuid, checked) {
   if (checked) selectedUUIDs.add(uuid); else selectedUUIDs.delete(uuid);
-  document.getElementById('btnAddSelected').disabled = selectedUUIDs.size === 0;
-  document.getElementById('btnAddSelected').textContent = `+ 将选中项 (${selectedUUIDs.size}) 加入数据集`;
+  updateWSUI();
 }
-function selectAllUUIDs() {
-  document.querySelectorAll('#workScanResult input[type=checkbox]').forEach(cb => { cb.checked = true; selectedUUIDs.add(cb.value); });
-  document.getElementById('btnAddSelected').disabled = false;
-  document.getElementById('btnAddSelected').textContent = `+ 将选中项 (${selectedUUIDs.size}) 加入数据集`;
+
+function updateWSUI() {
+  const count = selectedUUIDs.size;
+  const addBtn = document.getElementById('btnAddSelected');
+  addBtn.disabled = count === 0;
+  addBtn.textContent = count > 0 ? `+ 将选中项 (${count}) 加入数据集` : '+ 将选中项加入数据集';
+  // 更新工具栏计数和删除按钮
+  const countEl = document.getElementById('wsSelectedCount');
+  if (countEl) countEl.textContent = `已选 ${count} 项`;
+  const delBtn = document.getElementById('wsDeleteSelected');
+  if (delBtn) delBtn.disabled = count === 0;
+  // 同步全选复选框三态
+  const selectAllCb = document.getElementById('wsSelectAll');
+  if (selectAllCb) {
+    const allCbs = document.querySelectorAll('#workScanResult .ws-list input[type=checkbox]');
+    if (allCbs.length === 0) { selectAllCb.checked = false; selectAllCb.indeterminate = false; }
+    else if (count === allCbs.length) { selectAllCb.checked = true; selectAllCb.indeterminate = false; }
+    else if (count > 0) { selectAllCb.checked = false; selectAllCb.indeterminate = true; }
+    else { selectAllCb.checked = false; selectAllCb.indeterminate = false; }
+  }
 }
-function deselectAllUUIDs() {
-  document.querySelectorAll('#workScanResult input[type=checkbox]').forEach(cb => cb.checked = false);
-  selectedUUIDs.clear();
-  document.getElementById('btnAddSelected').disabled = true;
-  document.getElementById('btnAddSelected').textContent = '+ 将选中项加入数据集';
+
+function toggleSelectAllUUIDs(checked) {
+  document.querySelectorAll('#workScanResult .ws-list input[type=checkbox]').forEach(cb => {
+    cb.checked = checked;
+    if (checked) selectedUUIDs.add(cb.value); else selectedUUIDs.delete(cb.value);
+  });
+  updateWSUI();
 }
+
+function selectAllUUIDs() { toggleSelectAllUUIDs(true); }
+function deselectAllUUIDs() { toggleSelectAllUUIDs(false); }
 
 async function deleteWorkUUID(uuid) {
   if (!confirm(`永久删除此 UUID 及其关联文件？\n${uuid}\n\n此操作不可撤销。`)) return;
   try {
     const r = await fetch(`/api/work-uuid/${uuid}`, { method: 'DELETE' });
     const d = await r.json();
-    t(`已删除: ${uuid.slice(0,12)}... (释放 ${(d.freed_bytes/1024).toFixed(1)} KB)`, 'warn');
+    if (!r.ok) {
+      t(`✗ 删除失败: ${d.error || r.statusText}${d.detail ? ' ('+d.detail+')' : ''}`, 'error');
+      return;
+    }
+    const freedKB = d.freed_bytes ? (d.freed_bytes/1024).toFixed(1) : '0.0';
+    t(`已删除: ${uuid.slice(0,12)}... (释放 ${freedKB} KB)`, 'warn');
     scanWork();
-  } catch (e) { t(`删除失败: ${e.message}`, 'error'); }
+  } catch (e) { t(`✗ 删除失败: ${e.message}`, 'error'); }
 }
 
 async function deleteSelectedUUIDs() {
   if (!selectedUUIDs.size) return;
   if (!confirm(`永久删除选中的 ${selectedUUIDs.size} 个 UUID 及其关联文件？\n此操作不可撤销。`)) return;
   let count = 0;
+  const failed = [];
   for (const uuid of selectedUUIDs) {
     try {
-      await fetch(`/api/work-uuid/${uuid}`, { method: 'DELETE' });
-      count++;
-    } catch (e) { /* continue */ }
+      const r = await fetch(`/api/work-uuid/${uuid}`, { method: 'DELETE' });
+      if (r.ok) { count++; }
+      else { failed.push(uuid); }
+    } catch (e) { failed.push(uuid); }
   }
-  t(`已删除 ${count}/${selectedUUIDs.size} 个 UUID`, 'warn');
+  if (failed.length) {
+    t(`已删除 ${count}/${selectedUUIDs.size} 个 UUID，${failed.length} 个失败`, 'warn');
+  } else {
+    t(`已删除 ${count}/${selectedUUIDs.size} 个 UUID`, 'warn');
+  }
   selectedUUIDs.clear();
-  document.getElementById('btnAddSelected').disabled = true;
+  updateWSUI();
   scanWork();
 }
 
@@ -481,18 +514,41 @@ document.getElementById('btnAddSelected').addEventListener('click', async () => 
 // 清理按钮
 document.getElementById('btnCleanOrphans').addEventListener('click', async () => {
   if (!confirm('删除仅有 input.txt 无 result.json 的孤儿文件？')) return;
-  await fetch('/api/work-clean', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ dry_run: false, orphans_only: true }),
-  });
+  try {
+    const r = await fetch('/api/work-clean', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ dry_run: false, orphans_only: true }),
+    });
+    const d = await r.json();
+    if (!r.ok) {
+      t(`✗ 清理失败: ${d.error || r.statusText}`, 'error');
+    } else {
+      const freedKB = d.freed_bytes ? (d.freed_bytes/1024).toFixed(1) : '0.0';
+      const errMsg = d.errors && d.errors.length > 0 ? ` (${d.errors.length} 个警告)` : '';
+      t(`✓ 已清理 ${d.deleted || 0} 个孤儿, 释放 ${freedKB} KB${errMsg}`, 'done');
+    }
+  } catch (e) {
+    t(`✗ 清理失败: ${e.message}`, 'error');
+  }
   scanWork();
 });
 document.getElementById('btnCleanInvalid').addEventListener('click', async () => {
   if (!confirm('删除所有无效 TRACE 输出？(text_only + empty + JSON损坏)')) return;
-  await fetch('/api/work-clean', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ dry_run: false }),
-  });
+  try {
+    const r = await fetch('/api/work-clean', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ dry_run: false }),
+    });
+    const d = await r.json();
+    if (!r.ok) {
+      t(`✗ 清理失败: ${d.error || r.statusText}`, 'error');
+    } else {
+      const freedKB = d.freed_bytes ? (d.freed_bytes/1024).toFixed(1) : '0.0';
+      t(`✓ 已清理 ${d.deleted || 0} 个无效项, 释放 ${freedKB} KB`, 'done');
+    }
+  } catch (e) {
+    t(`✗ 清理失败: ${e.message}`, 'error');
+  }
   scanWork();
 });
 
@@ -750,7 +806,7 @@ async function refreshChart() {
     const r = await fetch('/api/trajectory');
     const d = await r.json();
     if (!d.rows || d.rows.length < 2) {
-      ctx.fillStyle = '#64748b'; ctx.font = '11px monospace';
+      ctx.fillStyle = '#94a3b8'; ctx.font = '13px monospace';
       ctx.fillText('数据不足 (需≥2行)', pad.left, H/2);
       return;
     }
@@ -782,7 +838,7 @@ async function refreshChart() {
 
     const allData = series.flatMap(s => s.data).filter(v => !isNaN(v));
     if (!allData.length) {
-      ctx.fillStyle = '#64748b'; ctx.font = '11px monospace';
+      ctx.fillStyle = '#94a3b8'; ctx.font = '13px monospace';
       ctx.fillText('无有效数据', pad.left, H/2); return;
     }
 
@@ -794,23 +850,23 @@ async function refreshChart() {
     const scaleY = v => pad.top + ph - ((v - yMin) / yRange) * ph;
 
     // 网格
-    ctx.strokeStyle = '#1f2a36'; ctx.lineWidth = 0.5;
+    ctx.strokeStyle = '#1f2a36'; ctx.lineWidth = 0.8;
     for (let i = 0; i <= 4; i++) {
       const y = pad.top + (ph * i / 4);
       ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(W - pad.right, y); ctx.stroke();
-      ctx.fillStyle = '#64748b'; ctx.font = '9px monospace';
-      ctx.fillText((yMax - (yRange * i / 4)).toFixed(2), 2, y + 3);
+      ctx.fillStyle = '#94a3b8'; ctx.font = '11px monospace';
+      ctx.fillText((yMax - (yRange * i / 4)).toFixed(2), 2, y + 4);
     }
     // 底部时间标签
-    ctx.fillStyle = '#64748b'; ctx.font = '8px monospace';
+    ctx.fillStyle = '#94a3b8'; ctx.font = '10px monospace';
     for (let i = 0; i < labels.length; i += Math.max(1, Math.floor(labels.length / 8))) {
-      ctx.fillText(labels[i], scaleX(i) - 15, H - 5);
+      ctx.fillText(labels[i], scaleX(i) - 18, H - 8);
     }
 
     // 画线函数
     function drawLine(data, color, dash) {
       if (!data.length) return;
-      ctx.strokeStyle = color; ctx.lineWidth = 1.5;
+      ctx.strokeStyle = color; ctx.lineWidth = 2.2;
       if (dash) ctx.setLineDash([4, 3]); else ctx.setLineDash([]);
       ctx.beginPath();
       for (let i = 0; i < data.length; i++) {
@@ -824,8 +880,8 @@ async function refreshChart() {
     series.forEach(s => drawLine(s.data, s.color, false));
 
     // Y轴标签
-    ctx.fillStyle = '#64748b'; ctx.font = '9px monospace';
-    ctx.fillText('ATE', 2, pad.top - 4);
+    ctx.fillStyle = '#94a3b8'; ctx.font = '11px monospace';
+    ctx.fillText('ATE', 2, pad.top - 6);
 
   } catch (e) { console.error('Chart error:', e); }
 }
@@ -930,6 +986,9 @@ async function triggerEDMWithFeedback() {
     // 3. 检查结果 — 是否有非线性检测
     if (status === 'completed') {
       t('✓ EDM分析完成', 'done');
+      // 通信管线：EDM OBS 阶段激活
+      const edmStage = document.querySelector('.pipe-stage[data-stage="edm"]');
+      if (edmStage) edmStage.classList.add('active');
 
       // 尝试拉取结果摘要
       try {
@@ -1074,7 +1133,9 @@ window.__traceToEdmTestHarness = {
 
 // 任务时钟（右上角）
 function updateMissionClock() {
-  const el = document.getElementById('missionClock');
+  const wrap = document.getElementById('missionClock');
+  if (!wrap) return;
+  const el = wrap.querySelector('.clock-value');
   if (!el) return;
   const now = new Date();
   el.textContent = now.toLocaleTimeString('zh-CN', { hour12: false });

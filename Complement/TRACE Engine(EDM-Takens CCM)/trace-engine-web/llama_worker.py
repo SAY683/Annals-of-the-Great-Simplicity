@@ -196,26 +196,35 @@ def _estimate_trace_pairs(segments: List[List[int]], window: int) -> int:
 def _check_vram_budget(n_params_m: float, device: torch.device):
     """模型 VRAM 预算检查：根据参数量估算所需显存，不足时给出警告。
 
+    P1-c 修缮：返回 (ok, message) 元组，支持硬拦截。
     - 27M 级模型（shehui-llama）: ~1.5GB（FP32 ~108MB 权重 + 激活）
     - 470M 级模型（shenji-llama / shehui-llama-v4-archive）: ~3.0GB（FP32 ~1.88GB 权重 + 激活/碎片）
+
+    Returns:
+        (ok: bool, message: str) — ok=True 表示 VRAM 充足或非 CUDA 设备；
+        ok=False 表示 VRAM 不足，message 含诊断信息
     """
     if device.type != 'cuda':
-        return
+        return True, ''
     try:
         free_gb = torch.cuda.mem_get_info()[0] / 1e9
         if n_params_m and n_params_m > 200:
-            required_gb = 3.0
+            required_gb = float(os.environ.get('TRACE_VRAM_LARGE_GB', '3.0'))
         elif n_params_m and n_params_m > 50:
-            required_gb = 2.0
+            required_gb = float(os.environ.get('TRACE_VRAM_MEDIUM_GB', '2.0'))
         else:
-            required_gb = 1.5
+            required_gb = float(os.environ.get('TRACE_VRAM_SMALL_GB', '1.5'))
         if free_gb < required_gb:
+            msg = f'VRAM 不足: 空闲 {free_gb:.1f}GB < 需要 {required_gb:.1f}GB'
             log('warn', f'VRAM 预算紧张: 空闲 {free_gb:.1f}GB < 建议 {required_gb:.1f}GB')
             log('warn', '建议: 关闭其它 GPU 程序、设置 TRACE_MODEL_DTYPE=fp16，或减少 window_size/max_segments')
+            return False, msg
         else:
             log('info', f'VRAM 预算 OK: 空闲 {free_gb:.1f}GB / 建议 {required_gb:.1f}GB')
-    except Exception:
-        pass
+            return True, ''
+    except Exception as e:
+        log('warn', f'VRAM 探测失败（跳过硬拦截）: {e}')
+        return True, ''  # 探测失败时不拦截，避免误杀
 
 
 def _estimate_trace_timeout_seconds(n_pairs: int, model_name: str, n_params_m: float = None) -> float:
@@ -598,7 +607,10 @@ class ModelCache:
             estimated_params_m = 27.0       # shehui-llama (27M 纯哲学版)
         else:
             estimated_params_m = 100.0      # 未知模型，保守估计
-        _check_vram_budget(estimated_params_m, device)
+        # P1-c：VRAM 硬拦截 — 加载前检查，不足时直接抛异常，避免 OOM 崩溃浪费时间
+        vram_ok, vram_msg = _check_vram_budget(estimated_params_m, device)
+        if not vram_ok:
+            raise RuntimeError(f'VRAM 硬拦截: {vram_msg}。建议关闭其它 GPU 程序、设置 TRACE_MODEL_DTYPE=fp16，或减小 window_size/max_segments。')
 
         # 量化加载策略：默认优先 FP16（速度+显存双赢），失败自动回退 FP32
         model_dtype_env = os.environ.get('TRACE_MODEL_DTYPE', 'auto').lower()

@@ -38,6 +38,53 @@ router.post('/clear', (_req, res) => {
   res.json({ success: true, message: '任务历史已清空' });
 });
 
+// ── 批量删除任务历史（P1-c：批量工具栏后端支持） ───────────────────
+router.post('/batch-delete', (req, res) => {
+  const { ids } = req.body;
+  if (!Array.isArray(ids) || ids.length === 0) {
+    return res.status(400).json({ success: false, error: 'ids 数组不能为空' });
+  }
+  // 安全校验：过滤非法 ID，防止注入
+  const validIds = ids.filter(id => isValidId(id));
+  if (validIds.length === 0) {
+    return res.status(400).json({ success: false, error: '无有效任务 ID' });
+  }
+  // 不允许删除正在运行的任务
+  const runningIds = validIds.filter(id => activeJobs.has(id));
+  const deletableIds = validIds.filter(id => !activeJobs.has(id));
+  let removed = 0;
+  for (let i = jobHistory.length - 1; i >= 0; i--) {
+    if (deletableIds.includes(jobHistory[i].id)) {
+      jobHistory.splice(i, 1);
+      removed++;
+    }
+  }
+  persistJobHistory();
+  res.json({
+    success: true,
+    removed,
+    skipped: runningIds.length > 0 ? `${runningIds.length} 个任务正在运行，已跳过` : null,
+  });
+});
+
+// ── 删除单条任务历史（P1-c：批量工具栏后端支持） ─────────────────────
+router.delete('/:id', (req, res) => {
+  const id = req.params.id;
+  if (!isValidId(id)) {
+    return res.status(400).json({ success: false, error: '非法的任务 ID' });
+  }
+  if (activeJobs.has(id)) {
+    return res.status(409).json({ success: false, error: '任务正在运行，无法删除' });
+  }
+  const idx = jobHistory.findIndex(j => j.id === id);
+  if (idx < 0) {
+    return res.status(404).json({ success: false, error: '任务不存在' });
+  }
+  jobHistory.splice(idx, 1);
+  persistJobHistory();
+  res.json({ success: true, removed: 1 });
+});
+
 // ── 单任务查询 ──────────────────────────────────────────────────────
 router.get('/:id', (req, res) => {
   const id = req.params.id;

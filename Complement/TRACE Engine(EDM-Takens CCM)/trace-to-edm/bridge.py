@@ -63,13 +63,47 @@ from edm_trigger import EDMTrigger
 
 
 # ── 全局单例 ────────────────────────────────────────────────
+# P0-02 修复：项目切换时必须重建 L2/L3 单例，否则会复用上一个项目的
+# sacred_vectors / pca_state cache，导致跨项目数据污染。
+# 通过 _singleton_project 记录单例所属项目名，每次 _get_layerN 时校验。
 _layer2_projector = None
 _layer3_projector = None
+_singleton_project = None  # 当前单例绑定的项目名
+
+
+def _check_and_reset_singletons():
+    """检查当前活动项目是否与单例绑定的项目一致，不一致则重置单例。
+
+    在 _get_layer2 / _get_layer3 入口调用，确保项目切换后单例重建。
+    也对外暴露为 reset_semantic_singletons()，供 project_manager.activate
+    或测试代码主动调用。
+    """
+    global _layer2_projector, _layer3_projector, _singleton_project
+    try:
+        from project_manager import get_project_manager
+        current = get_project_manager().active
+    except Exception:
+        current = None
+    if _singleton_project != current:
+        if VERBOSE and _singleton_project is not None:
+            print(f"[Bridge] 项目切换: {_singleton_project} → {current}, 重建 L2/L3 单例")
+        _layer2_projector = None
+        _layer3_projector = None
+        _singleton_project = current
+
+
+def reset_semantic_singletons():
+    """主动重置 L2/L3 单例（项目切换 / 模型切换 / 测试场景调用）。"""
+    global _layer2_projector, _layer3_projector, _singleton_project
+    _layer2_projector = None
+    _layer3_projector = None
+    _singleton_project = None
 
 
 def _get_layer2():
-    """延迟加载 Layer 2"""
+    """延迟加载 Layer 2（项目切换时自动重建）"""
     global _layer2_projector
+    _check_and_reset_singletons()
     if _layer2_projector is None:
         from layer2_semantic import SemanticProjector
         _layer2_projector = SemanticProjector(sacred_projector=_get_layer3())
@@ -77,8 +111,9 @@ def _get_layer2():
 
 
 def _get_layer3():
-    """延迟加载 Layer 3"""
+    """延迟加载 Layer 3（项目切换时自动重建）"""
     global _layer3_projector
+    _check_and_reset_singletons()
     if _layer3_projector is None:
         from layer3_sacred import SacredProjector
         _layer3_projector = SacredProjector()
@@ -416,8 +451,9 @@ def _find_input_text(uuid_str: str) -> Optional[str]:
         try:
             with open(input_file, "r", encoding="utf-8") as f:
                 return f.read().strip()
-        except Exception:
-            pass
+        except Exception as e:
+            # debt-12.13: 文件存在但读取失败，记录原因以便排查（编码错误/权限等）
+            print(f"[Bridge] 警告: 读取 input 文件失败 {input_file}: {e}", file=sys.stderr)
     return None
 
 

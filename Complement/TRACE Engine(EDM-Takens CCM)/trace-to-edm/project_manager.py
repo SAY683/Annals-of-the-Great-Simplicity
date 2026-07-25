@@ -113,8 +113,10 @@ class ProjectManager:
                 try:
                     with open(csv_path, "r", encoding="utf-8") as f:
                         rows = sum(1 for _ in f) - 1  # 减表头
-                except Exception:
-                    pass
+                except Exception as e:
+                    # debt-12.13: 行数统计失败不阻断列表，但需记录
+                    if VERBOSE:
+                        print(f"[PM] 警告: 统计 {name} 行数失败: {e}")
 
             result.append({
                 "name": name,
@@ -196,6 +198,30 @@ class ProjectManager:
         _save_index(self._index)
         if VERBOSE:
             print(f"[PM] 激活项目: {name}")
+        # P0-02 修复：项目切换后主动重置 bridge 的 L2/L3 单例，
+        # 避免复用旧项目的 sacred_vectors / pca_state cache。
+        try:
+            import bridge as _bridge
+            if hasattr(_bridge, "reset_semantic_singletons"):
+                _bridge.reset_semantic_singletons()
+        except Exception as e:
+            # debt-12.13: 不再静默吞错，至少在 VERBOSE 模式下记录原因
+            if VERBOSE:
+                print(f"[PM] 警告: 重置 bridge 单例失败: {e}")
+        # P1-d 修缮：项目切换后重新加载该项目的活动模型配置
+        # _active_model.txt 现已按项目隔离（projects/<name>/cache/_active_model.txt）
+        # 需重置 L3 内存状态以匹配新项目的模型选择
+        try:
+            import layer3_sacred as _l3
+            _l3._load_model_config()  # 从新项目的 _active_model.txt 重新加载
+            _l3._MODEL = None          # 清除旧模型实例
+            _l3._TOKENIZER = None
+            _l3._SACRED_VECTORS = None  # 清除旧八正道向量缓存
+            if VERBOSE:
+                print(f"[PM] 已重置 L3 模型为项目 {name} 的配置: {_l3._ACTIVE_MODEL}")
+        except Exception as e:
+            if VERBOSE:
+                print(f"[PM] ⚠ 切换项目后重置 L3 模型失败: {e}")
         return True
 
     def delete(self, name: str) -> bool:
@@ -279,8 +305,10 @@ class ProjectManager:
                     pmeta["rows"] = rows
                     with open(project_json, "w", encoding="utf-8") as f:
                         json.dump(pmeta, f, ensure_ascii=False, indent=2)
-            except Exception:
-                pass
+            except Exception as e:
+                # debt-12.13: 行数同步失败不影响主流程，但需记录以便排查
+                if VERBOSE:
+                    print(f"[PM] 警告: 同步行数到 _index/project.json 失败: {e}")
 
 
 # ── 全局单例 ────────────────────────────────────────────────

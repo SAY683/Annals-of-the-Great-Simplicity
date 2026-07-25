@@ -2,11 +2,11 @@
 将 trace-engine 与 trace-engine-web 同步到成品目录，并重新整理为子目录结构。
 排除运行时产物（outputs, __pycache__, .git, node_modules, work 等）。
 
-路径可通过环境变量覆盖，默认保持与原始开发目录一致：
-  TRACE_PRODUCT_DIR  -> 成品目录
-  TRACE_SRC_ENGINE   -> trace-engine 源码目录
-  TRACE_SRC_WEB      -> trace-engine-web 源码目录
-  TRACE_SRC_DATA     -> 测试数据目录
+路径可通过环境变量覆盖，默认基于脚本自身位置自动推断（无硬编码绝对路径）：
+  TRACE_PRODUCT_DIR  -> 成品目录（必填，未设置时仅打印提示并退出）
+  TRACE_SRC_ENGINE   -> trace-engine 源码目录（默认从脚本位置推断）
+  TRACE_SRC_WEB      -> trace-engine-web 源码目录（默认从脚本位置推断）
+  TRACE_SRC_DATA     -> 测试数据目录（默认从脚本位置推断）
 """
 import os
 import shutil
@@ -15,24 +15,31 @@ import tempfile
 import warnings
 from pathlib import Path
 
-# 成品目录（硬编码 fallback）
-# 注意：迁移机器需通过环境变量 TRACE_PRODUCT_DIR 或命令行参数 --product 覆盖
-_DEFAULT_PRODUCT_DIR = r'G:\git\Annals-of-the-Great-Simplicity-main\Annals-of-the-Great-Simplicity\Complement\TRACE Engine(EDM-Takens CCM)'
+# P0-03 修复：移除所有硬编码绝对路径，改为基于脚本自身位置推断。
+# 脚本位置：trace-engine-web/work/sync_product.py
+# 因此：trace-engine-web = script.parent.parent, trace-engine = script.parent.parent.parent / '.skills' / 'trace-engine'
+_SCRIPT_PATH = Path(__file__).resolve()
+_WEB_ROOT = _SCRIPT_PATH.parent.parent  # trace-engine-web/
+_SKILLS_ROOT = _WEB_ROOT.parent          # .skills/（开发布局）或成品根（便携布局）
 
+# 成品目录：必须通过环境变量或命令行参数指定，不再硬编码 fallback
 _env_product = os.environ.get('TRACE_PRODUCT_DIR')
 if _env_product:
     product = Path(_env_product)
 else:
-    product = Path(_DEFAULT_PRODUCT_DIR)
-    warnings.warn(
-        f'TRACE_PRODUCT_DIR 环境变量未设置，使用硬编码 fallback: {product}. '
-        '迁移机器需通过环境变量 TRACE_PRODUCT_DIR 或命令行参数 --product 覆盖。',
-        stacklevel=2,
-    )
+    # 自动探测：若当前处于便携布局（.skills 同级有 TRACE Engine(EDM-Takens CCM)），则使用之
+    _candidate_portable = _SKILLS_ROOT / 'TRACE Engine(EDM-Takens CCM)'
+    if _candidate_portable.exists():
+        product = _candidate_portable
+    else:
+        print('[sync_product] 错误：TRACE_PRODUCT_DIR 环境变量未设置，且未探测到便携布局。')
+        print('[sync_product] 请通过环境变量 TRACE_PRODUCT_DIR 或命令行参数 --product 指定成品目录。')
+        sys.exit(2)
 
-src_engine = Path(os.environ.get('TRACE_SRC_ENGINE', r'F:\攻略\研发测试\.skills\trace-engine'))
-src_web = Path(os.environ.get('TRACE_SRC_WEB', r'F:\攻略\研发测试\.skills\trace-engine-web'))
-src_data = Path(os.environ.get('TRACE_SRC_DATA', r'F:\攻略\研发测试\TRACE\date'))
+# 源码目录：基于脚本位置推断，可被环境变量覆盖
+src_engine = Path(os.environ.get('TRACE_SRC_ENGINE') or (_SKILLS_ROOT / 'trace-engine'))
+src_web = Path(os.environ.get('TRACE_SRC_WEB') or _WEB_ROOT)
+src_data = Path(os.environ.get('TRACE_SRC_DATA') or (_SKILLS_ROOT / 'TRACE' / 'date'))
 
 dst_engine = product / 'trace-engine'
 dst_web = product / 'trace-engine-web'
@@ -392,7 +399,7 @@ if __name__ == '__main__':
     parser.add_argument('--force-stop', action='store_true',
                         help='同步前先结束可能锁定成品目录的 stale Node 服务')
     parser.add_argument('--product', type=str, default=None,
-                        help='成品目录路径（覆盖环境变量 TRACE_PRODUCT_DIR 与硬编码 fallback）')
+                        help='成品目录路径（覆盖环境变量 TRACE_PRODUCT_DIR 与自动探测）')
     args = parser.parse_args()
     if args.product:
         product = Path(args.product)

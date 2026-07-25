@@ -16,6 +16,7 @@
 """
 
 import sys, os, json, warnings
+from pathlib import Path
 
 # Windows: force UTF-8 for HAVOK diagnostic output
 if hasattr(sys.stdout, 'reconfigure'):
@@ -26,6 +27,14 @@ if hasattr(sys.stdout, 'reconfigure'):
 _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 _SKILL_SRC = os.path.join(_SCRIPT_DIR, '..', '..', 'src')
 sys.path.insert(0, _SKILL_SRC)
+
+# ── Shared terminal theme ──
+SHARED_DIR = Path(__file__).resolve().parents[3] / "shared"
+sys.path.insert(0, str(SHARED_DIR))
+from terminal_theme import (
+    T, print_header, log_stage, log_info, log_warn, log_error, log_done,
+    stage_bar, verdict_panel, metric_line
+)
 
 import numpy as np
 import pandas as pd
@@ -158,7 +167,11 @@ def simple_kpss(data):
 # ═══════════════════════════════════════════════════════════
 
 def main():
+    print_header("音神吟诵数据 EDM-Takens 分析", dept="THEORY", subtitle="Defense-Team Theory Lab")
+
     # ── 0. 加载数据 ──
+    stage_bar(["LOAD", "EMBED", "SIMPLEX", "SMAP", "CCM", "HAVOK", "KOOPMAN", "AUDIT"], current="LOAD")
+    log_stage("LOAD — 加载数据")
     data_path = os.path.join(_SCRIPT_DIR, 'data', 'yinshen_wide.csv')
     df_wide = pd.read_csv(data_path, encoding='utf-8-sig')
     vowel_seq, consonant_seq, ji_seq_raw = [], [], []
@@ -172,7 +185,7 @@ def main():
     consonant_num, consonant_states = encode_integer(consonant_seq)
     ji_num, ji_states = encode_integer(ji_seq_raw)
     N = len(ji_num)
-    print(f"音神序列: N={N}, 姬={len(ji_states)}类, 元音={len(vowel_states)}类, 辅音={len(consonant_states)}类")
+    log_info(f"音神序列: N={N}, 姬={len(ji_states)}类, 元音={len(vowel_states)}类, 辅音={len(consonant_states)}类")
 
     df_ji = pd.DataFrame({'time': np.arange(N), 'ji': ji_num})
     df_vowel = pd.DataFrame({'time': np.arange(N), 'vowel': vowel_num})
@@ -183,22 +196,21 @@ def main():
     # ═══════════════════════════════════════════════════
     # LAYER 2: 前置审计
     # ═══════════════════════════════════════════════════
-    print("\n" + "=" * 58)
-    print("  LAYER 2 — 前置审计: S3 Hankel | S8 Stationarity | S9 Genericity")
-    print("=" * 58)
+    stage_bar(["LOAD", "EMBED", "SIMPLEX", "SMAP", "CCM", "HAVOK", "KOOPMAN", "AUDIT"], current="EMBED", completed=["LOAD"])
+    log_stage("LAYER 2 — 前置审计: S3 Hankel | S8 Stationarity | S9 Genericity")
 
     audit = []
 
     # S3 — Hankel 比 (★★★★)
-    print("\n[S3 ★★★★] Hankel 纵横比:")
+    log_info("[S3 ★★★★] Hankel 纵横比")
     for name, max_e in [('ji', 8), ('vowel', 8), ('consonant', 8)]:
         status, ratio, p, q_rec = classify_hankel_ratio(N, max_e)
         icon = {'GOOD': '✓', 'MARGINAL': '!', 'DEGRADED': '✗', 'BROKEN': '✗'}[status]
-        print(f"  {name}: maxE={max_e} p/q={ratio:.1f} [{icon}] {status}")
+        log_info(f"  {name}: maxE={max_e} p/q={ratio:.1f} [{icon}] {status}")
         audit.append({'rule': 'S3', 'var': name, 'status': status, 'ratio': ratio})
 
     # S8 — 平稳性 (★★★★)
-    print("\n[S8 ★★★★] 平稳性 (ADF+KPSS):")
+    log_info("[S8 ★★★★] 平稳性 (ADF+KPSS)")
     for name, arr in [('ji', ji_num), ('vowel', vowel_num), ('consonant', consonant_num)]:
         data = np.array(arr, dtype=float)
         adf_stat, adf_p = simple_adf(data)
@@ -208,11 +220,11 @@ def main():
         elif adf_r and kpss_r: v = 'WARN — 趋势平稳'
         elif not adf_r and kpss_r: v = 'WARN — 差分平稳'
         else: v = 'WARN — 效力不足'
-        print(f"  {name}: ADF p={adf_p:.4f} KPSS p={kpss_p:.4f} → {v}")
+        log_info(f"  {name}: ADF p={adf_p:.4f} KPSS p={kpss_p:.4f} → {v}")
         audit.append({'rule': 'S8', 'var': name, 'verdict': v})
 
     # S9 — 泛型性 (★★★)
-    print("\n[S9 ★★★] 观测泛型性:")
+    log_info("[S9 ★★★] 观测泛型性")
     for name, arr, states in [('ji', ji_num, ji_states),
                                ('vowel', vowel_num, vowel_states),
                                ('consonant', consonant_num, consonant_states)]:
@@ -220,20 +232,19 @@ def main():
         issues = []
         if n_uniq < 5: issues.append(f"类别过少({n_uniq})")
         if n_uniq / len(arr) < 0.1: issues.append(f"量化粗糙({n_uniq}/{len(arr)}={n_uniq/len(arr):.0%})")
-        print(f"  {name}: {n_uniq}类 → {'PASS' if not issues else 'WARN: '+'; '.join(issues)}")
+        log_info(f"  {name}: {n_uniq}类 → {'PASS' if not issues else 'WARN: '+'; '.join(issues)}")
         audit.append({'rule': 'S9', 'var': name, 'issues': issues})
 
     # ═══════════════════════════════════════════════════
     # EXECUTION: EDM + CCM
     # ═══════════════════════════════════════════════════
-    print("\n" + "=" * 58)
-    print("  EXECUTION — EDM (EmbedDim + Simplex + S-Map + CCM)")
-    print("=" * 58)
+    stage_bar(["LOAD", "EMBED", "SIMPLEX", "SMAP", "CCM", "HAVOK", "KOOPMAN", "AUDIT"], current="SIMPLEX", completed=["LOAD", "EMBED"])
+    log_stage("EXECUTION — EDM (EmbedDim + Simplex + S-Map + CCM)")
 
     edm_results = {}
 
     for var_name, df_var in [('ji', df_ji), ('vowel', df_vowel), ('consonant', df_consonant)]:
-        print(f"\n── [{var_name}] ──")
+        log_info(f"── [{var_name}] ──")
 
         # EmbedDimension
         E_opt = 3; rho_E_df = None
@@ -245,16 +256,16 @@ def main():
             rho_E_df['rho'] = pd.to_numeric(rho_E_df['rho'], errors='coerce')
             E_opt = int(rho_E_df.loc[rho_E_df['rho'].idxmax(), 'E'])
         except Exception as e:
-            print(f"  EmbedDimension 失败: {type(e).__name__}, fallback E={E_opt}")
+            log_warn(f"  EmbedDimension 失败: {type(e).__name__}, fallback E={E_opt}")
 
         # S3 校验
         h_status, h_ratio, h_p, q_rec = classify_hankel_ratio(N, E_opt)
         if h_status in ('DEGRADED', 'BROKEN'):
             old_E = E_opt; E_opt = q_rec
-            print(f"  [S3] E 从 {old_E} 修正至 {E_opt} (p/q={h_ratio:.1f})")
+            log_warn(f"  [S3] E 从 {old_E} 修正至 {E_opt} (p/q={h_ratio:.1f})")
             h_status, h_ratio, h_p, _ = classify_hankel_ratio(N, E_opt)
 
-        print(f"  E_opt = {E_opt}")
+        metric_line("E (嵌入维度)", E_opt)
 
         # Simplex
         rho_sx, mae_sx = np.nan, np.nan
@@ -267,9 +278,10 @@ def main():
             if mask.sum() > 3:
                 rho_sx = float(pearsonr(obs[mask], prd[mask])[0])
                 mae_sx = float(np.mean(np.abs(obs[mask] - prd[mask])))
-            print(f"  Simplex: ρ={rho_sx:.3f} MAE={mae_sx:.3f} n={mask.sum()}")
+            metric_line("simplex_rho", f"{rho_sx:.3f}")
+            log_info(f"  Simplex: MAE={mae_sx:.3f} n={mask.sum()}")
         except Exception as e:
-            print(f"  Simplex 失败: {e}")
+            log_error(f"  Simplex 失败: {e}")
 
         # S-Map
         is_nonlinear, theta_best, rho_smap = False, 0.0, 0.0
@@ -283,11 +295,13 @@ def main():
             rho_smap = float(sm.loc[peak_idx, 'rho'])
             rho_theta0 = float(sm.loc[sm['theta'].idxmin(), 'rho'])
             is_nonlinear = (rho_smap - rho_theta0) >= 0.05 and theta_best > 0
-            print(f"  S-Map: θ={theta_best:.0f} ρ={rho_smap:.3f} 非线性={'是' if is_nonlinear else '否/弱'}")
+            metric_line("S-Map theta", f"{theta_best:.0f}")
+            log_info(f"  S-Map: ρ={rho_smap:.3f} 非线性={'是' if is_nonlinear else '否/弱'}")
         except Exception as e:
-            print(f"  S-Map 失败: {e}")
+            log_error(f"  S-Map 失败: {e}")
 
         # CCM — 使用 E_opt
+        stage_bar(["LOAD", "EMBED", "SIMPLEX", "SMAP", "CCM", "HAVOK", "KOOPMAN", "AUDIT"], current="CCM", completed=["LOAD", "EMBED", "SIMPLEX", "SMAP"])
         vals = df_var[var_name].values
         df_ccm = pd.DataFrame({
             'time': np.arange(len(vals)), var_name: vals,
@@ -305,10 +319,12 @@ def main():
             fwd_rho = ccm_r['forward']['final_rho']; rev_rho = ccm_r['reverse']['final_rho']
             fwd_s = f"{fwd_rho:.3f}" if fwd_rho is not None else 'N/A'
             rev_s = f"{rev_rho:.3f}" if rev_rho is not None else 'N/A'
-            print(f"  CCM (E={E_opt}): {ccm_verdict} (fwd ρ={fwd_s} rev ρ={rev_s})")
-            print(f"  [S11] {ccm_r.get('note', 'CCM 检测动力学耦合，非机制性因果。未观测公共驱动可产生相同收敛模式。')}")
+            if fwd_rho is not None:
+                metric_line(f"CCM rho ({var_name})", f"{fwd_rho:.3f}", threshold=0.0, mode="min")
+            log_info(f"  CCM (E={E_opt}): {ccm_verdict} (fwd ρ={fwd_s} rev ρ={rev_s})")
+            log_info(f"  [S11] {ccm_r.get('note', 'CCM 检测动力学耦合，非机制性因果。未观测公共驱动可产生相同收敛模式。')}")
         except Exception as e:
-            print(f"  CCM 失败: {e}")
+            log_error(f"  CCM 失败: {e}")
 
         edm_results[var_name] = {
             'E_opt': E_opt, 'rho_sx': rho_sx, 'mae_sx': mae_sx,
@@ -323,9 +339,8 @@ def main():
     # ═══════════════════════════════════════════════════
     # LAYER 3: HAVOK + 交叉验证
     # ═══════════════════════════════════════════════════
-    print("\n" + "=" * 58)
-    print("  LAYER 3 — HAVOK 分解 + 交叉验证")
-    print("=" * 58)
+    stage_bar(["LOAD", "EMBED", "SIMPLEX", "SMAP", "CCM", "HAVOK", "KOOPMAN", "AUDIT"], current="HAVOK", completed=["LOAD", "EMBED", "SIMPLEX", "SMAP", "CCM"])
+    log_stage("LAYER 3 — HAVOK 分解 + 交叉验证")
 
     havok_results = {}
     xv_results = {}
@@ -334,7 +349,7 @@ def main():
         from sovereign_havok import SovereignHAVOK
         HAS_HAVOK = True
     except ImportError:
-        print("  [!] SovereignHAVOK 不可用")
+        log_warn("  [!] SovereignHAVOK 不可用")
         HAS_HAVOK = False
 
     if HAS_HAVOK:
@@ -345,14 +360,14 @@ def main():
             wl = min(11, (n_data - E) // 2 * 2 - 1)
             if wl < 5: wl = 5
             if wl % 2 == 0: wl -= 1
-            print(f"\n── [{var_name}] HAVOK (q={E}, wl={wl}) ──")
+            log_info(f"── [{var_name}] HAVOK (q={E}, wl={wl}) ──")
             try:
                 sh = SovereignHAVOK(q_delays=E, dt=1.0, energy_threshold=0.99,
                                     poly_order=min(3, wl-1), window_length=wl, basis="V")
                 sh.fit(arr)
                 kurt_vr = float(sh.kurtosis_vr_)
-                print(f"  r={sh.r_} R²={sh.regression_r2_:.3f} kurtosis={kurt_vr:.3f} "
-                      f"expl_var={sh.explained_var_:.0%}")
+                metric_line("HAVOK kurtosis", f"{kurt_vr:.3f}", threshold=3.0, mode="max")
+                log_info(f"  r={sh.r_} R²={sh.regression_r2_:.3f} expl_var={sh.explained_var_:.0%}")
 
                 # S14: 采样充分性
                 forcing = sh.forcing_
@@ -366,7 +381,7 @@ def main():
                 n_undersampled = sum(1 for s, e in spike_regions if e - s + 1 <= 2)
                 n_spikes = len(spike_regions)
                 if n_spikes >= 3 and n_undersampled / max(n_spikes, 1) > 0.3:
-                    print(f"  [S14] {n_undersampled}/{n_spikes} 尖峰 ≤2 采样点")
+                    log_warn(f"  [S14] {n_undersampled}/{n_spikes} 尖峰 ≤2 采样点")
 
                 havok_results[var_name] = {
                     'r': sh.r_, 'r2': sh.regression_r2_, 'kurtosis': kurt_vr,
@@ -374,10 +389,10 @@ def main():
                     'forcing': forcing, 'sh': sh,
                 }
             except Exception as e:
-                print(f"  HAVOK 失败: {e}")
+                log_error(f"  HAVOK 失败: {e}")
 
         # S6 交叉验证
-        print("\n[S6] EDM-HAVOK 交叉验证:")
+        log_info("[S6] EDM-HAVOK 交叉验证:")
         for var_name in ['ji', 'vowel', 'consonant']:
             edm = edm_results[var_name]; hv = havok_results.get(var_name, {})
             if 'kurtosis' not in hv: continue
@@ -386,27 +401,27 @@ def main():
             elif edm_nl and hv_kt <= 1.5: s6 = 'DISCREPANCY — EDM 非线性，HAVOK 近高斯'
             elif not edm_nl and hv_kt > 1.5: s6 = 'DISCREPANCY — HAVOK 重尾，EDM 线性'
             else: s6 = 'CONSISTENT — 近线性/随机'
-            print(f"  {var_name}: EDM_nl={edm_nl} HAVOK_kurt={hv_kt:.3f} → {s6}")
+            log_info(f"  {var_name}: EDM_nl={edm_nl} HAVOK_kurt={hv_kt:.3f} → {s6}")
             xv_results[var_name] = {'s6_verdict': s6}
 
         # S1 Lyapunov
-        print("\n[S1] Lyapunov 视界 (Rosenstein):")
+        log_info("[S1] Lyapunov 视界 (Rosenstein):")
         for var_name, arr in [('ji', ji_num), ('vowel', vowel_num), ('consonant', consonant_num)]:
             E = edm_results[var_name]['E_opt']
             try:
                 from enhanced_cross_validate import estimate_lyapunov_exponent
                 lyap = estimate_lyapunov_exponent(np.array(arr, dtype=float), E)
                 if lyap.get('lambda_max'):
-                    print(f"  {var_name}: λ_max={lyap['lambda_max']:.4f} τ_L={lyap['lyapunov_time']:.1f} "
-                          f"3τ_L={lyap['prediction_horizon_3x']:.1f}")
+                    metric_line(f"Lyapunov λ_max ({var_name})", f"{lyap['lambda_max']:.4f}", threshold=0.0, mode="max")
+                    log_info(f"  {var_name}: τ_L={lyap['lyapunov_time']:.1f} 3τ_L={lyap['prediction_horizon_3x']:.1f}")
                     xv_results.setdefault(var_name, {})['lyap'] = lyap
                 else:
-                    print(f"  {var_name}: {lyap.get('warning', '估计失败')}")
+                    log_warn(f"  {var_name}: {lyap.get('warning', '估计失败')}")
             except Exception as e:
-                print(f"  {var_name}: 失败 {e}")
+                log_error(f"  {var_name}: 失败 {e}")
 
         # S10 周期性
-        print("\n[S10] 周期性检测 (Lomb-Scargle):")
+        log_info("[S10] 周期性检测 (Lomb-Scargle):")
         for var_name, arr in [('ji', ji_num), ('vowel', vowel_num), ('consonant', consonant_num)]:
             try:
                 from scipy.signal import lombscargle
@@ -421,14 +436,14 @@ def main():
                     warn = ''
                     if p_ratio > 0.30:
                         warn = f' [S10 WARN] 功率比 {p_ratio:.1%} > 30% — CCM 可能反映周期性外驱'
-                    print(f"  {var_name}: 周期≈{dom_period:.1f}步 功率={p_ratio:.1%}{warn}")
+                    log_info(f"  {var_name}: 周期≈{dom_period:.1f}步 功率={p_ratio:.1%}{warn}")
                     if p_ratio > 0.30: xv_results.setdefault(var_name, {})['season_warn'] = True
             except Exception: pass
 
     # ═══════════════════════════════════════════════════
     # 可视化 — 修复后的布局
     # ═══════════════════════════════════════════════════
-    print("\n生成图表...")
+    log_info("生成图表...")
     fig = plt.figure(figsize=(20, 14))
     gs = GridSpec(3, 5, figure=fig, hspace=0.5, wspace=0.4,
                   height_ratios=[1, 1, 1], width_ratios=[1.0, 1.2, 1.3, 1.1, 1.0])
@@ -561,7 +576,7 @@ def main():
     out_path = os.path.join(_OUT_DIR, 'yinshen_dashboard.png')
     plt.savefig(out_path, dpi=150, bbox_inches='tight', facecolor='white', pad_inches=0.3)
     plt.close()
-    print(f"  图表: {out_path}")
+    log_done(f"图表: {out_path}")
 
     # ═══════════════════════════════════════════════════
     # 报告
@@ -722,9 +737,15 @@ def main():
                    for k, v in edm_results.items()}, 'havok': {k: {kk: vv for kk, vv in v.items() if kk not in ('forcing','sh')}
                    for k, v in havok_results.items()}, 'xv': xv_results}, f, ensure_ascii=False, indent=2, default=str)
 
-    print(f"\n报告: {os.path.join(_SCRIPT_DIR, 'yinshen_report.md')}")
-    print(f"数据: {os.path.join(_SCRIPT_DIR, 'yinshen_report.json')}")
-    print("=" * 58)
+    log_done(f"报告: {os.path.join(_SCRIPT_DIR, 'yinshen_report.md')}")
+    log_done(f"数据: {os.path.join(_SCRIPT_DIR, 'yinshen_report.json')}")
+
+    # Audit / final status
+    stage_bar(["LOAD", "EMBED", "SIMPLEX", "SMAP", "CCM", "HAVOK", "KOOPMAN", "AUDIT"], current="AUDIT", completed=["LOAD", "EMBED", "SIMPLEX", "SMAP", "CCM", "HAVOK"])
+    n_warn = sum(1 for a in audit if a['rule'] == 'S9' and a.get('issues'))
+    n_pass = 3 - n_warn
+    verdict_panel("WARN" if n_warn else "PASS", n_pass=n_pass, n_warn=n_warn, n_fail=0)
+    log_done("分析流程结束")
 
 
 if __name__ == '__main__':

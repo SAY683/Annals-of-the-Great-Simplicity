@@ -345,9 +345,7 @@ def interpret_data(df, target_col, columns, causality_pairs=None,
     skipped_vars = []
 
     # ── Phase 1: per-variable dynamics ──
-    print("─" * 72)
     print("  PHASE 1: Individual Variable Dynamics")
-    print("─" * 72)
 
     for var in columns:
         print(f"\n  [{label_map.get(var, var)}]")
@@ -445,7 +443,7 @@ def interpret_data(df, target_col, columns, causality_pairs=None,
     # ── Phase 2: CCM causality ──
     print(f"\n{'─' * 72}")
     print("  PHASE 2: Causal Structure (CCM with convergence)")
-    print("─" * 72)
+    # print("─" * 72)  # 移除纯分隔线，避免Web日志无意义符号
     E_ref = all_data[target_col]['E']
     _significant_directions = {
         'forward', 'reverse', 'forward_dominant', 'reverse_dominant',
@@ -592,9 +590,9 @@ def interpret_game_data(data_path_override: str = None,
     skipped_vars = []
 
     # ── Phase 1: EDM + HAVOK on each variable ──
-    print("─" * 72)
+    # print("─" * 72)  # 移除纯分隔线，避免Web日志无意义符号
     print("  PHASE 1: Individual Variable Dynamics")
-    print("─" * 72)
+    # print("─" * 72)  # 移除纯分隔线，避免Web日志无意义符号
 
     for var in variables:
       try:
@@ -739,7 +737,7 @@ def interpret_game_data(data_path_override: str = None,
     print(f"\n{'─' * 72}")
     print("  PHASE 2: Causal Structure (CCM with Convergence Check)")
     print("  Reviewer improvement #2: convergence slope required")
-    print("─" * 72)
+    # print("─" * 72)  # 移除纯分隔线，避免Web日志无意义符号
 
     # P0 fix: 当 PHASE 1 所有变量都失败（样本量不足/数据退化）时，
     # all_data 为空字典，访问 all_data[target_col] 会 KeyError 导致整个

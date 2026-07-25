@@ -105,14 +105,18 @@ def extract_meta_scm_params(result_json_path: Path) -> Dict[str, Any]:
     """
     从 TRACE result.json 提取全部元 SCM 参数。
 
-    返回一个字典，包含 ~22 个固定键。
-    所有键在任何文本的 result.json 上都是对齐的。
+    P1-g 修缮：基于 config.LAYER1_COLUMNS 表驱动提取，消除三处独立硬编码。
+    - json_path 非 None 的列：通过 _deep_get + 类型强转提取
+    - json_path 为 None 的列：为计算列，在下方显式处理
+    - 默认值统一从 config.LAYER1_COLUMNS 读取，解决 layer1_meta_scm (None) vs config (0.0) 不一致
+
+    返回一个字典，包含与 LAYER1_COLUMNS 对齐的固定键集。
 
     Args:
         result_json_path: TRACE 输出目录下的 result.json 路径
 
     Returns:
-        Dict[str, Any]: 22 个不变的元参数
+        Dict[str, Any]: 元参数字典
     """
     if not result_json_path.exists():
         raise FileNotFoundError(f"result.json 不存在: {result_json_path}")
@@ -120,85 +124,108 @@ def extract_meta_scm_params(result_json_path: Path) -> Dict[str, Any]:
     with open(result_json_path, "r", encoding="utf-8") as f:
         data = json.load(f)
 
-    # ── 提取所有预定义参数 ──────────────────────────────
+    # P1-g：从 config 导入列定义，作为单一真相源
+    try:
+        from config import LAYER1_COLUMNS
+    except ImportError:
+        # 回退：config 不可用时使用内联定义（仅用于独立测试）
+        LAYER1_COLUMNS = [
+            ("ate", "ate", 0.0, ""), ("ate_ci_lower", "confidence_interval[0]", 0.0, ""),
+            ("ate_ci_upper", "confidence_interval[1]", 0.0, ""), ("ci_width", None, 0.0, ""),
+            ("refuted_count", None, 0, ""), ("identifiable", "identifiable", 0, ""),
+            ("concept_count", None, 0, ""), ("edge_count", "n_significant_edges", 0, ""),
+            ("adj_density", "data_diagnostics.adj_density", 0.0, ""),
+            ("max_delta_nll", "data_diagnostics.max_delta_nll", 0.0, ""),
+            ("concept_coverage", "data_diagnostics.concept_coverage", 0.0, ""),
+            ("condition_number", "data_diagnostics.condition_number", 0.0, ""),
+            ("unk_rate", "data_diagnostics.unk_rate", 0.0, ""),
+            ("ccm_coverage_pct", "six_warriors.ccm.metrics.CCM_coverage", 0.0, ""),
+            ("ccm_verdict", None, "N/A", ""),
+            ("edm_rho_high", "six_warriors.edm.metrics.rho_high", 0, ""),
+            ("edm_rho_mid", "six_warriors.edm.metrics.rho_mid", 0, ""),
+            ("havok_status", None, "unavailable", ""), ("havok_linear_pct", None, -1.0, ""),
+            ("causallearn_consensus", "six_warriors.causallearn.metrics.Agree", 0, ""),
+            ("edge_stability_mean", "stability_analysis.edge_stability_mean", 0.0, ""),
+            ("permutation_p_value", "stability_analysis.permutation_p_value", 1.0, ""),
+            ("total_ms", "execution_profile.total_ms", 0, ""),
+        ]
+
     params = {}
 
-    # 基础因果效应
-    ate = _safe_float(data.get("ate"))
-    params["ate"] = ate
+    # ── 阶段 1：表驱动提取（json_path 非 None 的简单字段） ──
+    for col_name, json_path, default, _desc in LAYER1_COLUMNS:
+        if json_path is None:
+            continue  # 计算列，留给阶段 2
+        raw = _deep_get(data, json_path, None)
+        if raw is None:
+            params[col_name] = default
+        elif isinstance(default, float):
+            params[col_name] = _safe_float(raw)
+        elif isinstance(default, int):
+            params[col_name] = _safe_int(raw)
+        elif isinstance(default, str):
+            params[col_name] = str(raw) if raw else default
+        else:
+            params[col_name] = raw
 
-    # CI 缺失或长度不足时显式用 None 标记，避免与真实 ci_width=0 混淆
-    ci = data.get("confidence_interval")
-    if isinstance(ci, list) and len(ci) >= 2:
-        ci_lower = _safe_float(ci[0])
-        ci_upper = _safe_float(ci[1])
-        params["ate_ci_lower"] = ci_lower
-        params["ate_ci_upper"] = ci_upper
+    # ── 阶段 2：计算列（json_path 为 None 的字段） ──
+
+    # ci_width: CI 上界 - 下界（P1-g：统一默认值 0.0，不再返回 None）
+    ci_lower = params.get("ate_ci_lower", 0.0)
+    ci_upper = params.get("ate_ci_upper", 0.0)
+    if ci_lower is not None and ci_upper is not None:
         params["ci_width"] = ci_upper - ci_lower
     else:
-        params["ate_ci_lower"] = None
-        params["ate_ci_upper"] = None
-        params["ci_width"] = None
+        params["ci_width"] = 0.0
 
-    # 反驳次数
+    # refuted_count: 从 refutations 列表计数
     refutations = data.get("refutations", [])
-    refuted_count = sum(1 for r in refutations if r.get("refuted", False))
-    params["refuted_count"] = refuted_count
+    if isinstance(refutations, list):
+        params["refuted_count"] = sum(
+            1 for r in refutations if isinstance(r, dict) and r.get("refuted", False)
+        )
+    else:
+        params["refuted_count"] = 0
 
-    # 可识别性
-    params["identifiable"] = _safe_bool_to_int(data.get("identifiable"))
-
-    # 图结构
+    # concept_count: 概念节点数
     concepts = data.get("concepts", [])
-    params["concept_count"] = len(concepts)
-    params["edge_count"] = _safe_int(data.get("n_significant_edges"))
-    params["adj_density"] = _safe_float(_deep_get(data, "data_diagnostics.adj_density"))
-    params["max_delta_nll"] = _safe_float(_deep_get(data, "data_diagnostics.max_delta_nll"))
+    params["concept_count"] = len(concepts) if isinstance(concepts, list) else 0
 
-    # 数据诊断
-    params["concept_coverage"] = _safe_float(_deep_get(data, "data_diagnostics.concept_coverage"))
-    params["condition_number"] = _safe_float(_deep_get(data, "data_diagnostics.condition_number"))
-    params["unk_rate"] = _safe_float(_deep_get(data, "data_diagnostics.unk_rate"))
-
-    # CCM
-    ccm_coverage_raw = _deep_get(data, "six_warriors.ccm.metrics.CCM_coverage", "0%")
-    params["ccm_coverage_pct"] = _safe_float(ccm_coverage_raw)
+    # ccm_verdict: CCM 判定文本
     ccm_verdict = _deep_get(data, "six_warriors.ccm.verdict", "N/A")
     params["ccm_verdict"] = ccm_verdict if ccm_verdict else "N/A"
 
-    # EDM
-    params["edm_rho_high"] = _safe_int(_deep_get(data, "six_warriors.edm.metrics.rho_high"))
-    params["edm_rho_mid"] = _safe_int(_deep_get(data, "six_warriors.edm.metrics.rho_mid"))
-
-    # HAVOK — 可能不可用
+    # HAVOK 状态 + 线性占比（P1-g：优先从结构化字段提取，回退到文本正则）
     havok = _deep_get(data, "six_warriors.havok", {})
-    params["havok_status"] = havok.get("status", "unavailable") if havok else "unavailable"
+    params["havok_status"] = havok.get("status", "unavailable") if isinstance(havok, dict) else "unavailable"
 
-    # 尝试从 findings 文本提取线性占比
     havok_linear = -1.0
-    havok_findings = havok.get("findings", []) if havok else []
-    for finding in havok_findings:
-        if "线性" in str(finding) and "%" in str(finding):
-            import re
-            match = re.search(r'(\d+\.?\d*)\s*%', str(finding))
-            if match:
-                havok_linear = float(match.group(1))
-                break
+    if isinstance(havok, dict):
+        # 优先：结构化字段
+        metrics = havok.get("metrics", {})
+        if isinstance(metrics, dict) and "linear_pct" in metrics:
+            try:
+                havok_linear = float(metrics["linear_pct"])
+            except (ValueError, TypeError):
+                pass
+        # 回退：从 findings 文本正则提取
+        if havok_linear < 0:
+            havok_findings = havok.get("findings", [])
+            if isinstance(havok_findings, list):
+                for finding in havok_findings:
+                    finding_str = str(finding)
+                    if "线性" in finding_str and "%" in finding_str:
+                        import re
+                        match = re.search(r'(\d+\.?\d*)\s*%', finding_str)
+                        if match:
+                            havok_linear = float(match.group(1))
+                            break
     params["havok_linear_pct"] = havok_linear
 
-    # causallearn 共识
-    params["causallearn_consensus"] = _safe_int(
-        _deep_get(data, "six_warriors.causallearn.metrics.Agree")
-    )
-
-    # 稳定性
-    stability = data.get("stability_analysis", {})
-    params["edge_stability_mean"] = _safe_float(stability.get("edge_stability_mean"))
-    params["permutation_p_value"] = _safe_float(stability.get("permutation_p_value", 1.0))
-
-    # 执行剖面
-    exec_profile = data.get("execution_profile", {})
-    params["total_ms"] = _safe_int(exec_profile.get("total_ms"))
+    # ── 阶段 3：schema 校验（P1-g：确保所有 LAYER1_COLUMNS 键都存在） ──
+    for col_name, _json_path, default, _desc in LAYER1_COLUMNS:
+        if col_name not in params:
+            params[col_name] = default
 
     return params
 

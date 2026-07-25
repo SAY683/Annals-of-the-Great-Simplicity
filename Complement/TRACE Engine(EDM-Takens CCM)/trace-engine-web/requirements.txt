@@ -1,0 +1,27 @@
+# trace-engine-web 依赖
+# Python 桥接器（py_bridge.py）所需
+
+# 中文分词（核心依赖，非可选）
+# P0 修缮 (2026-07-25 元审计 Round 12.12):
+# 原标记为"可选依赖"导致回退到无效正则模式，使中英混排文本
+# 的有效概念数严重不足，触发"有效词数不足"错误。
+jieba>=0.42
+
+# 因果推断（DoWhy + causallearn）
+dowhy>=0.14
+pydot<3.0
+causallearn>=0.1.3
+
+# 数值计算
+numpy>=1.24
+pandas>=2.0
+scipy>=1.10
+scikit-learn>=1.3
+
+# 可视化
+matplotlib>=3.7
+
+# LLaMA 模型支持（SUPER 模式，可选）
+# torch 和 transformers 仅在 SUPER 模式下需要
+# torch>=2.0
+# transformers>=4.35

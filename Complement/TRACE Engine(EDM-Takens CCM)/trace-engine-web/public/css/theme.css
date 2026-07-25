@@ -1,34 +1,8 @@
-/* TRACE Engine Web — 主题变量（昭和/平成特摄科技 + 极客暗色）
- * 抽取自原 index.html 内联 <style>（debt-09）。
- * 仅保留 :root CSS 自定义属性与基础字号设定，便于主题切换与统一调色。
+/* TRACE Engine Web — 部门特定变量覆写
+ * 共享主题系统见 ../shared/themes/tokusatsu.css
+ * 本项目仅覆写部门色，保持跨项目统一视觉语言。
  */
 :root {
-  color-scheme: dark;
-  /* 昭和/平成特摄科技 + 极客暗色主题 */
-  --bg: #08090d;
-  --bg-elevated: #0c0e13;
-  --panel: rgba(14, 16, 22, 0.92);
-  --panel-solid: #0e1016;
-  --panel-2: #14171f;
-  --panel-3: #1b1f2a;
-  --text: #d8dce6;
-  --text-bright: #f0f2f7;
-  --muted: #6e7787;
-  --accent: #66fcf1;
-  --accent-dim: #45a29e;
-  --accent-tokusatsu: #ff9f43;
-  --accent-tokusatsu-dim: #c77d30;
-  --success: #03c988;
-  --warn: #f2c94c;
-  --fail: #ff4d4d;
-  --border: rgba(42, 47, 58, 0.85);
-  --border-bright: #3a4050;
-  --grid: rgba(102, 252, 241, 0.035);
-  --glow-accent: rgba(102, 252, 241, 0.18);
-  --glow-orange: rgba(255, 159, 67, 0.14);
-  --font-mono: "JetBrains Mono", "Fira Code", "Consolas", "SF Mono", monospace;
-  --font-ui: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif;
-  /* 基础字号：在 1280px 视口约 18px，大屏 22px，小屏 16px，整体可读性优先 */
-  font-size: clamp(16px, 1.05vw + 9px, 22px);
-  --ui-scale: 1.05;
+  --dept-color: #ff9f43;
+  --dept-color-dim: #c77d30;
 }

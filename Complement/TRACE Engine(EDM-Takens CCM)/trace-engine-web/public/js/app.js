@@ -68,6 +68,8 @@ let currentJobId = null;
 let streamAbort = null;
 let lastConfig = null;
 let elapsedInterval = null;
+// P1-g：标记用户主动取消，区分 firstEventTimeout 触发的 abort
+let userInitiatedAbort = false;
 
 // ── UI 缩放控制 ───────────────────────────────────────────────────────
 function applyScale(pct) {
@@ -96,6 +98,7 @@ function updateModelBadge() {
 function updateStatusBoard() {
   const mode = getMode();
   sbMode.textContent = mode.toUpperCase();
+  sbMode.classList.toggle('mode-super', mode === 'super');
   if (mode === 'super') {
     sbCore.textContent = superModelSelect.value.toUpperCase().replace('-', ' ');
     inputPanel.classList.add('alert');
@@ -254,25 +257,106 @@ async function startAnalysis() {
     }
     return resp;
   };
+
+  // 兜底：部分浏览器/自动化环境对长连接 SSE 支持不稳定，流式失败后降级为同步接口
+  async function fallbackToSync(errorMessage) {
+    log('warn', `流式接口不可用：${errorMessage}，尝试恢复结果...`);
+    console.warn('[TRACE fallback]', errorMessage);
+
+    // P0 修缮：先检查当前 job 是否已完成（SSE 断开期间任务可能已结束）
+    // 如果已有结果，直接渲染，避免重复计算
+    if (currentJobId) {
+      try {
+        const resultResp = await fetch(`/api/result/${currentJobId}`);
+        if (resultResp.ok) {
+          const resultData = await resultResp.json().catch(() => null);
+          // /api/result/:id 返回裸 result 对象（含 concepts/ate/analysis_mode 等字段）
+          // 不是 {success, data} 包装结构
+          if (resultData && (resultData.concepts || resultData.ate !== undefined || resultData.analysis_mode)) {
+            log('info', `✓ 任务 ${currentJobId.slice(0,8)}... 已在断连期间完成，恢复结果`);
+            renderResult({ id: currentJobId, result: resultData });
+            showToast('分析完成（断连恢复）', 'success');
+            setRunning(false);
+            loadJobHistory();
+            return;
+          }
+        }
+      } catch (e) {
+        // 结果尚未就绪，继续降级同步分析
+        console.log('[TRACE fallback] result not ready yet:', e.message);
+      }
+    }
+
+    // 降级为同步分析
+    // P1-g 修缮：使用全新的 AbortController，避免复用已 aborted 的 streamAbort.signal
+    // 当 firstEventTimeout 触发时 streamAbort.signal 已 aborted，复用会导致同步 fetch 立即失败
+    log('info', '降级为同步分析接口...');
+    const syncAbort = new AbortController();
+    try {
+      const resp = await fetch('/api/analyze-text', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: payloadText, mode, config: lastConfig }),
+        signal: syncAbort.signal,
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok || !data.success) {
+        throw new Error(data.error || `同步分析失败 HTTP ${resp.status}`);
+      }
+      const result = data.data && data.data.result ? data.data.result : data.data;
+      renderResult(result);
+      showToast('分析完成（同步模式）', 'success');
+    } catch (err) {
+      if (err.name !== 'AbortError') {
+        log('error', err.message || '同步分析兜底失败');
+        showToast(err.message || '同步分析兜底失败', 'error');
+      }
+    } finally {
+      setRunning(false);
+      loadJobHistory();
+    }
+  }
+
+  // P1-g 修缮：首事件超时从 3s 提升到 15s
+  // Python 冷启动 + 模块 import 常需 3-5s，3s 超时导致 SSE 被前端主动 abort (net::ERR_ABORTED)
+  // 服务端现已发送握手事件，正常情况下 <1s 内可收到，15s 作为兜底防御
+  let streamReceivedEvent = false;
+  // P1-g：重置用户取消标记（模块级变量，每次启动分析时重置）
+  userInitiatedAbort = false;
+  const firstEventTimeout = setTimeout(() => {
+    if (!streamReceivedEvent && streamAbort) {
+      console.warn('[TRACE fallback] 15秒内未收到任何 SSE 事件，主动取消并降级同步');
+      streamAbort.abort();
+    }
+  }, 15000);
+
   try {
     const response = await doFetch();
     // P0 修缮：传入 reconnectFactory + signal，readSSEStream 在网络中断时自动重连 3 次（1s/2s/4s）
     await readSSEStream(response.body, {
       reconnectFactory: doFetch,
       signal: streamAbort.signal,
+      onEvent: () => {
+        streamReceivedEvent = true;
+        clearTimeout(firstEventTimeout);
+      },
     });
+    clearTimeout(firstEventTimeout);
   } catch (err) {
-    if (err.name !== 'AbortError') {
-      log('error', err.message || '分析请求失败');
-      showToast(err.message || '分析请求失败', 'error');
-      setRunning(false);
-      loadJobHistory();
-    }
+    clearTimeout(firstEventTimeout);
+    // P1-g：仅当用户主动点击 ABORT 时才静默退出
+    // 超时触发的 abort 不是用户意图，应走降级同步路径
+    const isUserAbort = err.name === 'AbortError' && userInitiatedAbort;
+    console.error('[TRACE analyze error]', err.name, err.message, { isUserAbort, streamAborted: streamAbort?.signal.aborted });
+    if (isUserAbort) return;
+    await fallbackToSync(err.message || 'SSE 连接异常');
   }
 }
 
 async function cancelAnalysis() {
   if (!currentJobId) return;
+  // P1-g：标记为用户主动取消，startAnalysis catch 块据此跳过降级同步
+  userInitiatedAbort = true;
   if (streamAbort) streamAbort.abort();
   try {
     const res = await fetch(`/api/cancel/${currentJobId}`, { method: 'POST' });
@@ -308,6 +392,8 @@ superModelSelect.addEventListener('change', updateStatusBoard);
 
 modeRadios.forEach(r => r.addEventListener('change', () => {
   const mode = getMode();
+  document.body.classList.toggle('super-mode-active', mode === 'super');
+  document.querySelector('.mode-toggle').className = 'mode-toggle mode-' + mode;
   const superWrap = document.getElementById('superModelWrap');
   if (mode === 'deep') {
     modeNote.innerHTML = '<strong>DEEP 模式：</strong>执行完整六战士深度诊断（TRACE、CCM、EDM、HAVOK、DoWhy+CF、causallearn PC/GES）。概念图由 jieba 构建，预计耗时 10–60 秒或更长。';
@@ -323,10 +409,18 @@ modeRadios.forEach(r => r.addEventListener('change', () => {
   updateStatusBoard();
 }));
 
-// 任务时钟
+// 初始化模式相关样式（页面默认模式可能不是 light）
+(function initModeStyles() {
+  const mode = getMode();
+  document.body.classList.toggle('super-mode-active', mode === 'super');
+  document.querySelector('.mode-toggle').className = 'mode-toggle mode-' + mode;
+})();
+
+// 任务时钟（只更新 .clock-value，避免覆盖 MISSION CLOCK 标签结构）
 setInterval(() => {
   const now = new Date();
-  missionClock.textContent = now.toLocaleTimeString('zh-CN', { hour12: false });
+  const clockValue = missionClock.querySelector('.clock-value');
+  if (clockValue) clockValue.textContent = now.toLocaleTimeString('zh-CN', { hour12: false });
 }, 1000);
 
 loadSampleBtn.addEventListener('click', () => {

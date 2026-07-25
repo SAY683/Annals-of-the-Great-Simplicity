@@ -6,15 +6,17 @@
  * 架构:
  *   Browser ←→ Express (port 3100) ←→ Python bridge.py (child_process)
  *
- * 端点 (共 26 个 API 端点 + 静态前端 /，详见 README.md §API 端点表):
- *   GET  /                 前端面板 (express.static, 不计入 26)
+ * 端点 (共 30 个 API 端点 + 静态前端 /，详见 README.md §API 端点表):
+ *   GET  /                 前端面板 (express.static, 不计入 30)
+ *   GET  /api/health       L0  健康检查
+ *   GET  /api/version      L0  版本查询 (debt-12.13: 从 package.json 读取)
  *   GET  /api/status       L1  轨迹状态 + EDM 就绪度
  *   POST /api/run          L3  提交文本管线任务 (Mode A, SSE)
  *   POST /api/replay       L3  提交回填任务 (Mode B, SSE；replay_all=true 复用此端点)
  *   GET  /api/edm/poll/:id L3  EDM轮询代理（避免CORS — P2修复）
  *   POST /api/edm/trigger  L3  触发 EDM 分析
  *   GET  /api/jobs         L4  任务历史
- *   …其余 20 个端点（dataset/projects/work/models 等）见 README.md 表
+ *   …其余 21 个端点（dataset/projects/work/models 等）见 README.md 表
  */
 
 const express = require('express');
@@ -38,6 +40,15 @@ const PROJECTS_DIR = path.join(ROOT, 'projects');
 const LOG_FILE = path.join(ROOT, 'data', 'logs', 'server.log');
 // P1修复: 默认 CORS 限制为本地回环，避免生产环境通配符风险 (原默认 '*')
 const CORS_ORIGIN = process.env.TRACE_CORS_ORIGIN || 'http://localhost:3100';
+// debt-12.13: 版本号从 package.json 读取，避免硬编码与实际版本漂移
+const PACKAGE_VERSION = (() => {
+  try {
+    return require('./package.json').version || '0.0.0-dev';
+  } catch (e) {
+    console.error(`[trace-to-edm] 读取 package.json 版本失败: ${e.message}，回退到 'unknown'`);
+    return 'unknown';
+  }
+})();
 
 // 确保日志目录存在
 (function ensureLogDir() {
@@ -72,6 +83,11 @@ function getActiveTrajectoryCSV() {
 }
 
 // ── Python 辅助调用 ────────────────────────────────────────
+// debt-12.13 修缮: 当 stdout 不是合法 JSON 时，原先仅依据 exit code 判定
+// success，会掩盖 Python 进程崩溃但 exit code=0 的场景（例如 Python 未捕获
+// 异常被 sys.exit(0) 调用吞掉，或 stdout 被第三方日志污染）。
+// 修复策略: success 必须同时满足 (a) JSON 解析成功且字段 success=true，或
+// (b) JSON 解析失败但 exit code=0 且 stderr 为空。其余情况一律视为失败。
 function pyCall(args, timeout = 15000) {
   return new Promise((resolve, reject) => {
     const proc = spawn(PYTHON_CMD, [BRIDGE_SCRIPT, ...args], {
@@ -84,8 +100,38 @@ function pyCall(args, timeout = 15000) {
     proc.stderr.on('data', d => err += d.toString());
     proc.on('close', code => {
       clearTimeout(timer);
-      try { resolve(JSON.parse(out)); }
-      catch { resolve({ success: code === 0, output: out.trim(), error: err.trim() }); }
+      const trimmedOut = out.trim();
+      const trimmedErr = err.trim();
+      // 尝试 JSON 解析
+      if (trimmedOut) {
+        try {
+          const parsed = JSON.parse(trimmedOut);
+          // 若 Python 输出了显式 success 字段，尊重该字段
+          if (parsed && typeof parsed === 'object' && 'success' in parsed) {
+            resolve(parsed);
+            return;
+          }
+          // JSON 解析成功但无 success 字段: 仅当 exit code=0 且无 stderr 时才视为成功
+          resolve({
+            success: code === 0 && !trimmedErr,
+            ...parsed,
+            _warning: 'JSON 无显式 success 字段，依据 exit code 与 stderr 推断',
+            exit_code: code,
+            stderr: trimmedErr,
+          });
+          return;
+        } catch (e) {
+          // JSON 解析失败，进入下方 fallback
+        }
+      }
+      // Fallback: stdout 不是 JSON。success 必须同时满足 exit code=0 且 stderr 为空。
+      // 若 exit code!=0 或 stderr 非空，即使 exit code=0 也视为失败（stderr 表明 Python 报错）。
+      resolve({
+        success: code === 0 && !trimmedErr && !trimmedOut,
+        output: trimmedOut,
+        error: trimmedErr || (code !== 0 ? `Python 退出码非零: ${code}` : ''),
+        exit_code: code,
+      });
     });
     proc.on('error', e => { clearTimeout(timer); reject(e); });
   });
@@ -136,6 +182,45 @@ app.use((_req, res, next) => {
   }
   next();
 });
+
+// P1-b 修缮：所有 /api/ GET 端点禁止浏览器缓存，防止前端获取过期数据
+// SSE 端点已在各自的 writeHead 中设置 no-cache，此处覆盖其余 GET 数据端点
+// （/api/models、/api/projects、/api/status、/api/trajectory 等）
+app.use((req, res, next) => {
+  if (req.method === 'GET' && req.path.startsWith('/api/')) {
+    res.header('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.header('Pragma', 'no-cache');
+    res.header('Expires', '0');
+  }
+  next();
+});
+
+// P1-b 修缮：服务端内存缓存（TTL 5s），减少 Python 子进程冷启动开销
+// _apiCache = { key: { data, expireAt, mtime? } }
+const _apiCache = new Map();
+const API_CACHE_TTL_MS = 5000;
+
+function getCached(key) {
+  const entry = _apiCache.get(key);
+  if (!entry) return null;
+  if (Date.now() > entry.expireAt) {
+    _apiCache.delete(key);
+    return null;
+  }
+  return entry.data;
+}
+
+function setCached(key, data) {
+  _apiCache.set(key, { data, expireAt: Date.now() + API_CACHE_TTL_MS });
+}
+
+function invalidateCache(key) {
+  if (key) {
+    _apiCache.delete(key);
+  } else {
+    _apiCache.clear();
+  }
+}
 
 // 请求追踪 ID（便于日志串联）
 app.use((req, _res, next) => {
@@ -244,6 +329,18 @@ function readTrajectoryCSV() {
 
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', service: 'trace-to-edm', time: new Date().toISOString() });
+});
+
+// debt-12.13: 暴露 /api/version 端点，版本号从 package.json 读取
+// 与 trace-engine-web /api/version 契约对齐，便于便携式 verify 与运维监控
+app.get('/api/version', (_req, res) => {
+  res.json({
+    success: true,
+    service: 'trace-to-edm',
+    version: PACKAGE_VERSION,
+    node: process.version,
+    time: new Date().toISOString(),
+  });
 });
 
 // ── API: 状态查询 ─────────────────────────────────────────
@@ -938,10 +1035,16 @@ app.post('/api/pipeline/run', async (req, res) => {
 // ── API: 模型配置 ─────────────────────────────────────────
 
 app.get('/api/models', async (_req, res) => {
+  // P1-b：服务端 5s 内存缓存，减少 Python 冷启动开销
+  const cached = getCached('models');
+  if (cached) return res.json(cached);
   try {
     const script = "import sys, json; sys.path.insert(0, '.'); from layer3_sacred import list_models, get_active_model; print(json.dumps({'models': list_models(), 'active': get_active_model()}, ensure_ascii=False))";
     const result = await pyScript(script, 30000);
-    try { res.json(JSON.parse(result.out)); } catch { res.json({ error: result.out }); }
+    let payload;
+    try { payload = JSON.parse(result.out); } catch { payload = { error: result.out }; }
+    setCached('models', payload);
+    res.json(payload);
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -975,6 +1078,8 @@ app.post('/api/models/activate', async (req, res) => {
         allowed: ALLOWED_MODELS.filter(k => !['shehui-llama','shenji-llama'].includes(k)),
       });
     }
+    // P1-b：模型切换后失效缓存，确保下次 GET /api/models 返回最新状态
+    invalidateCache('models');
     res.json(payload);
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -983,8 +1088,12 @@ app.post('/api/models/activate', async (req, res) => {
 // ── API: 项目管理 ─────────────────────────────────────────
 
 app.get('/api/projects', async (_req, res) => {
+  // P1-b：服务端 5s 内存缓存
+  const cached = getCached('projects');
+  if (cached) return res.json(cached);
   try {
     const result = await pyCall(['--list-projects']);
+    setCached('projects', result);
     res.json(result);
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -996,6 +1105,7 @@ app.post('/api/projects', async (req, res) => {
   if (!name) return res.status(400).json({ error: 'name required' });
   try {
     const result = await pyCall(['--create-project', name]);
+    invalidateCache('projects');  // P1-b：项目列表变更后失效缓存
     res.json(result);
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -1007,6 +1117,8 @@ app.put('/api/projects/activate', async (req, res) => {
   if (!name) return res.status(400).json({ error: 'name required' });
   try {
     const result = await pyCall(['--project', name]);
+    // P1-b：项目切换后失效所有缓存（模型列表也因项目隔离而变化）
+    invalidateCache();
     res.json(result);
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -1016,6 +1128,7 @@ app.put('/api/projects/activate', async (req, res) => {
 app.delete('/api/projects/:name', async (req, res) => {
   try {
     const result = await pyCall(['--delete-project', req.params.name]);
+    invalidateCache('projects');  // P1-b：项目删除后失效缓存
     res.json(result);
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -1034,10 +1147,10 @@ app.get('/api/work-scan', async (_req, res) => {
 });
 
 app.delete('/api/work-uuid/:uuid', async (req, res) => {
-  // P1 修复: UUID 格式校验，防止注入
-  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-  if (!UUID_RE.test(req.params.uuid)) {
-    return res.status(400).json({ error: 'INVALID_UUID', detail: 'UUID format required' });
+  // 安全校验: 允许标准UUID和非标准短名称(如test-abort)，但拒绝路径遍历和特殊字符
+  const SAFE_NAME_RE = /^[A-Za-z0-9_\-]{1,64}$/;
+  if (!SAFE_NAME_RE.test(req.params.uuid)) {
+    return res.status(400).json({ error: 'INVALID_UUID', detail: 'Only alphanumeric, hyphen, underscore allowed (max 64 chars)' });
   }
   try {
     const script = `
@@ -1059,17 +1172,24 @@ print(json.dumps(result, ensure_ascii=False))
 app.post('/api/work-clean', async (req, res) => {
   const dryRun = req.body.dry_run !== false;
   const orphansOnly = req.body.orphans_only === true;
+  // P0 修缮：JavaScript 的 true/false 插入 Python 代码必须转为 True/False
+  // 否则 Python 会抛 NameError: name 'true' is not defined
+  const dryRunPy = dryRun ? 'True' : 'False';
+  const orphansOnlyPy = orphansOnly ? 'True' : 'False';
   try {
     const script = `
 import sys, json
 sys.path.insert(0, '.')
 from work_scanner import WorkScanner
 ws = WorkScanner()
-result = ws.delete_invalid(dry_run=${dryRun}) if not ${orphansOnly} else ws.delete_orphans(dry_run=${dryRun})
+result = ws.delete_invalid(dry_run=${dryRunPy}) if not ${orphansOnlyPy} else ws.delete_orphans(dry_run=${dryRunPy})
 print(json.dumps(result, ensure_ascii=False))
     `.trim();
-    const { out } = await pyScript(script, 15000);
-    try { res.json(JSON.parse(out)); } catch { res.json({ raw: out.trim() }); }
+    const { out, err } = await pyScript(script, 15000);
+    if (err && err.trim()) {
+      console.warn('[work-clean] Python stderr:', err.trim());
+    }
+    try { res.json(JSON.parse(out)); } catch { res.json({ raw: out.trim(), error: err.trim() || undefined }); }
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -1150,17 +1270,22 @@ print(json.dumps({"count": count}))
 
 // ── 启动 ──────────────────────────────────────────────────
 
-app.listen(PORT, () => {
+// P1 修缮 (2026-07-25 元审计 Round 12.10): host 收窄到 127.0.0.1
+// 原实现 app.listen(PORT) 未指定 host，等价于隐式 0.0.0.0（暴露至 LAN/公网）
+// 默认仅本机访问；如需外部访问，显式设置 TRACE_HOST=0.0.0.0
+const HOST = process.env.TRACE_HOST || '127.0.0.1';
+app.listen(PORT, HOST, () => {
   console.log('');
   console.log('╔══════════════════════════════════════════════════╗');
-  console.log('║   trace-to-edm Web 操纵台 v0.1.0                ║');
+  console.log(`║   trace-to-edm Web 操纵台 v${PACKAGE_VERSION.padEnd(6)}            ║`);
   console.log('║   元因果控制论桥接系统 — 可视化面板               ║');
-  console.log(`║   http://localhost:${PORT}                          ║`);
+  console.log(`║   http://${HOST}:${PORT}                          ║`);
   console.log('╠══════════════════════════════════════════════════╣');
   console.log('║   Mode A: 文本管线  POST /api/run               ║');
   console.log('║   Mode B: 回填管线  POST /api/replay            ║');
   console.log('║   EDM 触发         POST /api/edm/trigger        ║');
   console.log('║   轨迹查询         GET  /api/trajectory          ║');
+  console.log('║   版本查询         GET  /api/version             ║');
   console.log('╚══════════════════════════════════════════════════╝');
   console.log('');
 });

@@ -222,12 +222,26 @@ def _deploy_ccm(adj_matrix, token_list, concept_names=None) -> WarriorCard:
         ]
         card.verdict = "LOW_TRUST"
     else:
+        # 元审计 P1 修缮: verdict 必须反映"是否真正运行了 ccm_with_convergence"
+        # 原实现仅依据 _CCM_AVAILABLE 就标 VERIFIABLE，但本函数始终未调用真算法
+        # ——仅做覆盖率统计。这会误导用户认为已执行交叉映射验证。
+        # 修复: 区分三层语义
+        #   ELIGIBLE_BUT_NOT_RUN  — 满足 CCM 数据条件，但未调用真算法（本函数常态）
+        #   HEURISTIC_FALLBACK    — 真算法不可用，仅启发式统计
+        #   VERIFIABLE            — 仅当本函数实际调用 ccm_with_convergence 成功后设置
+        #                       （当前实现未调用，故永不标 VERIFIABLE；如需真验证，
+        #                        应在 _deploy_ccm 中调用 ccm_with_convergence 并捕获结果）
         card.status = "deployed" if _CCM_AVAILABLE else "fallback"
         card.findings = [
-            f"CCM 覆盖 {ccm_ratio:.1%} — 可进行交叉映射验证",
+            f"CCM 覆盖 {ccm_ratio:.1%} — 满足交叉映射数据条件",
         ]
         if _CCM_AVAILABLE:
-            card.verdict = "VERIFIABLE"
+            # 真算法可导入，但本函数未实际调用 → 明确标注
+            card.verdict = "ELIGIBLE_BUT_NOT_RUN"
+            card.findings.append(
+                "ℹ 真算法可导入但本诊断未实际运行 ccm_with_convergence；"
+                "如需真实验证，应在 counterfactual_bridge 中显式调用并捕获 ρ/rho 曲线"
+            )
         else:
             card.verdict = "HEURISTIC_FALLBACK"
             card.findings.append("⚠ 启发式回退: edm-takens 真算法不可用，仅做覆盖率统计")

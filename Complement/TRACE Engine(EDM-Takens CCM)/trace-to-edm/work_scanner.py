@@ -44,6 +44,8 @@ class WorkScanner:
         """
         扫描工作目录，返回所有条目的状态。
 
+        同时扫描 outputs/ 和 inputs/ 目录，确保只存在于 inputs/ 的孤儿也能被发现。
+
         Returns:
             按时间倒序排列的条目列表:
             [{
@@ -59,14 +61,21 @@ class WorkScanner:
             }, ...]
         """
         entries = []
-        if not self.work_dir.exists():
+        if not self.work_dir.exists() and not self.inputs_dir.exists():
             return entries
 
-        for task_dir in self.work_dir.iterdir():
-            if not task_dir.is_dir():
-                continue
+        # 收集所有 UUID：来自 outputs/ 目录和 inputs/ 中的 .txt 文件
+        uuid_set = set()
+        if self.work_dir.exists():
+            for task_dir in self.work_dir.iterdir():
+                if task_dir.is_dir():
+                    uuid_set.add(task_dir.name)
+        if self.inputs_dir.exists():
+            for txt_file in self.inputs_dir.glob("*.txt"):
+                uuid_set.add(txt_file.stem)
 
-            uuid_str = task_dir.name
+        for uuid_str in sorted(uuid_set, reverse=True):
+            task_dir = self.work_dir / uuid_str
             result_json = task_dir / "result.json"
             input_txt = self.inputs_dir / f"{uuid_str}.txt"
 
@@ -219,21 +228,23 @@ class WorkScanner:
             input_file = self.inputs_dir / f"{uuid_str}.txt"
 
             try:
+                # 删除 outputs/{uuid} 目录（孤儿可能没有此目录，属正常情况）
                 if task_dir.exists():
-                    # 计算大小
                     for f in task_dir.rglob("*"):
                         if f.is_file():
                             freed += f.stat().st_size
                     if not dry_run:
                         shutil.rmtree(task_dir)
-                        deleted += 1
-                elif not dry_run:
-                    errors.append(f"{uuid_str}: 目录不存在")
+                    deleted += 1
 
+                # 删除 inputs/{uuid}.txt（孤儿的主要清理目标）
                 if input_file.exists():
                     freed += input_file.stat().st_size
                     if not dry_run:
                         input_file.unlink()
+                    # 若 task_dir 不存在（text_only 孤儿），仅删 input 也算删除成功
+                    if not task_dir.exists():
+                        deleted += 1
 
             except Exception as e:
                 errors.append(f"{uuid_str}: {e}")

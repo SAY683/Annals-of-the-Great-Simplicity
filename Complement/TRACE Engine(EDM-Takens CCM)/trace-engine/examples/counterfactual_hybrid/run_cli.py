@@ -34,48 +34,33 @@ import subprocess
 from datetime import datetime
 from pathlib import Path
 
+# ══════════════════════════════════════════════════════════════════════
+# 引入共享终端主题模块
+# ══════════════════════════════════════════════════════════════════════
+
+SHARED_DIR = Path(__file__).resolve().parents[3] / "shared"
+sys.path.insert(0, str(SHARED_DIR))
+from terminal_theme import (
+    T, print_header, print_ascii_logo, log_stage, log_info, log_warn, log_error, log_done,
+    stage_bar, verdict_panel, metric_line
+)
+
 from _config import setup_graphviz
 from project_paths import resolve_paths
 from presets import load_presets
 from pipeline_helpers import run_full_pipeline
 
-# ══════════════════════════════════════════════════════════════════════
-# 昭和/平成特摄防卫队基地终端氛围
-# ══════════════════════════════════════════════════════════════════════
 
-class T:
-    RESET = '\033[0m'
-    BOLD = '\033[1m'
-    DIM = '\033[2m'
-    GREEN = '\033[38;5;82m'
-    CYAN = '\033[38;5;51m'
-    YELLOW = '\033[38;5;220m'
-    RED = '\033[38;5;196m'
-    BLUE = '\033[38;5;75m'
-    ORANGE = '\033[38;5;208m'
-    BG_DARK = '\033[48;5;232m'
-
-
-def _supports_color():
-    return sys.stdout.isatty() and os.environ.get('TERM') not in (None, 'dumb')
-
-
-def _colorize(s, color):
-    return f"{color}{s}{T.RESET}" if _supports_color() else s
-
-
-def _print_header(title):
-    if not _supports_color():
-        print("═" * 58)
-        print(f"  {title}")
-        print("═" * 58)
-        return
-    now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    print(f"{T.BG_DARK}{T.CYAN}╔══════════════════════════════════════════════════════════╗{T.RESET}")
-    print(f"{T.BG_DARK}{T.CYAN}║{T.RESET} {T.GREEN}{T.BOLD}SENTAI CAUSAL BASE TERMINAL{T.RESET}  {T.DIM}[MISSION CLOCK] {now}{T.RESET}{' ' * 15}{T.CYAN}║{T.RESET}")
-    print(f"{T.BG_DARK}{T.CYAN}║{T.RESET} {title}{' ' * (56 - len(title))}{T.CYAN}║{T.RESET}")
-    print(f"{T.BG_DARK}{T.CYAN}╚══════════════════════════════════════════════════════════╝{T.RESET}")
-    print()
+# 简洁的 ASCII 战队标识
+ASCII_LOGO = [
+    "    ____  _____  ___   ___   ___  _   _ ",
+    "   / __ \|  __ \|__ \ / _ \ / _ \| \ | |",
+    "  | |  | | |__) |  ) | | | | | | |  \| |",
+    "  | |  | |  _  /  / /| | | | | | | . ` |",
+    "  | |__| | | \ \ / /_| |_| | |_| | |\  |",
+    "   \____/|_|  \_\____|\___/ \___/|_| \_|",
+    "        COUNTERFACTUAL SENTAI v1.0      ",
+]
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -107,10 +92,11 @@ def _setup_graphviz():
 
 def cmd_env():
     """打印环境状态"""
-    _print_header("因果战队 CLI · 环境状态 (Sentai Environment)")
+    print_header("因果战队 CLI · 环境状态", dept="ANALYSIS", subtitle="Sentai Environment Diagnostics")
+    print_ascii_logo(ASCII_LOGO, dept="ANALYSIS")
 
     # Python
-    print(f"  Python: {sys.version.split()[0]}")
+    log_info(f"Python: {sys.version.split()[0]}")
 
     # Graphviz
     gv = _setup_graphviz()
@@ -118,20 +104,20 @@ def cmd_env():
         try:
             result = subprocess.run(['dot', '-V'], capture_output=True, text=True, timeout=5)
             ver = result.stderr.strip() if result.stderr else result.stdout.strip()
-            print(f"  Graphviz: {_colorize('✓', T.GREEN)} ({ver})  [{gv}]")
+            log_info(f"Graphviz OK  ({ver})  [{gv}]")
         except Exception:
-            print(f"  Graphviz: {_colorize('⚠', T.YELLOW)} bin found but dot -V failed  [{gv}]")
+            log_warn(f"Graphviz bin found but dot -V failed  [{gv}]")
     else:
-        print(f"  Graphviz: {_colorize('✗', T.RED)} 未找到 (下载: https://graphviz.org/download/)")
+        log_error(f"Graphviz not found  (下载: https://graphviz.org/download/)")
 
     # Core deps
     for mod, name in [('numpy', 'NumPy'), ('torch', 'PyTorch'), ('transformers', 'Transformers')]:
         try:
             m = __import__(mod)
             ver = getattr(m, '__version__', '?')
-            print(f"  {name}: {_colorize('✓', T.GREEN)} {ver}")
+            log_info(f"{name}: {ver}")
         except ImportError:
-            print(f"  {name}: {_colorize('✗', T.RED)} 未安装")
+            log_error(f"{name}: 未安装")
 
     # Causal deps
     for mod, name in [('dowhy', 'DoWhy'), ('causallearn', 'causal-learn'),
@@ -141,9 +127,9 @@ def cmd_env():
         try:
             m = __import__(mod)
             ver = getattr(m, '__version__', '?')
-            print(f"  {name}: {_colorize('✓', T.GREEN)} {ver}")
+            log_info(f"{name}: {ver}")
         except ImportError:
-            print(f"  {name}: {_colorize('✗', T.RED)} 未安装")
+            log_error(f"{name}: 未安装")
 
     # Models (通过 _paths 解析，支持 TRACE_ROOT 环境变量)
     try:
@@ -153,16 +139,16 @@ def cmd_env():
             if model_dir.exists():
                 safetensors = list(model_dir.glob("model.safetensors"))
                 size_mb = safetensors[0].stat().st_size / 1e6 if safetensors else 0
-                print(f"  {model_name}: {_colorize('✓', T.GREEN)} ({size_mb:.0f}MB)")
+                log_info(f"{model_name}: ({size_mb:.0f}MB)")
             else:
-                print(f"  {model_name}: {_colorize('✗', T.RED)} 未找到")
+                log_error(f"{model_name}: 未找到")
     except FileNotFoundError as e:
-        print(f"  模型检测: {_colorize('✗', T.RED)} {e}")
+        log_error(f"模型检测: {e}")
 
     # Outputs
     for label, d in [('demo', DEMO_DIR), ('real', REAL_DIR), ('cache', CACHE_DIR)]:
         files = list(d.glob('*'))
-        print(f"  outputs/{label}: {_colorize(str(len(files)), T.CYAN)} files")
+        log_info(f"outputs/{label}: {len(files)} files")
 
     print()
 
@@ -173,7 +159,10 @@ def cmd_env():
 
 def cmd_demo():
     """运行模拟数据演示管线"""
-    _print_header("因果战队 · 模拟数据演示 (Demo Simulation)")
+    print_header("因果战队 · 模拟数据演示", dept="ANALYSIS", subtitle="Demo Simulation")
+    print_ascii_logo(ASCII_LOGO, dept="ANALYSIS")
+
+    stage_bar(["IDENTIFY", "ESTIMATE", "REFUTE", "COUNTERFACTUAL", "REPORT"], current="IDENTIFY")
 
     _setup_graphviz()
 
@@ -198,7 +187,7 @@ def cmd_demo():
                     for sj in pos[cd]:
                         if si<sj: adj[si,sj]=ADJ[ci,cj]
 
-    print(f"\n[1/5] TRACE → DoWhy 桥接 + 全管线（聚合→建模→识别→估计→反驳→反事实）...")
+    log_stage("TRACE → DoWhy 桥接 + 全管线（聚合→建模→识别→估计→反驳→反事实）")
     # 加载 demo 预设参数，避免硬编码绕过 presets.yaml
     demo_preset = load_presets("demo")
     bridge = TRACE2DoWhy(
@@ -214,38 +203,39 @@ def cmd_demo():
         identify_kwargs={'treatment': '算法推荐', 'outcome': '信息茧房'},
         n_top_edges=5,
     )
-    print(f"  概念: {len(bridge.concept_names)} → 边: {len(bridge.significant_edges)}")
+    log_info(f"概念: {len(bridge.concept_names)} → 边: {len(bridge.significant_edges)}")
     for i, e in enumerate(bridge.significant_edges[:5]):
-        print(f"    {i+1}. {e[0]} → {e[1]} (ΔNLL={e[2]:.2f})")
+        metric_line(f"{i+1}. {e[0]} → {e[1]}", e[2])
 
-    print(f"\n[2/5] 效应估计 + 反驳结果...")
+    log_stage("效应估计 + 反驳结果")
     est = bridge.estimate_result
     ci = DoWhy14Adapter.get_confidence_interval(est)
-    print(f"  {bridge.treatment} → {bridge.outcome}")
-    print(f"  ATE={est.value:.4f}  95%CI=[{ci[0]:.4f},{ci[1]:.4f}]")
+    log_info(f"{bridge.treatment} → {bridge.outcome}")
+    metric_line("ATE", est.value)
+    log_info(f"95% CI=[{ci[0]:.4f}, {ci[1]:.4f}]")
 
-    print(f"\n[3/5] 反事实扫描结果...")
+    log_stage("反事实扫描结果")
     for r in bridge.scan_results[:5]:
-        print(f"  {r['source']}→{r['target']}: ITE={r['ite']:+.4f}")
+        metric_line(f"{r['source']}→{r['target']}", r['ite'])
 
-    print(f"\n[4/5] 审计防火墙...")
+    log_stage("审计防火墙")
     auditor = DoWhyAuditor(bridge)
     audit = auditor.audit('full')
-    print(f"  Verdict: {audit.verdict} (PASS={audit.n_pass}, WARN={audit.n_warn}, FAIL={audit.n_fail})")
+    verdict_panel(audit.verdict, audit.n_pass, audit.n_warn, audit.n_fail)
 
-    print(f"\n[5/5] 生成输出...")
+    log_stage("生成输出")
     # Dashboard
     dash_path = render_dashboard(bridge, str(DEMO_DIR / "dashboard.png"), dpi=150)
-    print(f"  仪表板: {dash_path}")
+    log_info(f"仪表板: {dash_path}")
     # DOT graph
     gv_path = bridge.visualize(str(DEMO_DIR / "causal_graph"), format="png")
-    print(f"  DAG: {gv_path}")
+    log_info(f"DAG: {gv_path}")
     # Report
     report = bridge.report()
     (DEMO_DIR / "report.md").write_text(report, encoding='utf-8')
-    print(f"  报告: {DEMO_DIR / 'report.md'} ({len(report)} chars)")
+    log_info(f"报告: {DEMO_DIR / 'report.md'} ({len(report)} chars)")
 
-    print(f"\n{_colorize('✅ 完成', T.GREEN)} — 输出在 {DEMO_DIR}")
+    log_done(f"完成 — 输出在 {DEMO_DIR}")
 
 
 def cmd_real(preset="llama"):
@@ -272,8 +262,12 @@ def cmd_real(preset="llama"):
         logger.warning(f"加载预设 {preset} 失败: {e}，回退到 llama")
         p = load_presets("llama")
 
-    _print_header(f"因果战队 · 真实 TRACE 数据管线 | Preset: {preset}")
-    print(f"  threshold={p.trace2dowhy.threshold}")
+    print_header("因果战队 · 真实 TRACE 数据管线", dept="ANALYSIS", subtitle=f"Preset: {preset}")
+    print_ascii_logo(ASCII_LOGO, dept="ANALYSIS")
+
+    stage_bar(["IDENTIFY", "ESTIMATE", "REFUTE", "COUNTERFACTUAL", "SIX-WARRIOR", "AUDIT", "REPORT"], current="IDENTIFY")
+
+    metric_line("threshold", p.trace2dowhy.threshold)
     print()
 
     _setup_graphviz()
@@ -283,9 +277,9 @@ def cmd_real(preset="llama"):
     tokens_cache = CACHE_DIR / "real_tokens.json"
 
     if not adj_cache.exists() or not tokens_cache.exists():
-        print(f"\n⚠ 未找到 TRACE 缓存文件 ({CACHE_DIR})")
-        print(f"  请先运行 TRACE 管线生成缓存，或运行:")
-        print(f"    python run_real_pipeline.py")
+        log_warn(f"未找到 TRACE 缓存文件 ({CACHE_DIR})")
+        log_info("请先运行 TRACE 管线生成缓存，或运行:")
+        log_info("  python run_real_pipeline.py")
         return
 
     import numpy as np, json
@@ -299,7 +293,7 @@ def cmd_real(preset="llama"):
     adj = np.load(str(adj_cache))
     tokens = json.loads(tokens_cache.read_text(encoding='utf-8'))
 
-    print(f"\n[1/5] TRACE → DoWhy 桥接 + 全管线（聚合→建模→识别→估计→反驳→反事实）...")
+    log_stage("TRACE → DoWhy 桥接 + 全管线（聚合→建模→识别→估计→反驳→反事实）")
     logger.info(
         f"TRACE→DoWhy: threshold={p.trace2dowhy.threshold}, "
         f"min_freq={p.trace2dowhy.concept_min_freq}, "
@@ -318,50 +312,51 @@ def cmd_real(preset="llama"):
     # debt-05: 管线核心序列抽取到 pipeline_helpers.run_full_pipeline（双轨入口合并）
     run_full_pipeline(bridge, preset=p)
     logger.info(f"Concepts: {len(bridge.concept_names)}, Edges: {len(bridge.significant_edges)}, Mode: {bridge.mode_name}")
-    print(f"  Tokens: {len(tokens)} → Concepts: {len(bridge.concept_names)} → Edges: {len(bridge.significant_edges)}")
-    print(f"  Mode: {bridge.mode_name}")
+    log_info(f"Tokens: {len(tokens)} → Concepts: {len(bridge.concept_names)} → Edges: {len(bridge.significant_edges)}")
+    log_info(f"Mode: {bridge.mode_name}")
     for i, e in enumerate(bridge.significant_edges[:6]):
-        print(f"    {i+1}. {e[0]:12s} → {e[1]:12s}  ΔNLL={e[2]:.3f}")
+        metric_line(f"{i+1}. {e[0]:12s} → {e[1]:12s}", e[2])
 
-    print(f"\n[2/5] 效应估计 + 反驳结果...")
+    log_stage("效应估计 + 反驳结果")
     est = bridge.estimate_result
     ci = DoWhy14Adapter.get_confidence_interval(est)
     logger.info(f"ATE={est.value:.4f}, CI=[{ci[0]:.4f},{ci[1]:.4f}]")
-    print(f"  {bridge.treatment} → {bridge.outcome}")
-    print(f"  ATE={est.value:.4f}  95%CI=[{ci[0]:.4f},{ci[1]:.4f}]")
+    log_info(f"{bridge.treatment} → {bridge.outcome}")
+    metric_line("ATE", est.value)
+    log_info(f"95% CI=[{ci[0]:.4f}, {ci[1]:.4f}]")
 
-    print(f"\n[3/5] 反事实扫描结果...")
+    log_stage("反事实扫描结果")
     # scan_results 已由 run_full_pipeline 计算
 
-    print(f"\n[4/5] 六战士合体...")
+    log_stage("六战士合体")
     cards = assemble_all_six(adj, tokens, bridge=bridge)
     # debt-04 audit 修复：将六战士卡片注入 bridge，激活 report() 中的复合诊断引擎
     bridge.set_six_warriors_cards(cards)
     logger.info(f"Six warriors: {', '.join(f'{k}={c.status}' for k,c in cards.items())}")
     for key, card in cards.items():
         icon = f'[{card.status.upper()}]'
-        print(f"  {card.color} {card.warrior_id:12s} {icon:14s} {card.verdict}")
+        log_info(f"{card.color} {card.warrior_id:12s} {icon:14s} {card.verdict}")
 
-    print(f"\n[5/6] 审计防火墙...")
+    log_stage("审计防火墙")
     auditor = DoWhyAuditor(bridge)
     audit = auditor.audit('full')
     logger.info(f"Auditor: {audit.verdict} (P={audit.n_pass}, W={audit.n_warn}, F={audit.n_fail})")
-    print(f"  Verdict: {audit.verdict} (PASS={audit.n_pass}, WARN={audit.n_warn}, FAIL={audit.n_fail})")
+    verdict_panel(audit.verdict, audit.n_pass, audit.n_warn, audit.n_fail)
 
-    print(f"\n[6/6] 生成多云化图谱套件...")
+    log_stage("生成多云化图谱套件")
     charts = render_chart_suite(bridge, cards, str(REAL_DIR), dpi=150)
     logger.info(f"Generated {len(charts)} chart files")
     for chart_path in charts:
-        print(f"  {chart_path}")
+        log_info(f"{chart_path}")
         logger.debug(f"  Chart: {chart_path}")
     report = render_six_panel_report(cards) + "\n\n" + bridge.report()
     (REAL_DIR / "report.md").write_text(report, encoding='utf-8')
     logger.info(f"Report: {REAL_DIR / 'report.md'} ({len(report)} chars)")
 
-    print(f"\n✅ 完成 — 输出在 {REAL_DIR}")
+    log_done(f"完成 — 输出在 {REAL_DIR}")
     file_handler = next((h for h in logger.handlers if isinstance(h, logging.FileHandler)), None)
     log_file = Path(file_handler.baseFilename) if file_handler else None
-    print(f"   日志: {log_file}")
+    log_info(f"日志: {log_file}")
 
 
 def cmd_clean():
@@ -371,7 +366,7 @@ def cmd_clean():
         if d.exists():
             shutil.rmtree(str(d))
             d.mkdir()
-    print(f"✅ 已清理 {DEMO_DIR} 和 {REAL_DIR}")
+    log_done(f"已清理 {DEMO_DIR} 和 {REAL_DIR}")
 
 
 # ══════════════════════════════════════════════════════════════════════

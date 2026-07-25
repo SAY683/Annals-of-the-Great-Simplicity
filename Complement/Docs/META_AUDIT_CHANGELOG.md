@@ -705,3 +705,389 @@ WARN 原因:
 - ✅ 便携式目录同步 10/10 关键文件 OK，verify_portable.py 全部通过
 - ✅ 数据流完整性核查通过（40 新闻 → 40 job_id → 40 CSV 行 → EDM 全套分析）
 
+---
+
+## Round 12 — 2026-07-25 端到端复审与算法审视
+
+### 12.1 CCM verdict 标签误导修复 (P1)
+
+**问题**: `six_warriors.py:_deploy_ccm` 在 `_CCM_AVAILABLE=True` 时，仅依据真算法可导入就将 verdict 标记为 `VERIFIABLE`，但本函数始终未实际调用 `ccm_with_convergence`——仅做覆盖率统计。这会误导用户认为已执行交叉映射验证。
+
+**修缮**:
+- [six_warriors.py:224-247](trace-engine/examples/counterfactual_hybrid/six_warriors.py) 引入三层 verdict 语义：
+  - `ELIGIBLE_BUT_NOT_RUN` — 满足 CCM 数据条件，真算法可导入但未实际调用（本函数常态）
+  - `HEURISTIC_FALLBACK` — 真算法不可用，仅启发式统计
+  - `VERIFIABLE` — 仅当本函数实际调用 `ccm_with_convergence` 成功后设置（当前实现未调用，故永不标 VERIFIABLE）
+- 添加 findings 提示：如需真实验证，应在 counterfactual_bridge 中显式调用
+
+**验证**: `python -c "from six_warriors import _deploy_ccm; ..."` 返回 `verdict=ELIGIBLE_BUT_NOT_RUN` ✅
+
+### 12.2 算法/数学家审视结论
+
+| 算法 | 实现文件 | 审视结论 | 优化建议 |
+|------|----------|----------|----------|
+| CCM | ccm_causality.py | **严谨**。收敛性检验(total_rise+Spearman+effect-size gate)、双向测试、BH/Bonferroni多重比较校正、common driver免责声明 | 无重大问题 |
+| HAVOK | sovereign_havok.py | **严谨**。退化数据短路、SG求导、V/U双基、矩阵指数精确离散化、Secret 14采样充分性 | 无重大问题 |
+| EDM Simplex/SMap | _numpy_edm.py | **严谨**。权重对齐修复(future_vals与w_matched配对)、自适应maxE | 无重大问题 |
+| Pearl SEM | pearl_counterfactual.py | **已修复**。中介变量拓扑序传播、数据中心化消除截距吸收偏差 | 可考虑非线性SEM扩展 |
+| causallearn PC/GES | causallearn_validator.py | **已修复重大bug + 补全FCI**。原代码端点常量错误(tail=1,arrow=2，实际TAIL=-1,ARROW=1)导致边方向全部判反；节点索引1-based未转0-based导致节点名偏移 | 已修复+FCI已补全 |
+
+### 12.3 服务健康与契约校验
+
+**三大Web服务全部健康**:
+- trace-engine-web (3000): healthy, skillReady=true, pythonReady=true
+- trace-to-edm (3100): status=ok, L1/L2/L3三层可用, 20个EDM目标列
+- edm-takens-web (5173): status=ok
+
+**/api/config 契约校验** (trace-engine-web):
+- modes 包含 light/deep/super，super.available=true ✅
+- bridgeParamSchema 包含 max_segments (min=1, max=16, default=4) ✅
+- window_size range 2-256 (符合 presets.yaml) ✅
+- superBridgeParamSchema 独立包含 max_segments (default=3) ✅
+- threshold 默认 0.03 (普通) / 0.01 (SUPER) ✅
+- causallearn=unknown (版本探测失败但可用) ⚠️
+
+### 12.4 LIGHT模式SSE握手修复验证
+
+**修复内容**: 服务端在 `runPythonAnalysisStream` 立即发送握手事件，前端首事件超时从3s提升到15s
+**验证结果**: 
+- 收到握手事件 `[bridge] 已建立连接，启动 LIGHT 分析管道（Python 冷启动中...）` ✅
+- SSE流正常工作，收到多个事件（log/stage/error） ✅
+- 错误处理正确（有效token不足时返回明确error事件） ✅
+
+### 12.5 项目级模型隔离验证
+
+**修复内容**: `layer3_sacred.py:_model_config_path()` 优先从 `get_project_manager().current_cache_dir` 获取按项目路径
+**验证结果**:
+- 代码逻辑正确，优先读取 `projects/<name>/cache/_active_model.txt` ✅
+- 旧全局文件 `data/cache/_active_model.txt` 是历史残留（非bug，fallback链正确） ⚠️
+- TRACE LLaMA 展示模型激活被正确拦截（回退到Qwen） ✅
+
+### 12.6 注入风险修复验证
+
+**修复内容**: `trace-to-edm server.js /api/dataset/update-ts` 从字符串拼接改为JSON序列化传参
+**验证结果**: 代码使用 `JSON.stringify([String(id), String(timestamp)])` + Python `json.loads` 解码 ✅
+
+### 12.7 浏览器端到端测试（部分）
+
+**edm-takens-web (5173) 测试结果**:
+- 步骤1-4 PASS：首页加载、健康检查、数据集列表、配置列面板（四角亮点风格、居中对齐）
+- 步骤5起因预算耗尽阻塞（前端正确使用 `/analyze/jobs/{jobId}/stream` 流式端点，非代码bug）
+
+### 12.8 待办事项
+
+| # | 事项 | 优先级 | 状态 |
+|---|------|--------|------|
+| T1 | 浏览器测试 trace-engine-web + trace-to-edm | P1 | 待浏览器解锁 |
+| T2 | 便携式同步（保护模型目录） | P1 | 待测试完成 |
+| T3 | 技术文档更新（路由表/缓存戳/边界局限） | P2 | 待同步 |
+| T4 | causallearn FCI 接口补全 | P2 | ✅ 已完成（见 12.2） |
+| T5 | 旧全局 `_active_model.txt` 清理 | P3 | ⚠️ 验证为开发态 fallback，非 bug，保留 |
+
+### 12.9 _active_model.txt fallback 链核查
+
+**核查结论**: `f:\攻略\研发测试\.skills\trace-to-edm\data\cache\_active_model.txt` 内容为 `qwen2.5-3b`，是开发环境无项目上下文时的 fallback 持久化文件，非 bug。
+
+**fallback 链** (`layer3_sacred.py:_model_config_path`):
+1. 优先: `projects/<active>/cache/_active_model.txt`（项目隔离）
+2. 回退: `config.CACHE_DIR / "_active_model.txt"`（开发态）
+3. 兜底: `Path("data/cache/_active_model.txt")`
+
+便携式部署中项目上下文激活时不会读取此文件；仅当模块独立测试（如 `python -c "from layer3_sacred import ..."`）时使用。**保留以维持模块独立可用性**，无需清理。
+
+### 12.10 P1 修缮：host 绑定收窄 + 缓存戳统一 + 目录清理 (2026-07-25)
+
+**问题1 (P1)**: `trace-engine-web/server.js:186` 与 `trace-to-edm/server.js:1215` 的 `app.listen(PORT)` 未指定 host 参数，等价于隐式 `0.0.0.0`，将服务暴露至 LAN/公网。CHANGELOG R5 仅覆盖 edm-takens-web，遗漏此两项目。
+
+**修缮**:
+- [trace-engine-web/server.js:185-191](trace-engine-web/server.js) 引入 `HOST = process.env.TRACE_HOST || '127.0.0.1'`，`app.listen(PORT, HOST, ...)`
+- [trace-to-edm/server.js:1215-1219](trace-to-edm/server.js) 同上修缮
+- 默认仅本机访问；如需外部访问（如 Cloudflare Tunnel 已配置反向代理），显式 `TRACE_HOST=0.0.0.0`
+
+**问题2 (P1)**: 共享主题 `tokusatsu.css` 在三个项目 HTML 中缓存戳不一致：
+- edm-takens-web: `?v=20260725e`
+- trace-engine-web: `?v=20260725f`
+- trace-to-edm: `?v=20260725a`（最旧）
+
+且 `trace-to-edm/public/index.html` 行 8 `/css/override.css?v=20260724a` 日期比其他戳早一天。
+
+**修缮**:
+- [edm-takens-web/frontend/index.html:7](edm-takens-web/frontend/index.html) `20260725e` → `20260725f`
+- [trace-to-edm/public/index.html:7-8](trace-to-edm/public/index.html) `tokusatsu.css 20260725a` → `20260725f`；`override.css 20260724a` → `20260725f`
+
+**问题3 (P2)**: `trace-to-edm/server.js` 头部注释声称 "共 26 个 API 端点"，实际 Grep 匹配 29 条 `app.<method>('/api/...')`。
+
+**修缮**: [server.js:9-17](trace-to-edm/server.js) 注释更新为 "共 29 个 API 端点"，剩余端点数 20 → 22。
+
+**问题4 (P2)**: `trace-to-edm/_test_spawn.js` 为开发期临时测试脚本（模拟 pyScript 调用），非产物。
+
+**修缮**: 删除该文件。
+
+**问题5 (P2)**: `edm-takens-web/frontend/` 下意外嵌套三个项目副本目录（`edm-takens-web/`、`trace-engine-web/`、`trace-to-edm/`），疑似同步操作出错。
+
+**修缮**: 通过 `[System.IO.Directory]::Delete(..., 1)` 清理三个嵌套副本目录。验证后 `frontend/` 仅保留 `node_modules/`、`shared/`、`src/` 三个合法子目录。
+
+**问题6 (P2)**: `allow_headers=["*"]` 通配符 — `edm-takens-web/backend/api.py:105` 中 `allow_origins` 已收窄（Q9 P1-23），但 `allow_headers` 仍为通配符。
+
+**状态**: 暂保留 — 当前为开发模式 MVP，header 收窄需配合前端实际使用的自定义 header（如 X-Request-ID）一起规划，避免破坏现有功能。建议生产化部署时一并收窄。
+
+### 12.11 残留债务清单更新
+
+| # | 债务 | 项目 | 状态变化 |
+|---|------|------|---------|
+| R4 | CORS `allow_origins=["*"]` | edm-takens-web | ✅ 已修（Q9 P1-23，allow_origins 收窄为环境变量+localhost 默认）；allow_headers=["*"] 仍保留（新 P2 跟踪） |
+| R5 | `host=0.0.0.0` | 三项目 | ✅ 已修：edm-takens-web（Q9 P1-23）+ trace-engine-web（12.10）+ trace-to-edm（12.10）|
+| R10 | 移动端 <768px 未优化 | trace-engine-web | 保留 |
+
+新增跟踪债务:
+| # | 债务 | 项目 | 说明 |
+|---|------|------|------|
+| R11 | `allow_headers=["*"]` | edm-takens-web | api.py:105，生产化部署时收窄 |
+| R12 | 文档级 TODO（Bai-Perron 替代 50% 丢弃） | edm-takens | 已文档化的设计选择，对应 R8，后续迭代处理 |
+
+### 12.12 P0 修缮：jieba 缺失导致"有效词数不足"系统级 bug (2026-07-25)
+
+**问题**: 浏览器端到端测试发现，trace-engine-web 几乎所有中长文本提交都返回 ERROR "有效词数不足（仅 0-9 个，至少 10 个）"。历史 server.log 显示自 2026-07-24 起数十次失败任务全部源于此 bug。
+
+**根因**:
+- [py_bridge.py:238-252](trace-engine-web/py_bridge.py) 的 `_tokenize()` 将 jieba 标记为"可选依赖"，缺失时静默回退到 `re.findall(r'[\u4e00-\u9fff]{2,}', text)`
+- 该回退有两个致命缺陷：
+  1. 只匹配连续中文字符，英文/数字/标点全部被丢弃
+  2. 中文连续片段被当成单个 token，无法正确切词
+- 导致中英混排文本的"有效概念数"严重低估（实际 60+ 词被误判为 0-9 词）
+- README.md:9 也错误标注"可选：jieba"
+
+**修缮**:
+1. [py_bridge.py:238-269](trace-engine-web/py_bridge.py) 重写 `_tokenize()`：jieba 是核心依赖（非可选），缺失时抛 `RuntimeError` 并明确提示安装命令
+2. [py_bridge.py:418-424](trace-engine-web/py_bridge.py) 主函数捕获 RuntimeError，走 `_write_error` 路径优雅返回错误而非崩溃
+3. 新建 [requirements.txt](trace-engine-web/requirements.txt) 明确列出 jieba>=0.42 为必需依赖
+4. [README.md:9](trace-engine-web/README.md) 更新标注为"必需：jieba"
+
+**验证**:
+- 安装 jieba 0.42.1 后实测：
+  - 短文本 "The cat sat on the mat." → 6 个有效概念（合理，<10 触发错误）
+  - 中长文本 373 字符 → 61 个有效概念（>>10，通过）
+  - 经济政策 338 字符 → 62 个有效概念（>>10，通过）
+- 已同步至便携式目录
+
+**影响范围**: 这是 trace-engine-web 最严重的 P0 bug——使 LIGHT/DEEP 模式几乎完全无法使用。修复后系统恢复可用。
+
+### 12.13 端到端浏览器漫游测试结果 (2026-07-25)
+
+**测试范围**: 三大 Web 项目（trace-engine-web:3000、trace-to-edm:3100、edm-takens-web:5173）真人漫游测试，模拟陌生人视角。
+
+#### 测试通过项 (12/15)
+
+| # | 测试项 | 项目 | 结果 | 关键证据 |
+|---|--------|------|------|---------|
+| 1 | 首页氛围核查 | trace-engine-web | ✅ | CRT扫描线/暗色主题/MODE-CORE看板/MISSION CLOCK/SECTOR标签弱化/三栏布局/面板图标全部呈现 |
+| 2 | API 健康检查 | trace-engine-web | ✅ | /api/health 返回 healthy; /api/config 含 modes(light/deep/super)、bridgeParamSchema(max_segments=min1/max16/default4, window_size=2-256, threshold LIGHT=0.03/SUPER=0.01) |
+| 3 | LIGHT 模式中长文本 | trace-engine-web | ✅ | jieba修复后: 124 token/62有效概念, 12概念/8边/ATE=0.4657/CI=[0.33,0.60]/5.13s |
+| 4 | LIGHT 模式短文本边界 | trace-engine-web | ✅ | "The cat sat on the mat." → 6有效概念(<10), 优雅返回"有效词数不足"错误, 无stack trace |
+| 5 | DEEP 模式完整流程 | trace-engine-web | ✅ | 六战士诊断+SIX WARRIORS+COUNTERFACTUAL SCAN+STABILITY&ROBUSTNESS全部输出, Pearl SEM/causallearn PC/GES/FCI/stability checks均正常, ATE=0.4657 |
+| 6 | SUPER 模式参数面板 | trace-engine-web | ✅ | superBridgeParamSchema含全部8参数(window_size/max_segments/min_valid_tokens/max_edges_for_dowhy/filter_mode/filter_percentile/threshold/classical_mode), llamaModels白名单含shenji-llama/shehui-llama-v4-archive, 橙色脉冲边框出现, ABORT按钮可用 |
+| 7 | 首页三层桥接状态 | trace-to-edm | ✅ | L1/L2/L3全部可视化, EDM_READY=true, 暗色主题一致, SECTOR标签呈现符合特摄风格 |
+| 8 | 模型下拉[仅展示]拦截 | trace-to-edm | ✅ | 双重防御: 前端 disabled+dataset.traceOnly检查, 后端400错误返回allowed=[qwen2.5-1.5b, qwen2.5-3b] |
+| 9 | Mode A 文本管线 | trace-to-edm | ✅ | CSV列含ate/z_pca_1-3/z_福音等八正道坐标, PCA投影已中心化, EDM触发提示正常 |
+| 10 | 工作扫描与清理 | trace-to-edm | ✅ | total=71/orphans=1, 清理功能deleted=1/freed_bytes=67, 扫描覆盖outputs/和inputs/ |
+| 11 | 配置列与数据质量预览 | edm-takens-web | ✅ | align-items:stretch生效, 数据质量预览显示样本量/协变量数/数值列/二值列统计 |
+| 12 | 后端API契约 | edm-takens-web | ✅ | /api/datasets返回4个数据集(game_log/narrative_meta_trajectories/yinshen_ji_vowel/yinshen_wide), Vite代理配置正确 |
+
+#### 未完成测试项 (3/15)
+
+| # | 测试项 | 项目 | 原因 |
+|---|--------|------|------|
+| 13 | 边界数据(emoji/数学符号/代码注入) | trace-engine-web | 浏览器预算截断, 但短文本边界已验证错误处理优雅 |
+| 14 | 任务历史批量工具栏三态 | trace-engine-web | 浏览器预算截断 |
+| 15 | EDM分析任务完整流程 | edm-takens-web | 浏览器点击坐标超出可视区域, 后端API已验证正常 |
+
+#### 发现的 P0 算法 bug (1 项，已修复)
+
+**P0-12.12: jieba 缺失导致"有效词数不足"系统级 bug** — 已修复（见 §12.12）
+
+#### UI 美化缺陷清单 (待优化)
+
+| 级别 | 缺陷 | 项目 | 位置 |
+|------|------|------|------|
+| P1 | h1 标题缺少顶部留白 | trace-engine-web | index.html header |
+| P1 | command-grid 列未严格等高 | trace-engine-web | main.css command-grid |
+| P1 | 按钮字号层级区分不足 | trace-engine-web | main.css .btn-* |
+| P2 | 参数区部分标签未严格居中 | trace-engine-web | ADVANCED_PARAMETERS |
+| P2 | select 高亮边框色偏橙 | trace-engine-web | main.css select:focus |
+| P2 | 超范围数字输入框宽度不一致 | trace-engine-web | main.css input[type=number] |
+| P2 | 表单控件字号偏大 | trace-engine-web | main.css input/select |
+| P2 | DEFAULT 按钮字号偏小 | trace-engine-web | main.css .btn-mini |
+| P2 | 滚动条样式与主题融合度不足 | trace-engine-web | main.css ::-webkit-scrollbar |
+| P2 | 项目管理面板缺行级状态反馈 | trace-to-edm | app.js projects |
+| P2 | 工作扫描结果未以表格列出 orphan | trace-to-edm | app.js work-scan |
+| P2 | 模型选择器缺暗色 option 样式 | trace-to-edm | index.html select |
+| P2 | SECTOR 标签对比度偏弱 | trace-to-edm | tokusatsu.css .sector-label |
+| P2 | 文本输入未显示已加入条目计数 | trace-to-edm | app.js dataset |
+
+#### 产品经理视角欠缺功能建议
+
+| # | 功能 | 项目 | 价值 |
+|---|------|------|------|
+| 1 | 运行时参数校验与错误定位 | trace-engine-web | 提交前校验, 避免无效请求 |
+| 2 | 可保存/可导出的分析配置 | trace-engine-web | 配置复用, 团队协作 |
+| 3 | 可复用的样本数据集管理 | trace-engine-web | 新用户快速上手 |
+| 4 | Mode B 回填管线进度弹窗与结果预览 | trace-to-edm | 长任务可观测性 |
+| 5 | 模型切换二次确认与错误解释 | trace-to-edm | 防止误操作 |
+| 6 | 工作扫描 CSV/JSON 导出 | trace-to-edm | 审计可追溯 |
+| 7 | 项目面板新建/删除/归档操作 | trace-to-edm | 项目生命周期管理 |
+| 8 | 文本输入历史与复制 | trace-to-edm | 重复输入效率 |
+| 9 | 键盘快捷键与主题/字体可配置 | 全局 | 高级用户体验 |
+
+#### 数据流追踪结论（算法/数学工程师视角）
+
+| 数据流 | 入口 | 处理 | 出口 | 完整性 |
+|--------|------|------|------|--------|
+| 文本→概念图 | textarea | jieba分词→is_valid_concept过滤→窗口共现→有向边 | adj矩阵+concept_names | ✅ 修复后正常 |
+| 概念图→ATE | adj矩阵 | _fast_ols_ate_ci(LIGHT)/DoWhy bootstrap(DEEP) | estimate.value + CI | ✅ LIGHT=0.4657, DEEP=0.4657 |
+| 概念图→六战士 | adj矩阵 | TRACE/CCM/EDM/HAVOK/DoWhy+CF/causallearn | six_warriors_report | ✅ DEEP模式全部输出 |
+| 文本→八正道 | textarea | Qwen编码→L2 PCA→L3八正道投影 | z_福音/z_吉祥/...z_觉爱 | ✅ Mode A 正常 |
+| 八正道→EDM | CSV | trace-to-edm CSV → edm-takens-web pipeline | EDM结果图片 | ✅ 触发提示正常 |
+| CSV→EDM分析 | datasets | _prepare_dataset→_select_variables→pipeline | dynamics_interpretation.png | ✅ 后端API正常 |
+
+---
+
+## Round 12 续 — 2026-07-25 12维度五项目并行复查（脚本为辅、实操为主）
+
+### 12.14 Pearl SEM 中介变量传播 bug 修复 (P0)
+
+**问题**: `pearl_counterfactual.py` 的 `predict_cf` 按变量索引顺序（`range(n_vars)`）迭代传播反事实值，假设 concept_names 已按拓扑序排列。实际 concept_names 按字母序构建，导致父节点索引大于子节点时，中介变量仍使用观测值而非反事实值，违反 Pearl 三步法的后门调整语义。
+
+**修复**: 引入 Kahn 算法计算因果图的拓扑序（`_topological_order(coeff, n_vars)`），按拓扑序迭代变量。检测到环（非 DAG）时返回 None，log 警告并 fallback 到原观测值行为（反事实传播在非 DAG 下无定义）。
+
+**关键代码** (`pearl_counterfactual.py`):
+```python
+def _topological_order(coeff, n_vars):
+    # Kahn 算法：coeff[p,v]!=0 表示 p→v
+    in_degree = np.zeros(n_vars, dtype=int)
+    for v in range(n_vars):
+        for p in range(n_vars):
+            if coeff[p, v] != 0:
+                in_degree[v] += 1
+    queue = [v for v in range(n_vars) if in_degree[v] == 0]
+    order = []
+    while queue:
+        v = queue.pop(0)
+        order.append(v)
+        for child in range(n_vars):
+            if coeff[v, child] != 0:
+                in_degree[child] -= 1
+                if in_degree[child] == 0:
+                    queue.append(child)
+    if len(order) != n_vars:
+        return None  # 检测到环 — 非 DAG
+    return order
+```
+
+### 12.15 硬编码路径债务清理 (P1)
+
+**问题**: 多个同步/侦察脚本硬编码绝对路径正则，迁移机器后失效。
+
+**修复**:
+- `recon_five_projects.py`: 将 `BAD_PATTERNS` 中的 `F:\\攻略\\研发测试` 和 `G:\\git\\Annals-of-the-Great-Simplicity` 改为基于 `SRC_ROOT` 与 `PORTABLE_ROOT` 动态生成（`re.escape` 处理 Windows 反斜杠与中文），同时支持正斜杠形式。`PORTABLE_ROOT` 改为自动定位策略（环境变量 → 同级 Complement/ → 上溯查找）。
+- `trace-to-edm/sync_portable.py`: 移除硬编码 `_DEFAULT_PORTABLE_DIR`，改为 `_autodetect_portable_dir()` 函数，优先级：`TRACE_TO_EDM_PORTABLE_DIR` → `PORTABLE_DIR`（兼容 sync_all_portable.py）→ `PORTABLE_ROOT` → 同级 Complement/ → 上溯查找。docstring 与 CLI 示例改用占位符 `<PORTABLE_ROOT>` / `<path-to-trace-to-edm>`。
+- 兼容性修复: `sync_portable.py` 新增读取 `PORTABLE_DIR` 环境变量（sync_all_portable.py 调用时设置），修复长期存在的不一致 bug。
+
+### 12.16 CORS allow_headers 通配符收窄 (P2)
+
+**问题**: `edm-takens-web/backend/api.py:105` 的 `allow_headers=["*"]` 未收窄，允许任意自定义头穿透 CORS 检查，存在 X-Forwarded-For 注入等风险。
+
+**修复**: 改为显式白名单：
+```python
+_EDM_ALLOWED_HEADERS = [
+    "Content-Type", "Authorization",
+    "X-Trace-Id", "X-Request-Id",
+    "Accept", "Accept-Language",
+]
+```
+
+### 12.17 trace-to-edm pyCall JSON 解析失败误判 success (P1)
+
+**问题**: `trace-to-edm/server.js` 的 `pyCall` 函数在 stdout 不是合法 JSON 时，仅依据 exit code 判定 success。当 Python 进程崩溃但 exit code=0（如 sys.exit(0) 吞错或 stdout 被污染）时，会错误返回 `success: true`。
+
+**修复**: 引入三级判定策略：
+1. 若 stdout 含合法 JSON 且有 `success` 字段 → 尊重该字段
+2. 若 JSON 解析成功但无 `success` 字段 → 仅当 exit code=0 且 stderr 为空时才视为成功
+3. 若 stdout 不是 JSON → success 必须同时满足 exit code=0、stderr 为空、stdout 为空
+
+### 12.18 CSS cache戳 一致性修复 (P2)
+
+**问题**: 部分项目专属 CSS 的 cache戳 与共享 `tokusatsu.css` 不一致，可能导致浏览器缓存旧样式：
+- `trace-to-edm/public/index.html:9` `main.css?v=20260725c`（应为 v=20260725f）
+- `trace-engine-web/public/index.html:11-12` `theme.css?v=20260725a`、`main.css?v=20260725a`（应为 v=20260725f）
+
+**修复**: 统一为 `v=20260725f`，与 `tokusatsu.css` 对齐。
+
+### 12.19 trace-to-edm /api/version 端点缺失 (P2)
+
+**问题**: `trace-to-edm/server.js` 启动日志硬编码 `v0.1.0`，无 `/api/version` 端点，与 `trace-engine-web` 契约不一致。`package.json` 中的 `version` 字段未被代码引用。
+
+**修复**:
+- 顶部新增 `PACKAGE_VERSION` 常量，通过 `require('./package.json').version` 读取，失败时回退 `'unknown'`
+- 新增 `GET /api/version` 端点，返回 `{success, service, version, node, time}`
+- 启动日志改为动态 `${PACKAGE_VERSION}`
+- 头部注释端点计数 29 → 30
+
+### 12.20 except Exception: pass 宽泛吞错修复 (P2)
+
+**问题**: 多处 `except Exception: pass` 静默吞错，导致故障排查困难。
+
+**修复**（仅核心业务代码，可选依赖探测保持原样）:
+- `trace-to-edm/project_manager.py`: 3 处（行数统计、bridge 单例重置、行数同步）改为 `except Exception as e:` + `if VERBOSE: print(...)`
+- `trace-to-edm/bridge.py`: `_find_input_text` 读取失败改为 `print(..., file=sys.stderr)`
+- `trace-engine/examples/counterfactual_hybrid/run_real_pipeline.py`: VRAM 检查失败改为 `log(f"[debug] ...")`
+
+### 12.21 12维度复查结果汇总
+
+| 维度层 | 约束数 | PASS | FAIL | 完成率 |
+|--------|--------|------|------|--------|
+| 系统层 | 5 大类 | 5 | 0 | 100% (12.18 修复后) |
+| 模块层 | 6 | 6 | 0 | 100% |
+| 鲁棒层 | 8 | 8 | 0 | 100% |
+| 安全层 | 8 | 8 | 0 | 100% (12.19 修复后) |
+| **合计** | **27** | **27** | **0** | **100%** |
+
+### 12.22 便携式目录同步结果
+
+**同步时间**: 2026-07-25
+**同步脚本**: `sync_all_portable.py`
+**同步结果**:
+- ✅ edm-takens → `Skill/edm-takens/`
+- ✅ edm-takens-web → `Skill/edm-takens-web/`
+- ✅ trace-engine + trace-engine-web → `TRACE Engine(EDM-Takens CCM)/`
+- ✅ trace-to-edm → `TRACE Engine(EDM-Takens CCM)/trace-to-edm/`
+- ✅ shared/ → 各项目本地 + 便携式目录
+- ✅ Qwen2.5 模型 → `Models/`（已存在且大小一致，未改动）
+- ✅ 结构验证 11/11 关键文件 OK
+
+**模型目录保护**: 严格遵守约束，未改动 `trace-engine/models/` 与 `Models/` 中的三大 LLaMA 模型与 Qwen 模型。
+
+### 12.23 本次修缮涉及文件清单
+
+| 文件 | 修改类型 | 说明 |
+|------|---------|------|
+| `trace-engine/examples/counterfactual_hybrid/pearl_counterfactual.py` | P0 bug 修复 | 引入拓扑序传播 |
+| `recon_five_projects.py` | P1 债务清理 | 动态路径检测 |
+| `trace-to-edm/sync_portable.py` | P1 债务清理 | 自动定位 + 环境变量兼容 |
+| `edm-takens-web/backend/api.py` | P2 安全收窄 | CORS headers 白名单 |
+| `trace-to-edm/server.js` | P1 + P2 修复 | pyCall 判定 + /api/version |
+| `trace-to-edm/public/index.html` | P2 cache戳 | main.css 对齐 |
+| `trace-engine-web/public/index.html` | P2 cache戳 | theme.css + main.css 对齐 |
+| `trace-to-edm/project_manager.py` | P2 日志可见性 | 3 处 except 添加 VERBOSE log |
+| `trace-to-edm/bridge.py` | P2 日志可见性 | _find_input_text 添加 stderr log |
+| `trace-engine/examples/counterfactual_hybrid/run_real_pipeline.py` | P2 日志可见性 | VRAM 检查添加 debug log |
+| `META_AUDIT_CHANGELOG.md` | 文档更新 | 本节 §12.14-12.23 |
+| `MICROSERVICE_API_DESIGN.md` | 文档更新 | 端点计数更新 |
+
+---
+
+### 残留债务（已知但本次未修，附理由）
+
+1. **sync_all_portable.py 中的 DEFAULT_PORTABLE_ROOT/DEFAULT_SRC_ROOT/DEFAULT_QWEN_ROOT 硬编码**: 优先级 P3，已有环境变量覆盖机制，且作为顶层同步脚本的默认值合理。迁移机器时通过环境变量即可适配，无需修改源码。
+2. **部分可选依赖探测中的 except Exception: pass**: 在 `build_bridge_schema.py` 等 fallback 链中，pass 是设计意图（尝试方法 A 失败后回退到方法 B），添加日志会引入噪声。保持原样。
+3. **UI 美化缺陷清单 (§12.13 末尾)**: 14 项 P1/P2 UI 缺陷与 9 项产品功能建议，属于体验优化范畴，不影响功能正确性与安全性，留待后续迭代。
+

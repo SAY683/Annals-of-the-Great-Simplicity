@@ -1,3 +1,6 @@
+import '../shared/themes/tokusatsu.css'
+import './style.css'
+
 const API_PREFIX = '/api'
 
 const $ = (sel) => document.querySelector(sel)
@@ -30,18 +33,127 @@ async function refreshDatasets() {
     sel.innerHTML = '<option value="">-- 选择数据集 --</option>'
     if (!datasets || datasets.length === 0) {
       console.warn('No datasets found')
+      const status = $('#uploadStatus')
+      if (status) status.textContent = '暂无已上传数据集，请上传 CSV 文件。'
       return
     }
     datasets.forEach((name) => {
       const opt = document.createElement('option')
       opt.value = name
-      opt.textContent = name
+      opt.textContent = name || '(未命名)'
       sel.appendChild(opt)
     })
+    const status = $('#uploadStatus')
+    if (status && status.textContent.includes('暂无已上传')) {
+      status.textContent = ''
+    }
   } catch (e) {
     console.error('refreshDatasets:', e)
     const sel = $('#datasetSelect')
     if (sel) sel.innerHTML = '<option value="">加载失败</option>'
+    const status = $('#uploadStatus')
+    if (status) status.textContent = `数据集列表加载失败: ${e.message}`
+  }
+}
+
+function setStatusValue(id, value) {
+  const el = document.getElementById(id)
+  if (!el) return
+  if (value == null || value === '') {
+    el.textContent = ''
+    el.dataset.empty = 'true'
+  } else {
+    el.textContent = value
+    el.dataset.empty = 'false'
+  }
+}
+
+function updateStatusWall(options = {}) {
+  const wall = $('#statusWall')
+  if (!wall) return
+  // P1-f 修缮：数据集就绪 或 有分析历史时都显示状态墙
+  if (options.dataset || (options.analyses && options.analyses > 0)) {
+    wall.classList.remove('awaiting-data')
+  }
+  if (options.dataset != null) setStatusValue('statusDataset', options.dataset)
+  if (options.target != null) setStatusValue('statusTarget', options.target)
+  if (options.rows != null) setStatusValue('statusRows', options.rows)
+  if (options.q != null) setStatusValue('statusQ', options.q)
+  if (options.analyses != null) setStatusValue('statusAnalyses', options.analyses)
+  // P1-f 修缮：MODE 字段动态更新（之前硬编码为 OBS，从不变化）
+  if (options.mode != null) setStatusValue('statusMode', options.mode)
+}
+
+// P1-f 修缮：分析强度 → MODE 显示名映射
+const INTENSITY_TO_MODE = {
+  auto: 'AUTO',
+  light: 'LIGHT',
+  medium: 'DEEP',
+  heavy: 'SUPER',
+}
+
+// P1-f 修缮：监听分析强度变化，实时更新状态墙 MODE 字段
+document.addEventListener('DOMContentLoaded', () => {
+  const intensitySel = $('#intensitySelect')
+  if (intensitySel) {
+    // 初始化时设置当前 MODE
+    updateStatusWall({ mode: INTENSITY_TO_MODE[intensitySel.value] || 'OBS' })
+    intensitySel.addEventListener('change', (e) => {
+      updateStatusWall({ mode: INTENSITY_TO_MODE[e.target.value] || 'OBS' })
+    })
+  }
+})
+
+// P1-f 修缮：真实健康检查 — 定期轮询后端 /api/health，更新状态点
+async function checkBackendHealth() {
+  const statusDot = document.querySelector('.status-dot')
+  if (!statusDot) return
+  try {
+    const res = await fetch('/api/health', { timeout: 5000 })
+    if (res.ok) {
+      statusDot.classList.remove('offline')
+      statusDot.classList.add('online')
+      statusDot.innerHTML = '<span></span>SYSTEM ONLINE'
+    } else {
+      throw new Error(`HTTP ${res.status}`)
+    }
+  } catch {
+    statusDot.classList.remove('online')
+    statusDot.classList.add('offline')
+    statusDot.innerHTML = '<span></span>BACKEND OFFLINE'
+  }
+}
+
+// P1-f 修缮：跨项目导航点健康检查 — 轮询其他项目的 /api/health
+const NAV_TARGETS = [
+  { port: 3000, selector: '.base-nav a[href*=":3000"]' },
+  { port: 3100, selector: '.base-nav a[href*=":3100"]' },
+]
+
+async function checkNavHealth() {
+  for (const target of NAV_TARGETS) {
+    const link = document.querySelector(target.selector)
+    if (!link) continue
+    const dot = link.querySelector('.nav-dot')
+    if (!dot) continue
+    try {
+      const controller = new AbortController()
+      const timeout = setTimeout(() => controller.abort(), 3000)
+      const res = await fetch(`http://127.0.0.1:${target.port}/api/health`, {
+        signal: controller.signal,
+      })
+      clearTimeout(timeout)
+      if (res.ok) {
+        dot.style.opacity = '1'
+        dot.title = '在线'
+      } else {
+        dot.style.opacity = '0.3'
+        dot.title = '离线'
+      }
+    } catch {
+      dot.style.opacity = '0.3'
+      dot.title = '离线'
+    }
   }
 }
 
@@ -67,6 +179,14 @@ async function loadDatasetColumns(filename) {
     await loadRecommendation(filename)
     await loadQuality(filename)
     $('#runBtn').disabled = false
+    // 状态墙：数据集就绪后显示并回填基础信息
+    updateStatusWall({
+      dataset: filename,
+      rows: info.rows,
+      target: targetSel.value,
+      q: $('#qInput').value || '自动',
+      analyses: 0
+    })
     // UX: 数据集就绪后将运行按钮滚动到可视区域，避免长页面中按钮被淹没
     setTimeout(() => $('#runBtn').scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 100)
   } catch (e) {
@@ -142,9 +262,12 @@ async function loadQuality(filename) {
       if (q.is_target) badges.push('<span class="badge target">目标</span>')
       if (q.selected && !q.is_target) badges.push('<span class="badge selected">已选</span>')
       if (!q.selected) badges.push('<span class="badge muted">未选</span>')
-      const warnings = q.warnings.length
-        ? `<ul>${q.warnings.map((w) => `<li class="warn">${escapeHtml(w)}</li>`).join('')}</ul>`
-        : '<span class="ok">无警告</span>'
+      const warnText = q.warnings.length
+        ? q.warnings.map((w) => escapeHtml(w)).join('；')
+        : ''
+      const warnings = warnText
+        ? `<span class="warn-cell" data-warn="${warnText}">${q.warnings.length} 条警告</span>`
+        : '<span class="ok">无</span>'
       return `
         <tr class="${q.selected ? 'selected-row' : ''}">
           <td><strong>${escapeHtml(name)}</strong> ${badges.join(' ')}</td>
@@ -196,15 +319,19 @@ async function uploadFile() {
   try {
     const res = await apiJson('/upload', { method: 'POST', body: form })
     $('#uploadStatus').textContent = `已上传: ${res.filename}`
+    // 等待后端文件系统刷新后重新拉取列表
+    await new Promise((resolve) => setTimeout(resolve, 200))
     await refreshDatasets()
     // Ensure the newly uploaded file is selectable before forcing selection.
     const sel = $('#datasetSelect')
-    if (!Array.from(sel.options).some((o) => o.value === res.filename)) {
-      // If the backend sanitized the filename, fall back to a manual refresh.
+    let found = Array.from(sel.options).some((o) => o.value === res.filename)
+    if (!found) {
+      await new Promise((resolve) => setTimeout(resolve, 300))
       await refreshDatasets()
+      found = Array.from(sel.options).some((o) => o.value === res.filename)
     }
-    sel.value = res.filename
-    if (sel.value === res.filename) {
+    if (found) {
+      sel.value = res.filename
       await loadDatasetColumns(res.filename)
     } else {
       $('#uploadStatus').textContent += ' （刷新后未找到该文件，请手动选择）'
@@ -222,9 +349,35 @@ function clearTerminal() {
 
 function appendTerminal(text, type = 'info') {
   const term = $('#terminal')
+  // 过滤无意义行：空行、纯分隔符行（ASCII #### ==== ---- **** 或 Unicode 制表符 ─━│┃═║ 等）
+  const trimmed = String(text).trim()
+  if (!trimmed) return
+  // 去除空格后检测纯分隔符（如 "── ── ──" → "────────"）
+  const noSpaces = trimmed.replace(/\s+/g, '')
+  if (/^[#=\-*+_~─━│┃═║╔╗╚╝╠╣╦╩╬]+$/.test(noSpaces)) return
+  // 过滤单字符重复 4 次以上的纯分隔行（如 ────── 或 ======）
+  if (/^(.)\1{4,}$/.test(noSpaces)) return
+  // 过滤纯图标行（单个符号无实际内容）
+  if (/^[◉▶▲✖✓✦○●◇◆□■△▽☆★]+$/.test(noSpaces)) return
+
   const line = document.createElement('div')
-  line.className = `terminal-line ${type}`
-  line.textContent = text
+  const typeMap = { cmd: 'stage', success: 'stage', dim: 'info' }
+  const themeType = typeMap[type] || type || 'info'
+  line.className = `terminal-line ${themeType}`
+
+  const iconMap = { stage: '▶', info: '◉', warn: '▲', error: '✖' }
+  const icon = iconMap[themeType] || '◉'
+
+  const iconSpan = document.createElement('span')
+  iconSpan.className = 'log-icon'
+  iconSpan.textContent = icon
+
+  const msgSpan = document.createElement('span')
+  msgSpan.className = 'log-msg'
+  msgSpan.textContent = text
+
+  line.appendChild(iconSpan)
+  line.appendChild(msgSpan)
   term.appendChild(line)
   term.scrollTop = term.scrollHeight
 }
@@ -404,6 +557,30 @@ async function runAnalysis() {
 
 function renderSummary(summary) {
   const rows = []
+
+  // 审计裁决面板
+  const verdict = summary.post_audit_verdict
+  if (verdict) {
+    const normalized = String(verdict).toUpperCase()
+    let vClass = 'warn'
+    let vText = 'WARN'
+    let vStamp = '▲'
+    if (normalized === 'PASS' || normalized === 'PASS_WITH_NOTES') {
+      vClass = 'pass'
+      vText = 'PASS'
+      vStamp = '✓'
+    } else if (normalized === 'FAIL' || normalized === 'BLOCKED') {
+      vClass = 'fail'
+      vText = 'FAIL'
+      vStamp = '✖'
+    } else if (normalized === 'INCONCLUSIVE') {
+      vClass = 'warn'
+      vText = 'INCONCLUSIVE'
+      vStamp = '▲'
+    }
+    rows.push(`<div class="audit-verdict ${vClass}"><span class="verdict-stamp">${vStamp}</span><span>${vText}</span></div>`)
+  }
+
   if (summary.project_name) {
     rows.push(`<p><strong>项目名称:</strong> ${escapeHtml(summary.project_name)}</p>`)
   }
@@ -483,6 +660,7 @@ async function loadHistory() {
   const container = $('#historyList')
   try {
     const tasks = await apiJson('/history')
+    updateStatusWall({ analyses: tasks.length })
     if (!tasks.length) {
       container.innerHTML = '暂无历史数据。'
       $('#historyBatchToolbar').style.display = 'none'
@@ -605,6 +783,24 @@ function updateBatchToolbar() {
   $('#historyBatchCount').textContent = `已选 ${ids.length} 项`
   const compareBtn = $('#compareSelectedBtn')
   compareBtn.disabled = ids.length !== 2
+  // 同步全选复选框状态
+  const allCbs = $('#historyList').querySelectorAll('.history-checkbox input[type="checkbox"]')
+  const selectAllCb = $('#selectAllHistory')
+  if (selectAllCb) {
+    if (allCbs.length === 0) {
+      selectAllCb.checked = false
+      selectAllCb.indeterminate = false
+    } else if (ids.length === allCbs.length) {
+      selectAllCb.checked = true
+      selectAllCb.indeterminate = false
+    } else if (ids.length > 0) {
+      selectAllCb.checked = false
+      selectAllCb.indeterminate = true
+    } else {
+      selectAllCb.checked = false
+      selectAllCb.indeterminate = false
+    }
+  }
 }
 
 function updateCompareSelectionState() {
@@ -948,6 +1144,31 @@ function drawLineChart(canvas, x, y, xLabel, yLabel) {
 
 // Event bindings
 $('#uploadBtn').addEventListener('click', uploadFile)
+
+// Drop zone drag-and-drop
+const dropZone = $('#dropZone')
+if (dropZone) {
+  ;['dragenter', 'dragover', 'dragleave', 'drop'].forEach((evt) => {
+    dropZone.addEventListener(evt, (e) => {
+      e.preventDefault()
+      e.stopPropagation()
+    })
+  })
+  ;['dragenter', 'dragover'].forEach((evt) => {
+    dropZone.addEventListener(evt, () => dropZone.classList.add('drag-over'))
+  })
+  ;['dragleave', 'drop'].forEach((evt) => {
+    dropZone.addEventListener(evt, () => dropZone.classList.remove('drag-over'))
+  })
+  dropZone.addEventListener('drop', (e) => {
+    const files = e.dataTransfer.files
+    if (files.length) {
+      $('#csvInput').files = files
+      uploadFile()
+    }
+  })
+}
+
 $('#refreshDatasetsBtn').addEventListener('click', refreshDatasets)
 $('#refreshHistoryBtn').addEventListener('click', loadHistory)
 $('#refreshQualityBtn').addEventListener('click', () => {
@@ -969,6 +1190,7 @@ $('#datasetSelect').addEventListener('change', (e) => {
 $('#targetSelect').addEventListener('change', () => {
   const filename = $('#datasetSelect').value
   if (filename) {
+    updateStatusWall({ target: $('#targetSelect').value })
     loadRecommendation(filename)
     loadQuality(filename)
   }
@@ -981,6 +1203,18 @@ $('#variablesInput').addEventListener('input', () => {
   }
 })
 $('#runBtn').addEventListener('click', runAnalysis)
+$('#qInput').addEventListener('input', () => {
+  const filename = $('#datasetSelect').value
+  if (filename) updateStatusWall({ q: $('#qInput').value || '自动' })
+})
+
+// 全选/取消全选历史记录
+$('#selectAllHistory').addEventListener('change', (e) => {
+  const cbs = $('#historyList').querySelectorAll('.history-checkbox input[type="checkbox"]')
+  cbs.forEach((cb) => { cb.checked = e.target.checked })
+  updateBatchToolbar()
+  updateCompareSelectionState()
+})
 
 // UX: 全局快捷键 Ctrl+Enter 触发分析（方便长页面中快速运行）
 document.addEventListener('keydown', (e) => {
@@ -990,28 +1224,49 @@ document.addEventListener('keydown', (e) => {
   }
 })
 
-// 特摄防卫队氛围: 任务时钟与状态看板
+// 特摄防卫队氛围: 任务时钟
 function startMissionClock() {
   const update = () => {
-    const now = new Date();
-    const timeStr = now.toLocaleTimeString('zh-CN', { hour12: false });
-    const clockEl = document.getElementById('clockValue');
-    if (clockEl) clockEl.textContent = timeStr;
-  };
-  update();
-  setInterval(update, 1000);
+    const now = new Date()
+    const timeStr = now.toLocaleTimeString('zh-CN', { hour12: false })
+    const clockEl = document.querySelector('#missionClock .clock-value')
+    if (clockEl) clockEl.textContent = timeStr
+  }
+  update()
+  setInterval(update, 1000)
 }
 
-function updateStatusBoard() {
-  const intensity = $('#intensitySelect')?.value?.toUpperCase() || 'AUTO';
-  const modeEl = document.getElementById('sbMode');
-  if (modeEl) modeEl.textContent = intensity;
-}
+// 点击质量表格中的警告单元格，弹出该行完整质量报告
+$('#qualityList').addEventListener('click', (e) => {
+  const cell = e.target.closest('.warn-cell')
+  if (!cell || !cell.dataset.warn) return
+  const name = cell.closest('tr')?.querySelector('td strong')?.textContent || '未知列'
+  const lines = cell.dataset.warn.split('；')
+  const detailHtml = lines.map((w) => `<li>${w}</li>`).join('')
+  const panel = document.createElement('div')
+  panel.className = 'quality-detail-modal'
+  panel.innerHTML = `
+    <div class="quality-detail-backdrop"></div>
+    <div class="quality-detail-content">
+      <div class="quality-detail-header">
+        <h4>◉ ${escapeHtml(name)} — 数据质量详情</h4>
+        <button class="close-detail" aria-label="关闭">✕</button>
+      </div>
+      <ul class="quality-detail-list">${detailHtml}</ul>
+    </div>
+  `
+  document.body.appendChild(panel)
+  panel.querySelector('.close-detail').addEventListener('click', () => panel.remove())
+  panel.querySelector('.quality-detail-backdrop').addEventListener('click', () => panel.remove())
+})
 
 // Init
 refreshDatasets()
 loadHistory()
 loadArchives()
 startMissionClock()
-updateStatusBoard()
-$('#intensitySelect')?.addEventListener('change', updateStatusBoard)
+// P1-f 修缮：启动健康检查（本机后端 + 跨项目导航点）
+checkBackendHealth()
+checkNavHealth()
+setInterval(checkBackendHealth, 30000)  // 每 30s 检查本机后端
+setInterval(checkNavHealth, 60000)      // 每 60s 检查跨项目导航点

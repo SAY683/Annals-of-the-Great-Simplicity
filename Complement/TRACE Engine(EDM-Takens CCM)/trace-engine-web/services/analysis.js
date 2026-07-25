@@ -80,6 +80,10 @@ function runPythonAnalysisStream(text, outputId, mode, bridgeConfig, res, schema
 
   activeJobs.set(outputId, py);
 
+  // P1-g 修缮：立即发送握手事件，避免前端 firstEventTimeout(3s→15s) 误判为连接失败
+  // Python 冷启动 + 模块 import 常需 3-5s，若此期间无任何 SSE 事件，前端会主动 abort
+  sendSSE(res, 'log', { level: 'info', message: `[bridge] 已建立连接，启动 ${mode.toUpperCase()} 分析管道（Python 冷启动中...）` });
+
   let stdoutBuffer = '';
   let timeoutId = null;
   let finished = false;
@@ -111,15 +115,21 @@ function runPythonAnalysisStream(text, outputId, mode, bridgeConfig, res, schema
 
   // P2-9 + 元审计 P1 修缮：SSE 客户端断开的宽限期机制
   // 之前 res.on('close') 立即取消任务，客户端重连后只能取 /api/result/:id
-  // 现增加 30s 宽限期：客户端断开后不立即 kill 进程，
-  // 若 30s 内客户端重连（通过 /api/result/:id 或重新触发 SSE）则恢复流式
-  // 30s 后仍未重连则真正清理资源（避免僵尸进程）
+  // 现增加动态宽限期：客户端断开后不立即 kill 进程，
+  // 若宽限期内客户端重连（通过 /api/result/:id 或重新触发 SSE）则恢复流式
+  // 宽限期后仍未重连则真正清理资源（避免僵尸进程）
+  // P1 修缮：根据模式动态调整宽限期，DEEP/SUPER 需要更长时间
+  const gracePeriod = mode === 'super' ? 600000 : mode === 'deep' ? 120000 : 30000;
+  // P0 修缮：标记 res 是否已关闭，避免向已关闭的流写入 result/error 事件
+  // 这是"任务完成但前端看不到结论"的根因——SSE 断开后 sendSSE 仍尝试写入
+  let resClosed = false;
   res.on('close', () => {
     if (finished) return;
-    logToFile('info', `SSE 客户端断开，启动 30s 宽限期 job=${outputId} mode=${mode}`);
+    resClosed = true;
+    logToFile('info', `SSE 客户端断开，启动 ${gracePeriod/1000}s 宽限期 job=${outputId} mode=${mode}`);
     activeJobResponses.delete(outputId);  // 移除 res 引用，避免写已关闭的流
 
-    // 宽限期：30s 后若未重连则真正清理
+    // 宽限期：超时后若未重连则真正清理
     const graceTimer = setTimeout(() => {
       if (finished) return;
       logToFile('info', `宽限期超时，清理 ${mode} 任务 job=${outputId}`);
@@ -130,11 +140,11 @@ function runPythonAnalysisStream(text, outputId, mode, bridgeConfig, res, schema
       // （前端 sse.js 3 次指数退避重连可能已用新 py 覆盖 activeJobs[outputId]，
       //   此时若误删会导致新进程无法被取消，且 recordJob 会覆盖新任务状态）
       if (activeJobs.get(outputId) === py) {
-        recordJob(outputId, mode, 'cancelled', '客户端断开连接且 30s 内未重连');
+        recordJob(outputId, mode, 'cancelled', `客户端断开连接且 ${gracePeriod/1000}s 内未重连`);
         activeJobs.delete(outputId);
         processJobQueue();
       }
-    }, 30000);
+    }, gracePeriod);
 
     // 若进程在宽限期内完成，清理定时器
     py.on('exit', () => {
@@ -157,9 +167,9 @@ function runPythonAnalysisStream(text, outputId, mode, bridgeConfig, res, schema
       try {
         const obj = JSON.parse(line);
         if (obj.type === 'stage') {
-          sendSSE(res, 'stage', obj);
+          if (!resClosed) sendSSE(res, 'stage', obj);
         } else if (obj.type === 'log') {
-          sendSSE(res, 'log', obj);
+          if (!resClosed) sendSSE(res, 'log', obj);
         } else if (obj.type === 'result') {
           cleanupTimeout();
           const resultData = {
@@ -168,18 +178,28 @@ function runPythonAnalysisStream(text, outputId, mode, bridgeConfig, res, schema
             reportPath: fs.existsSync(path.join(outDir, 'report.md')) ? `/api/report/${outputId}` : null,
             resultPath: `/api/result/${outputId}`,
           };
-          sendSSE(res, 'result', resultData);
+          // P0 修缮：SSE 断开后仍保存结果到缓存和 job 历史，
+          // 前端可通过 /api/result/:id 或任务历史获取
           setResultCache(cacheKey(text, mode, cfgObj), outputId);
           recordJob(outputId, mode, 'completed');
-          logToFile('info', `分析完成 job=${outputId}`);
+          if (resClosed) {
+            logToFile('info', `分析完成(SSE已断开,结果已缓存) job=${outputId}`);
+          } else {
+            sendSSE(res, 'result', resultData);
+            logToFile('info', `分析完成 job=${outputId}`);
+          }
         } else if (obj.type === 'error') {
           cleanupTimeout();
-          sendSSE(res, 'error', { message: obj.message });
           recordJob(outputId, mode, 'error', obj.message);
-          logToFile('error', `分析错误 job=${outputId}: ${obj.message}`);
+          if (resClosed) {
+            logToFile('error', `分析错误(SSE已断开) job=${outputId}: ${obj.message}`);
+          } else {
+            sendSSE(res, 'error', { message: obj.message });
+            logToFile('error', `分析错误 job=${outputId}: ${obj.message}`);
+          }
         }
       } catch (err) {
-        sendSSE(res, 'log', { level: 'raw', message: line });
+        if (!resClosed) sendSSE(res, 'log', { level: 'raw', message: line });
       }
     }
   });
@@ -204,13 +224,16 @@ function runPythonAnalysisStream(text, outputId, mode, bridgeConfig, res, schema
     }
     if (code !== 0 && isCurrent) {
       const msg = `Python 进程异常退出 (code=${code})`;
-      sendSSE(res, 'error', { message: msg });
+      // P1-a 修缮：resClosed 守卫，避免向已关闭的 SSE 流写入
+      if (!resClosed) sendSSE(res, 'error', { message: msg });
       recordJob(outputId, mode, 'error', msg);
       logToFile('error', `Python 异常退出 job=${outputId} code=${code}`);
     }
     if (isCurrent) {
-      sendSSE(res, 'done', { code });
-      res.end();
+      if (!resClosed) {
+        sendSSE(res, 'done', { code });
+        res.end();
+      }
     }
     processJobQueue();
   });
@@ -220,11 +243,13 @@ function runPythonAnalysisStream(text, outputId, mode, bridgeConfig, res, schema
     cleanupTimeout();
     activeJobs.delete(outputId);
     activeJobResponses.delete(outputId);
-    sendSSE(res, 'error', { message: err.message });
+    if (!resClosed) sendSSE(res, 'error', { message: err.message });
     recordJob(outputId, mode, 'error', err.message);
     logToFile('error', `Python 启动错误 job=${outputId}: ${err.message}`);
-    sendSSE(res, 'done', { code: -1 });
-    res.end();
+    if (!resClosed) {
+      sendSSE(res, 'done', { code: -1 });
+      res.end();
+    }
     processJobQueue();
   });
 }
@@ -270,6 +295,8 @@ async function runSuperAnalysisStream(text, outputId, bridgeConfig, res) {
   const taskStartTime = Date.now();
   let keepAlive = null;
   let stageWatchdog = null;
+  // P1-a 修缮：SUPER 模式同样需要 resClosed 守卫，避免向已关闭的 SSE 流写入
+  let resClosed = false;
 
   const cleanupTimeout = () => {
     if (timeoutId) {
@@ -290,8 +317,12 @@ async function runSuperAnalysisStream(text, outputId, bridgeConfig, res) {
     llamaWorkerSvc.releaseLlamaWorker();
     activeJobs.delete(outputId);
     activeJobResponses.delete(outputId);
-    sendSSE(res, 'done', { code: doneCode });
-    res.end();
+    // P1-a：SSE 已断开时仅记录日志，不再写入 res（结果已通过 resultCache + jobHistory 保留）
+    if (!resClosed) {
+      try { sendSSE(res, 'done', { code: doneCode }); res.end(); } catch (_) {}
+    } else {
+      logToFile('info', `SUPER finish(SSE已断开) job=${outputId} code=${doneCode}`);
+    }
     processJobQueue();
   };
 
@@ -304,7 +335,9 @@ async function runSuperAnalysisStream(text, outputId, bridgeConfig, res) {
       activeJobResponses.delete(outputId);
       recordJob(outputId, 'super', 'cancelled', '等待 Worker 期间被取消');
       logToFile('info', `SUPER 任务在等待 Worker 期间被取消 job=${outputId}`);
-      try { sendSSE(res, 'error', { message: '用户主动停止计算' }); sendSSE(res, 'done', { code: 125 }); res.end(); } catch (_) {}
+      if (!resClosed) {
+        try { sendSSE(res, 'error', { message: '用户主动停止计算' }); sendSSE(res, 'done', { code: 125 }); res.end(); } catch (_) {}
+      }
       processJobQueue();
       return;
     }
@@ -315,7 +348,7 @@ async function runSuperAnalysisStream(text, outputId, bridgeConfig, res) {
       const stageDur = Date.now() - lastStageTime;
       const msg = `SUPER 分析已运行超过 24 小时安全兜底。任务在 [${lastStageName}] 阶段停留约 ${stageDur}ms，总耗时 ${elapsed}ms。系统已强制终止；如仍需分析，请缩短文本、减小 window_size / max_segments、切换到 DEEP 模式，或检查模型/算力状态。`;
       logToFile('warn', `SUPER 安全兜底触发 job=${outputId} model=${cfgObj?.model || 'shehui-llama'} stage=${lastStageName} elapsed=${elapsed}`);
-      sendSSE(res, 'error', { message: msg });
+      if (!resClosed) sendSSE(res, 'error', { message: msg });
       recordJob(outputId, 'super', 'timeout');
       finish(124);
     }, superTimeoutMs);
@@ -327,7 +360,7 @@ async function runSuperAnalysisStream(text, outputId, bridgeConfig, res) {
         const elapsed = Date.now() - taskStartTime;
         const msg = `SUPER 分析在 [${lastStageName}] 阶段停留超过 ${Math.round(stageHangMs / 60000)} 分钟无进度更新（已停留 ${Math.round(stageSilence / 60000)} 分钟，总耗时 ${Math.round(elapsed / 60000)} 分钟），判定为 hang，系统已强制终止。建议检查模型加载/算力状态，或缩短文本、减小 window_size / max_segments。`;
         logToFile('warn', `SUPER 阶段 hang 触发 job=${outputId} model=${cfgObj?.model || 'shehui-llama'} stage=${lastStageName} silence=${stageSilence}ms elapsed=${elapsed}ms`);
-        sendSSE(res, 'error', { message: msg });
+        if (!resClosed) sendSSE(res, 'error', { message: msg });
         recordJob(outputId, 'super', 'timeout', 'stage_hang');
         finish(124);
       }
@@ -341,14 +374,14 @@ async function runSuperAnalysisStream(text, outputId, bridgeConfig, res) {
       if (obj.type === 'stage') {
         lastStageName = obj.stage || lastStageName;
         lastStageTime = Date.now();
-        sendSSE(res, 'stage', obj);
+        if (!resClosed) sendSSE(res, 'stage', obj);
       } else if (obj.type === 'log') {
-        sendSSE(res, 'log', obj);
+        if (!resClosed) sendSSE(res, 'log', obj);
       } else if (obj.type === 'stats') {
-        sendSSE(res, 'stats', obj.stats);
+        if (!resClosed) sendSSE(res, 'stats', obj.stats);
       } else if (obj.type === 'error') {
         cleanupTimeout();
-        sendSSE(res, 'error', { message: obj.message });
+        if (!resClosed) sendSSE(res, 'error', { message: obj.message });
         recordJob(outputId, 'super', 'error', obj.message);
         logToFile('error', `SUPER 错误 job=${outputId}: ${obj.message}`);
         finish(-1);
@@ -368,20 +401,26 @@ async function runSuperAnalysisStream(text, outputId, bridgeConfig, res) {
           reportPath: `/api/report/${outputId}`,
           resultPath: `/api/result/${outputId}`,
         };
-        sendSSE(res, 'result', resultData);
+        // P1-a：SSE 已断开时跳过 sendSSE，但结果已持久化 + 缓存 + jobHistory 保留
+        if (!resClosed) {
+          sendSSE(res, 'result', resultData);
+          logToFile('info', `SUPER 分析完成 job=${outputId}`);
+        } else {
+          logToFile('info', `SUPER 分析完成(SSE已断开,结果已缓存) job=${outputId}`);
+        }
         setResultCache(cacheKey(text, 'super', cfgObj), outputId);
         recordJob(outputId, 'super', 'completed');
-        logToFile('info', `SUPER 分析完成 job=${outputId}`);
         finish(0);
       }
     };
 
     // P1-3 + P1-19：SUPER 模式 SSE 客户端断开的宽限期机制（与 LIGHT/DEEP 一致）
-    // 之前 res.on('close') 立即取消任务，现增加 30s 宽限期：
-    // 客户端断开后不立即清理，若 30s 内重连则恢复流式，30s 后才真正清理
+    // 之前 res.on('close') 立即取消任务，现增加 600s 宽限期（SUPER 模式耗时长）：
+    // 客户端断开后不立即清理，若 600s 内重连则恢复流式，600s 后才真正清理
     res.on('close', () => {
       if (finished) return;
-      logToFile('info', `SSE 客户端断开，启动 30s 宽限期 job=${outputId} mode=super`);
+      resClosed = true;  // P1-a：标记 SSE 已关闭，后续不再向 res 写入
+      logToFile('info', `SSE 客户端断开，启动 600s 宽限期 job=${outputId} mode=super`);
       activeJobResponses.delete(outputId);  // 移除 res 引用，避免写已关闭的流
 
       const graceTimer = setTimeout(() => {
@@ -393,12 +432,12 @@ async function runSuperAnalysisStream(text, outputId, bridgeConfig, res) {
         try {
           worker.stdin.write(JSON.stringify({ type: 'cancel', id: outputId }) + '\n', 'utf-8');
         } catch (_) {}
-        recordJob(outputId, 'super', 'cancelled', '客户端断开连接且 30s 内未重连');
+        recordJob(outputId, 'super', 'cancelled', '客户端断开连接且 600s 内未重连');
         llamaState.currentHandler = null;
         llamaWorkerSvc.releaseLlamaWorker();
         activeJobs.delete(outputId);
         processJobQueue();
-      }, 30000);
+      }, 600000);
 
       // 若进程在宽限期内完成，清理定时器
       worker.on('exit', () => {
@@ -423,7 +462,7 @@ async function runSuperAnalysisStream(text, outputId, bridgeConfig, res) {
   } catch (err) {
     cleanupTimeout();
     if (keepAlive) clearInterval(keepAlive);
-    sendSSE(res, 'error', { message: err.message });
+    if (!resClosed) sendSSE(res, 'error', { message: err.message });
     recordJob(outputId, 'super', 'error', err.message);
     logToFile('error', `SUPER 启动失败 job=${outputId}: ${err.message}`);
     finish(-1);

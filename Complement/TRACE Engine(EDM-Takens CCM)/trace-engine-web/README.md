@@ -6,7 +6,7 @@
 
 - Node.js >= 18
 - Python 3.10+（已安装 `trace-engine` Skill 所需依赖：numpy, pandas, dowhy 等）
-- 可选：`jieba`（提升中文分词效果，`pip install jieba`）
+- 必需：`jieba`（中文分词核心依赖，`pip install jieba`）
 
 ## 快速启动
 

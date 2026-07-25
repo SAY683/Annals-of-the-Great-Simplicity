@@ -25,7 +25,7 @@ import os
 from pathlib import Path
 from typing import Dict, List, Optional
 
-from config import TRAJECTORY_CSV, OUTPUTS_DIR, VERBOSE
+from config import TRAJECTORY_CSV, OUTPUTS_DIR, VERBOSE, LAYER1_COLUMNS, SACRED_BOOKS
 
 
 def _hash_text(text: str) -> str:
@@ -73,37 +73,26 @@ class TrajectoryCSV:
     """
 
     # 列顺序定义 (类常量, 所有实例共享引用但每个实例独立维护 KNOWN_COLUMNS)
+    # P1-g 修缮：Layer 1 列名从 config.LAYER1_COLUMNS 动态构建，消除三处独立硬编码
     COLUMN_ORDER = [
         # ── Meta ──
         "time_step", "text_hash", "source_label",
-
-        # ── Layer 1: 元 SCM ──
-        "ate", "ate_ci_lower", "ate_ci_upper", "ci_width",
-        "refuted_count", "identifiable",
-        "concept_count", "edge_count", "adj_density", "max_delta_nll",
-        "concept_coverage", "condition_number", "unk_rate",
-        "ccm_coverage_pct", "ccm_verdict",
-        "edm_rho_high", "edm_rho_mid",
-        "havok_status", "havok_linear_pct",
-        "causallearn_consensus",
-        "edge_stability_mean", "permutation_p_value",
-        "total_ms",
-
+    ] + [
+        # ── Layer 1: 元 SCM（从 config.LAYER1_COLUMNS 程序化绑定） ──
+        c[0] for c in LAYER1_COLUMNS
+    ] + [
         # ── Layer 2: 世俗语义 ──
         "z_pca_1", "z_pca_2", "z_pca_3",
         "secular_entropy",
-
+    ] + [
         # ── Layer 3: 八正道审计 (绝对投影) ──
-        "z_福音", "z_吉祥", "z_奥美", "z_存在",
-        "z_自孕", "z_弥赛亚", "z_Alice", "z_觉爱",
-
+        f"z_{short}" for short, _, _ in SACRED_BOOKS
+    ] + [
         # ── Layer 3: 八正道审计 (一阶差分) ──
-        "dz_福音", "dz_吉祥", "dz_奥美", "dz_存在",
-        "dz_自孕", "dz_弥赛亚", "dz_Alice", "dz_觉爱",
-
+        f"dz_{short}" for short, _, _ in SACRED_BOOKS
+    ] + [
         # ── Layer 3: 八正道审计 (二阶差分) ──
-        "d2z_福音", "d2z_吉祥", "d2z_奥美", "d2z_存在",
-        "d2z_自孕", "d2z_弥赛亚", "d2z_Alice", "d2z_觉爱",
+        f"d2z_{short}" for short, _, _ in SACRED_BOOKS
     ]
 
     def __init__(self, csv_path: Optional[Path] = None):
@@ -127,17 +116,26 @@ class TrajectoryCSV:
             self._load_existing()
 
     def _load_existing(self):
-        """加载已有 CSV，保留所有行"""
+        """加载已有 CSV，保留所有行（跳过以 _ 开头的内部元数据列，清理历史污染）"""
         with open(self.csv_path, "r", encoding="utf-8", newline="") as f:
             reader = csv.DictReader(f)
             for row in reader:
-                self._rows.append(row)
-                # 更新实例级已知列
-                for key in row.keys():
+                # 过滤以 _ 开头的内部元数据字段（历史污染清理）
+                clean_row = {
+                    k: v for k, v in row.items()
+                    if not k.startswith(self._INTERNAL_FIELD_PREFIX)
+                }
+                self._rows.append(clean_row)
+                # 更新实例级已知列（同样跳过 _ 前缀）
+                for key in clean_row.keys():
                     self._known_columns.add(key)
 
         if VERBOSE:
             print(f"[CSV] 加载已有轨迹: {len(self._rows)} 行, {len(self._known_columns)} 列")
+
+    # 内部元数据字段前缀（不写入 CSV，防止污染 54 列规范）
+    # 例如 layer3_sacred.py 返回的 _orthogonality_report / _method
+    _INTERNAL_FIELD_PREFIX = "_"
 
     def append_row(self, row: Dict, auto_write: bool = True):
         """
@@ -146,17 +144,24 @@ class TrajectoryCSV:
         Args:
             row: 包含各列值的字典 (键可以是不完整子集)
             auto_write: 是否自动写入磁盘
+
+        Note:
+            以 ``_`` 开头的键视为内部元数据（如 ``_orthogonality_report``、
+            ``_method``），不会作为新列追加，从而保持 54 列规范不被污染。
+            若需保留此类字段，应在调用方先重命名为正式列名。
         """
         # 确保所有已知列都存在
         normalized = {}
         for col in self._known_columns:
             normalized[col] = row.get(col, "")
 
-        # 添加新列
+        # 添加新列（跳过以 _ 开头的内部元数据字段）
         for key, value in row.items():
+            if key.startswith(self._INTERNAL_FIELD_PREFIX):
+                continue
             if key not in self._known_columns:
                 self._known_columns.add(key)
-                normalized[key] = value
+            normalized[key] = value
 
         self._rows.append(normalized)
 
@@ -165,9 +170,13 @@ class TrajectoryCSV:
 
     def _write(self):
         """写入 CSV 文件"""
-        # 构建列顺序: 预定义顺序 + 动态添加的列
+        # 构建列顺序: 预定义顺序 + 动态添加的列（双保险：排除 _ 前缀内部字段）
         ordered_cols = [c for c in self.COLUMN_ORDER if c in self._known_columns]
-        extra_cols = sorted(c for c in self._known_columns if c not in self.COLUMN_ORDER)
+        extra_cols = sorted(
+            c for c in self._known_columns
+            if c not in self.COLUMN_ORDER
+            and not c.startswith(self._INTERNAL_FIELD_PREFIX)
+        )
         all_cols = ordered_cols + extra_cols
 
         with open(self.csv_path, "w", encoding="utf-8", newline="") as f:

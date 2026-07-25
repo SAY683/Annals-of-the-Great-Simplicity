@@ -35,14 +35,14 @@ let lastSseEventId = null;
  * @param {AbortSignal} [options.signal] AbortSignal，触发时立即停止重连（保持 AbortError 语义）
  */
 async function readSSEStream(body, options = {}) {
-  const { reconnectFactory, signal } = options;
+  const { reconnectFactory, signal, onEvent } = options;
   const maxRetries = 3;
   let attempt = 0;
   let currentBody = body;
 
   while (true) {
     try {
-      await consumeSSEBody(currentBody);
+      await consumeSSEBody(currentBody, onEvent);
       return;
     } catch (err) {
       // 用户主动 abort：直接抛出（保持原 AbortError 语义，由 app.js catch 跳过提示）
@@ -74,7 +74,7 @@ async function readSSEStream(body, options = {}) {
  * 消费单个 SSE body 流（原 readSSEStream 主体逻辑）。
  * body 正常结束（done=true）时返回；读取过程中抛错则向上传播给 readSSEStream 触发重连。
  */
-async function consumeSSEBody(body) {
+async function consumeSSEBody(body, onEvent) {
   const reader = body.getReader();
   const decoder = new TextDecoder();
   let buffer = '';
@@ -87,12 +87,16 @@ async function consumeSSEBody(body) {
     for (const block of blocks) {
       const event = parseSSEBlock(block);
       if (!event) continue;
+      if (typeof onEvent === 'function') onEvent(event);
       dispatchSSEEvent(event);
     }
   }
   if (buffer.trim()) {
     const event = parseSSEBlock(buffer);
-    if (event) dispatchSSEEvent(event);
+    if (event) {
+      if (typeof onEvent === 'function') onEvent(event);
+      dispatchSSEEvent(event);
+    }
   }
 }
 
