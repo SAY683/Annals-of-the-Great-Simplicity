@@ -241,6 +241,36 @@ main {
   font-size: clamp(0.66rem, 0.88vw, 0.78rem);
 }
 
+/* P1 修复 (§20.12): 配置列按钮在等比例缩放时与 SECTOR 标签的视觉错位
+   根因: 按钮沿用 display:block + margin:auto (layout-time 居中),
+   而 .sector-label 使用 left:50% + translateX(-50%) (paint-time 居中).
+   缩放 (75%-150%) 时两套机制的 subpixel 舍入不一致, 导致按钮偏离几何中心.
+   修复: 让按钮改用 flex 的 align-self:center (与父级 align-items:center 同源,
+   不再依赖 margin auto), 显式 width:auto + min-width 保障可点击区域,
+   同时移除 display:block 以避免被父级 flex 视为块级子项填满 max-width. */
+#app .config-panel button,
+#app .panel.config-panel .btn-center {
+  display: inline-block;
+  align-self: center;
+  width: auto;
+  min-width: 140px;
+  max-width: 420px;
+  margin-left: auto;
+  margin-right: auto;
+  text-align: center;
+}
+
+/* 兜底: 配置列内非按钮/标签的提示类元素同样统一 max-width,
+   防止缩放时出现 "长条突兀" 的视觉破坏 (美学一致性) */
+#app .config-panel .config-placeholder,
+#app .config-panel #columnInfo,
+#app .config-panel .recommendation-box {
+  width: 100%;
+  max-width: 420px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
 #app .upload-panel #uploadBtn {
   margin-top: 2px;
   margin-bottom: 2px;
@@ -1154,7 +1184,8 @@ footer {
 }
 
 .history-item .actions button.export-json-btn,
-.history-item .actions button.export-csv-btn {
+.history-item .actions button.export-csv-btn,
+.history-item .actions button.export-md-btn {
   font-size: 0.78rem;
   padding: 5px 10px;
   margin-right: 8px;
@@ -1166,9 +1197,21 @@ footer {
 }
 
 .history-item .actions button.export-json-btn:hover,
-.history-item .actions button.export-csv-btn:hover {
+.history-item .actions button.export-csv-btn:hover,
+.history-item .actions button.export-md-btn:hover {
   border-color: var(--dept-color);
   color: var(--dept-color);
+}
+
+/* P2 (§20.12): 人话版导出按钮 — 略带暖色突出 "可读报告" 语义 */
+.history-item .actions button.export-md-btn {
+  border-color: rgba(242, 201, 76, 0.4);
+  color: #f2c94c;
+}
+
+.history-item .actions button.export-md-btn:hover {
+  background: rgba(242, 201, 76, 0.1);
+  border-color: #f2c94c;
 }
 
 .history-item .actions .compare-select-btn.selected {

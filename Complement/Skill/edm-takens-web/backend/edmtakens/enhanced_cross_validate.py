@@ -104,9 +104,16 @@ def estimate_lyapunov_exponent(data, E, dt=1.0, n_expand=20):
     x_centered = data - np.mean(data)
     autocorr = np.correlate(x_centered, x_centered, mode='full')
     autocorr = autocorr[len(autocorr)//2:]
-    autocorr = autocorr / autocorr[0]
-    zero_cross = np.where(np.diff(np.sign(autocorr - 1/np.exp(1))))[0]
-    mean_period = zero_cross[0] + 1 if len(zero_cross) > 0 else max(5, E)
+    # P1-5 修复 (Round 21 §P0-B): autocorr[0] 可能为 0 (常量序列或 std=0),
+    # 导致除以 0 产生 NaN 传播到下游. 用 safe division + fallback.
+    ac0 = autocorr[0] if len(autocorr) > 0 else 0.0
+    if abs(ac0) < 1e-12:
+        # 常量序列: 无法定义 mean period, 用 E+1 作为保守值
+        mean_period = max(5, E + 1)
+    else:
+        autocorr = autocorr / ac0
+        zero_cross = np.where(np.diff(np.sign(autocorr - 1/np.exp(1))))[0]
+        mean_period = zero_cross[0] + 1 if len(zero_cross) > 0 else max(5, E)
 
     # Find nearest neighbors for each point (with temporal separation)
     div_curves = []

@@ -329,9 +329,14 @@ router.get('/report/:id', (req, res) => {
 // ── 任务重试 ────────────────────────────────────────────────────────
 router.post('/retry/:id', async (req, res) => {
   const id = req.params.id;
+  // P0-1 (Round 21 §P0-A): 路径遍历防护 — retry 路由的 :id 会进入 path.join(INPUTS_DIR, ${id}.txt)
+  // 必须先校验 UUID 格式, 否则攻击者可传 id=../../etc/passwd 读取任意文件
+  if (!isValidId(id)) {
+    return res.status(400).json({ success: false, error: '非法的任务 ID', code: 'INVALID_ID', traceId: req.traceId });
+  }
   const old = jobHistory.find((j) => j.id === id);
   if (!old) {
-    return res.status(404).json({ success: false, error: '未找到该任务历史' });
+    return res.status(404).json({ success: false, error: '未找到该任务历史', code: 'JOB_NOT_FOUND', traceId: req.traceId });
   }
   if (!['error', 'timeout', 'cancelled'].includes(old.status)) {
     return res.status(400).json({ success: false, error: `当前状态 ${old.status} 不支持重试` });

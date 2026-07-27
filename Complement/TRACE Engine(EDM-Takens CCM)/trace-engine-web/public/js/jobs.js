@@ -262,6 +262,35 @@ async function viewJobDetail(id) {
   reportText.textContent = '加载中...';
   modal.style.display = 'flex';
 
+  // P2 (§20.12): 在标题区动态注入"📝人话版"导出按钮（每次打开时刷新 data-id）
+  // 按钮固定在 modal-header 右侧（关闭按钮左侧），避免与原关闭按钮冲突
+  let exportMdBtn = document.getElementById('jobDetailExportMd');
+  if (!exportMdBtn) {
+    exportMdBtn = document.createElement('button');
+    exportMdBtn.id = 'jobDetailExportMd';
+    exportMdBtn.className = 'btn-mini';
+    exportMdBtn.style.cssText = 'margin-right:0.4rem;padding:0.25rem 0.6rem;font-size:0.72rem;background:rgba(0,255,136,0.08);border:1px solid var(--accent,#00ff88);color:var(--accent,#00ff88);';
+    exportMdBtn.textContent = '📝 人话版';
+    exportMdBtn.title = '导出人话版 Markdown 报告';
+    const closeBtn = document.getElementById('jobDetailClose');
+    if (closeBtn && closeBtn.parentNode) {
+      closeBtn.parentNode.insertBefore(exportMdBtn, closeBtn);
+    }
+    exportMdBtn.addEventListener('click', () => {
+      const tid = exportMdBtn.dataset.taskId;
+      if (!tid) return;
+      // 直接触发下载
+      const a = document.createElement('a');
+      a.href = `/api/jobs/${tid}/export/md`;
+      a.download = `${tid}_report.md`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      if (typeof log === 'function') log('info', `已请求导出人话版报告: ${tid.slice(0, 8)}…`);
+    });
+  }
+  exportMdBtn.dataset.taskId = id;
+
   try {
     const r = await fetch(`/api/jobs/${id}/detail`);
     if (!r.ok) throw new Error(`HTTP ${r.status}`);

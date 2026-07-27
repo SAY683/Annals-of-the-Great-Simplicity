@@ -477,6 +477,204 @@ print('{"success":true,"rows":0}')
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// ── P2 (§20.12): 一键导出人话版 Markdown 报告 ─────────────────────
+// 将轨迹 CSV + 项目元数据 + 任务历史 转译为非技术读者可理解的中文报告.
+// 设计目标: 用户读这份 .md 就能知道 "这次桥接采集了哪些数据, EDM 能不能跑, 关键指标趋势如何".
+//
+// 报告结构:
+//   1. 概览 (项目, 轨迹行数, EDM 就绪度, 任务统计)
+//   2. 列 schema 解读 (L1/L2/L3 各层含义)
+//   3. 关键指标统计 (min/max/mean + 趋势判定)
+//   4. 轨迹数据预览 (Top 15 行)
+//   5. 任务历史 (最近 20 条)
+app.get('/api/trajectory/export/md', async (_req, res) => {
+  try {
+    const traj = readTrajectoryCSV();
+    const active = Array.from(activeJobs.entries()).map(([id, j]) => ({
+      id, mode: j.mode, status: j.status, startTime: j.startTime,
+    }));
+    const history = jobHistory.slice(0, 20);
+
+    // 当前项目名
+    let projectName = 'default';
+    try {
+      const idxPath = path.join(PROJECTS_DIR, '_index.json');
+      if (fs.existsSync(idxPath)) {
+        const idx = JSON.parse(fs.readFileSync(idxPath, 'utf-8'));
+        projectName = idx.active || 'default';
+      }
+    } catch (_) { /* ignore */ }
+
+    const edmReady = traj.total >= 15;
+    const fmtTs = (iso) => {
+      if (!iso) return 'N/A';
+      try { return new Date(iso).toLocaleString('zh-CN', { hour12: false }); } catch (_) { return String(iso); }
+    };
+
+    // 列分层映射 (基于 /api/status 的 edm_targets 结构)
+    const colLayer = {
+      ate: 'L1 元SCM', adj_density: 'L1 元SCM', max_delta_nll: 'L1 元SCM',
+      ci_width: 'L1 元SCM', edge_count: 'L1 元SCM', ccm_coverage_pct: 'L1 元SCM',
+      z_pca_1: 'L2 PCA', z_pca_2: 'L2 PCA', z_pca_3: 'L2 PCA', secular_entropy: 'L2 PCA',
+      z_福音: 'L3 八正道', z_吉祥: 'L3 八正道', z_奥美: 'L3 八正道', z_存在: 'L3 八正道',
+      z_自孕: 'L3 八正道', z_弥赛亚: 'L3 八正道', z_Alice: 'L3 八正道', z_觉爱: 'L3 八正道',
+      dz_存在: 'L3 一阶差分', dz_觉爱: 'L3 一阶差分',
+    };
+    const colDesc = {
+      ate: '因果效应强度 — ATE 数值, 反映处理→结果的因果关联大小',
+      adj_density: '因果图密度 — 系统纠缠度, 越高概念间因果链越密',
+      max_delta_nll: '最强因果信号 — ΔNLL 最大值',
+      ci_width: '因果不确定性 — 时代噪音, CI 越宽噪音越大',
+      edge_count: '显著因果边数 — 通过统计显著性检验的边',
+      ccm_coverage_pct: 'CCM 非线性验证覆盖率',
+      z_pca_1: '世俗 PCA 第 1 主轴 — 经济/物质维度投影',
+      z_pca_2: '世俗 PCA 第 2 主轴',
+      z_pca_3: '世俗 PCA 第 3 主轴',
+      secular_entropy: '世俗熵 — 话语多样性',
+      z_福音: '福音 (祂志书) 投影 — 信仰维度',
+      z_吉祥: '吉祥 (赐福书) 投影 — 祝福维度',
+      z_奥美: '奥美 (圣源书) 投影 — 美学维度',
+      z_存在: '存在 (真实书) 投影 — 本体论距离',
+      z_自孕: '自孕 (胜育书) 投影 — 生命维度',
+      z_弥赛亚: '弥赛亚 (至意书) 投影 — 救赎维度',
+      z_Alice: 'Alice (慧辩书) 投影 — 逻辑维度',
+      z_觉爱: '觉爱 (智识书) 投影 — 智慧维度',
+      dz_存在: '存在轴一阶差分 Δz/Δt — 突变速率',
+      dz_觉爱: '觉爱轴一阶差分 Δz/Δt — 智慧突变速率',
+    };
+
+    const lines = [];
+    lines.push(`# TRACE-TO-EDM 桥接报告: 项目 \`${projectName}\`\n`);
+    lines.push(`> 自动生成 — 面向非技术读者的人话版解读. 报告基于轨迹 CSV + 任务历史.\n`);
+    lines.push('');
+
+    // 1. 概览
+    lines.push('## 1. 概览\n');
+    lines.push(`- **当前项目**: \`${projectName}\``);
+    lines.push(`- **轨迹文件**: \`${traj.path || 'N/A'}\``);
+    lines.push(`- **轨迹行数**: ${traj.total}`);
+    lines.push(`- **轨迹列数**: ${traj.columns.length}`);
+    lines.push(`- **EDM 就绪**: ${edmReady ? '✓ 是 (≥15 行, 可触发 EDM 分析)' : '✗ 否 (<15 行, 需更多数据)'}`);
+    lines.push(`- **生成时间**: ${fmtTs(new Date().toISOString())}`);
+    lines.push(`- **活动任务**: ${active.length}`);
+    lines.push(`- **历史任务**: ${history.length} 条 (最近)`);
+    lines.push('');
+
+    // 2. 列 schema
+    lines.push('## 2. 轨迹列解读\n');
+    if (traj.columns.length > 0) {
+      lines.push('| 列名 | 层级 | 含义 |');
+      lines.push('|------|------|------|');
+      traj.columns.forEach(col => {
+        const layer = colLayer[col] || '(其他)';
+        const desc = colDesc[col] || '—';
+        lines.push(`| \`${col}\` | ${layer} | ${desc} |`);
+      });
+      lines.push('');
+      lines.push('> **解读**: 轨迹 CSV 的每一行代表一次新闻事件的处理结果. '
+        + 'L1 = 元 SCM 因果图指标; L2 = 世俗语义 PCA 投影; L3 = 八正道神圣投影 + 一阶差分.\n');
+    } else {
+      lines.push('- 轨迹文件为空或不存在.\n');
+    }
+
+    // 3. 关键指标统计
+    lines.push('## 3. 关键指标统计\n');
+    if (traj.rows.length > 0) {
+      const numericCols = traj.columns.filter(c => {
+        return traj.rows.some(r => r[c] !== '' && !isNaN(parseFloat(r[c])));
+      });
+      if (numericCols.length > 0) {
+        lines.push('| 指标 | 最小 | 最大 | 均值 | 趋势 |');
+        lines.push('|------|------|------|------|------|');
+        numericCols.forEach(col => {
+          const vals = traj.rows.map(r => parseFloat(r[col])).filter(v => !isNaN(v));
+          if (vals.length === 0) return;
+          const min = Math.min(...vals);
+          const max = Math.max(...vals);
+          const mean = vals.reduce((a, b) => a + b, 0) / vals.length;
+          // 趋势: 比较前后半段均值
+          const half = Math.floor(vals.length / 2);
+          const firstHalf = vals.slice(0, half).reduce((a, b) => a + b, 0) / Math.max(half, 1);
+          const secondHalf = vals.slice(half).reduce((a, b) => a + b, 0) / Math.max(vals.length - half, 1);
+          const delta = secondHalf - firstHalf;
+          const trend = Math.abs(delta) < Math.abs(mean) * 0.05
+            ? '→ 平稳'
+            : (delta > 0 ? '↗ 上升' : '↘ 下降');
+          const fmt = (v) => (Math.abs(v) >= 1000 ? v.toFixed(1) : v.toFixed(3));
+          lines.push(`| \`${col}\` | ${fmt(min)} | ${fmt(max)} | ${fmt(mean)} | ${trend} |`);
+        });
+        lines.push('');
+        lines.push('> **解读**: 趋势 = 后半段均值 vs 前半段均值. '
+          + '↗/↘ 幅度 > 5% 均值才算"上升/下降", 否则视为"平稳".\n');
+      }
+    } else {
+      lines.push('- 无可用数值列.\n');
+    }
+
+    // 4. 轨迹数据预览
+    lines.push('## 4. 轨迹数据预览 (Top 15)\n');
+    if (traj.rows.length > 0) {
+      const previewCols = traj.columns.slice(0, 8);  // 限制前 8 列
+      lines.push('| # | ' + previewCols.map(c => `\`${c}\``).join(' | ') + ' |');
+      lines.push('|---|' + previewCols.map(() => '------').join('|') + '|');
+      traj.rows.slice(0, 15).forEach((row, i) => {
+        const vals = previewCols.map(c => {
+          const v = row[c] || '';
+          const num = parseFloat(v);
+          if (!isNaN(num) && v !== '') {
+            return Math.abs(num) >= 1000 ? num.toFixed(1) : num.toFixed(3);
+          }
+          return String(v).slice(0, 20);
+        });
+        lines.push(`| ${i + 1} | ${vals.join(' | ')} |`);
+      });
+      if (traj.rows.length > 15) {
+        lines.push('');
+        lines.push(`_...共 ${traj.total} 行, 此处仅展示前 15 行._`);
+      }
+      lines.push('');
+    } else {
+      lines.push('- 轨迹为空.\n');
+    }
+
+    // 5. 任务历史
+    lines.push('## 5. 任务历史 (最近 20 条)\n');
+    if (history.length > 0) {
+      lines.push('| # | 任务 ID | 模式 | 状态 | 开始时间 |');
+      lines.push('|---|---------|------|------|----------|');
+      history.forEach((j, i) => {
+        const status = j.status === 'completed' ? '✓ 完成' : (j.status === 'failed' ? '✗ 失败' : j.status);
+        lines.push(`| ${i + 1} | \`${j.id}\` | ${j.mode || '?'} | ${status} | ${fmtTs(j.startTime)} |`);
+      });
+      lines.push('');
+    } else {
+      lines.push('- 无任务历史.\n');
+    }
+
+    // 总结
+    lines.push('## 6. 一句话总结\n');
+    const parts = [];
+    if (traj.total > 0) parts.push(`已采集 ${traj.total} 条轨迹`);
+    if (edmReady) parts.push('EDM 可触发');
+    else parts.push(`需 ${15 - traj.total} 条更多数据才能触发 EDM`);
+    if (history.length > 0) {
+      const completed = history.filter(j => j.status === 'completed').length;
+      parts.push(`历史任务 ${completed}/${history.length} 完成`);
+    }
+    lines.push('**' + parts.join('; ') + '.**');
+    lines.push('');
+    lines.push('---');
+    lines.push(`_报告由 trace-to-edm Web 自动生成于 ${fmtTs(new Date().toISOString())}._`);
+
+    const mdContent = lines.join('\n');
+    res.setHeader('Content-Type', 'text/markdown; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="trajectory_${projectName}_${Date.now()}.md"`);
+    res.send(mdContent);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // ── API: 提交文本管线任务 (Mode A) ────────────────────────
 
 app.post('/api/run', (req, res) => {
@@ -663,17 +861,44 @@ app.post('/api/replay', (req, res) => {
 
 app.post('/api/edm/trigger', (req, res) => {
   const { target, q, time_start, time_end, predict_window } = req.body;
+
+  // P0-4 (Round 21 §P0-A): 入参校验 — 防止恶意输入触发 Python 端异常或长时间运行
+  // target: 字符串白名单 (ate/ci_width/refuted_count/identifiable 等已知列名)
+  // q: 正整数 [2, 20]
+  // time_start/time_end: 数字 (时间步索引)
+  // predict_window: 非负整数 [0, 1000]
+  const ALLOWED_TARGETS = new Set([
+    'ate', 'ate_ci_lower', 'ate_ci_upper', 'ci_width', 'refuted_count',
+    'identifiable', 'n_significant_edges', 'trace_status', 'trace_error',
+  ]);
+  if (target != null && (typeof target !== 'string' || !ALLOWED_TARGETS.has(target))) {
+    return res.status(400).json({ success: false, error: `target 必须为白名单值: ${Array.from(ALLOWED_TARGETS).join('/')}`, code: 'INVALID_TARGET' });
+  }
+  const qNum = Number(q);
+  if (q != null && (!Number.isInteger(qNum) || qNum < 2 || qNum > 20)) {
+    return res.status(400).json({ success: false, error: 'q 必须为 [2, 20] 之间的整数', code: 'INVALID_Q' });
+  }
+  for (const [k, v] of [['time_start', time_start], ['time_end', time_end]]) {
+    if (v != null && (typeof v !== 'number' || !Number.isFinite(v) || v < 0)) {
+      return res.status(400).json({ success: false, error: `${k} 必须为非负数字`, code: 'INVALID_TIME' });
+    }
+  }
+  const pwNum = Number(predict_window);
+  if (predict_window != null && (!Number.isInteger(pwNum) || pwNum < 0 || pwNum > 1000)) {
+    return res.status(400).json({ success: false, error: 'predict_window 必须为 [0, 1000] 之间的整数', code: 'INVALID_PW' });
+  }
+
   const args = [
     BRIDGE_SCRIPT,
     '--edm-only',
     '--target', target || 'ate',
-    '--q', String(q || 3),
+    '--q', String(qNum || 3),
     '--no-wait',  // 不等待EDM完成, 立即返回job_id
     '--verbose',
   ];
-  if (time_start) args.push('--time-start', time_start);
-  if (time_end) args.push('--time-end', time_end);
-  if (predict_window) args.push('--predict-window', String(predict_window));
+  if (time_start != null) args.push('--time-start', String(time_start));
+  if (time_end != null) args.push('--time-end', String(time_end));
+  if (predict_window != null) args.push('--predict-window', String(pwNum));
 
   const proc = spawn(PYTHON_CMD, args, {
     cwd: ROOT,
@@ -1171,9 +1396,19 @@ app.get('/api/projects', async (_req, res) => {
   }
 });
 
+// P0-2/P0-3 (Round 21 §P0-A): 项目名称格式校验
+// 防止 path traversal — name 会传给 Python project_manager 拼接路径
+// 允许: 字母/数字/下划线/连字符/中文, 长度 1-64, 禁止 ../ \ / : 等路径字符
+const PROJECT_NAME_RE = /^[A-Za-z0-9_\-\u4e00-\u9fa5]{1,64}$/;
+function isValidProjectName(name) {
+  return typeof name === 'string' && PROJECT_NAME_RE.test(name);
+}
+
 app.post('/api/projects', async (req, res) => {
   const { name, description } = req.body;
-  if (!name) return res.status(400).json({ error: 'name required' });
+  if (!isValidProjectName(name)) {
+    return res.status(400).json({ error: 'name 必须为 1-64 位字母/数字/下划线/连字符/中文', code: 'INVALID_NAME' });
+  }
   try {
     const result = await pyCall(['--create-project', name]);
     invalidateCache('projects');  // P1-b：项目列表变更后失效缓存
@@ -1185,7 +1420,9 @@ app.post('/api/projects', async (req, res) => {
 
 app.put('/api/projects/activate', async (req, res) => {
   const { name } = req.body;
-  if (!name) return res.status(400).json({ error: 'name required' });
+  if (!isValidProjectName(name)) {
+    return res.status(400).json({ error: 'name 必须为 1-64 位字母/数字/下划线/连字符/中文', code: 'INVALID_NAME' });
+  }
   try {
     const result = await pyCall(['--project', name]);
     // P1-b：项目切换后失效所有缓存（模型列表也因项目隔离而变化）
@@ -1197,8 +1434,12 @@ app.put('/api/projects/activate', async (req, res) => {
 });
 
 app.delete('/api/projects/:name', async (req, res) => {
+  const { name } = req.params;
+  if (!isValidProjectName(name)) {
+    return res.status(400).json({ error: 'name 必须为 1-64 位字母/数字/下划线/连字符/中文', code: 'INVALID_NAME' });
+  }
   try {
-    const result = await pyCall(['--delete-project', req.params.name]);
+    const result = await pyCall(['--delete-project', name]);
     invalidateCache('projects');  // P1-b：项目删除后失效缓存
     res.json(result);
   } catch (e) {

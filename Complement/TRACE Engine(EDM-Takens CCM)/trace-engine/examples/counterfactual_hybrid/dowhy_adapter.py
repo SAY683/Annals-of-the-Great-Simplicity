@@ -29,8 +29,16 @@ class DoWhy14Adapter:
 
     @staticmethod
     def is_identifiable(estimand) -> bool:
-        """跨版本检查可识别性"""
+        """跨版本检查可识别性.
+
+        D-P0-3 修复 (Round 21 §P0-A): 检查 `synthetic` 标记.
+        合成 estimand (SimulationEstimand with synthetic=True) 永远返回 False,
+        防止模拟模式 ATE 伪装为可识别的 do-calculus 结果.
+        """
         if estimand is None:
+            return False
+        # 优先检查 synthetic 标记: 合成 estimand 强制不可识别
+        if getattr(estimand, 'synthetic', False):
             return False
         if hasattr(estimand, 'identifiable'):
             return bool(estimand.identifiable)

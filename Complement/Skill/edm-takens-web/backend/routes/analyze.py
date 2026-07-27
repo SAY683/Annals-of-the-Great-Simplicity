@@ -5,13 +5,17 @@ Extracted from api.py using APIRouter. Handles job submission (async and
 blocking), status polling, log streaming, and result image serving.
 """
 import os
+import sys
+import traceback
 from typing import Optional
 
-from fastapi import APIRouter, Form, HTTPException
+from fastapi import APIRouter, Depends, Form, HTTPException
 from fastapi.responses import FileResponse, StreamingResponse
 
 from core.locks import _BLOCKING_ENDPOINT_SLOT, RESULTS_DIR
 from core.runtime import _JOB_STORE
+# D-P0-4 修复 (Round 21 §P0-A): 全端点鉴权链.
+from core.auth import require_auth, require_auth_optional
 from job_store import _sanitize_json
 from services.file_management import (
     _prepare_dataset,
@@ -23,7 +27,7 @@ from services.file_management import (
 router = APIRouter()
 
 
-@router.post("/api/analyze/jobs")
+@router.post("/api/analyze/jobs", dependencies=[Depends(require_auth)])
 def create_analysis_job(
     filename: str = Form(...),
     target_col: Optional[str] = Form(None),
@@ -62,7 +66,7 @@ def create_analysis_job(
     return response
 
 
-@router.get("/api/analyze/jobs/{job_id}")
+@router.get("/api/analyze/jobs/{job_id}", dependencies=[Depends(require_auth_optional)])
 def get_job_status(job_id: str, limit_logs: int = 200):
     """Poll job status, latest logs and final result."""
     job = _JOB_STORE.get(job_id)
@@ -71,7 +75,7 @@ def get_job_status(job_id: str, limit_logs: int = 200):
     return job.to_public_dict(limit_logs=limit_logs)
 
 
-@router.get("/api/analyze/jobs/{job_id}/stream")
+@router.get("/api/analyze/jobs/{job_id}/stream", dependencies=[Depends(require_auth_optional)])
 def stream_job(job_id: str):
     """Stream a job's logs as NDJSON."""
     return StreamingResponse(
@@ -80,7 +84,7 @@ def stream_job(job_id: str):
     )
 
 
-@router.post("/api/analyze")
+@router.post("/api/analyze", dependencies=[Depends(require_auth)])
 def analyze(
     filename: str = Form(...),
     target_col: Optional[str] = Form(None),
@@ -127,7 +131,11 @@ def analyze(
         job._done.wait()
 
         if job.error:
-            raise HTTPException(status_code=500, detail=job.error)
+            # P0-6 (Round 21 §P0-A): 不向客户端泄露内部错误细节
+            # 完整错误写入 stderr 供运维排查, 客户端只收到通用文案
+            print(f"[analyze:blocking] job error: {job.error}", file=sys.stderr)
+            traceback.print_exc(file=sys.stderr)
+            raise HTTPException(status_code=500, detail="分析任务执行失败, 请查看服务端日志")
 
         response = {
             **_sanitize_json(job.result),
@@ -140,7 +148,7 @@ def analyze(
         _BLOCKING_ENDPOINT_SLOT.release()
 
 
-@router.get("/api/analyze/stream")
+@router.get("/api/analyze/stream", dependencies=[Depends(require_auth_optional)])
 def analyze_stream(
     filename: str,
     target_col: Optional[str] = None,
@@ -179,7 +187,7 @@ def analyze_stream(
     )
 
 
-@router.get("/api/results/{image_path:path}")
+@router.get("/api/results/{image_path:path}", dependencies=[Depends(require_auth_optional)])
 def get_image(image_path: str):
     """Serve a result image, optionally nested under a task directory."""
     requested = os.path.abspath(os.path.join(RESULTS_DIR, image_path))

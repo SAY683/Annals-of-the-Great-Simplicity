@@ -346,6 +346,20 @@ body::after {
   animation: pulse-dot 1.4s ease-in-out infinite;
 }
 
+/* P1-2 (§20.12): 隧道模式下未配置跨项目 URL 的视觉提示 */
+.base-nav a.tunnel-unconfigured {
+  color: #f2c94c;
+  border-color: rgba(242, 201, 76, 0.5);
+  background: rgba(242, 201, 76, 0.06);
+  cursor: help;
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+
+.base-nav a.tunnel-unconfigured:hover {
+  background: rgba(242, 201, 76, 0.14);
+  border-color: #f2c94c;
+}
+
 /* ── 任务时钟 ── */
 .mission-clock {
   background: var(--panel-2);

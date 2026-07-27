@@ -122,13 +122,19 @@ def estimate_lyapunov_robust(data, E, dt=1.0):
         for k in range(min(n_expand, N - max(i, j) - 1)):
             div[k] = np.sqrt(np.sum((X[i+k+1] - X[j+k+1])**2))
         if div[0] > 1e-12:
-            div_curves.append(np.log(div + 1e-12))
+            # P1-3 修复 (Round 21 §P0-B): log(div + 1e-12) 当 div→0 时引入 -27.6 偏差,
+            # 拉低 div_mean 使拟合斜率偏小 (λ_max 低估). 改用 where 掩码 + nan 替换.
+            log_div = np.log(div, where=div > 1e-12, out=np.full_like(div, np.nan))
+            div_curves.append(log_div)
 
     if len(div_curves) < 10:
         return {'lambda_max': None, 'reliable': False,
                 'reason': f'Too few divergence curves ({len(div_curves)})'}
 
-    div_mean = np.mean(np.array(div_curves), axis=0)
+    # P1-3 修复 (续): div_curves 现含 NaN (div→0 处), 用 nanmean 忽略 NaN.
+    # 若某列全 NaN, nanmean 会抛 RuntimeWarning 并返回 NaN, 后续 linregress 会自然失败.
+    div_arr = np.array(div_curves)
+    div_mean = np.nanmean(div_arr, axis=0) if np.any(~np.isnan(div_arr)) else np.zeros(n_expand)
     t_fit = np.arange(min(n_expand // 2, len(div_mean) - 5))
 
     if len(t_fit) < 3:
@@ -233,6 +239,11 @@ def estimate_lyapunov_lower_bound(data, E, dt=1.0, n_surrogates=19,
         # Track median neighbor distance over first few steps
         grow_rates = []
         n_pairs = min(30, N_local // 2)
+        # P1-4 修复 (Round 21 §P0-B): N_local - 10 可能为负 (当 E 接近 N 时),
+        # 导致 np.random.choice(负数) 抛 ValueError 被外层 catch 但语义错误.
+        # 此处显式检查, N_local 不足时返回保守下界 0.001.
+        if N_local <= 12:
+            return 0.001
         for _ in range(10):  # bootstrap samples
             idx = np.random.choice(N_local - 10, size=min(n_pairs, N_local - 10),
                                    replace=False)

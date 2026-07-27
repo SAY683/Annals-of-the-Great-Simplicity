@@ -6,7 +6,7 @@
   <title>EDM-Takens Web</title>
   <link rel="stylesheet" href="shared/themes/tokusatsu.css?v=20260727e" />
 </head>
-<body>
+<body data-self-port="8000">
   <div id="app">
     <!-- 特摄防卫队氛围: CRT 扫描线 -->
     <div class="crt-overlay" aria-hidden="true"></div>
@@ -17,11 +17,11 @@
         <p>从拓扑重建动力学 // EDM-Takens Web Console</p>
       </div>
       <div class="header-right">
-        <nav class="base-nav">
+        <nav class="base-nav" id="baseNav">
           <span class="nav-label">BASE</span>
-          <a href="http://127.0.0.1:3000"><span class="nav-dot" style="color:#ff9f43"></span>CMD</a>
-          <a href="http://127.0.0.1:3100"><span class="nav-dot" style="color:#f2c94c"></span>RELAY</a>
-          <a class="active" href="http://127.0.0.1:5173"><span class="nav-dot"></span>OBS</a>
+          <a data-port="3000" href="http://127.0.0.1:3000"><span class="nav-dot" style="color:#ff9f43"></span>CMD</a>
+          <a data-port="3100" href="http://127.0.0.1:3100"><span class="nav-dot" style="color:#f2c94c"></span>RELAY</a>
+          <a class="active" data-port="8000" href="/"><span class="nav-dot"></span>OBS</a>
         </nav>
         <div class="mission-clock" id="missionClock">
           <span class="clock-label">MISSION CLOCK</span>
@@ -223,5 +223,48 @@
     </footer>
   </div>
   <script type="module" src="/src/main.js"></script>
+  <!-- P1-2 (§20.12): BASE 导航隧道模式自适应, 替代 9 处硬编码 127.0.0.1:PORT -->
+  <script>
+  (function () {
+    var nav = document.getElementById('baseNav');
+    if (!nav) return;
+    var selfPort = document.body.getAttribute('data-self-port') || '';
+    var host = window.location.hostname;
+    var isTunnel = /trycloudflare\.com$|\.cfargotunnel\.com$/.test(host);
+    var links = nav.querySelectorAll('a[data-port]');
+    links.forEach(function (a) {
+      var port = a.getAttribute('data-port');
+      if (port === selfPort) {
+        a.href = '/';
+      } else if (isTunnel) {
+        var saved = localStorage.getItem('tunnel_url_' + port);
+        if (saved) {
+          a.href = saved;
+          a.target = '_blank';
+          a.rel = 'noopener';
+        } else {
+          a.href = '#';
+          a.classList.add('tunnel-unconfigured');
+          a.title = '隧道模式下未配置此项目的 URL, 点击配置';
+          a.addEventListener('click', function (e) {
+            e.preventDefault();
+            var label = a.textContent.trim();
+            var input = prompt('请输入 ' + label + ' (端口 ' + port + ') 的隧道 URL (如 https://xxx.trycloudflare.com):');
+            if (input) {
+              try { new URL(input); } catch (err) { alert('URL 格式无效'); return; }
+              localStorage.setItem('tunnel_url_' + port, input);
+              a.href = input;
+              a.target = '_blank';
+              a.rel = 'noopener';
+              a.classList.remove('tunnel-unconfigured');
+            }
+          });
+        }
+      } else {
+        a.href = 'http://127.0.0.1:' + port;
+      }
+    });
+  })();
+  </script>
 </body>
 </html>

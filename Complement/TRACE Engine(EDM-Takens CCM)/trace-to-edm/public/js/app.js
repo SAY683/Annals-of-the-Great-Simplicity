@@ -1357,6 +1357,39 @@ if (btnClearTerm) btnClearTerm.addEventListener('click', tClear);
 const btnRefreshTable = document.getElementById('btnRefreshTable');
 if (btnRefreshTable) btnRefreshTable.addEventListener('click', refreshTable);
 
+// P2 (§20.12): 一键导出人话版 Markdown 报告 (轨迹数据 → 中文解读 .md)
+const btnExportMd = document.getElementById('btnExportMd');
+if (btnExportMd) {
+  btnExportMd.addEventListener('click', async () => {
+    try {
+      t('◉ 正在生成人话版 Markdown 报告...', 'info');
+      btnExportMd.disabled = true;
+      const originalText = btnExportMd.textContent;
+      btnExportMd.textContent = '⏳ 生成中...';
+      const res = await fetch('/api/trajectory/export/md');
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      // 从 Content-Disposition 提取文件名
+      const cd = res.headers.get('Content-Disposition') || '';
+      const m = cd.match(/filename="([^"]+)"/);
+      a.download = m ? m[1] : `trajectory_report_${Date.now()}.md`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      t('✓ 人话版报告已下载', 'done');
+    } catch (e) {
+      t(`✖ 导出失败: ${e.message}`, 'error');
+    } finally {
+      btnExportMd.disabled = false;
+      btnExportMd.textContent = '📝人话版';
+    }
+  });
+}
+
 // 日志过滤工具栏事件绑定
 ['progress','info','warn','error','done'].forEach(l => {
   const cb = document.getElementById(`filter${l.charAt(0).toUpperCase() + l.slice(1)}`);

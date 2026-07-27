@@ -7,6 +7,14 @@
 SimulationModel 四个类，API 与 DoWhy 0.14 一致，保证管线在
 DoWhy 不可用时仍可端到端运行。
 
+D-P0-3 修复 (Round 21 §P0-A): SimulationEstimand 增加 `synthetic` 标记,
+`identifiable` 默认 False. 原实现硬编码 identifiable=True, 使模拟模式
+(ATE=rng.uniform(0.1, 0.5)) 报告显示"可识别", 用户无法区分真实
+do-calculus 与合成值. 现在:
+  - SimulationModel.identify_effect() 显式传 identifiable=False, synthetic=True
+  - DoWhy14Adapter.is_identifiable 对 synthetic 返回 False
+  - 报告渲染层显示"模拟模式 (合成值, 不可识别)"
+
 依赖说明:
   本模块仅依赖 numpy，不维护模块级依赖检查块。
 """
@@ -15,11 +23,22 @@ import numpy as np
 
 
 class SimulationEstimand:
-    def __init__(self, treatment, outcome, identifiable=True):
+    def __init__(self, treatment, outcome, identifiable=False, synthetic=True):
+        """模拟估计量.
+
+        D-P0-3 修复: 默认 identifiable=False, synthetic=True.
+        真实 DoWhy 路径请用 DoWhy 的 IdentifiedEstimand, 不要用本类.
+        """
         self.treatment = treatment
         self.outcome = outcome
-        self.identifiable = identifiable
-        self.identifier = "backdoor (simulated)"
+        # synthetic=True 表示 ATE 为合成值, 不来自真实 do-calculus 识别.
+        # identifiable 在 synthetic=True 时强制为 False, 防止误报.
+        self.synthetic = synthetic
+        if synthetic:
+            self.identifiable = False
+        else:
+            self.identifiable = identifiable
+        self.identifier = "backdoor (simulated, synthetic)"
         self.estimand_type = "nonparametric-ate"
 
 
@@ -67,10 +86,13 @@ class SimulationModel:
                 self._coeff[si, di] = rng.uniform(0.3, 0.9)
 
     def identify_effect(self, proceed_when_unidentifiable=True):
+        # D-P0-3 修复: 显式标记 synthetic=True, identifiable 强制 False.
+        # 调用方 (DoWhy14Adapter.is_identifiable) 应检查 synthetic 字段.
         return SimulationEstimand(
             treatment=self.concept_names[0],
             outcome=self.concept_names[-1],
-            identifiable=True,
+            identifiable=False,
+            synthetic=True,
         )
 
     def estimate_effect(self, identified_estimand, method_name,

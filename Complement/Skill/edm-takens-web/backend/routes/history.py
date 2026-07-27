@@ -12,12 +12,15 @@ import time
 import shutil
 import zipfile
 import tempfile
-from typing import Optional
+from typing import Optional, List
 
-from fastapi import APIRouter, HTTPException, Body
+from fastapi import APIRouter, Depends, HTTPException, Body
 from fastapi.responses import FileResponse, StreamingResponse
+from pydantic import BaseModel, Field
 
 from core.locks import RESULTS_DIR, ARCHIVE_DIR, _PROJECT_ROOT
+# D-P0-4 修复 (Round 21 §P0-A): 全端点鉴权链.
+from core.auth import require_auth, require_auth_optional
 from services.file_management import (
     _safe_task_path,
     _zip_task,
@@ -31,7 +34,24 @@ from job_store import _sanitize_json
 router = APIRouter()
 
 
-@router.get("/api/history")
+# P0-7 (Round 21 §P0-A): Pydantic 请求模型 — 替代裸 dict 校验
+class BatchRequest(BaseModel):
+    """batch_history 端点的请求体模型. 兼容 ids 旧字段名."""
+    action: str = Field(..., description="操作类型: archive|delete|download")
+    task_ids: Optional[List[str]] = Field(None, min_items=1, description="任务 ID 列表, 至少 1 个")
+    ids: Optional[List[str]] = Field(None, min_items=1, description="task_ids 的旧别名")
+
+    def normalized_ids(self) -> List[str]:
+        """返回有效的 task_ids, 优先 task_ids 字段, 回退到 ids."""
+        return self.task_ids if self.task_ids else (self.ids or [])
+
+
+class CompareRequest(BaseModel):
+    """compare_tasks 端点的请求体模型."""
+    task_ids: List[str] = Field(..., min_items=2, max_items=2, description="必须包含恰好 2 个任务 ID")
+
+
+@router.get("/api/history", dependencies=[Depends(require_auth_optional)])
 def list_history(limit: int = 50):
     """List completed analysis task directories under ``results/``."""
     # P0 fix: 防御性创建 results/ 目录 — 同步脚本或外部操作可能
@@ -110,7 +130,7 @@ def _lookup_summary_by_task_id(task_id: str) -> Optional[dict]:
         return None
 
 
-@router.get("/api/history/{task_id}")
+@router.get("/api/history/{task_id}", dependencies=[Depends(require_auth_optional)])
 def get_history_detail(task_id: str):
     """返回单任务的完整数据：config + params + images + summary。
 
@@ -135,7 +155,7 @@ def get_history_detail(task_id: str):
     }
 
 
-@router.post("/api/history/{task_id}/archive")
+@router.post("/api/history/{task_id}/archive", dependencies=[Depends(require_auth)])
 def archive_task(task_id: str):
     """Compress a task's results into archive/{task_id}.zip and remove the active directory."""
     task_dir = _safe_task_path(task_id, RESULTS_DIR)
@@ -149,7 +169,7 @@ def archive_task(task_id: str):
         raise HTTPException(status_code=500, detail=f"Archive failed: {e}")
 
 
-@router.get("/api/history/{task_id}/download")
+@router.get("/api/history/{task_id}/download", dependencies=[Depends(require_auth_optional)])
 def download_task(task_id: str):
     """Download a task's results as a zip archive."""
     task_dir = _safe_task_path(task_id, RESULTS_DIR)
@@ -163,7 +183,7 @@ def download_task(task_id: str):
     return FileResponse(zip_path, filename=f"{task_id}.zip", media_type="application/zip")
 
 
-@router.delete("/api/history/{task_id}")
+@router.delete("/api/history/{task_id}", dependencies=[Depends(require_auth)])
 def delete_task(task_id: str):
     """Delete a task's active results and any associated archive."""
     task_dir = _safe_task_path(task_id, RESULTS_DIR)
@@ -180,7 +200,7 @@ def delete_task(task_id: str):
     return {"task_id": task_id, "deleted": deleted}
 
 
-@router.post("/api/history/cleanup")
+@router.post("/api/history/cleanup", dependencies=[Depends(require_auth)])
 def cleanup_history(
     days: int = 30,
     max_size_mb: Optional[float] = None,
@@ -271,7 +291,7 @@ def cleanup_history(
     }
 
 
-@router.get("/api/archives")
+@router.get("/api/archives", dependencies=[Depends(require_auth_optional)])
 def list_archives():
     """List zip files in the archive directory."""
     archives = []
@@ -292,7 +312,7 @@ def list_archives():
     return {"archives": archives}
 
 
-@router.post("/api/archives/{task_id}/restore")
+@router.post("/api/archives/{task_id}/restore", dependencies=[Depends(require_auth)])
 def restore_archive(task_id: str):
     """Unzip an archive back into the results directory."""
     zip_path = _safe_task_path(task_id + ".zip", ARCHIVE_DIR)
@@ -310,7 +330,7 @@ def restore_archive(task_id: str):
         raise HTTPException(status_code=500, detail=f"Restore failed: {e}")
 
 
-@router.get("/api/archives/{task_id}/preview")
+@router.get("/api/archives/{task_id}/preview", dependencies=[Depends(require_auth_optional)])
 def preview_archive(task_id: str):
     """临时解压 zip 到临时目录，返回 config + params + images 列表。
 
@@ -349,7 +369,7 @@ def preview_archive(task_id: str):
             pass
 
 
-@router.delete("/api/archives/{task_id}")
+@router.delete("/api/archives/{task_id}", dependencies=[Depends(require_auth)])
 def delete_archive(task_id: str):
     """Delete an archive zip file."""
     zip_path = _safe_task_path(task_id + ".zip", ARCHIVE_DIR)
@@ -362,7 +382,7 @@ def delete_archive(task_id: str):
         raise HTTPException(status_code=500, detail=f"Delete failed: {e}")
 
 
-@router.post("/api/history/batch")
+@router.post("/api/history/batch", dependencies=[Depends(require_auth)])
 def batch_history(body: dict = Body(...)):
     """Batch archive, delete, or download multiple tasks.
 
@@ -375,12 +395,20 @@ def batch_history(body: dict = Body(...)):
     For ``download``, returns a zip containing each task's zip (or its result
     directory if not yet archived).
     """
-    action = (body.get("action") or "").lower()
-    task_ids = body.get("task_ids") or body.get("ids") or []
+    # P0-7 (Round 21 §P0-A): 用 Pydantic 模型替换裸 dict 校验
+    # 保留 dict 入参以兼容旧客户端, 但用模型做严格校验
+    try:
+        req = BatchRequest(**body)
+    except Exception as ve:
+        # 提取 Pydantic 校验错误信息
+        detail = "; ".join(f"{'.'.join(str(p) for p in err['loc'])}: {err['msg']}" for err in ve.errors())
+        raise HTTPException(status_code=422, detail=f"参数校验失败: {detail}")
+    action = req.action.lower()
+    task_ids = req.normalized_ids()
     if action not in ("archive", "delete", "download"):
         raise HTTPException(status_code=400, detail="action must be archive|delete|download")
-    if not isinstance(task_ids, list) or not task_ids:
-        raise HTTPException(status_code=400, detail="task_ids must be a non-empty list")
+    if not task_ids:
+        raise HTTPException(status_code=400, detail="task_ids 不能为空")
 
     if action == "download":
         fd, bundle_path = tempfile.mkstemp(suffix=".zip", prefix="edmtakens_batch_")
@@ -442,12 +470,14 @@ def batch_history(body: dict = Body(...)):
     return {"action": action, "results": results}
 
 
-@router.post("/api/history/compare")
+@router.post("/api/history/compare", dependencies=[Depends(require_auth)])
 def compare_tasks(body: dict = Body(...)):
     """Return side-by-side summaries and image lists for two tasks.
 
     Accepts either ``{task_ids: [id1, id2]}`` or ``{left_id, right_id}``.
     """
+    # P0-7 (Round 21 §P0-A): 用 Pydantic 模型替换裸 dict 校验
+    # 支持两种入参形态, 优先 task_ids, 回退 left_id/right_id
     task_ids = body.get("task_ids") or []
     if not isinstance(task_ids, list) or len(task_ids) != 2:
         left_id = body.get("left_id")
@@ -455,7 +485,13 @@ def compare_tasks(body: dict = Body(...)):
         if left_id and right_id:
             task_ids = [left_id, right_id]
         else:
-            raise HTTPException(status_code=400, detail="task_ids must contain exactly 2 items")
+            raise HTTPException(status_code=400, detail="task_ids 必须包含 2 个元素, 或同时提供 left_id 和 right_id")
+    try:
+        req = CompareRequest(task_ids=task_ids)
+    except Exception as ve:
+        detail = "; ".join(f"{'.'.join(str(p) for p in err['loc'])}: {err['msg']}" for err in ve.errors())
+        raise HTTPException(status_code=422, detail=f"参数校验失败: {detail}")
+    task_ids = req.task_ids
     summaries = []
     for task_id in task_ids:
         summary = _task_summary(task_id)
@@ -465,7 +501,7 @@ def compare_tasks(body: dict = Body(...)):
     return {"task_ids": task_ids, "left_task": summaries[0], "right_task": summaries[1], "summaries": summaries}
 
 
-@router.get("/api/history/{task_id}/export/json")
+@router.get("/api/history/{task_id}/export/json", dependencies=[Depends(require_auth_optional)])
 def export_task_json(task_id: str):
     """Export a task summary and image list as a downloadable JSON file."""
     summary = _task_summary(task_id)
@@ -479,7 +515,7 @@ def export_task_json(task_id: str):
     )
 
 
-@router.get("/api/history/{task_id}/export/csv")
+@router.get("/api/history/{task_id}/export/csv", dependencies=[Depends(require_auth_optional)])
 def export_task_csv(task_id: str):
     """Export a task summary as a CSV of summary fields."""
     summary = _task_summary(task_id)
@@ -503,4 +539,262 @@ def export_task_csv(task_id: str):
         io.BytesIO(buf.getvalue().encode("utf-8-sig")),
         media_type="text/csv",
         headers={"Content-Disposition": f'attachment; filename="{task_id}_summary.csv"'},
+    )
+
+
+# P2 (§20.12): 一键导出人话版 Markdown 报告
+# 将 SQLite 中缓存的 rich summary + 基础 task_summary 转译为非技术读者可理解的中文报告.
+# 设计目标: 用户读这份 .md 就能知道 "这次分析说了什么、稳不稳定、有哪些因果链、可不可信".
+def _fmt_rho(rho):
+    """将相关系数 ρ 转译为人话强度的中文标签."""
+    if rho is None:
+        return "N/A"
+    abs_rho = abs(rho)
+    # P1 修复 (Round 21 §P0-C): ρ 精度从 3 位提升到 4 位, 与论文要求一致.
+    if abs_rho >= 0.85:
+        return f"{rho:.4f} (极强)"
+    if abs_rho >= 0.7:
+        return f"{rho:.4f} (强)"
+    if abs_rho >= 0.5:
+        return f"{rho:.4f} (中等)"
+    if abs_rho >= 0.3:
+        return f"{rho:.4f} (弱)"
+    return f"{rho:.4f} (极弱/无)"
+
+
+def _fmt_stability(tier):
+    """将稳定性分级翻译为人话."""
+    if not tier:
+        return "未提供"
+    mapping = {
+        "Stable / dissipative": "稳定 (耗散系统, 可长期预测)",
+        "Near-critical / stable": "近临界 (稳定但接近相变点, 需警惕突发重组)",
+        "Chaotic / unstable": "混沌 (不稳定, 长期预测不可靠)",
+    }
+    return mapping.get(tier, tier)
+
+
+def _fmt_timestamp(ts):
+    """Unix 时间戳 → 可读时间."""
+    if ts is None:
+        return "N/A"
+    try:
+        from datetime import datetime
+        return datetime.fromtimestamp(float(ts)).strftime("%Y-%m-%d %H:%M:%S")
+    except Exception:
+        return str(ts)
+
+
+@router.get("/api/history/{task_id}/export/md", dependencies=[Depends(require_auth_optional)])
+def export_task_md(task_id: str):
+    """导出人话版 Markdown 报告 — 面向非技术读者.
+
+    报告结构:
+      1. 概览 (任务 ID, 时间, 数据集, 目标变量)
+      2. 稳定性诊断 (HAVOK 分级 + 解读)
+      3. 各变量 EDM 技能 (ρ + 非线性判定)
+      4. CCM 因果链 (源→目标 + 收敛判定 + p 值)
+      5. 数据质量与后审计
+      6. 配置参数 (附录)
+    """
+    base = _task_summary(task_id)
+    if base is None:
+        raise HTTPException(status_code=404, detail="Task not found")
+    rich = _lookup_summary_by_task_id(task_id) or {}
+
+    config = base.get("config") or {}
+    params = base.get("params") or {}
+    target_col = rich.get("target_col") or config.get("target_col") or "(未指定)"
+    project_name = rich.get("project_name") or config.get("project_name") or "(默认)"
+    intensity = rich.get("intensity") or "(未设置)"
+    intensity_notes = rich.get("intensity_notes") or []
+
+    lines = []
+    lines.append(f"# EDM-Takens 分析报告: {task_id}\n")
+    lines.append(f"> 自动生成 — 面向非技术读者的人话版解读.\n")
+    lines.append("")
+
+    # 1. 概览
+    lines.append("## 1. 概览\n")
+    lines.append(f"- **任务 ID**: `{task_id}`")
+    lines.append(f"- **完成时间**: {_fmt_timestamp(base.get('updated_at'))}")
+    lines.append(f"- **项目**: {project_name}")
+    lines.append(f"- **目标变量**: `{target_col}`")
+    lines.append(f"- **分析强度档位**: {intensity}")
+    if intensity_notes:
+        lines.append(f"- **强度说明**: {'; '.join(map(str, intensity_notes))}")
+    lines.append(f"- **生成图表数**: {len(base.get('images', []))}")
+    lines.append("")
+
+    # 2. 稳定性诊断
+    lines.append("## 2. 稳定性诊断\n")
+    havok = rich.get("havok") or {}
+    if havok:
+        tier = havok.get("stability_tier")
+        lines.append(f"- **整体判定**: {_fmt_stability(tier)}")
+        if havok.get("max_eigenvalue") is not None:
+            lines.append(f"- **最大特征值 |λ_max|**: {havok['max_eigenvalue']:.4f}")
+            lines.append(f"  - |λ_max| < 0.05 → 稳定/近临界; |λ_max| ≥ 0.05 → 混沌.")
+        lines.append(f"- **HAVOK 秩 r**: {havok.get('rank')} (线性主导模态数)")
+        lines.append(f"- **线性解释方差占比**: {havok.get('explained_variance', 0) * 100:.1f}%")
+        lines.append(f"- **回归 R²**: {havok.get('regression_r2', 0):.3f}")
+        lines.append(f"- **峭度**: {havok.get('kurtosis', 0):.3f} (>3 表示重尾, 罕见事件频繁)")
+        # P0-2 修复 (Round 21 §P0-C): 暴露 condition_number 诊断.
+        # sovereign_havok.py 已计算 condition_number (L624/L677/L692),
+        # 论文已披露 5.5×10¹² 病态问题, cond > 1e10 时特征值计算可能有 10 位有效数字丢失.
+        cond_raw = havok.get("condition_number_raw")
+        if cond_raw is None:
+            # 尝试从字符串字段解析
+            cond_str = havok.get("condition_number", "N/A")
+            if cond_str not in (None, "N/A", "nan"):
+                try:
+                    cond_raw = float(cond_str)
+                except (TypeError, ValueError):
+                    cond_raw = None
+        if cond_raw is not None and cond_raw == cond_raw:  # NaN check
+            if cond_raw > 1e10:
+                lines.append(f"- **A 矩阵条件数**: {cond_raw:.2e} ⚠️ **病态** — 特征值/稳定性结论可信度受损")
+            elif cond_raw > 1e6:
+                lines.append(f"- **A 矩阵条件数**: {cond_raw:.2e} ⚠️ 接近病态, 稳定性结论应谨慎解读")
+            else:
+                lines.append(f"- **A 矩阵条件数**: {cond_raw:.2e} ✓ 良好")
+        if havok.get("is_degenerate"):
+            lines.append("- ⚠️ **HAVOK 退化**: 信号近常量或样本量不足, 稳定性结论仅供参考.")
+        lines.append("")
+        lines.append("> **解读**: 稳定性分级告诉我们系统是 \"可预测的稳定系统\" 还是 \"不可预测的混沌系统\". "
+                     "近临界意味着系统正在接近相变点, 一次小扰动可能引发结构性重组.\n")
+    else:
+        lines.append("- 未提供 HAVOK 诊断信息 (可能因样本量不足或信号退化).\n")
+
+    # 3. 各变量 EDM 技能
+    lines.append("## 3. 各变量 EDM 预测技能\n")
+    variables = rich.get("variables") or {}
+    if variables:
+        lines.append("| 变量 | 简单x粗 ρ | S-Map 最大 ρ | 最佳 θ | 非线性? |")
+        lines.append("|------|-----------|-------------|--------|---------|")
+        for var_name, m in variables.items():
+            rho_s = _fmt_rho(m.get("rho_simplex"))
+            rho_sm = _fmt_rho(m.get("rho_smap_max"))
+            theta = m.get("theta_best")
+            theta_str = f"{theta:.2f}" if theta is not None else "N/A"
+            nonlin = "是 ✓" if m.get("is_nonlinear") else "否"
+            lines.append(f"| `{var_name}` | {rho_s} | {rho_sm} | {theta_str} | {nonlin} |")
+        lines.append("")
+        lines.append("> **解读**: ρ 越接近 1 表示预测越准. "
+                     "若 S-Map ρ 显著高于简单x粗 ρ, 说明系统具有非线性特征, "
+                     "线性模型 (如 AR / VAR) 会严重低估其可预测性.\n")
+    else:
+        lines.append("- 未提供变量级 EDM 指标.\n")
+
+    # 4. CCM 因果链
+    lines.append("## 4. CCM 因果链 (Sugihara 因果关系)\n")
+    ccm = rich.get("ccm") or {}
+    if ccm and ccm.get("pairs"):
+        lines.append(f"- **测试对数**: {ccm.get('n_pairs', len(ccm['pairs']))}")
+        lines.append(f"- **原始显著数 (p<0.05)**: {ccm.get('n_significant_raw', 0)}")
+        lines.append(f"- **Bonferroni 校正后显著数**: {ccm.get('n_significant_corrected', 0)}")
+        lines.append(f"- **多重假设校正方法**: {ccm.get('method', 'N/A')}")
+        lines.append("")
+        lines.append("| 源 → 目标 | p 值 | 校正后显著? | 收敛? | 判定 |")
+        lines.append("|-----------|------|-------------|-------|------|")
+        for p in ccm["pairs"]:
+            cause = p.get("cause", "?")
+            effect = p.get("effect", "?")
+            pval = p.get("p_value")
+            pval_str = f"{pval:.4f}" if pval is not None else "N/A"
+            sig = "是 ✓" if p.get("significant_corrected") else "否"
+            conv = "是 ✓" if p.get("is_converging") else "否"
+            verdict = p.get("verdict") or "未判定"
+            lines.append(f"| `{cause}` → `{effect}` | {pval_str} | {sig} | {conv} | {verdict} |")
+        lines.append("")
+        lines.append("> **解读**: CCM 通过 \"能否从效应的流形预测原因\" 来判定因果方向. "
+                     "收敛 (converging) + p 值显著 = 存在因果链; "
+                     "Bonferroni 校正后仍显著 = 多重假设检验下仍稳健.\n")
+    else:
+        lines.append("- 未提供 CCM 因果分析结果 (可能因样本量不足或变量对数 < 2).\n")
+
+    # 5. 数据质量与后审计
+    lines.append("## 5. 数据质量与后审计\n")
+    dq_warn = rich.get("data_quality_warning")
+    if dq_warn:
+        lines.append(f"- ⚠️ **数据质量警告**: {dq_warn}")
+    else:
+        lines.append("- 数据质量: 无警告.")
+
+    pa_verdict = rich.get("post_audit_verdict")
+    if pa_verdict:
+        lines.append(f"- **后审计判定**: {pa_verdict}")
+        if rich.get("post_audit_passed") is not None:
+            passed = "通过 ✓" if rich.get("post_audit_passed") else "未通过 ✗"
+            lines.append(f"- **是否通过**: {passed}")
+        warns = rich.get("post_audit_warnings") or []
+        if warns:
+            lines.append("- **警告项**:")
+            for w in warns:
+                lines.append(f"  - {w}")
+        fails = rich.get("post_audit_failures") or []
+        if fails:
+            lines.append("- **失败项**:")
+            for f in fails:
+                lines.append(f"  - {f}")
+    else:
+        lines.append("- 后审计: 未运行.")
+    lines.append("")
+
+    # 6. 配置附录
+    lines.append("## 6. 配置附录\n")
+    if config:
+        lines.append("### 运行配置\n")
+        lines.append("| 参数 | 值 |")
+        lines.append("|------|----|")
+        for k, v in sorted(config.items()):
+            if isinstance(v, (list, dict)):
+                v = json.dumps(v, ensure_ascii=False)
+            lines.append(f"| `{k}` | `{v}` |")
+        lines.append("")
+    if params:
+        lines.append("### 算法参数\n")
+        lines.append("| 参数 | 值 |")
+        lines.append("|------|----|")
+        for k, v in sorted(params.items()):
+            if isinstance(v, (list, dict)):
+                v = json.dumps(v, ensure_ascii=False)
+            lines.append(f"| `{k}` | `{v}` |")
+        lines.append("")
+
+    # 7. 总结
+    lines.append("## 7. 一句话总结\n")
+    summary_parts = []
+    if havok:
+        tier = havok.get("stability_tier", "")
+        if "Stable" in tier:
+            summary_parts.append("系统稳定可预测")
+        elif "Near-critical" in tier:
+            summary_parts.append("系统接近临界点, 警惕突发重组")
+        elif "Chaotic" in tier:
+            summary_parts.append("系统混沌, 长期预测不可靠")
+    if ccm and ccm.get("n_significant_corrected", 0) > 0:
+        summary_parts.append(f"识别出 {ccm['n_significant_corrected']} 条显著因果链")
+    elif ccm:
+        summary_parts.append("未识别出显著因果链")
+    if variables:
+        nonlin_count = sum(1 for v in variables.values() if v.get("is_nonlinear"))
+        if nonlin_count > 0:
+            summary_parts.append(f"{nonlin_count}/{len(variables)} 个变量呈非线性")
+
+    if summary_parts:
+        lines.append("**" + "; ".join(summary_parts) + ".**")
+    else:
+        lines.append("_数据不足, 无法给出总结._")
+    lines.append("")
+    lines.append("---")
+    lines.append(f"_报告由 EDM-Takens Web 自动生成于 {_fmt_timestamp(time.time())}._")
+
+    md_content = "\n".join(lines)
+    return StreamingResponse(
+        io.BytesIO(md_content.encode("utf-8")),
+        media_type="text/markdown; charset=utf-8",
+        headers={
+            "Content-Disposition": f'attachment; filename="{task_id}_report.md"',
+        },
     )

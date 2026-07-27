@@ -104,9 +104,16 @@ def estimate_lyapunov_exponent(data, E, dt=1.0, n_expand=20):
     x_centered = data - np.mean(data)
     autocorr = np.correlate(x_centered, x_centered, mode='full')
     autocorr = autocorr[len(autocorr)//2:]
-    autocorr = autocorr / autocorr[0]
-    zero_cross = np.where(np.diff(np.sign(autocorr - 1/np.exp(1))))[0]
-    mean_period = zero_cross[0] + 1 if len(zero_cross) > 0 else max(5, E)
+    # P1-5 修复 (Round 21 §P0-B): autocorr[0] 可能为 0 (常量序列或 std=0),
+    # 导致除以 0 产生 NaN 传播到下游. 用 safe division + fallback.
+    ac0 = autocorr[0] if len(autocorr) > 0 else 0.0
+    if abs(ac0) < 1e-12:
+        # 常量序列: 无法定义 mean period, 用 E+1 作为保守值
+        mean_period = max(5, E + 1)
+    else:
+        autocorr = autocorr / ac0
+        zero_cross = np.where(np.diff(np.sign(autocorr - 1/np.exp(1))))[0]
+        mean_period = zero_cross[0] + 1 if len(zero_cross) > 0 else max(5, E)
 
     # Find nearest neighbors for each point (with temporal separation)
     div_curves = []
@@ -362,11 +369,22 @@ def havok_pipeline(data, q, dt=1.0):
 
 
 # ============================================================
-# Cross-Validation with all 3 safeguards
+# Heuristic Validation with all 3 safeguards
+# (D-P0-2: 原 "Cross-Validation" 命名误导, 实为算法间一致性启发式验证)
 # ============================================================
 
-def cross_validate_with_safeguards(edm, hv, hu, lyap, hankel_check, var_name, df):
-    """Enhanced cross-validation incorporating all three safeguards."""
+def heuristic_validation_with_safeguards(edm, hv, hu, lyap, hankel_check, var_name, df):
+    """启发式一致性验证 (非统计交叉验证).
+
+    D-P0-2 修复 (Round 21 §P0-A): 原函数名 `cross_validate_with_safeguards`
+    暗示统计意义上的 KFold/train-test CV, 但实际仅做算法间的 if-else 一致性
+    检查 (EDM vs HAVOK, Lyapunov horizon, Hankel ratio), 不涉及样本划分.
+    对时间序列相邻 hold-out (lib='1 {n-7}', pred='{n-6} {n}') 在 AR(1) φ=0.9
+    下互信息 ≈ 0.83 nats, 测试集 ρ 被系统性高估, 不构成独立 CV.
+
+    本函数已重命名为 `heuristic_validation_with_safeguards` 以反映其本质.
+    `cross_validate_with_safeguards` 保留为别名以兼容现有调用点.
+    """
     checks = []
     warnings_list = []
     n = len(df)
@@ -443,6 +461,11 @@ def cross_validate_with_safeguards(edm, hv, hu, lyap, hankel_check, var_name, df
             f"Basis mismatch: V-kurt={hv.kurtosis_vr_:.3f} vs U-kurt={hu.kurtosis_vr_:.3f}"))
 
     return checks, warnings_list
+
+
+# D-P0-2 兼容别名: 旧调用方仍可使用 `cross_validate_with_safeguards`,
+# 但建议迁移到 `heuristic_validation_with_safeguards` 以避免命名误导.
+cross_validate_with_safeguards = heuristic_validation_with_safeguards
 
 
 # ============================================================

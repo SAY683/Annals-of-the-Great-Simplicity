@@ -713,6 +713,7 @@ async function loadHistory() {
             <button class="small compare-select-btn" data-task="${tid}">对比</button>
             <button class="small export-json-btn" data-task="${tid}">JSON</button>
             <button class="small export-csv-btn" data-task="${tid}">CSV</button>
+            <button class="small export-md-btn" data-task="${tid}" title="导出人话版 Markdown 报告">📝人话版</button>
             <button class="small danger delete-btn" data-task="${tid}">删除</button>
           </div>
           <div class="thumbs">${thumbs || '<span class="dim">无图片</span>'}</div>
@@ -757,6 +758,10 @@ async function loadHistory() {
     })
     container.querySelectorAll('.export-csv-btn').forEach((btn) => {
       btn.addEventListener('click', () => downloadExport(btn.dataset.task, 'csv'))
+    })
+    // P2 (§20.12): 一键导出人话版 Markdown 报告
+    container.querySelectorAll('.export-md-btn').forEach((btn) => {
+      btn.addEventListener('click', () => downloadExport(btn.dataset.task, 'md'))
     })
   } catch (e) {
     container.innerHTML = `<p class="error">加载历史失败: ${e.message}</p>`

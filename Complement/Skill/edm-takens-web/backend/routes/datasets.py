@@ -9,7 +9,7 @@ from datetime import datetime
 from typing import Optional
 
 import pandas as pd
-from fastapi import APIRouter, File, Form, UploadFile, HTTPException, Request
+from fastapi import APIRouter, Depends, File, Form, UploadFile, HTTPException, Request
 from fastapi.responses import FileResponse
 
 from core.locks import DATA_DIR
@@ -27,6 +27,12 @@ from data_quality import evaluate_dataframe
 
 router = APIRouter()
 
+# D-P0-4 修复 (Round 21 §P0-A): 全端点鉴权链.
+# - GET 端点用 require_auth_optional (弱鉴权, 区分读写审计)
+# - POST 端点用 require_auth (强鉴权)
+# 本地开发 (EDM_API_KEY 未设置) 自动放行环回地址, 不影响 dev 体验.
+from core.auth import require_auth, require_auth_optional
+
 
 def _safe_data_path(filename: str) -> str:
     """Strip directory components from filenames to prevent path traversal."""
@@ -39,17 +45,17 @@ def _safe_data_path(filename: str) -> str:
     return full
 
 
-@router.get("/api/health")
+@router.get("/api/health", dependencies=[Depends(require_auth_optional)])
 def health():
     return {"status": "ok", "time": datetime.utcnow().isoformat()}
 
 
-@router.get("/api/datasets")
+@router.get("/api/datasets", dependencies=[Depends(require_auth_optional)])
 def list_datasets():
     return {"datasets": _list_uploaded_csvs()}
 
 
-@router.post("/api/upload")
+@router.post("/api/upload", dependencies=[Depends(require_auth)])
 def upload_file(request: Request, file: UploadFile = File(...)):
     if not file.filename.lower().endswith(".csv"):
         raise HTTPException(status_code=400, detail="Only CSV files are accepted")
@@ -118,7 +124,7 @@ def upload_file(request: Request, file: UploadFile = File(...)):
     return {"filename": file.filename, "saved": True, "size": total}
 
 
-@router.get("/api/datasets/{filename}/columns")
+@router.get("/api/datasets/{filename}/columns", dependencies=[Depends(require_auth_optional)])
 def get_columns(filename: str):
     path = _safe_data_path(filename)
     if not os.path.exists(path):
@@ -142,7 +148,7 @@ def get_columns(filename: str):
     }
 
 
-@router.get("/api/datasets/{filename}/recommend")
+@router.get("/api/datasets/{filename}/recommend", dependencies=[Depends(require_auth_optional)])
 def recommend_analysis(filename: str, target_col: Optional[str] = None, variables: Optional[str] = None):
     """Return an automatic analysis-intensity recommendation for a dataset."""
     csv_path, df, numeric_cols = _prepare_dataset(filename)
@@ -151,7 +157,7 @@ def recommend_analysis(filename: str, target_col: Optional[str] = None, variable
     return profile
 
 
-@router.get("/api/datasets/{filename}/quality")
+@router.get("/api/datasets/{filename}/quality", dependencies=[Depends(require_auth_optional)])
 def data_quality(filename: str, target_col: Optional[str] = None, variables: Optional[str] = None):
     """Return per-column EDM readiness diagnostics (algorithmic soundness)."""
     csv_path, df, numeric_cols = _prepare_dataset(filename)
@@ -183,7 +189,7 @@ def data_quality(filename: str, target_col: Optional[str] = None, variables: Opt
     return {"filename": filename, "target_col": target_col, "columns": _sanitize(report)}
 
 
-@router.get("/api/datasets/{filename}/embed_curve")
+@router.get("/api/datasets/{filename}/embed_curve", dependencies=[Depends(require_auth_optional)])
 def embed_curve(
     filename: str,
     target_col: Optional[str] = None,

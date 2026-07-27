@@ -581,10 +581,14 @@ def _deploy_causallearn(bridge) -> WarriorCard:
         from causallearn.search.ConstraintBased.PC import pc as _pc_alg
         pc_result = _pc_alg(sub_data, alpha=0.01)
         pc_edges = set()
+        # P0-2 修复 (Round 21 §P0-B): causallearn 节点名 'X1','X2',... 是 1-based,
+        # 必须做 -1 转换才能正确索引 sub_names (与 causallearn_validator.py:184-185 一致).
+        # 原 bug: 直接用 _node_index() 返回值,导致所有节点偏移1位,
+        # 最后一个节点 X_N 越界被静默丢弃, agree 集合比较结果全错.
         for e in pc_result.G.get_graph_edges():
-            ni = _node_index(e.get_node1())
-            nj = _node_index(e.get_node2())
-            if ni < len(sub_names) and nj < len(sub_names):
+            ni = _node_index(e.get_node1()) - 1  # 1-based → 0-based
+            nj = _node_index(e.get_node2()) - 1
+            if 0 <= ni < len(sub_names) and 0 <= nj < len(sub_names):
                 pc_edges.add((sub_names[ni], sub_names[nj]))
 
         # GES
@@ -592,9 +596,9 @@ def _deploy_causallearn(bridge) -> WarriorCard:
         ges_result = _ges_alg(sub_data)
         ges_edges = set()
         for e in ges_result['G'].get_graph_edges():
-            ni = _node_index(e.get_node1())
-            nj = _node_index(e.get_node2())
-            if ni < len(sub_names) and nj < len(sub_names):
+            ni = _node_index(e.get_node1()) - 1  # 1-based → 0-based
+            nj = _node_index(e.get_node2()) - 1
+            if 0 <= ni < len(sub_names) and 0 <= nj < len(sub_names):
                 ges_edges.add((sub_names[ni], sub_names[nj]))
 
         # 交叉比较
