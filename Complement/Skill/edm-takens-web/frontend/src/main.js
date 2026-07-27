@@ -125,12 +125,33 @@ async function checkBackendHealth() {
 }
 
 // P1-f 修缮：跨项目导航点健康检查 — 轮询其他项目的 /api/health
+// debt-12.15 隧道模式适配: 隧道下 (https://xxx.trycloudflare.com) 不能 fetch
+// 本地 http://127.0.0.1:xxxx（混合内容拦截），改为跳过健康检查，避免误显示离线
 const NAV_TARGETS = [
   { port: 3000, selector: '.base-nav a[href*=":3000"]' },
   { port: 3100, selector: '.base-nav a[href*=":3100"]' },
 ]
 
+function _isTunnelMode() {
+  try {
+    const host = window.location.hostname;
+    return host.includes('trycloudflare.com') || (window.location.protocol === 'https:' && !host.match(/^(localhost|127\.0\.0\.1)$/));
+  } catch { return false; }
+}
+
 async function checkNavHealth() {
+  // 隧道模式下跳过跨项目健康检查（混合内容拦截，会误显示离线）
+  if (_isTunnelMode()) {
+    for (const target of NAV_TARGETS) {
+      const link = document.querySelector(target.selector)
+      const dot = link?.querySelector('.nav-dot')
+      if (dot) {
+        dot.style.opacity = '0.6'
+        dot.title = '隧道模式（不检测本地服务）'
+      }
+    }
+    return
+  }
   for (const target of NAV_TARGETS) {
     const link = document.querySelector(target.selector)
     if (!link) continue
@@ -686,6 +707,7 @@ async function loadHistory() {
           <h4>${tid}</h4>
           <div class="meta">更新时间: ${escapeHtml(date)} | 图片: ${task.images.length} 张 ${task.has_config ? '| 含配置' : ''}</div>
           <div class="actions">
+            <button class="small view-btn" data-task="${tid}">查看</button>
             <button class="small download-btn" data-task="${tid}">下载 zip</button>
             <button class="small archive-btn" data-task="${tid}">归档</button>
             <button class="small compare-select-btn" data-task="${tid}">对比</button>
@@ -712,6 +734,9 @@ async function loadHistory() {
     })
 
     // Download / archive / delete / compare-select buttons
+    container.querySelectorAll('.view-btn').forEach((btn) => {
+      btn.addEventListener('click', () => viewHistoryTask(btn.dataset.task))
+    })
     container.querySelectorAll('.download-btn').forEach((btn) => {
       btn.addEventListener('click', () => {
         const id = btn.dataset.task
@@ -736,6 +761,46 @@ async function loadHistory() {
   } catch (e) {
     container.innerHTML = `<p class="error">加载历史失败: ${e.message}</p>`
     $('#historyBatchToolbar').style.display = 'none'
+  }
+}
+
+// 历史回看：调用 /api/history/:task_id 拉取完整数据，复用 renderSummary /
+// renderImages 把摘要和图片重新渲染到结果面板，并在摘要顶部插入回看标识。
+async function viewHistoryTask(taskId) {
+  try {
+    const r = await fetch(`${API_PREFIX}/history/${encodeURIComponent(taskId)}`)
+    if (!r.ok) throw new Error(`HTTP ${r.status}`)
+    const d = await r.json()
+    if (!d.success) throw new Error(d.error || 'unknown')
+
+    // 重渲染摘要面板（复用 renderSummary）
+    if (d.summary && typeof renderSummary === 'function') {
+      renderSummary(d.summary)
+    }
+    // 重渲染图片区（复用 renderImages）
+    if (d.images && typeof renderImages === 'function') {
+      renderImages(d.images, taskId)
+    }
+    // 在摘要顶部插入 task_id 标识
+    const summaryEl = document.getElementById('summary')
+    if (summaryEl) {
+      let badge = document.getElementById('historyViewBadge')
+      if (!badge) {
+        badge = document.createElement('div')
+        badge.id = 'historyViewBadge'
+        badge.style.cssText = 'padding:8px 12px;background:var(--accent-dim,rgba(0,255,200,0.1));border-left:3px solid var(--accent);margin-bottom:8px;font-size:0.8rem;'
+        summaryEl.prepend(badge)
+      }
+      // task_updated 是 Unix 秒；缺失时退回当前时间
+      const updatedSec = d.task_updated || (Date.now() / 1000)
+      badge.textContent = `◉ 历史回看: ${taskId.slice(0, 16)}... | 更新于 ${new Date(updatedSec * 1000).toLocaleString('zh-CN')}`
+    }
+    // 滚动到结果面板
+    summaryEl?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    // 日志提示
+    appendTerminal(`◉ 已加载历史任务 ${taskId.slice(0, 8)}... 的数据`, 'info')
+  } catch (e) {
+    appendTerminal(`✗ 加载历史失败: ${e.message}`, 'error')
   }
 }
 
@@ -985,6 +1050,7 @@ async function loadArchives() {
           <h4>${label}</h4>
           <div class="meta">归档时间: ${date} ${size}</div>
           <div class="actions">
+            <button class="small view-archive-btn" data-id="${a.task_id}">查看</button>
             <button class="small restore-archive-btn" data-id="${a.task_id}">恢复</button>
             <button class="small danger delete-archive-btn" data-id="${a.task_id}">删除</button>
           </div>
@@ -992,6 +1058,9 @@ async function loadArchives() {
       `
     }).join('')
 
+    container.querySelectorAll('.view-archive-btn').forEach((btn) => {
+      btn.addEventListener('click', () => viewArchiveTask(btn.dataset.id))
+    })
     container.querySelectorAll('.restore-archive-btn').forEach((btn) => {
       btn.addEventListener('click', () => restoreArchive(btn.dataset.id))
     })
@@ -1000,6 +1069,47 @@ async function loadArchives() {
     })
   } catch (e) {
     container.innerHTML = `<p class="error">加载归档失败: ${e.message}</p>`
+  }
+}
+
+// 归档回看：调用 /api/archives/:task_id/preview 临时解压 zip 拉取元数据，
+// 复用 renderSummary / renderImages 把摘要和图片渲染到结果面板。
+// 注意：归档预览端点只返回 config/params/images 元数据，不返回图片二进制；
+// 图片渲染仍走 /api/results/<task_id>/<img> 静态路由，因此若任务目录尚未
+// 恢复到 results/ 下，图片会 404。摘要和参数回看不依赖图片可达性。
+async function viewArchiveTask(taskId) {
+  try {
+    const r = await fetch(`${API_PREFIX}/archives/${encodeURIComponent(taskId)}/preview`)
+    if (!r.ok) throw new Error(`HTTP ${r.status}`)
+    const d = await r.json()
+    if (!d.success) throw new Error(d.error || 'unknown')
+
+    // 重渲染摘要面板（复用 renderSummary）
+    if (d.summary && typeof renderSummary === 'function') {
+      renderSummary(d.summary)
+    }
+    // 归档预览模式：图片渲染依赖 results/ 静态服务，若任务目录尚未恢复
+    // 则图片不可达。这里仍尝试渲染（若用户已恢复过同名任务，图片可见）。
+    if (d.images && typeof renderImages === 'function') {
+      renderImages(d.images, taskId)
+    }
+    // 在摘要顶部插入归档回看标识
+    const summaryEl = document.getElementById('summary')
+    if (summaryEl) {
+      let badge = document.getElementById('historyViewBadge')
+      if (!badge) {
+        badge = document.createElement('div')
+        badge.id = 'historyViewBadge'
+        badge.style.cssText = 'padding:8px 12px;background:var(--accent-dim,rgba(0,255,200,0.1));border-left:3px solid var(--accent);margin-bottom:8px;font-size:0.8rem;'
+        summaryEl.prepend(badge)
+      }
+      const updatedSec = d.task_updated || (Date.now() / 1000)
+      badge.textContent = `◉ 归档回看: ${taskId.slice(0, 16)}... | 归档于 ${new Date(updatedSec * 1000).toLocaleString('zh-CN')}`
+    }
+    summaryEl?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    appendTerminal(`◉ 已加载归档 ${taskId.slice(0, 8)}... 的预览数据`, 'info')
+  } catch (e) {
+    appendTerminal(`✗ 加载归档预览失败: ${e.message}`, 'error')
   }
 }
 

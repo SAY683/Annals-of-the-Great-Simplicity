@@ -24,6 +24,9 @@ from services.file_management import (
     _total_size_mb,
 )
 from services.summary_builder import _task_summary
+# 复用 _sanitize_json 清理从 SQLite 反查的 summary 中的 NaN/Inf 浮点值，
+# 避免 FastAPI 响应序列化时抛 ValueError: Out of range float values。
+from job_store import _sanitize_json
 
 router = APIRouter()
 
@@ -39,22 +42,97 @@ def list_history(limit: int = 50):
         task_dir = os.path.join(RESULTS_DIR, name)
         if not os.path.isdir(task_dir):
             continue
-        images = [
-            f for f in os.listdir(task_dir)
-            if f.lower().endswith((".png", ".jpg", ".jpeg"))
-        ]
-        has_config = any(
-            f.startswith("config_") and f.endswith(".json")
-            for f in os.listdir(task_dir)
-        )
+        # 改用 _task_summary() 统一扫描逻辑，避免与 summary_builder 的
+        # config 读取逻辑分叉；同时取回 params 字段。
+        summary = _task_summary(name)
+        if summary is None:
+            continue
         tasks.append({
-            "task_id": name,
-            "updated_at": os.path.getmtime(task_dir),
-            "images": sorted(images, reverse=True),
-            "has_config": has_config,
+            "task_id": summary["task_id"],
+            "updated_at": summary["updated_at"],
+            "images": summary["images"],
+            "has_config": summary["config"] is not None,
+            "config": summary["config"],
+            "params": summary["params"],
         })
     tasks.sort(key=lambda x: x["updated_at"], reverse=True)
     return tasks[:limit]
+
+
+def _lookup_summary_by_task_id(task_id: str) -> Optional[dict]:
+    """从 SQLite 缓存中反查与 task_id 关联的完整分析摘要。
+
+    遍历 jobs 表的 result 字段，匹配 ``result.task_id == task_id`` 的最新一行，
+    返回其 ``result.summary``。若 JobStore 不是 PersistentJobStore 或未找到
+    匹配项，返回 None。任何异常都吞掉返回 None，避免影响主流程。
+    """
+    try:
+        # 延迟导入避免循环依赖
+        from core.runtime import _JOB_STORE
+        from job_store import PersistentJobStore
+        if not isinstance(_JOB_STORE, PersistentJobStore):
+            return None
+        with _JOB_STORE._connect() as conn:
+            # 优先使用 json_extract（性能更优，依赖 JSON1 扩展）
+            try:
+                cur = conn.execute(
+                    "SELECT result FROM jobs "
+                    "WHERE result IS NOT NULL "
+                    "AND json_extract(result, '$.task_id') = ? "
+                    "ORDER BY updated_at DESC LIMIT 1",
+                    (task_id,),
+                )
+                row = cur.fetchone()
+            except Exception:
+                # JSON1 不可用时退化到 Python 侧过滤
+                cur = conn.execute(
+                    "SELECT result FROM jobs "
+                    "WHERE result IS NOT NULL "
+                    "ORDER BY updated_at DESC"
+                )
+                row = None
+                for r in cur.fetchall():
+                    try:
+                        obj = json.loads(r[0])
+                    except Exception:
+                        continue
+                    if isinstance(obj, dict) and obj.get("task_id") == task_id:
+                        row = r
+                        break
+        if not row or not row[0]:
+            return None
+        result_obj = json.loads(row[0])
+        summary = result_obj.get("summary") if isinstance(result_obj, dict) else None
+        # 清理 NaN/Inf（HAVOK 退化等场景产生的非法浮点值），否则 FastAPI
+        # 响应序列化会抛 ValueError。
+        return _sanitize_json(summary) if summary is not None else None
+    except Exception:
+        return None
+
+
+@router.get("/api/history/{task_id}")
+def get_history_detail(task_id: str):
+    """返回单任务的完整数据：config + params + images + summary。
+
+    ``summary`` 字段从 SQLite jobs 表反查（``result.task_id == task_id``），
+    若找不到匹配的 job（例如数据库被清空）则为 null，前端会跳过摘要渲染。
+    """
+    task_dir = _safe_task_path(task_id, RESULTS_DIR)
+    if not task_dir or not os.path.isdir(task_dir):
+        raise HTTPException(status_code=404, detail="Task not found")
+    summary = _task_summary(task_id)
+    if summary is None:
+        raise HTTPException(status_code=404, detail="Task not found")
+    rich_summary = _lookup_summary_by_task_id(task_id)
+    return {
+        "success": True,
+        "task_id": task_id,
+        "config": summary.get("config"),
+        "params": summary.get("params"),
+        "images": summary.get("images", []),
+        "summary": rich_summary,
+        "task_updated": summary.get("updated_at"),
+    }
 
 
 @router.post("/api/history/{task_id}/archive")
@@ -230,6 +308,45 @@ def restore_archive(task_id: str):
         return {"task_id": task_id, "restored": True, "path": task_dir}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Restore failed: {e}")
+
+
+@router.get("/api/archives/{task_id}/preview")
+def preview_archive(task_id: str):
+    """临时解压 zip 到临时目录，返回 config + params + images 列表。
+
+    不删除原 zip；解压后的临时目录在请求结束时清理。``summary`` 字段从
+    SQLite jobs 表反查（与 ``GET /api/history/{task_id}`` 同逻辑）。
+    """
+    zip_path = _safe_task_path(task_id + ".zip", ARCHIVE_DIR)
+    if not zip_path or not os.path.exists(zip_path):
+        raise HTTPException(status_code=404, detail="Archive not found")
+    tmp_dir = tempfile.mkdtemp(prefix="edmtakens_preview_")
+    try:
+        shutil.unpack_archive(zip_path, tmp_dir, format="zip")
+        # 调用 _task_summary 复用 config/params/images 读取逻辑
+        summary = _task_summary(task_id, task_dir=tmp_dir)
+        if summary is None:
+            raise HTTPException(status_code=500, detail="Preview build failed")
+        rich_summary = _lookup_summary_by_task_id(task_id)
+        return {
+            "success": True,
+            "task_id": task_id,
+            "config": summary.get("config"),
+            "params": summary.get("params"),
+            "images": summary.get("images", []),
+            "summary": rich_summary,
+            "task_updated": os.path.getmtime(zip_path),
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Preview failed: {e}")
+    finally:
+        # 清理临时目录，原 zip 不动
+        try:
+            shutil.rmtree(tmp_dir)
+        except Exception:
+            pass
 
 
 @router.delete("/api/archives/{task_id}")

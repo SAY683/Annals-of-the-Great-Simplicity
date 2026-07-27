@@ -154,6 +154,10 @@ LAYER1_COLUMNS = [
 
     # 执行剖面
     ("total_ms",             "execution_profile.total_ms", 0, "总耗时 (毫秒)"),
+
+    # Phase 2 L1-1 修缮: 跨算法一致性度量 (计算列, json_path=None)
+    ("consensus_score",      None, 0.0, "三方因果算法共识度 [0,1]"),
+    ("consensus_direction",  None, "ambiguous", "共识方向 (positive/negative/ambiguous)"),
 ]
 
 # ── Layer 2: 世俗语义投影列 ─────────────────────────────────

@@ -11,7 +11,7 @@ const router = express.Router();
 
 const state = require('../lib/state');
 const utils = require('../lib/utils');
-const { OUTPUT_DIR, activeJobs, jobHistory, resultCache } = state;
+const { OUTPUT_DIR, INPUTS_DIR, CONFIG, activeJobs, jobHistory, resultCache } = state;
 const { persistJobHistory, isValidId } = utils;
 
 // ── 任务历史列表 ────────────────────────────────────────────────────
@@ -105,6 +105,77 @@ router.get('/:id', (req, res) => {
     history: history || null,
     resultPath: outputExists ? `/api/result/${id}` : null,
     reportPath: fs.existsSync(path.join(OUTPUT_DIR, id, 'report.md')) ? `/api/report/${id}` : null,
+  });
+});
+
+// ── 单任务详情聚合（历史任务详情查看：聚合 job 元数据 + 输入文本 + result.json + report.md） ─
+// 注意：路径必须放在 GET /:id 之后；Express 会按定义顺序匹配，此处 /:id/detail 不会被 /:id 抢先。
+router.get('/:id/detail', async (req, res) => {
+  const id = req.params.id;
+  // 校验 UUID，防止 path.join 拼接出路径遍历
+  if (!isValidId(id)) {
+    return res.status(400).json({ success: false, error: '非法的任务 ID' });
+  }
+  // 从历史中查找任务元数据
+  const job = jobHistory.find(j => j.id === id);
+  if (!job) {
+    return res.status(404).json({ success: false, error: 'job not found' });
+  }
+
+  // P0 修缮：safeReadFile 返回 { data, exists, reason } 三元组
+  // 让前端能区分"未落盘/已被清理"vs"读取出错"vs"JSON 解析失败"，
+  // 不再把所有 null 误判为"已过 TTL 清理"
+  const safeReadFile = async (filePath, isJson = false) => {
+    let exists = false;
+    try {
+      await fs.promises.access(filePath, fs.constants.R_OK);
+      exists = true;
+    } catch (_) {
+      return { data: null, exists: false, reason: 'not_found' };
+    }
+    try {
+      const raw = await fs.promises.readFile(filePath, 'utf-8');
+      if (!isJson) return { data: raw, exists: true, reason: null };
+      try {
+        return { data: JSON.parse(raw), exists: true, reason: null };
+      } catch (parseErr) {
+        return { data: null, exists: true, reason: `json_parse_failed: ${parseErr.message}` };
+      }
+    } catch (readErr) {
+      return { data: null, exists: true, reason: `read_error: ${readErr.code || readErr.message}` };
+    }
+  };
+
+  const [inputRes, resultRes, reportRes] = await Promise.all([
+    safeReadFile(path.join(INPUTS_DIR, `${id}.txt`), false),
+    safeReadFile(path.join(OUTPUT_DIR, id, 'result.json'), true),
+    safeReadFile(path.join(OUTPUT_DIR, id, 'report.md'), false),
+  ]);
+
+  // 同时返回结构化诊断字段，前端可据此给出准确提示
+  // diagnostics 中包含 TTL 配置与路径，便于运维排查
+  const diagnostics = {
+    inputExists: inputRes.exists,
+    inputReason: inputRes.reason,
+    resultExists: resultRes.exists,
+    resultReason: resultRes.reason,
+    reportExists: reportRes.exists,
+    reportReason: reportRes.reason,
+    inputsTtlMs: CONFIG && CONFIG.inputsTtlMs ? CONFIG.inputsTtlMs : null,
+    outputTtlMs: CONFIG && CONFIG.outputTtlMs ? CONFIG.outputTtlMs : null,
+    inputsDir: INPUTS_DIR,
+    outputDir: path.join(OUTPUT_DIR, id),
+    jobCreatedAt: job && job.createdAt ? job.createdAt : null,
+    jobEndedAt: job && job.endedAt ? job.endedAt : null,
+  };
+
+  res.json({
+    success: true,
+    job,
+    inputText: inputRes.data,
+    result: resultRes.data,
+    report: reportRes.data,
+    diagnostics,
   });
 });
 

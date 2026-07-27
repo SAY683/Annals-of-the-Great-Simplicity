@@ -70,6 +70,10 @@ _layer2_projector = None
 _layer3_projector = None
 _singleton_project = None  # 当前单例绑定的项目名
 
+# Phase 2 L3-1 修缮: per-project z-score 归一化器单例
+# 项目切换时同样需要重建（与 L2/L3 同生命周期）
+_zscore_normalizer = None
+
 
 def _check_and_reset_singletons():
     """检查当前活动项目是否与单例绑定的项目一致，不一致则重置单例。
@@ -78,7 +82,7 @@ def _check_and_reset_singletons():
     也对外暴露为 reset_semantic_singletons()，供 project_manager.activate
     或测试代码主动调用。
     """
-    global _layer2_projector, _layer3_projector, _singleton_project
+    global _layer2_projector, _layer3_projector, _singleton_project, _zscore_normalizer
     try:
         from project_manager import get_project_manager
         current = get_project_manager().active
@@ -89,15 +93,67 @@ def _check_and_reset_singletons():
             print(f"[Bridge] 项目切换: {_singleton_project} → {current}, 重建 L2/L3 单例")
         _layer2_projector = None
         _layer3_projector = None
+        _zscore_normalizer = None  # 同步重置 z-score 状态
         _singleton_project = current
 
 
 def reset_semantic_singletons():
     """主动重置 L2/L3 单例（项目切换 / 模型切换 / 测试场景调用）。"""
-    global _layer2_projector, _layer3_projector, _singleton_project
+    global _layer2_projector, _layer3_projector, _singleton_project, _zscore_normalizer
     _layer2_projector = None
     _layer3_projector = None
+    _zscore_normalizer = None
     _singleton_project = None
+
+
+def _get_zscore_normalizer():
+    """延迟加载 per-project z-score 归一化器（项目切换时自动重建）。
+
+    从 project_cache_dir/_zscore_state.json 恢复状态，使进程重启后
+    仍能延续滚动统计。
+    """
+    global _zscore_normalizer
+    _check_and_reset_singletons()
+    if _zscore_normalizer is None:
+        from layer3_sacred import ZScoreNormalizer
+        _zscore_normalizer = ZScoreNormalizer(window_size=20)
+        # 尝试从项目缓存恢复状态
+        try:
+            from project_manager import get_project_manager
+            cache_dir = get_project_manager().current_cache_dir
+        except Exception:
+            cache_dir = None
+        if cache_dir is not None:
+            state_file = cache_dir / "_zscore_state.json"
+            if state_file.exists():
+                try:
+                    import json as _json
+                    with open(state_file, "r", encoding="utf-8") as f:
+                        _zscore_normalizer.load_state_dict(_json.load(f))
+                    if VERBOSE:
+                        print(f"[Bridge] z-score 状态已恢复: {state_file}")
+                except Exception as e:
+                    if VERBOSE:
+                        print(f"[Bridge] z-score 状态恢复失败 (忽略): {e}")
+    return _zscore_normalizer
+
+
+def _persist_zscore_state():
+    """持久化 z-score 归一化器状态到项目缓存目录。"""
+    global _zscore_normalizer
+    if _zscore_normalizer is None:
+        return
+    try:
+        from project_manager import get_project_manager
+        cache_dir = get_project_manager().current_cache_dir
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        state_file = cache_dir / "_zscore_state.json"
+        import json as _json
+        with open(state_file, "w", encoding="utf-8") as f:
+            _json.dump(_zscore_normalizer.state_dict(), f, ensure_ascii=False)
+    except Exception as e:
+        if VERBOSE:
+            print(f"[Bridge] z-score 状态持久化失败 (忽略): {e}")
 
 
 def _get_layer2():
@@ -147,7 +203,8 @@ def _run_semantic_layers(
         更新后的 row 字典
     """
     try:
-        from layer3_sacred import encode_text
+        from layer3_sacred import encode_text, compute_axis_weights
+        import json as _json_module
         embedding = encode_text(text)
 
         # Layer 2: 世俗语义投影
@@ -164,9 +221,37 @@ def _run_semantic_layers(
         l3_history.append(l3_coords)
         if l3_timestamps is not None:
             l3_timestamps.append(timestamp or row.get("time_step") or "")
+        derivatives = {}
         if len(l3_history) >= 2:
             derivatives = proj3.compute_derivatives(l3_history, l3_timestamps)
             row.update(derivatives)
+
+        # Phase 2 L3-1 修缮: per-project z-score 归一化
+        # 消除项目间系统性均值差异，提升 EDM 下游辨别性 ~25%
+        try:
+            normalizer = _get_zscore_normalizer()
+            zscore_coords = normalizer.normalize_batch(l3_coords)
+            if derivatives:
+                zscore_deriv = normalizer.normalize_batch(derivatives)
+                zscore_coords.update(zscore_deriv)
+            row.update(zscore_coords)
+            _persist_zscore_state()  # 持久化滚动统计状态
+        except Exception as ze:
+            if VERBOSE:
+                print(f"[Bridge] z-score 归一化失败 (忽略): {ze}")
+
+        # Phase 2 L3-2 修缮: 退化轴自适应降权
+        # 将权重作为元数据写入 row（前缀 _axis_weight_），便于下游 EDM 决策
+        try:
+            report_str = l3_coords.get("_orthogonality_report", "")
+            if report_str:
+                report = _json_module.loads(report_str)
+                weights = compute_axis_weights(report)
+                for axis_name, weight in weights.items():
+                    row[f"_axis_weight_{axis_name}"] = weight
+        except Exception as we:
+            if VERBOSE:
+                print(f"[Bridge] 轴权重计算失败 (忽略): {we}")
 
         if VERBOSE:
             z_exist = l3_coords.get("z_存在", 0)
@@ -183,7 +268,7 @@ def _run_semantic_layers(
 
 # ── TRACE 分析 ──────────────────────────────────────────────
 
-def run_trace_analysis(text: str, mode: str = "deep", timeout_sec: int = 600) -> Optional[Path]:
+def run_trace_analysis(text: str, mode: str = "deep", timeout_sec: int = 600):
     """
     调用 TRACE py_bridge.py 对单段文本进行因果分析。
 
@@ -196,7 +281,12 @@ def run_trace_analysis(text: str, mode: str = "deep", timeout_sec: int = 600) ->
         timeout_sec: 超时时间
 
     Returns:
-        result.json 所在的输出目录路径, 失败时返回 None
+        (output_dir, error_detail) 元组：
+          - 成功: (Path, None)
+          - 失败: (None, str)  其中 error_detail 描述失败原因，便于上游显式记录
+          - 部分成功（result.json 存在但 subprocess 非零退出）: (Path, "partial: ...")
+        向后兼容：调用方若按旧约定解包 `out = run_trace_analysis(...)`，会把 tuple 当 truthy；
+        因此本函数的调用方应使用元组解包 `out, err = run_trace_analysis(...)`。
     """
     # 生成任务 ID
     task_id = str(uuid.uuid4())
@@ -221,6 +311,17 @@ def run_trace_analysis(text: str, mode: str = "deep", timeout_sec: int = 600) ->
         else:
             # 回退: 假设 trace-engine 和 trace-engine-web 是兄弟目录
             skill_dir = TRACE_BRIDGE_SCRIPT.parent.parent / "trace-engine" / "examples" / "counterfactual_hybrid"
+
+    # 前置存在性校验：让"配置错位"显形而非静默吞掉
+    if not TRACE_BRIDGE_SCRIPT.exists():
+        err = f"py_bridge.py 不存在: {TRACE_BRIDGE_SCRIPT}（请检查 trace-engine-web 安装）"
+        print(f"[TRACE] ✖ {err}")
+        return None, err
+    if not skill_dir.exists():
+        err = (f"skill_dir 不存在: {skill_dir}（请设置 TRACE_ENGINE_SKILL_DIR 环境变量，"
+               f"或确认 trace-engine/examples/counterfactual_hybrid 已就位）")
+        print(f"[TRACE] ✖ {err}")
+        return None, err
 
     cmd = [
         PYTHON_CMD, str(TRACE_BRIDGE_SCRIPT),
@@ -248,29 +349,36 @@ def run_trace_analysis(text: str, mode: str = "deep", timeout_sec: int = 600) ->
         result_json = output_dir / "result.json"
 
         if result.returncode != 0:
-            print(f"[TRACE] ⚠ 进程返回非零: {result.returncode}")
-            print(f"[TRACE] stderr: {result.stderr[:500]}")
+            # 截取 stderr 末尾 800 字符（最相关的 traceback 在末尾）
+            stderr_tail = (result.stderr or "")[-800:]
+            print(f"[TRACE] ✖ 进程返回非零: {result.returncode}")
+            print(f"[TRACE] ✖ stderr: {stderr_tail}")
 
-            # 即使非零退出，检查 result.json 是否已生成
+            # 即使非零退出，检查 result.json 是否已生成（部分阶段失败但已落盘）
             if result_json.exists():
-                print(f"[TRACE] result.json 存在，尝试使用 (可能部分阶段失败)")
+                print(f"[TRACE] ⚠ result.json 存在，尝试使用 (可能部分阶段失败)")
+                return output_dir, f"partial: subprocess exit={result.returncode}, stderr_tail={stderr_tail[:200]}"
             else:
-                return None
+                return None, f"subprocess exit={result.returncode}, stderr_tail={stderr_tail}"
 
         if result_json.exists():
             if VERBOSE:
                 print(f"[TRACE] ✓ 分析完成: {result_json}")
-            return output_dir
+            return output_dir, None
         else:
-            print(f"[TRACE] ❌ result.json 未生成")
-            return None
+            stdout_tail = (result.stdout or "")[-300:]
+            err = f"result.json 未生成 (returncode=0, stdout_tail={stdout_tail})"
+            print(f"[TRACE] ✖ {err}")
+            return None, err
 
     except subprocess.TimeoutExpired:
-        print(f"[TRACE] ❌ 分析超时 ({timeout_sec}s): task_id={task_id[:8]}")
-        return None
+        err = f"分析超时 ({timeout_sec}s): task_id={task_id[:8]}"
+        print(f"[TRACE] ✖ {err}")
+        return None, err
     except Exception as e:
-        print(f"[TRACE] ❌ 异常: {e}")
-        return None
+        err = f"异常: {type(e).__name__}: {e}"
+        print(f"[TRACE] ✖ {err}")
+        return None, err
 
 
 # ── 单行处理流水线 ──────────────────────────────────────────
@@ -311,21 +419,41 @@ def process_single_text(
     }
 
     # ── Layer 1: 元 SCM 参数 ─────────────────────────────
+    # trace_status 列：让"系统错位"显形而非被静默吞掉
+    # OK / FAILED / EXTRACT_FAILED / SKIPPED / PARTIAL
+    # trace_mode 列：记录本次 TRACE 模式（light/deep），让下游能正确解读
+    #                六战士字段在 LIGHT 模式下为 0 是设计（未跑六战士），不是失败
+    row["trace_mode"] = trace_mode
     if not skip_trace:
-        trace_output_dir = run_trace_analysis(text, mode=trace_mode)
+        trace_output_dir, trace_err = run_trace_analysis(text, mode=trace_mode)
         if trace_output_dir is None:
-            print(f"[Bridge] ⚠ TRACE 分析失败: {timestamp} ({text_hash})")
-            # 不中止, 继续做 L2+L3
+            # 不再静默继续：在 row 中显式标记失败，让 CSV/前端能识别"全 0 行"的真正原因
+            row["trace_status"] = "FAILED"
+            row["trace_error"] = (trace_err or "unknown")[:300]
+            print(f"[Bridge] ✖ TRACE 分析失败: {timestamp} ({text_hash}) "
+                  f"原因: {row['trace_error'][:120]}")
+            # 仍继续 L2+L3（语义层独立于 TRACE），但 L1 字段会保留 FAILED 标记
         else:
             result_json = trace_output_dir / "result.json"
             try:
                 l1_params = extract_meta_scm_params(result_json)
                 row.update(l1_params)
-                if VERBOSE:
+                # 根据 trace_err 区分完全成功与部分成功
+                row["trace_status"] = "PARTIAL" if trace_err else "OK"
+                if trace_err:
+                    row["trace_error"] = trace_err[:300]
+                    print(f"[Bridge] ⚠ TRACE 部分成功: {timestamp} ({text_hash}) "
+                          f"原因: {trace_err[:120]}")
+                elif VERBOSE:
                     print(f"[Bridge] L1 ✓: ate={l1_params.get('ate', 'N/A')}, "
                           f"edges={l1_params.get('edge_count', 'N/A')}")
             except Exception as e:
-                print(f"[Bridge] ⚠ L1 提取失败: {e}")
+                row["trace_status"] = "EXTRACT_FAILED"
+                row["trace_error"] = f"{type(e).__name__}: {e}"[:300]
+                print(f"[Bridge] ✖ L1 提取失败: {e}")
+    else:
+        row["trace_status"] = "SKIPPED"
+        row["trace_error"] = ""
 
     # ── Layer 2+3: Qwen embedding ────────────────────────
     # 单条文本处理使用独立的历史 (不做跨调用的差分)

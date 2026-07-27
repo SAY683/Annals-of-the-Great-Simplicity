@@ -7,9 +7,9 @@
   <title>TRACE Engine // Causal Inference Terminal</title>
   <!-- debt-09：CSS 拆分为 theme.css（主题变量）+ main.css（样式） -->
   <!-- 共享特摄防卫队基地主题 -->
-  <link rel="stylesheet" href="shared/themes/tokusatsu.css?v=20260725f">
-  <link rel="stylesheet" href="/css/theme.css?v=20260725f">
-  <link rel="stylesheet" href="/css/main.css?v=20260725f">
+  <link rel="stylesheet" href="shared/themes/tokusatsu.css?v=20260727e">
+  <link rel="stylesheet" href="/css/theme.css?v=20260727e">
+  <link rel="stylesheet" href="/css/main.css?v=20260727e">
 </head>
 <body>
   <div class="crt-overlay" aria-hidden="true"></div>
@@ -157,7 +157,7 @@
         <span class="hud-corner br"></span>
         <span class="sector-label">SECTOR-B1</span>
         <div class="panel-header" style="justify-content:space-between;">
-          <span style="display:flex;align-items:center;"><span class="live-dot"></span> $ realtime_log.stream</span>
+          <span style="display:flex;align-items:center;">▶ <span class="live-dot"></span> $ realtime_log.stream</span>
           <span id="logStageBadge" class="log-stage-badge">IDLE</span>
         </div>
         <div class="log-toolbar">
@@ -190,10 +190,34 @@
           </div>
         </div>
         <div class="panel-body" style="padding:0.55rem;">
-          <div class="terminal log-cockpit" id="jobHistoryTerminal" style="min-height:160px;max-height:260px;"></div>
+          <div class="terminal log-cockpit" id="jobHistoryTerminal"></div>
         </div>
       </section>
     </div>
+    </div>
+
+    <!-- 历史任务详情模态框（点击 SECTOR-B2 历史项弹出，聚合输入文本 / result.json / report.md） -->
+    <div id="jobDetailModal" class="modal-overlay" style="display:none;">
+      <div class="modal-content" style="max-width:900px;max-height:85vh;overflow-y:auto;">
+        <div class="modal-header">
+          <span id="jobDetailTitle">◉ 任务详情</span>
+          <button id="jobDetailClose" class="btn-mini">✕ 关闭</button>
+        </div>
+        <div class="modal-body">
+          <details id="jobDetailInput" open>
+            <summary>▶ 输入文本</summary>
+            <pre id="jobDetailInputText" class="code-block"></pre>
+          </details>
+          <details id="jobDetailResult" open>
+            <summary>◉ 结果数据</summary>
+            <div id="jobDetailResultData"></div>
+          </details>
+          <details id="jobDetailReport">
+            <summary>◇ 执行报告 (Markdown)</summary>
+            <pre id="jobDetailReportText" class="code-block"></pre>
+          </details>
+        </div>
+      </div>
     </div>
 
     <section class="panel hidden result-fullwidth" id="resultPanel">
@@ -279,10 +303,10 @@
        jobs.js 处理任务历史；app.js 最后加载，声明 DOM 引用、附加监听器、执行初始化。 -->
   </div>
 
-  <script src="/js/schema.js?v=20260725a"></script>
-  <script src="/js/sse.js?v=20260725a"></script>
-  <script src="/js/render.js?v=20260725a"></script>
-  <script src="/js/jobs.js?v=20260725a"></script>
-  <script src="/js/app.js?v=20260725f"></script>
+  <script src="/js/schema.js?v=20260727e"></script>
+  <script src="/js/sse.js?v=20260727e"></script>
+  <script src="/js/render.js?v=20260727e"></script>
+  <script src="/js/jobs.js?v=20260727e"></script>
+  <script src="/js/app.js?v=20260727e"></script>
 </body>
 </html>

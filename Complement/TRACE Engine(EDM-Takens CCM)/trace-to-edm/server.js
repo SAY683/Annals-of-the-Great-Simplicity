@@ -6,8 +6,8 @@
  * 架构:
  *   Browser ←→ Express (port 3100) ←→ Python bridge.py (child_process)
  *
- * 端点 (共 30 个 API 端点 + 静态前端 /，详见 README.md §API 端点表):
- *   GET  /                 前端面板 (express.static, 不计入 30)
+ * 端点 (共 31 个 API 端点 + 静态前端 /，详见 README.md §API 端点表):
+ *   GET  /                 前端面板 (express.static, 不计入 31)
  *   GET  /api/health       L0  健康检查
  *   GET  /api/version      L0  版本查询 (debt-12.13: 从 package.json 读取)
  *   GET  /api/status       L1  轨迹状态 + EDM 就绪度
@@ -16,7 +16,7 @@
  *   GET  /api/edm/poll/:id L3  EDM轮询代理（避免CORS — P2修复）
  *   POST /api/edm/trigger  L3  触发 EDM 分析
  *   GET  /api/jobs         L4  任务历史
- *   …其余 21 个端点（dataset/projects/work/models 等）见 README.md 表
+ *   …其余 22 个端点（dataset/projects/work/models 等）见 README.md 表
  */
 
 const express = require('express');
@@ -39,7 +39,25 @@ const TRAJECTORY_CSV = path.join(ROOT, 'data', 'outputs', 'narrative_meta_trajec
 const PROJECTS_DIR = path.join(ROOT, 'projects');
 const LOG_FILE = path.join(ROOT, 'data', 'logs', 'server.log');
 // P1修复: 默认 CORS 限制为本地回环，避免生产环境通配符风险 (原默认 '*')
+// debt-12.15 隧道支持: 自动读取 tunnel_url.txt，把 trycloudflare 域名加入白名单
+function _loadTunnelOrigins() {
+  try {
+    const tunnelFile = path.join(ROOT, 'tunnel_url.txt');
+    if (fs.existsSync(tunnelFile)) {
+      const url = fs.readFileSync(tunnelFile, 'utf-8').trim();
+      if (url && url.includes('trycloudflare.com')) return [url];
+    }
+  } catch (e) { /* 静默降级 */ }
+  return [];
+}
 const CORS_ORIGIN = process.env.TRACE_CORS_ORIGIN || 'http://localhost:3100';
+// CORS 白名单: 环境变量 + 默认 localhost + 隧道域名
+const CORS_ALLOWED_ORIGINS = [
+  CORS_ORIGIN,
+  'http://127.0.0.1:3100',
+  'http://localhost:3100',
+  ..._loadTunnelOrigins(),
+];
 // debt-12.13: 版本号从 package.json 读取，避免硬编码与实际版本漂移
 const PACKAGE_VERSION = (() => {
   try {
@@ -111,6 +129,14 @@ function pyCall(args, timeout = 15000) {
             resolve(parsed);
             return;
           }
+          // 数组是合法的无 success 字段输出（如 --list-projects 输出项目数组），
+          // 原样返回，避免被 {...parsed} 展开为 {0: {...}, 1: {...}} 的畸形对象。
+          // 回归修复 (debt-12.14): 上次 pyCall 修缮未覆盖数组输出路径，
+          // 导致 /api/projects 下拉为空（前端 Array.isArray 检查失败）。
+          if (Array.isArray(parsed)) {
+            resolve(parsed);
+            return;
+          }
           // JSON 解析成功但无 success 字段: 仅当 exit code=0 且无 stderr 时才视为成功
           resolve({
             success: code === 0 && !trimmedErr,
@@ -173,13 +199,20 @@ app.use((err, _req, res, _next) => {
   _next();
 });
 
-// CORS: 开发默认 *, 生产通过 TRACE_CORS_ORIGIN 收窄
-app.use((_req, res, next) => {
-  res.header('Access-Control-Allow-Origin', CORS_ORIGIN);
-  res.header('Access-Control-Allow-Headers', 'Content-Type');
-  if (CORS_ORIGIN !== '*') {
+// CORS: 白名单模式（localhost + 隧道域名），生产通过 TRACE_CORS_ORIGIN 收窄
+// debt-12.15: 支持隧道域名自动放行，避免混合内容/CORS 阻断
+app.use((req, res, next) => {
+  const reqOrigin = req.headers['origin'];
+  if (reqOrigin && CORS_ALLOWED_ORIGINS.includes(reqOrigin)) {
+    res.header('Access-Control-Allow-Origin', reqOrigin);
+    res.header('Vary', 'Origin');
+  } else if (reqOrigin && /https:\/\/[a-z0-9-]+\.trycloudflare\.com/.test(reqOrigin)) {
+    // 隧道模式: 允许任意 trycloudflare 隧道域名（quick tunnel 域名随机）
+    res.header('Access-Control-Allow-Origin', reqOrigin);
     res.header('Vary', 'Origin');
   }
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Trace-Id');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   next();
 });
 
@@ -932,6 +965,7 @@ print(json.dumps({"rows": rows, "edm_ready": rows >= 15}, ensure_ascii=False))
 }
 
 // 流式执行 bridge.py 并实时转发 SSE
+// P2 修缮：识别 ✖ TRACE 失败标记，升级为 error 事件；返回 'ok'|'partial'|'failed' 三态
 function streamBridgeProcess(res, args, label) {
   return new Promise((resolve) => {
     emitSSE(res, 'progress', { message: `▶ ${label}` });
@@ -940,12 +974,23 @@ function streamBridgeProcess(res, args, label) {
       env: { ...process.env, PYTHONIOENCODING: 'utf-8' },
     });
 
+    let sawTraceFailure = false;  // P2：识别 bridge.py 内部的 ✖ TRACE 失败标记
+
     proc.stdout.on('data', data => {
       const text = data.toString();
       text.split('\n').filter(l => l.trim()).forEach(line => {
-        if (line.includes('✓') || line.includes('完成')) emitSSE(res, 'progress', { message: line.trim() });
-        else if (line.includes('⚠') || line.includes('❌')) emitSSE(res, 'warn', { message: line.trim() });
-        else if (line.trim()) emitSSE(res, 'log', { message: line.trim() });
+        const trimmed = line.trim();
+        // P2 修缮：✖ 标记的 TRACE 失败升级为 error 事件，让前端能感知"全 0 行"的真正原因
+        if (trimmed.includes('✖ TRACE') || trimmed.includes('✖ L1 提取失败') || trimmed.includes('TRACE 分析失败')) {
+          sawTraceFailure = true;
+          emitSSE(res, 'error', { message: trimmed });
+        } else if (trimmed.includes('✓') || trimmed.includes('完成')) {
+          emitSSE(res, 'progress', { message: trimmed });
+        } else if (trimmed.includes('⚠') || trimmed.includes('❌')) {
+          emitSSE(res, 'warn', { message: trimmed });
+        } else if (trimmed) {
+          emitSSE(res, 'log', { message: trimmed });
+        }
       });
     });
 
@@ -954,8 +999,18 @@ function streamBridgeProcess(res, args, label) {
       if (text && !text.includes('Loading weights')) emitSSE(res, 'log', { message: text });
     });
 
-    proc.on('close', code => resolve(code === 0));
-    proc.on('error', err => { emitSSE(res, 'error', { message: err.message }); resolve(false); });
+    proc.on('close', code => {
+      // P2：即使 exit=0，只要有 TRACE 失败标记就返回 'partial'，让 /api/pipeline/run 报告部分失败
+      if (code === 0 && sawTraceFailure) {
+        emitSSE(res, 'warn', { message: '管线完成但部分 TRACE 分析失败（轨迹 CSV 中 L1 字段可能为 0，trace_status=FAILED 已标记）' });
+        resolve('partial');
+      } else if (code === 0) {
+        resolve('ok');
+      } else {
+        resolve('failed');
+      }
+    });
+    proc.on('error', err => { emitSSE(res, 'error', { message: err.message }); resolve('failed'); });
   });
 }
 
@@ -969,12 +1024,18 @@ app.post('/api/pipeline/run', async (req, res) => {
   }
   _pipelineRunning = true;
 
+  // P2 修缮：从前端读取 trace_mode（默认 light），允许 LIGHT/DEEP 切换
+  // SUPER 模式不在此处支持（需经 trace-engine-web 的 LLaMA Worker）
+  const body = req.body || {};
+  const requestedMode = (typeof body.trace_mode === 'string' ? body.trace_mode : (req.query && req.query.trace_mode) || 'light').toLowerCase();
+  const traceMode = ['light', 'deep'].includes(requestedMode) ? requestedMode : 'light';
+
   const jobId = createJobId();
-  const job = { id: jobId, mode: 'pipeline', startTime: new Date().toISOString(), status: 'running' };
+  const job = { id: jobId, mode: `pipeline:${traceMode}`, startTime: new Date().toISOString(), status: 'running' };
   activeJobs.set(jobId, job);
 
   res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', 'Connection': 'keep-alive' });
-  emitSSE(res, 'start', { job_id: jobId });
+  emitSSE(res, 'start', { job_id: jobId, trace_mode: traceMode });
 
   try {
     // 1. 获取数据集导出
@@ -988,23 +1049,26 @@ app.post('/api/pipeline/run', async (req, res) => {
         return;
       }
 
-      emitSSE(res, 'log', { message: `待处理: ${exports.pending_replay} 回填 + ${exports.pending_text} 文本` });
+      emitSSE(res, 'log', { message: `待处理: ${exports.pending_replay} 回填 + ${exports.pending_text} 文本 | TRACE 模式: ${traceMode.toUpperCase()}` });
 
-      let allOk = true;
+      // P2 修缮：状态聚合改为 ok/partial/failed 三态
+      let worstStatus = 'ok';  // ok > partial > failed
 
       // 2. 处理回填条目 (实时流式)
       if (exports.replay_csv) {
         emitSSE(res, 'progress', { message: `--- 回填管线 (${exports.pending_replay}条) ---` });
-        const ok = await streamBridgeProcess(res, ['--replay', exports.replay_csv], `Mode B: 回填 ${exports.pending_replay} 条`);
-        if (!ok) { emitSSE(res, 'warn', { message: '回填管线部分失败' }); allOk = false; }
+        const status = await streamBridgeProcess(res, ['--replay', exports.replay_csv], `Mode B: 回填 ${exports.pending_replay} 条`);
+        if (status === 'failed') { emitSSE(res, 'warn', { message: '回填管线失败' }); worstStatus = 'failed'; }
+        else if (status === 'partial' && worstStatus === 'ok') { worstStatus = 'partial'; }
         emitSSE(res, 'progress', { message: '回填管线完成 ✓' });
       }
 
       // 3. 处理文本条目 (实时流式)
       if (exports.text_csv) {
-        emitSSE(res, 'progress', { message: `--- 文本管线 (${exports.pending_text}条, LIGHT模式) ---` });
-        const ok = await streamBridgeProcess(res, ['--input', exports.text_csv, '--mode', 'light'], `Mode A: 文本分析 ${exports.pending_text} 条`);
-        if (!ok) { emitSSE(res, 'warn', { message: '文本管线部分失败' }); allOk = false; }
+        emitSSE(res, 'progress', { message: `--- 文本管线 (${exports.pending_text}条, ${traceMode.toUpperCase()}模式) ---` });
+        const status = await streamBridgeProcess(res, ['--input', exports.text_csv, '--mode', traceMode], `Mode A: 文本分析 ${exports.pending_text} 条 [${traceMode.toUpperCase()}]`);
+        if (status === 'failed') { emitSSE(res, 'warn', { message: '文本管线失败' }); worstStatus = 'failed'; }
+        else if (status === 'partial' && worstStatus === 'ok') { worstStatus = 'partial'; }
         emitSSE(res, 'progress', { message: '文本管线完成 ✓' });
       }
 
@@ -1012,12 +1076,19 @@ app.post('/api/pipeline/run', async (req, res) => {
       emitSSE(res, 'log', { message: '更新数据集状态...' });
       const stats = await markDatasetProcessed(exports.pending_ids);
 
-      job.status = allOk ? 'completed' : 'failed';
+      // P2：partial 也算"完成但有警告"，failed 才算失败
+      job.status = worstStatus === 'failed' ? 'failed' : 'completed';
       job.endTime = new Date().toISOString();
+
+      // P2：如果 partial，在 done 事件中显式提示
+      if (worstStatus === 'partial') {
+        emitSSE(res, 'warn', { message: '部分 TRACE 分析失败：轨迹 CSV 中 trace_status=FAILED 的行 L1 字段为 0，请检查 server.log 或前端 error 事件' });
+      }
 
       emitSSE(res, 'done', {
         job_id: jobId,
-        success: allOk,
+        success: worstStatus !== 'failed',
+        partial: worstStatus === 'partial',
         trajectory_rows: stats.rows || 0,
         edm_ready: stats.edm_ready || false,
       });
@@ -1265,6 +1336,40 @@ print(json.dumps({"count": count}))
   } catch (e) {
     res.status(500).json({ error: e.message });
     try { fs.unlinkSync(uuidsFile); } catch {}
+  }
+});
+
+// ── API: 读取 replay UUID 的原始输入文本 ─────────────────
+// 复用 bridge.py 的 _find_input_text()，从 work/inputs/{uuid}.txt 读回原文
+// 用于前端数据集详情 modal 显示 replay 类型条目的完整文本
+app.get('/api/work-uuid/:uuid/text', async (req, res) => {
+  // 安全校验: 与 DELETE /api/work-uuid/:uuid 同一规则，防止路径遍历与命令注入
+  const SAFE_NAME_RE = /^[A-Za-z0-9_\-]{1,64}$/;
+  if (!SAFE_NAME_RE.test(req.params.uuid)) {
+    return res.status(400).json({ error: 'INVALID_UUID', detail: 'Only alphanumeric, hyphen, underscore allowed (max 64 chars)' });
+  }
+  // P0 修缮: UUID 已通过白名单校验，可安全插值；桥接脚本固定单引号包裹
+  const script = `
+import sys, json; sys.path.insert(0, '.')
+from bridge import _find_input_text
+text = _find_input_text('${req.params.uuid}')
+print(json.dumps({"text": text or ""}, ensure_ascii=False))
+  `.trim();
+  try {
+    const { out, err } = await pyScript(script, 10000);
+    if (err && err.trim()) {
+      // bridge.py 在文件读取失败时会向 stderr 写警告，但不影响返回空文本
+      console.warn(`[work-uuid/text] Python stderr for ${req.params.uuid}:`, err.trim());
+    }
+    try {
+      const parsed = JSON.parse(out);
+      res.json(parsed);
+    } catch {
+      // stdout 不是合法 JSON — 视为未找到
+      res.status(404).json({ error: 'TEXT_NOT_FOUND', raw: out.trim() });
+    }
+  } catch (e) {
+    res.status(500).json({ error: e.message });
   }
 });
 

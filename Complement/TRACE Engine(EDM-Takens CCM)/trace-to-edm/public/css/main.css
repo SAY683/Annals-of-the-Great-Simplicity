@@ -258,12 +258,19 @@
   text-align: center;
 }
 
-.panel.centered-form-panel .form-row select,
-.panel.centered-form-panel .form-row textarea {
+.panel.centered-form-panel .form-row select {
   flex: 0 0 auto;
   width: 100%;
   max-width: 420px;
   text-align: center;
+}
+
+/* Round 19 修缮：textarea 左对齐，避免多段文本居中影响可读性 */
+.panel.centered-form-panel .form-row textarea {
+  flex: 0 0 auto;
+  width: 100%;
+  max-width: 420px;
+  text-align: left;
 }
 
 /* 居中面板内的 span 文本（如 edmDataRange） */
@@ -344,7 +351,8 @@
 }
 .btn-mini:hover { color: var(--text); }
 
-/* 数据集操作栏：横向排列，居中对齐，避免按钮被压扁 */
+/* 数据集操作栏：横向排列，居中对齐，避免按钮被压扁
+   Round 19 修缮：统一按钮高度基线（.btn=34px, .btn-mini=28px），消除 36/30/32 混用 */
 .ds-actions-bar {
   display: flex;
   align-items: center;
@@ -359,17 +367,17 @@
   min-width: 120px;
   max-width: 100%;
   white-space: nowrap;
-  height: 36px;
-  min-height: 36px;
-  max-height: 36px;
-  padding: 0 18px;
+  height: 34px;
+  min-height: 34px;
+  max-height: 34px;
+  padding: 0 16px;
 }
 
 .ds-actions-bar .btn-mini {
   flex: 0 0 auto;
-  height: 30px;
-  min-height: 30px;
-  max-height: 30px;
+  height: 28px;
+  min-height: 28px;
+  max-height: 28px;
   padding: 0 10px;
 }
 
@@ -382,8 +390,9 @@
   .ds-actions-bar .btn-mini {
     width: 100%;
     height: auto;
-    min-height: 36px;
+    min-height: 44px;
     max-height: none;
+    padding: 10px 16px;
   }
 }
 
@@ -707,6 +716,18 @@ tr:hover td { background: #151d28; }
 th.l1 { color: var(--accent); }
 th.l2 { color: var(--accent2); }
 th.l3 { color: #c084fc; }
+th.trace { color: #fbbf24; }
+
+/* ── TRACE 诊断列状态色（R13-4 修缮） ──── */
+/* trace_status 单元格按状态着色，让"系统错位"一眼可见 */
+td.tstat-ok { color: #10b981; font-weight: 600; }
+td.tstat-failed { color: #ef4444; font-weight: 700; }
+td.tstat-partial { color: #f59e0b; font-weight: 600; }
+td.tstat-extract { color: #f97316; font-weight: 600; }
+td.tstat-skipped { color: var(--muted); font-style: italic; }
+
+/* trace_error 单元格：等宽字体便于排错，截断省略号 */
+td[title] { font-family: 'JetBrains Mono', 'Consolas', monospace; font-size: 0.62rem; }
 
 /* ── Responsive ─────────────────────────── */
 @media (max-width: 900px) {
@@ -728,4 +749,12 @@ th.l3 { color: #c084fc; }
   .btn { width: 100%; }
   .terminal { height: 200px; }
   .chart-wrap, .chart-wrap canvas { max-height: 220px; }
+}
+
+/* ── 数据集 → 轨迹高亮追溯 ─────────────────── */
+/* 点击数据集行时，对应轨迹行被加上 .highlight-ds 类 */
+.highlight-ds {
+  background: rgba(0, 255, 200, 0.15) !important;
+  box-shadow: 0 0 0 2px var(--accent, #66fcf1) inset;
+  transition: background 0.3s, box-shadow 0.3s;
 }

@@ -4,9 +4,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>trace-to-edm 操纵台</title>
-  <link rel="stylesheet" href="shared/themes/tokusatsu.css?v=20260725f" />
-  <link rel="stylesheet" href="/css/override.css?v=20260725f" />
-  <link rel="stylesheet" href="/css/main.css?v=20260725f" />
+  <link rel="stylesheet" href="shared/themes/tokusatsu.css?v=20260727e" />
+  <link rel="stylesheet" href="/css/override.css?v=20260727e" />
+  <link rel="stylesheet" href="/css/main.css?v=20260727e" />
   <!-- 内联兜底：确保 header 紧凑化优先于任何缓存或主题覆盖 -->
   <style>
     .base-header { padding: 8px 14px !important; margin-bottom: 12px !important; gap: 12px !important; }
@@ -56,6 +56,7 @@
         <div class="status-card"><span class="stat-label">CORE</span><span class="stat-value" id="statCore">Qwen1.5B</span></div>
       </section>
 
+      <!-- Round 19 修缮：移除 pipeline 中硬编码的 active 类，由 JS 根据真实状态动态切换 -->
       <!-- 通信管线 -->
       <section class="panel pipeline-panel">
         <span class="hud-corner tl"></span>
@@ -65,13 +66,13 @@
         <span class="sector-label">SECTOR-A1</span>
         <div class="panel-header"><span>◈ COMMUNICATION PIPELINE</span></div>
         <div class="panel-body pipeline-stages">
-          <div class="pipe-stage active" data-stage="trace"><span class="pipe-dot"></span>TRACE WEB</div>
+          <div class="pipe-stage" data-stage="trace"><span class="pipe-dot"></span>TRACE WEB</div>
           <div class="pipe-connector"></div>
-          <div class="pipe-stage active" data-stage="l1"><span class="pipe-dot"></span>L1 META-SCM</div>
+          <div class="pipe-stage" data-stage="l1"><span class="pipe-dot"></span>L1 META-SCM</div>
           <div class="pipe-connector"></div>
-          <div class="pipe-stage active" data-stage="l2"><span class="pipe-dot"></span>L2 PCA</div>
+          <div class="pipe-stage" data-stage="l2"><span class="pipe-dot"></span>L2 PCA</div>
           <div class="pipe-connector"></div>
-          <div class="pipe-stage active" data-stage="l3"><span class="pipe-dot"></span>L3 SACRED</div>
+          <div class="pipe-stage" data-stage="l3"><span class="pipe-dot"></span>L3 SACRED</div>
           <div class="pipe-connector"></div>
           <div class="pipe-stage" data-stage="edm"><span class="pipe-dot"></span>EDM OBS</div>
         </div>
@@ -142,7 +143,7 @@
             <span class="hud-corner bl"></span>
             <span class="hud-corner br"></span>
             <span class="sector-label">SECTOR-A5</span>
-            <h2><span class="panel-title-wrap"><span class="panel-icon">◈</span> 数据源: 文本输入</span></h2>
+            <h2><span class="panel-icon">◈</span> 数据源: 文本输入</h2>
             <div class="form-row">
               <label>CSV 文件:</label>
               <select id="textCsvSelect">
@@ -150,7 +151,7 @@
               </select>
             </div>
             <div class="form-row">
-              <textarea id="textDirect" placeholder="或直接粘贴文本 (多段用 --- 分隔)..." rows="3" class="text-direct-input"></textarea>
+              <textarea id="textDirect" placeholder="或直接粘贴文本 (多段用 --- 分隔)..." rows="3" class="text-direct-input" autocomplete="off" spellcheck="false"></textarea>
             </div>
             <div class="input-hint">Enter 提交 · Shift+Enter 换行 · 多段用 --- 分隔</div>
             <button id="btnAddText" class="btn btn-run">+ 将文本加入数据集</button>
@@ -163,7 +164,17 @@
             <span class="hud-corner bl"></span>
             <span class="hud-corner br"></span>
             <span class="sector-label">SECTOR-A6</span>
-            <div class="panel-header"><span>▶ 实时终端</span><span class="log-stats">total <b id="logCountTotal">0</b></span></div>
+            <div class="panel-header">
+              <span>▶ 实时终端</span>
+              <span class="log-stats">
+                <span class="badge-stage">▶<b id="logCountProgress">0</b></span>
+                <span class="badge-info">◉<b id="logCountInfo">0</b></span>
+                <span class="badge-warn">▲<b id="logCountWarn">0</b></span>
+                <span class="badge-error">✖<b id="logCountError">0</b></span>
+                <span class="badge-done">✓<b id="logCountDone">0</b></span>
+                · total <b id="logCountTotal">0</b>
+              </span>
+            </div>
             <div class="log-toolbar">
               <label class="log-filter"><input type="checkbox" id="filterProgress" checked /> <span class="badge-stage">▶ STAGE</span></label>
               <label class="log-filter"><input type="checkbox" id="filterInfo" checked /> <span class="badge-info">◉ INFO</span></label>
@@ -172,6 +183,7 @@
               <label class="log-filter"><input type="checkbox" id="filterDone" checked /> <span class="badge-done">✓ DONE</span></label>
               <button id="btnLogPause" class="btn-mini">⏸ 暂停</button>
               <button id="btnClearTerm" class="btn-mini">清空</button>
+              <button id="btnReconnect" class="btn-mini" disabled>⟲ 重连</button>
             </div>
             <div class="log-view terminal" id="terminal">
               <div class="terminal-line dim">就绪。从数据源添加条目到数据集，然后运行管线。</div>
@@ -201,6 +213,12 @@
               数据集为空。从左侧数据源添加条目。
             </div>
             <div class="ds-actions-bar">
+              <!-- P2 修缮：TRACE 模式选择器（默认 LIGHT，可选 DEEP 触发六战士诊断） -->
+              <label for="traceModeSelect" style="font-size:clamp(0.64rem,0.85vw,0.72rem);color:var(--muted,#7a8087);margin-right:4px;">TRACE 模式</label>
+              <select id="traceModeSelect" class="compact-bar" style="min-height:32px;width:auto;font-size:clamp(0.64rem,0.85vw,0.72rem);">
+                <option value="light" selected>LIGHT (1-3s/条, jieba)</option>
+                <option value="deep">DEEP (10-60s/条, 六战士)</option>
+              </select>
               <button id="btnRunPipeline" class="btn btn-run" disabled>▶ 运行管线 (处理所有待处理条目)</button>
             </div>
           </section>
@@ -273,7 +291,7 @@
     </main>
   </div>
 
-  <script src="/js/logCockpit.js?v=20260725a"></script>
-  <script src="/js/app.js?v=20260725b"></script>
+  <script src="/js/logCockpit.js?v=20260727e"></script>
+  <script src="/js/app.js?v=20260727e"></script>
 </body>
 </html>

@@ -1,8 +1,8 @@
 # 五大项目微服务 API 路由方案 + 前端鲁棒性 + 网页关闭重连机制
 
 > 范围：`f:\攻略\研发测试\.skills` 下五个项目（edm-takens、edm-takens-web、trace-engine、trace-engine-web、trace-to-edm）。
-> 目标：在 **不破坏现有 25 + 20 + 27 端点** 的前提下，沉淀一份微服务 API 路由契约、前端鲁棒性方案与网页关闭重连机制，作为后续渐进式微服务化的蓝图。
-> 备注：原始任务卡列 trace-to-edm 为 13 端点，Q5 盘点为 25 端点，Q8+ 新增 `/api/edm/poll/:id` 代理端点（CORS 修复），Round 12 续新增 `/api/version`（版本查询），现为 27 端点。
+> 目标：在 **不破坏现有 29 + 24 + 31 端点** 的前提下，沉淀一份微服务 API 路由契约、前端鲁棒性方案与网页关闭重连机制，作为后续渐进式微服务化的蓝图。
+> 备注：原始任务卡列 trace-to-edm 为 13 端点，Q5 盘点为 25 端点，Q8+ 新增 `/api/edm/poll/:id` 代理端点（CORS 修复），Round 12 续新增 `/api/version`（版本查询），R13+ 新增 `/api/replay-uuids`、`/api/work-uuid/:uuid/text`、`/api/pipeline/run` 等端点，现为 31 端点。edm-takens-web 经 routes/* 细化为 29 端点。trace-engine-web 经 routes/* 拆分为 24 端点（system=8 / jobs=7 / analysis=8 / admin=1）。
 
 ---
 
@@ -13,10 +13,10 @@
 | 项目 | 角色 | 语言/运行时 | 端口 | 提供的微服务 | 现有端点数 |
 |------|------|------------|------|-------------|-----------|
 | **edm-takens** | 算法内核（无独立 API） | Python 3.13 | — | EDM-Takens 流水线（CCM、EmbedDimension、Havok、SovereignHavok、SurrogateTest、AdaptivePipeline）。作为 Python 模块被 `edm-takens-web` 直接 `import` 调用。 | 0 |
-| **edm-takens-web** | EDM 分析 Web 服务 | FastAPI / Uvicorn | 8000 | 数据集管理、EDM 分析任务编排、历史归档、结果导出。 | 25 |
+| **edm-takens-web** | EDM 分析 Web 服务 | FastAPI / Uvicorn | 8000 | 数据集管理、EDM 分析任务编排、历史归档、结果导出。 | 29 |
 | **trace-engine** | 算法内核（无独立 API） | Python 3.13 | — | TRACE 引擎（六战士 + 反事实桥 + DoWhy 适配 + Pearl 反事实）。作为子进程被 `trace-engine-web` 通过 `py_bridge.py` 调用。 | 0 |
-| **trace-engine-web** | 文本因果分析 Web 服务 | Express + SSE | 3000 | 文本分析（LIGHT/DEEP/SUPER）、SSE 流式、结果缓存、LLaMA Worker 调度、任务历史。 | 20 |
-| **trace-to-edm** | 桥接编排服务 | Express + SSE | 3100 | 三层桥接（L1 元SCM / L2 世俗语义 PCA / L3 八正道）、文本管线 Mode A、回填管线 Mode B、EDM 触发与轮询代理、项目与数据集管理、版本查询。 | 27 |
+| **trace-engine-web** | 文本因果分析 Web 服务 | Express + SSE | 3000 | 文本分析（LIGHT/DEEP/SUPER）、SSE 流式、结果缓存、LLaMA Worker 调度、任务历史。 | 24 |
+| **trace-to-edm** | 桥接编排服务 | Express + SSE | 3100 | 三层桥接（L1 元SCM / L2 世俗语义 PCA / L3 八正道）、文本管线 Mode A、回填管线 Mode B、EDM 触发与轮询代理、项目与数据集管理、版本查询。 | 31 |
 
 ### 1.2 服务间通信拓扑
 
@@ -60,13 +60,31 @@
 | **只读型（Read-Only）** | 纯查询，无副作用 | `GET /api/health`、`GET /api/datasets`、`GET /api/history`、`GET /api/jobs`、`GET /api/schema` | 28 |
 | **治理型（Governance）** | 清理、归档、批量操作、模型切换 | `POST /api/admin/cleanup`、`POST /api/history/cleanup`、`POST /api/jobs/clear`、`POST /api/models/activate` | 10 |
 
-> 总计 72 端点（含 trace-to-edm 实际 27 端点，而非任务卡上的 13）。
+> 总计 84 端点（edm-takens-web 29 + trace-engine-web 24 + trace-to-edm 31，Round 13.4 对账后，Round 19 校正 §6.1 表格与此一致）。
+
+### 1.4 服务绑定地址规范（Round 19 新增）
+
+**强制规范**: 所有 Web 服务 (trace-engine-web / trace-to-edm / edm-takens-web) 必须绑定 `TRACE_HOST || '127.0.0.1'`, 而非隐式 `0.0.0.0`。
+
+**原因**:
+1. **本地开发安全**: 避免服务直接暴露到 LAN/Internet, 防止未授权访问
+2. **避免端口冲突**: 0.0.0.0 监听会与系统其他服务端口冲突 (Windows 上尤其明显)
+3. **隧道模式兼容**: 外部访问通过 Cloudflare Tunnel 暴露, 不需要服务直接监听 0.0.0.0
+4. **IPv6/IPv4 一致性**: `127.0.0.1` 明确走 IPv4, 避免 `localhost` 在某些系统下解析到 `::1` (IPv6) 导致连接失败
+
+**实现位置**:
+- `trace-engine-web/server.js`: `app.listen(PORT, process.env.TRACE_HOST || '127.0.0.1', ...)`
+- `trace-to-edm/server.js`: `app.listen(PORT, process.env.TRACE_HOST || '127.0.0.1', ...)`
+- `edm-takens-web/backend/api.py`: `uvicorn.run(app, host=os.getenv('TRACE_HOST', '127.0.0.1'), ...)`
+- `edm-takens-web/frontend/vite.config.js`: proxy target 使用 `http://127.0.0.1:8000` (非 `localhost`)
+
+**生产部署**: 通过环境变量 `TRACE_HOST=0.0.0.0` 在容器/反向代理后放开绑定, 配合防火墙规则限制来源 IP。
 
 ---
 
 ## 2. API 路由层级体系
 
-将现有 72 个端点按职能归入 5 个逻辑层。**层级不是物理部署**，同一服务可跨多层（如 edm-takens-web 同时提供 L1/L2/L3/L4/L5 端点）。这是后续抽出独立微服务的拆分依据。
+将现有 84 个端点按职能归入 5 个逻辑层。**层级不是物理部署**，同一服务可跨多层（如 edm-takens-web 同时提供 L1/L2/L3/L4/L5 端点）。这是后续抽出独立微服务的拆分依据。
 
 ### 2.1 L1 — 基础设施层（Health / Config / Schema）
 
@@ -130,11 +148,11 @@
 | `/api/analyze-file` | trace-engine-web | POST | 计算 | `multipart/form-data`：`file, mode, config?` | 同上 |
 | `/api/cancel/:id` | trace-engine-web | POST | 治理 | path: id | `{success, cancelled, reason}`；404 |
 | `/api/retry/:id` | trace-engine-web | POST | 计算 | path: id | `{success, originalId, newId, data}`；400/404/500 |
-| `/api/run` | trace-to-edm | POST | 转发 | `{csv_path?, mode?}` | SSE 流：`start/progress/warn/log/done/error` |
+| `/api/run` | trace-to-edm | POST | 转发 | `{csv_path?, mode?, trace_mode?}` | SSE 流：`start/progress/warn/log/done/error`；`trace_mode` 取值 `light`/`deep`，决定 TRACE 分析使用 LIGHT 还是 DEEP 模式（默认 `light`） |
 | `/api/replay` | trace-to-edm | POST | 转发 | `{csv_path?, replay_all?}` | SSE 流：同上 |
 | `/api/replay-all` | trace-to-edm | POST | 转发 | — | SSE 流（实际由 `/api/replay` 复用） |
 | `/api/edm/trigger` | trace-to-edm | POST | 计算+转发 | `{target?, q?, time_start?, time_end?, predict_window?}` | `{success, ...result}` 或 `{success, output, stderr}` |
-| `/api/pipeline/run` | trace-to-edm | POST | 计算+储存 | — | SSE 流：聚合回填+文本管线 |
+| `/api/pipeline/run` | trace-to-edm | POST | 计算+储存 | `{trace_mode?}` | SSE 流：聚合回填+文本管线；`trace_mode` 取值 `light`/`deep`，决定 TRACE 分析使用 LIGHT 还是 DEEP 模式（默认 `light`，Round 13 P2-13.6 修缮后支持） |
 | `/api/replay-uuids` | trace-to-edm | POST | 转发 | `{uuids: string[]}` | SSE 流：`start/progress/warn/log/done/error` |
 
 **SSE 错误反馈统一规范**（治理建议）：
@@ -648,7 +666,7 @@ async function fetchResult(jobId) {
 
 **动作项**：
 1. 为 edm-takens-web 启用 FastAPI 自带的 OpenAPI 生成（`/docs`、`/openapi.json`），补充 Pydantic 模型。
-2. 为 trace-engine-web 与 trace-to-edm 编写手写 `openapi.yaml`，覆盖所有 70 端点。
+2. 为 trace-engine-web 与 trace-to-edm 编写手写 `openapi.yaml`，覆盖所有 84 端点。
 3. 统一错误响应格式：
    ```json
    { "success": false, "error": "...", "code": "VALIDATION_FAILED", "field": "filename", "traceId": "..." }
@@ -702,10 +720,10 @@ async function fetchResult(jobId) {
 
 | 项目 | 现有端点数 | 微服务化后保留 | 备注 |
 |------|-----------|--------------|------|
-| edm-takens-web | 25 | 25 | 仅补 OpenAPI 文档，不改路由 |
-| trace-engine-web | 23 | 23 | 仅补 OpenAPI 文档，不改路由 |
-| trace-to-edm | 29 | 29 | 仅补 OpenAPI 文档，不改路由 |
-| **合计** | **77** | **77** | 网关层只做转发，不重写路径 |
+| edm-takens-web | 29 | 29 | 仅补 OpenAPI 文档，不改路由 (Round 19 校正: 25→29) |
+| trace-engine-web | 24 | 24 | 仅补 OpenAPI 文档，不改路由 (Round 19 校正: 23→24) |
+| trace-to-edm | 31 | 31 | 仅补 OpenAPI 文档，不改路由 (Round 19 校正: 29→31, 与 server.js header 一致) |
+| **合计** | **84** | **84** | 网关层只做转发，不重写路径 (Round 19 校正: 77→84) |
 
 ### 6.2 渐进式策略
 
@@ -738,9 +756,61 @@ async function fetchResult(jobId) {
 
 ---
 
-## 附录 A：70 端点全量索引（按服务 + 层级）
+## 7. 轨迹表诊断字段与 threshold 默认值
 
-### A.1 edm-takens-web（25 端点）
+### 7.1 轨迹表诊断字段（trace_status / trace_mode / trace_error）
+
+**背景**: Round 13 P0-13.1 修缮后，trace-to-edm 的 `bridge.py` 在 `process_single_text` 中显式写入三个诊断字段到 `narrative_meta_trajectories.csv`，让下游（edm-takens-web 与前端）能正确区分"LIGHT 模式不跑六战士"与"DEEP 模式跑失败"，避免 §13.0 描述的"7 列全 0 误判算法失败"问题。
+
+**字段定义**:
+
+| 字段 | 类型 | 取值 | 含义 |
+|------|------|------|------|
+| `trace_status` | string | `OK` / `FAILED` / `PARTIAL` / `EXTRACT_FAILED` / `SKIPPED` / `LEGACY` | TRACE 分析状态。`OK`=完全成功；`FAILED`=TRACE 子进程失败；`PARTIAL`=部分成功（如六战士部分降级）；`EXTRACT_FAILED`=L1 提取失败；`SKIPPED`=跳过 TRACE；`LEGACY`=历史行补标记（Round 13 前的数据） |
+| `trace_mode` | string | `light` / `deep` / `unknown` | TRACE 分析模式。`light`=LIGHT 模式（不跑六战士）；`deep`=DEEP 模式（完整六战士诊断）；`unknown`=历史行无模式标记 |
+| `trace_error` | string | 错误详情（最长 300 字符） | TRACE 失败时的错误详情，便于下游诊断。前端表格中截断显示 40 字符，完整内容放 `title` tooltip |
+
+**前端渲染契约**（trace-to-edm `public/js/app.js`）:
+- `preferredCols` 末尾追加 `trace_status`、`trace_mode`、`trace_error` 三列
+- `layerMap` 归入 `trace` 分组
+- `trace_status` 按状态值着色（`tstat-*` CSS 类）：
+  - `OK` = 绿色
+  - `FAILED` = 红色
+  - `PARTIAL` = 黄色
+  - `EXTRACT_FAILED` = 橙色
+  - `SKIPPED` = 灰色
+- `trace_error` 截断 40 字符防单元格溢出，完整 300 字符放 `title` tooltip
+
+**关联端点**: `/api/run`、`/api/pipeline/run`、`/api/replay-uuids` 的 SSE `done` 事件携带 `trajectory_rows`，CSV 中即包含上述三列。
+
+### 7.2 threshold 默认值（双轨制）
+
+**背景**: §13.4.3 文档歧义修正后，threshold 默认值明确为双轨制。
+
+**权威来源**:
+- [presets.yaml:23](../TRACE Engine(EDM-Takens CCM)/trace-engine/examples/counterfactual_hybrid/presets.yaml) `threshold: 0.03`，注释 "默认取模型文档推荐标准值 0.03"
+- [TRACE Interpretation Dictionary.md:34](../TRACE Engine(EDM-Takens CCM)/trace-engine-web/TRACE Interpretation Dictionary.md) "Web 默认值 0.03 适合通用文本"
+
+**取值规则**:
+
+| 场景 | threshold | 说明 |
+|------|-----------|------|
+| 通用文本（standard 预设） | **0.03** | 模型文档推荐标准值，匹配 `ΔNLL ~ 0–0.16` 的 99% 置信区 |
+| LLaMA/llama 预设（V4 过拟合模型） | **0.01** | V4 过拟合模型 ΔNLL 偏低，需更严格过滤防止假阳性 |
+| SUPER 模式（trace-engine-web） | **0.01** | SUPER 模式使用 LLaMA 模型，沿用 llama 预设的 0.01 |
+
+**API 契约**:
+- `GET /api/config`（trace-engine-web）返回的 `bridgeParamSchema.threshold.default = 0.03`，`superBridgeParamSchema.threshold.default = 0.01`
+- `GET /api/presets`（trace-engine-web）返回的 `standard.trace2dowhy.threshold = 0.03`，`llama.trace2dowhy.threshold = 0.01`
+- 前端 LIGHT/DEEP 模式默认 0.03，SUPER 模式默认 0.01
+
+**注意**: `test_presets.py` 4 处断言 `0.03`，盲改为 0.01 会破坏测试套件。代码无需修改，文档与 memory 已修正歧义。
+
+---
+
+## 附录 A：84 端点全量索引（按服务 + 层级）
+
+### A.1 edm-takens-web（29 端点）
 
 | 层级 | 端点 | 方法 | 文件 |
 |------|------|------|------|
@@ -758,19 +828,23 @@ async function fetchResult(jobId) {
 | L3 | `/api/analyze/stream` | GET | analyze.py |
 | L3 | `/api/results/{image_path}` | GET | analyze.py |
 | L4 | `/api/history` | GET | history.py |
+| L4 | `/api/history/{task_id}` | GET | history.py |
 | L4 | `/api/history/{task_id}/archive` | POST | history.py |
 | L4 | `/api/history/{task_id}/download` | GET | history.py |
 | L4 | `/api/history/{task_id}` | DELETE | history.py |
 | L5 | `/api/history/cleanup` | POST | history.py |
 | L4 | `/api/archives` | GET | history.py |
 | L4 | `/api/archives/{task_id}/restore` | POST | history.py |
+| L4 | `/api/archives/{task_id}/preview` | GET | history.py |
 | L4 | `/api/archives/{task_id}` | DELETE | history.py |
 | L4 | `/api/history/batch` | POST | history.py |
 | L4 | `/api/history/compare` | POST | history.py |
 | L4 | `/api/history/{task_id}/export/json` | GET | history.py |
 | L4 | `/api/history/{task_id}/export/csv` | GET | history.py |
+| L1 | `/` | GET | api.py（SPA 根） |
+| L1 | `/{path:path}` | GET | api.py（SPA fallback） |
 
-### A.2 trace-engine-web（20 端点）
+### A.2 trace-engine-web（24 端点）
 
 | 层级 | 端点 | 方法 | 文件 |
 |------|------|------|------|
@@ -779,6 +853,7 @@ async function fetchResult(jobId) {
 | L1 | `/api/version` | GET | system.js |
 | L1 | `/api/schema` | GET | system.js |
 | L1 | `/api/presets` | GET | system.js |
+| L1 | `/api/models` | GET | system.js |
 | L5 | `/api/queue` | GET | system.js |
 | L5 | `/api/metrics` | GET | system.js |
 | L3 | `/api/analyze-stream` | GET | analysis.js |
@@ -791,41 +866,50 @@ async function fetchResult(jobId) {
 | L3 | `/api/retry/:id` | POST | analysis.js |
 | L4 | `/api/jobs` | GET | jobs.js |
 | L4 | `/api/jobs/export` | GET | jobs.js |
-| L5 | `/api/jobs/clear` | POST | jobs.js |
 | L4 | `/api/jobs/:id` | GET | jobs.js |
+| L4 | `/api/jobs/:id/detail` | GET | jobs.js |
+| L5 | `/api/jobs/clear` | POST | jobs.js |
+| L5 | `/api/jobs/batch-delete` | POST | jobs.js |
+| L5 | `/api/jobs/:id` | DELETE | jobs.js |
 | L5 | `/api/admin/cleanup` | POST | admin.js |
 
-### A.3 trace-to-edm（26 端点）
+### A.3 trace-to-edm（31 端点）
 
-> 行号同步至 2026-07-20（元审计 Q5：server.js 头部注释精简后整体 -2 行）。
+> 行号同步至 2026-07-27（Round 13.4 后 server.js 端点计数 31，含 /api/health、/api/version、/api/orthogonality、/api/inputs、/api/edm/poll/:jobId、/api/work-uuid/:uuid/text 等新增端点）。
 
 | 层级 | 端点 | 方法 | 行号 |
 |------|------|------|------|
-| L1 | `/api/status` | GET | 147 |
-| L2 | `/api/trajectory` | GET | 200 |
-| L5 | `/api/trajectory/clear` | POST | 205 |
-| L3 | `/api/run` | POST | 226 |
-| L3 | `/api/replay` | POST | 316 |
-| L3 | `/api/edm/trigger` | POST | 402 |
-| L4 | `/api/jobs` | GET | 456 |
-| L2 | `/api/dataset` | GET | 491 |
-| L2 | `/api/dataset/add` | POST | 500 |
-| L2 | `/api/dataset/add-text` | POST | 510 |
-| L2 | `/api/dataset/remove` | POST | 529 |
-| L5 | `/api/dataset/clear-processed` | POST | 534 |
-| L5 | `/api/dataset/reset` | POST | 539 |
-| L2 | `/api/dataset/update-ts` | POST | 544 |
-| L3 | `/api/pipeline/run` | POST | 665 |
-| L2 | `/api/models` | GET | 739 |
-| L5 | `/api/models/activate` | POST | 747 |
-| L2 | `/api/projects` | GET | 774 |
-| L2 | `/api/projects` | POST | 783 |
-| L2 | `/api/projects/activate` | PUT | 794 |
-| L2 | `/api/projects/:name` | DELETE | 805 |
-| L2 | `/api/work-scan` | GET | 816 |
-| L2 | `/api/work-uuid/:uuid` | DELETE | 825 |
-| L5 | `/api/work-clean` | POST | 843 |
-| L3 | `/api/replay-uuids` | POST | 864 |
+| L1 | `/api/health` | GET | 363 |
+| L1 | `/api/version` | GET | 369 |
+| L1 | `/api/status` | GET | 381 |
+| L1 | `/api/orthogonality` | GET | 434 |
+| L2 | `/api/trajectory` | GET | 456 |
+| L5 | `/api/trajectory/clear` | POST | 461 |
+| L3 | `/api/run` | POST | 482 |
+| L3 | `/api/replay` | POST | 575 |
+| L3 | `/api/edm/trigger` | POST | 664 |
+| L3 | `/api/edm/poll/:jobId` | GET | 723 |
+| L4 | `/api/jobs` | GET | 758 |
+| L4 | `/api/inputs` | GET | 794 |
+| L2 | `/api/dataset` | GET | 816 |
+| L2 | `/api/dataset/add` | POST | 825 |
+| L2 | `/api/dataset/add-text` | POST | 835 |
+| L2 | `/api/dataset/remove` | POST | 855 |
+| L5 | `/api/dataset/clear-processed` | POST | 860 |
+| L5 | `/api/dataset/reset` | POST | 865 |
+| L2 | `/api/dataset/update-ts` | POST | 870 |
+| L3 | `/api/pipeline/run` | POST | 1017 |
+| L2 | `/api/models` | GET | 1108 |
+| L5 | `/api/models/activate` | POST | 1122 |
+| L2 | `/api/projects` | GET | 1161 |
+| L2 | `/api/projects` | POST | 1174 |
+| L2 | `/api/projects/activate` | PUT | 1186 |
+| L2 | `/api/projects/:name` | DELETE | 1199 |
+| L2 | `/api/work-scan` | GET | 1211 |
+| L2 | `/api/work-uuid/:uuid` | DELETE | 1220 |
+| L5 | `/api/work-clean` | POST | 1243 |
+| L3 | `/api/replay-uuids` | POST | 1271 |
+| L2 | `/api/work-uuid/:uuid/text` | GET | 1345 |
 
 ---
 

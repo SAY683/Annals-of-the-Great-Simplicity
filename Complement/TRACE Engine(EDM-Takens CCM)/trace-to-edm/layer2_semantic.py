@@ -238,10 +238,12 @@ class SemanticProjector:
         for i in range(n_axes, LAYER2_N_COMPONENTS):
             result[f"z_pca_{i+1}"] = 0.0
 
-        # 世俗熵
-        projections = [abs(result[f"z_pca_{i+1}"]) for i in range(n_axes)]
-        total = sum(projections) + 1e-10
-        probs = [p / total for p in projections]
+        # 世俗熵（P0 修正：使用 z² 能量作为概率质量，符合 PCA 谱熵标准定义）
+        # 原实现用 |z| 绝对值会丢失方向信息且物理意义不明确；
+        # z² 等价于各主轴上的方差/能量贡献，与 explained_variance_ratio_ 一致。
+        energy = [result[f"z_pca_{i+1}"] ** 2 for i in range(n_axes)]
+        total_energy = sum(energy) + 1e-10
+        probs = [e / total_energy for e in energy]
         entropy = -sum(p * np.log(p + 1e-10) for p in probs)
         max_entropy = np.log(len(probs)) if len(probs) > 1 else 1.0
         result["secular_entropy"] = entropy / max_entropy if max_entropy > 0 else 0.0

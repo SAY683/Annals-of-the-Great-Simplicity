@@ -110,6 +110,27 @@ def _job_worker(store: JobStore, job: Job):
                     preexisting_files=preexisting_files,
                     project_name=params.get("project_name"),
                 )
+            # 写入 params_*.json（与 config_*.json 同 timestamp 命名模式），
+            # 用于历史面板回看任务的输入参数。写入失败不阻断主流程。
+            try:
+                _task_dir = os.path.join(RESULTS_DIR, task_id)
+                _params_payload = {
+                    "filename": params.get("filename"),
+                    "target_col": params.get("target_col"),
+                    "selected_vars": params.get("selected_vars", []),
+                    "q": params.get("q"),
+                    "max_e": params.get("max_e"),
+                    "intensity": params.get("intensity"),
+                    "project_name": params.get("project_name"),
+                    "auto_fix": params.get("auto_fix"),
+                }
+                _params_path = os.path.join(
+                    _task_dir, f"params_{int(time.time())}.json"
+                )
+                with open(_params_path, "w", encoding="utf-8") as _pf:
+                    json.dump(_params_payload, _pf, ensure_ascii=False, indent=2)
+            except Exception as _e:
+                print(f"[analysis_worker] params_*.json 写入失败（不阻断主流程）: {_e}")
             summary = _build_summary(
                 result,
                 params["selected_vars"],

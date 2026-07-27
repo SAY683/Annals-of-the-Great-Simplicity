@@ -74,9 +74,15 @@ class TrajectoryCSV:
 
     # 列顺序定义 (类常量, 所有实例共享引用但每个实例独立维护 KNOWN_COLUMNS)
     # P1-g 修缮：Layer 1 列名从 config.LAYER1_COLUMNS 动态构建，消除三处独立硬编码
+    # P0 修缮：新增 trace_status / trace_error 列，让 TRACE 失败显形而非被静默吞掉
+    # Phase 2 L3-1 修缮：新增 z_{name}_zscore 列（per-project 滚动窗口归一化）
     COLUMN_ORDER = [
         # ── Meta ──
         "time_step", "text_hash", "source_label",
+        # ── 诊断标记（P0 修缮）：OK/FAILED/EXTRACT_FAILED/SKIPPED/PARTIAL/LEGACY ──
+        "trace_status", "trace_error",
+        # ── TRACE 模式（P2 修缮）：light/deep，让下游解读六战士 0 值的语义 ──
+        "trace_mode",
     ] + [
         # ── Layer 1: 元 SCM（从 config.LAYER1_COLUMNS 程序化绑定） ──
         c[0] for c in LAYER1_COLUMNS
@@ -93,6 +99,16 @@ class TrajectoryCSV:
     ] + [
         # ── Layer 3: 八正道审计 (二阶差分) ──
         f"d2z_{short}" for short, _, _ in SACRED_BOOKS
+    ] + [
+        # ── Phase 2 L3-1 修缮: per-project z-score 归一化列 ──
+        # 消除项目间均值差异，提升 EDM 辨别性
+        f"z_{short}_zscore" for short, _, _ in SACRED_BOOKS
+    ] + [
+        # ── Phase 2 L3-1 修缮: 一阶差分 z-score 列 ──
+        f"dz_{short}_zscore" for short, _, _ in SACRED_BOOKS
+    ] + [
+        # ── Phase 2 L3-1 修缮: 二阶差分 z-score 列 ──
+        f"d2z_{short}_zscore" for short, _, _ in SACRED_BOOKS
     ]
 
     def __init__(self, csv_path: Optional[Path] = None):
@@ -116,15 +132,30 @@ class TrajectoryCSV:
             self._load_existing()
 
     def _load_existing(self):
-        """加载已有 CSV，保留所有行（跳过以 _ 开头的内部元数据列，清理历史污染）"""
+        """加载已有 CSV，保留所有行（跳过以 _ 开头的内部元数据列，清理历史污染）
+
+        P0 修缮：对历史行补 LEGACY 标记，让新增的 trace_status 列在旧行也有显式值，
+        避免"全 0 行"误导用户以为是算法失败。
+        """
         with open(self.csv_path, "r", encoding="utf-8", newline="") as f:
             reader = csv.DictReader(f)
             for row in reader:
                 # 过滤以 _ 开头的内部元数据字段（历史污染清理）
+                # P0 修缮 (2026-07-27 E2E 测试发现): csv.DictReader 对未命名多余列
+                # (如尾部逗号或表头不匹配) 返回 None key，None.startswith() 会崩溃。
+                # 增加 k is not None 守卫。
                 clean_row = {
                     k: v for k, v in row.items()
-                    if not k.startswith(self._INTERNAL_FIELD_PREFIX)
+                    if k is not None and not k.startswith(self._INTERNAL_FIELD_PREFIX)
                 }
+                # P0 修缮：历史行没有 trace_status 列时补 LEGACY 标记
+                # LEGACY 表示该行在新诊断标记引入之前写入，TRACE 实际状态未知
+                if "trace_status" not in clean_row:
+                    clean_row["trace_status"] = "LEGACY"
+                    clean_row.setdefault("trace_error", "")
+                # P2 修缮：历史行没有 trace_mode 列时补 unknown
+                if "trace_mode" not in clean_row:
+                    clean_row["trace_mode"] = "unknown"
                 self._rows.append(clean_row)
                 # 更新实例级已知列（同样跳过 _ 前缀）
                 for key in clean_row.keys():
@@ -132,6 +163,26 @@ class TrajectoryCSV:
 
         if VERBOSE:
             print(f"[CSV] 加载已有轨迹: {len(self._rows)} 行, {len(self._known_columns)} 列")
+
+        # P0 修缮 (2026-07-27 E2E 测试发现): 表头迁移检测。
+        # 场景: COLUMN_ORDER 新增了列（如 Phase 2 zscore 24 列），但旧 CSV 表头
+        # 仍是 57 列。append-only 优化（_append_row）不会更新表头，导致新行写入的
+        # 26 列 zscore 数据被 DictReader 归入 None key（restkey），既丢失数据又触发
+        # None.startswith() 崩溃。修复: 检测到表头缺列时立即全量重写，更新表头。
+        try:
+            with open(self.csv_path, "r", encoding="utf-8", newline="") as _f:
+                _reader = csv.reader(_f)
+                _file_header = next(_reader, [])
+        except Exception:
+            _file_header = []
+        _missing_cols = [
+            c for c in self.COLUMN_ORDER
+            if c not in _file_header
+        ]
+        if _missing_cols and self._rows:
+            if VERBOSE:
+                print(f"[CSV] 表头缺 {len(_missing_cols)} 列，触发全量重写以更新表头")
+            self._write()
 
     # 内部元数据字段前缀（不写入 CSV，防止污染 54 列规范）
     # 例如 layer3_sacred.py 返回的 _orthogonality_report / _method
@@ -156,20 +207,28 @@ class TrajectoryCSV:
             normalized[col] = row.get(col, "")
 
         # 添加新列（跳过以 _ 开头的内部元数据字段）
+        # P0 优化：追踪是否有新列添加，若有则需全量重写（header 变化）
+        new_column_added = False
         for key, value in row.items():
             if key.startswith(self._INTERNAL_FIELD_PREFIX):
                 continue
             if key not in self._known_columns:
                 self._known_columns.add(key)
+                new_column_added = True
             normalized[key] = value
 
         self._rows.append(normalized)
 
         if auto_write:
-            self._write()
+            if new_column_added:
+                # 新列加入需全量重写以更新 header
+                self._write()
+            else:
+                # P0 优化：append-only 模式，仅追加新行，避免 O(N) 全量重写
+                self._append_row(normalized)
 
     def _write(self):
-        """写入 CSV 文件"""
+        """全量写入 CSV 文件（新列添加时使用，更新 header）"""
         # 构建列顺序: 预定义顺序 + 动态添加的列（双保险：排除 _ 前缀内部字段）
         ordered_cols = [c for c in self.COLUMN_ORDER if c in self._known_columns]
         extra_cols = sorted(
@@ -185,6 +244,27 @@ class TrajectoryCSV:
 
             for row in self._rows:
                 writer.writerow(row)
+
+    def _append_row(self, row: Dict):
+        """P0 优化：append-only 追加单行，避免 O(N) 全量重写。
+
+        仅当无新列添加时使用。文件不存在或为空时自动写 header。
+        大 CSV（N>1000）场景性能提升 100-1000×。
+        """
+        ordered_cols = [c for c in self.COLUMN_ORDER if c in self._known_columns]
+        extra_cols = sorted(
+            c for c in self._known_columns
+            if c not in self.COLUMN_ORDER
+            and not c.startswith(self._INTERNAL_FIELD_PREFIX)
+        )
+        all_cols = ordered_cols + extra_cols
+
+        is_new_file = not self.csv_path.exists() or self.csv_path.stat().st_size == 0
+        with open(self.csv_path, "a", encoding="utf-8", newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=all_cols, extrasaction="ignore")
+            if is_new_file:
+                writer.writeheader()
+            writer.writerow(row)
 
     @property
     def n_rows(self) -> int:

@@ -1,10 +1,17 @@
-# trace-to-edm 依赖
-# 根据 README.md "技术依赖" 章节创建
-# Python 3.10+
+# trace-to-edm — Runtime Dependencies
+# =====================================
+# 三层桥接编排器（L1 元SCM / L2 世俗语义 PCA / L3 八正道神圣投影）
+# 安装: pip install -r requirements.txt
+#
+# 分层说明:
+#   [core]  — 三层投影与 CSV 构建，必须安装
+#   [opt]   — 可选优化
 
-numpy>=1.24
-pandas>=2.0
-scikit-learn>=1.3
-torch>=2.1
-transformers>=4.36
-bitsandbytes>=0.41  # 可选，4-bit 量化需要
+# ── [core] 三层投影数学基础 ──
+numpy>=1.22
+scipy>=1.8                  # SVD (Procrustes 对齐) + 统计检验
+scikit-learn>=1.0           # PCA (L2 世俗语义层)
+
+# ── [opt] 算法优化 (Round 20 新增) ──
+# 注: ruptures 用于 L1 元SCM 的结构断点检测，当前为可选增强
+# ruptures>=1.1

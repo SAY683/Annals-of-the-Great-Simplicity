@@ -150,9 +150,16 @@ def _build_summary(
     return summary
 
 
-def _task_summary(task_id: str) -> Optional[dict]:
-    """Build a lightweight summary for a task directory."""
-    task_dir = _safe_task_path(task_id, RESULTS_DIR)
+def _task_summary(task_id: str, task_dir: Optional[str] = None) -> Optional[dict]:
+    """Build a lightweight summary for a task directory.
+
+    若指定 ``task_dir``，则直接使用该路径（用于归档 zip 临时解压预览等场景）；
+    否则从 ``RESULTS_DIR`` 下按 ``task_id`` 解析。返回的字典包含 config 与
+    params 字段（分别来自 ``config_*.json`` 与 ``params_*.json``，文件不存在
+    则对应字段为 None）。
+    """
+    if task_dir is None:
+        task_dir = _safe_task_path(task_id, RESULTS_DIR)
     if not task_dir or not os.path.isdir(task_dir):
         return None
     images = sorted(
@@ -171,9 +178,23 @@ def _task_summary(task_id: str) -> Optional[dict]:
                 config = json.load(f)
         except Exception:
             config = None
+    # 读取 params_*.json（与 config_*.json 同 timestamp 命名模式，不存在则 None）
+    params_files = [
+        f for f in os.listdir(task_dir)
+        if f.startswith("params_") and f.endswith(".json")
+    ]
+    params = None
+    if params_files:
+        params_path = os.path.join(task_dir, sorted(params_files)[-1])
+        try:
+            with open(params_path, "r", encoding="utf-8") as f:
+                params = json.load(f)
+        except Exception:
+            params = None
     return {
         "task_id": task_id,
         "updated_at": os.path.getmtime(task_dir),
         "images": images,
         "config": config,
+        "params": params,
     }

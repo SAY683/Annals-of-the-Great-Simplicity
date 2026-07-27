@@ -171,17 +171,23 @@ def ensure_trace_scripts_in_sys_path() -> None:
 
 
 def ensure_edm_takens_in_sys_path() -> None:
-    """将 edm-takens/src 加入 sys.path（若存在）。"""
+    """将 edm-takens/src 加入 sys.path（若存在）。
+
+    Round 20 修缮: 路径探测从硬编码 `.skills/edm-takens/src` 扩展为多候选探测，
+    兼容 `Skill/edm-takens/src` (开发树) 和 `.skills/edm-takens/src` (便携式) 两种布局。
+    """
     import sys
     skill_dir = get_skill_dir()
-    # 从 Skill 目录向上探测 .skills/edm-takens/src
+    # 候选目录名: 开发树用 `Skill`，便携式用 `.skills`
+    candidates = ["Skill", ".skills", "skills"]
     current = skill_dir
     for _ in range(10):
-        edm_src = current.parent / ".skills" / "edm-takens" / "src"
-        if edm_src.exists():
-            if str(edm_src) not in sys.path:
-                sys.path.insert(0, str(edm_src))
-            return
+        for dir_name in candidates:
+            edm_src = current.parent / dir_name / "edm-takens" / "src"
+            if edm_src.exists():
+                if str(edm_src) not in sys.path:
+                    sys.path.insert(0, str(edm_src))
+                return
         if current.parent == current:
             break
         current = current.parent

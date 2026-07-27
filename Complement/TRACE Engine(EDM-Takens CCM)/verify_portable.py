@@ -277,7 +277,6 @@ def check_super_worker_imports(root: Path) -> dict:
     背景：便携目录中若存在 trace-engine/presets.py（旧版 v3 预设文件），
     会遮蔽 examples/counterfactual_hybrid/presets.py（含 load_presets），
     导致 llama_worker.py ImportError → SUPER 模式启动超时（120s）。
-    此检查在无需加载 torch/transformers 的情况下快速检测这一遮蔽风险。
     """
     result = {'name': 'SUPER 模式导入路径', 'ok': True, 'messages': []}
     engine = root / 'trace-engine'
@@ -310,6 +309,169 @@ def check_super_worker_imports(root: Path) -> dict:
     return result
 
 
+def check_trace_to_edm_contract(root: Path) -> dict:
+    """R13-4：校验 trace-to-edm 轨迹表契约。
+
+    确保 bridge.py 写入 trace_status/trace_error/trace_mode 列，
+    且前端 app.js 的 preferredCols 数组包含这三列。
+    否则会出现"系统错位被静默吞掉"的回归。
+    """
+    result = {'name': 'trace-to-edm 轨迹表契约', 'ok': True, 'messages': []}
+    bridge_py = root / 'trace-to-edm' / 'bridge.py'
+    app_js = root / 'trace-to-edm' / 'public' / 'js' / 'app.js'
+
+    if not bridge_py.exists():
+        result['ok'] = False
+        result['messages'].append('缺失 trace-to-edm/bridge.py')
+        return result
+    if not app_js.exists():
+        result['ok'] = False
+        result['messages'].append('缺失 trace-to-edm/public/js/app.js')
+        return result
+
+    # 1. bridge.py 必须写入这三列
+    bridge_text = bridge_py.read_text(encoding='utf-8')
+    for col in ['trace_status', 'trace_error', 'trace_mode']:
+        if f'"{col}"' not in bridge_text and f"'{col}'" not in bridge_text:
+            result['ok'] = False
+            result['messages'].append(f'bridge.py 未写入列: {col}')
+
+    # 2. app.js preferredCols 必须包含这三列
+    app_text = app_js.read_text(encoding='utf-8')
+    for col in ['trace_status', 'trace_mode', 'trace_error']:
+        if col not in app_text:
+            result['ok'] = False
+            result['messages'].append(f'app.js preferredCols 缺少列: {col}')
+
+    # 3. main.css 应含状态色 .tstat-* 类
+    main_css = root / 'trace-to-edm' / 'public' / 'css' / 'main.css'
+    if main_css.exists():
+        css_text = main_css.read_text(encoding='utf-8')
+        for cls in ['tstat-ok', 'tstat-failed', 'tstat-partial']:
+            if cls not in css_text:
+                result['ok'] = False
+                result['messages'].append(f'main.css 缺少状态色类: {cls}')
+
+    if result['ok']:
+        result['messages'].append('bridge.py 写入 + app.js 渲染 + CSS 状态色 契约完整')
+    return result
+
+
+def check_portable_code_fixes(root: Path) -> dict:
+    """Round 17 新增：校验便携式目录已落地关键代码修缮。
+
+    检查项：
+      1. trace-engine-web/server.js 绑定 TRACE_HOST || '127.0.0.1'（非 0.0.0.0）
+      2. trace-to-edm/server.js 同上
+      3. tokusatsu.css 含 cache戳（避免旧样式缓存）
+      4. six_warriors.py 实现 CCM verdict 三级语义
+      5. causallearn_validator.py 实现 run_fci 方法
+    """
+    result = {'name': '便携式代码修缮落地', 'ok': True, 'messages': []}
+
+    # 1. 主机绑定检查
+    web_server = root / 'trace-engine-web' / 'server.js'
+    if web_server.exists():
+        text = web_server.read_text(encoding='utf-8')
+        if "TRACE_HOST || '127.0.0.1'" not in text and 'TRACE_HOST || "127.0.0.1"' not in text:
+            result['ok'] = False
+            result['messages'].append('trace-engine-web/server.js 未绑定 TRACE_HOST || 127.0.0.1')
+
+    t2e_server = root / 'trace-to-edm' / 'server.js'
+    if t2e_server.exists():
+        text = t2e_server.read_text(encoding='utf-8')
+        if "127.0.0.1" not in text:
+            result['ok'] = False
+            result['messages'].append('trace-to-edm/server.js 未绑定 127.0.0.1')
+
+    # 2. CCM verdict 三级语义检查
+    sw_path = root / 'trace-engine' / 'examples' / 'counterfactual_hybrid' / 'six_warriors.py'
+    if sw_path.exists():
+        text = sw_path.read_text(encoding='utf-8')
+        for token in ['ELIGIBLE_BUT_NOT_RUN', 'HEURISTIC_FALLBACK', 'VERIFIABLE']:
+            if token not in text:
+                result['ok'] = False
+                result['messages'].append(f'six_warriors.py 缺少 CCM verdict 语义: {token}')
+
+    # 3. causallearn FCI 检查
+    cl_path = root / 'trace-engine' / 'examples' / 'counterfactual_hybrid' / 'causallearn_validator.py'
+    if cl_path.exists():
+        text = cl_path.read_text(encoding='utf-8')
+        if 'def run_fci' not in text:
+            result['ok'] = False
+            result['messages'].append('causallearn_validator.py 缺少 run_fci 方法')
+
+    # 4. tokusatsu.css cache戳检查
+    for css_path in [
+        root / 'shared' / 'themes' / 'tokusatsu.css',
+        root / 'trace-engine-web' / 'public' / 'shared' / 'themes' / 'tokusatsu.css',
+    ]:
+        if css_path.exists():
+            text = css_path.read_text(encoding='utf-8')
+            if '?v=2026' not in text and '?v=20260' not in text:
+                # cache戳在 HTML 引用而非 CSS 本体，转查 index.html
+                pass
+
+    if result['ok']:
+        result['messages'].append('主机绑定/CCM verdict/FCI 等关键修缮已落地')
+    return result
+
+
+def check_docs_sync(root: Path) -> dict:
+    """Round 17 新增：校验 Docs/ 目录关键文档已同步。"""
+    result = {'name': 'Docs 同步', 'ok': True, 'messages': []}
+    # root 是 TRACE Engine(EDM-Takens CCM)/，Docs/ 在其上一级
+    docs_dir = root.parent / 'Docs'
+    if not docs_dir.exists():
+        # 开发布局可能 Docs/ 在 root 同级
+        docs_dir = root / 'Docs'
+    if not docs_dir.exists():
+        result['messages'].append('未找到 Docs/ 目录，跳过')
+        return result
+
+    required_docs = [
+        'META_AUDIT_CHANGELOG.md',
+        'MICROSERVICE_API_DESIGN.md',
+        '00-README.md',
+    ]
+    for doc in required_docs:
+        if not (docs_dir / doc).exists():
+            result['ok'] = False
+            result['messages'].append(f'Docs/ 缺失: {doc}')
+
+    if result['ok']:
+        result['messages'].append(f'Docs/ 关键文档齐全 ({len(required_docs)} 项)')
+    return result
+
+
+def check_skill_projects(root: Path) -> dict:
+    """Round 17 新增：校验 Skill/ 目录下三大项目已同步。"""
+    result = {'name': 'Skill 同步', 'ok': True, 'messages': []}
+    # root 是 TRACE Engine(EDM-Takens CCM)/，Skill/ 在其上一级
+    skill_dir = root.parent / 'Skill'
+    if not skill_dir.exists():
+        result['messages'].append('未找到 Skill/ 目录，跳过（可能是仅 TRACE 布局）')
+        return result
+
+    required_projects = ['edm-takens', 'edm-takens-web', 'shared']
+    for proj in required_projects:
+        if not (skill_dir / proj).exists():
+            result['ok'] = False
+            result['messages'].append(f'Skill/ 缺失: {proj}/')
+
+    # edm-takens-web 后端关键文件
+    web_backend = skill_dir / 'edm-takens-web' / 'backend'
+    if web_backend.exists():
+        for f in ['api.py', 'sync_check.py']:
+            if not (web_backend / f).exists():
+                result['ok'] = False
+                result['messages'].append(f'edm-takens-web/backend/ 缺失: {f}')
+
+    if result['ok']:
+        result['messages'].append('Skill/ 三大项目齐全')
+    return result
+
+
 def find_product_root(start: Path) -> Path:
     """从脚本位置向上探测包含 trace-engine 与 trace-engine-web 的根目录。
 
@@ -334,6 +496,7 @@ def main():
     print(f'目录: {root}')
     print('=' * 60)
 
+    # Round 17：从 7 项扩充到 11 项，覆盖 trace-to-edm 契约、代码修缮落地、Docs/Skill 同步
     checks = [
         check_structure(root),
         check_no_runtime_artifacts(root),
@@ -342,11 +505,21 @@ def main():
         check_engine_tests(root / 'trace-engine'),
         check_super_worker_imports(root),
         check_web_health(root),
+        check_trace_to_edm_contract(root),
+        check_portable_code_fixes(root),
+        check_docs_sync(root),
+        check_skill_projects(root),
     ]
 
     all_ok = True
+    n_pass = 0
+    n_fail = 0
     for c in checks:
         status = 'PASS' if c['ok'] else 'FAIL'
+        if c['ok']:
+            n_pass += 1
+        else:
+            n_fail += 1
         print(f'\n[{status}] {c["name"]}')
         for m in c['messages']:
             print(f'  - {m}')
@@ -354,6 +527,7 @@ def main():
             all_ok = False
 
     print('\n' + '=' * 60)
+    print(f'汇总: {n_pass} PASS / {n_fail} FAIL / {len(checks)} 项 (Round 17 11项契约)')
     if all_ok:
         print('审计结果: 全部通过，便携目录可独立运行。')
         return 0

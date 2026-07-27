@@ -66,6 +66,7 @@ function toggleLogPause() {
 }
 
 // ── SSE 流处理（支持手动重连） ─────────────────────────────
+let _currentConnectFn = null;  // 当前 streamJob 的 connect 函数引用，供手动重连按钮调用
 function streamJob(url, body, label) {
   tClear();
   t(`▶ ${label}`, 'progress');
@@ -73,6 +74,7 @@ function streamJob(url, body, label) {
   let attempt = 0;
 
   function connect() {
+    _currentConnectFn = connect;  // 暴露给手动重连按钮
     return fetch(url, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
@@ -113,7 +115,13 @@ function streamJob(url, body, label) {
           throw err;
         });
       }
-      return process();
+      return process().then(success => {
+        // 流正常结束（done 事件或服务端关闭），清除重连句柄并禁用按钮
+        _currentConnectFn = null;
+        const rcBtn = document.getElementById('btnReconnect');
+        if (rcBtn) rcBtn.disabled = true;
+        return success;
+      });
     }).catch(err => {
       attempt++;
       if (attempt <= maxRetries) {
@@ -121,6 +129,9 @@ function streamJob(url, body, label) {
         return new Promise(r => setTimeout(r, 1500 * attempt)).then(connect);
       }
       t(`✗ 连接失败: ${err.message}`, 'error');
+      // 自动重连耗尽，启用手动重连按钮
+      const rcBtn = document.getElementById('btnReconnect');
+      if (rcBtn) rcBtn.disabled = false;
       throw err;
     });
   }
@@ -144,6 +155,26 @@ async function refreshStatus() {
     edmEl.style.color = d.trajectory.edm_ready ? 'var(--accent)' : 'var(--warn)';
     document.getElementById('statLayers').textContent =
       `${d.layers.l1?'L1✓':'L1✗'} ${d.layers.l2?'L2✓':'L2✗'} ${d.layers.l3?'L3✓':'L3✗'}`;
+    // 通信管线: 根据 L1/L2/L3 就绪状态动态切换 active 类（Round 19 修缮：HTML 中已移除硬编码 active）
+    // TRACE WEB 阶段: 探测 trace-engine-web (127.0.0.1:3000) 是否在线；离线则熄灭
+    //   注：fetch 跨端口请求可能被 CORS 拦截，失败时保守地保持亮起（避免误灭）
+    fetch('http://127.0.0.1:3000/api/health', { mode: 'no-cors', signal: AbortSignal.timeout(1500) })
+      .then(() => {
+        const traceStage = document.querySelector('.pipe-stage[data-stage="trace"]');
+        if (traceStage) traceStage.classList.add('active');
+      })
+      .catch(() => {
+        // no-cors 模式下 opaque response 仍算成功；只有网络层失败才到这里
+        const traceStage = document.querySelector('.pipe-stage[data-stage="trace"]');
+        if (traceStage) traceStage.classList.remove('active');
+      });
+    ['l1','l2','l3'].forEach(layer => {
+      const stage = document.querySelector(`.pipe-stage[data-stage="${layer}"]`);
+      if (stage) stage.classList.toggle('active', !!d.layers[layer]);
+    });
+    // EDM 阶段: 根据轨迹就绪状态切换
+    const edmPipeStage = document.querySelector('.pipe-stage[data-stage="edm"]');
+    if (edmPipeStage) edmPipeStage.classList.toggle('active', !!d.trajectory.edm_ready);
     const edmBtn = document.getElementById('btnEDM');
     edmBtn.disabled = !d.trajectory.edm_ready;
     document.getElementById('edmStatus').textContent = d.trajectory.edm_ready ? '✓ 就绪' : `需≥15行 (当前${d.trajectory.rows})`;
@@ -153,23 +184,20 @@ async function refreshStatus() {
       document.getElementById('edmDataRange').textContent = '无数据 (需≥15行)';
     }
 
+    const edmTargetSel = document.getElementById('edmTarget');
     if (d.trajectory.edm_targets && d.trajectory.edm_targets.length > 0) {
-      const sel = document.getElementById('edmTarget');
-      const cv = sel.value;
-      sel.innerHTML = '';
+      const cv = edmTargetSel.value;
+      edmTargetSel.innerHTML = '';
       d.trajectory.edm_targets.forEach(t => {
         const o = document.createElement('option');
         o.value = t.col;
         o.textContent = `[${t.layer}] ${t.col} — ${t.desc}`;
-        sel.appendChild(o);
+        edmTargetSel.appendChild(o);
       });
-      if ([...sel.options].some(o => o.value === cv)) sel.value = cv;
-    } else {
-      // EDM未就绪时不清空已有选项, 保持占位符可见
-      const sel = document.getElementById('edmTarget');
-      if (sel.options.length === 0) {
-        sel.innerHTML = '<option value="">(需≥15行轨迹数据)</option>';
-      }
+      if ([...edmTargetSel.options].some(o => o.value === cv)) edmTargetSel.value = cv;
+    } else if (!d.trajectory.edm_ready) {
+      // Round 19 修缮：EDM 未就绪时清空选项并显示占位符，避免"看到合法选项但按钮 disabled"的认知失调
+      edmTargetSel.innerHTML = '<option value="">(需≥15行轨迹数据)</option>';
     }
   } catch (e) { console.error(e); }
   finally { _statusPending = false; }
@@ -553,11 +581,18 @@ document.getElementById('btnCleanInvalid').addEventListener('click', async () =>
 });
 
 // ── 文本输入 ──────────────────────────────────────────────
+// P1 修缮：补成功视觉反馈——按钮状态变化 + 新行高亮 + 状态徽章闪烁
+// 之前反馈仅走终端日志面板（位置隐蔽），用户感知不到操作生效
 async function addDirectText() {
   const csvFile = document.getElementById('textCsvSelect').value;
   const directText = document.getElementById('textDirect').value.trim();
 
   if (!csvFile && !directText) { alert('请选择 CSV 或粘贴文本'); return; }
+
+  const btn = document.getElementById('btnAddText');
+  const originalText = btn.textContent;
+  btn.disabled = true;
+  let totalAdded = 0;
 
   tClear();
   if (csvFile) {
@@ -569,7 +604,9 @@ async function addDirectText() {
       });
       const d = await r.json();
       if (!r.ok || d.error) throw new Error(d.error || `HTTP ${r.status}`);
-      t(`✓ 已添加 ${d.added !== undefined ? d.added : d} 条文本`, 'done');
+      const added = d.added !== undefined ? d.added : d;
+      totalAdded += added;
+      t(`✓ 已添加 ${added} 条文本`, 'done');
     } catch (e) { t(`✗ CSV 添加失败: ${e.message}`, 'error'); }
   }
 
@@ -583,12 +620,52 @@ async function addDirectText() {
       });
       const d = await r.json();
       if (!r.ok || d.error) throw new Error(d.error || `HTTP ${r.status}`);
-      t(`✓ 已添加 ${d.added !== undefined ? d.added : d} 条文本`, 'done');
+      const added = d.added !== undefined ? d.added : d;
+      totalAdded += added;
+      t(`✓ 已添加 ${added} 条文本`, 'done');
       document.getElementById('textDirect').value = '';
     } catch (e) { t(`✗ 文本添加失败: ${e.message}`, 'error'); }
   }
 
-  refreshDataset();
+  // P1 修缮：按钮临时显示成功状态（2 秒后还原）
+  if (totalAdded > 0) {
+    btn.textContent = `✓ 已添加 ${totalAdded} 条`;
+    btn.style.borderColor = 'var(--success, #4ade80)';
+    btn.style.color = 'var(--success, #4ade80)';
+    setTimeout(() => {
+      btn.textContent = originalText;
+      btn.style.borderColor = '';
+      btn.style.color = '';
+    }, 2000);
+  }
+
+  await refreshDataset();
+
+  // P1 修缮：高亮新增的数据集行（最后 totalAdded 行），3 秒后淡出
+  if (totalAdded > 0) {
+    const table = document.getElementById('datasetTable');
+    if (table) {
+      const rows = table.querySelectorAll('table tbody tr, .ds-row');
+      const highlightCount = Math.min(totalAdded, rows.length);
+      for (let i = 0; i < highlightCount; i++) {
+        const row = rows[rows.length - 1 - i];
+        if (row) {
+          row.style.transition = 'background-color 0.5s ease';
+          row.style.backgroundColor = 'rgba(74, 222, 128, 0.18)';
+          setTimeout(() => { row.style.backgroundColor = ''; }, 3000);
+        }
+      }
+    }
+    // 状态徽章闪烁
+    const statBadge = document.getElementById('statDS');
+    if (statBadge) {
+      statBadge.style.transition = 'color 0.4s';
+      statBadge.style.color = 'var(--success, #4ade80)';
+      setTimeout(() => { statBadge.style.color = ''; }, 1500);
+    }
+  }
+
+  btn.disabled = false;
   document.getElementById('btnRunPipeline').disabled = false;
 }
 
@@ -602,6 +679,43 @@ document.getElementById('textDirect').addEventListener('keydown', (e) => {
 });
 
 // ── 数据集管理 ────────────────────────────────────────────
+
+// HTML 转义辅助函数 — 防止 XSS
+// Round 19 修缮：统一委托给 window.LogCockpit.escapeHtml，消除重复定义
+function escapeHtml(s) {
+  if (window.LogCockpit && window.LogCockpit.escapeHtml) {
+    return window.LogCockpit.escapeHtml(s);
+  }
+  // 兜底：logCockpit.js 未加载时使用本地实现
+  if (s === null || s === undefined) return '';
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+// 通用 modal: 单实例、点击遮罩关闭、暗色特摄主题
+// 复用同一 DOM 节点 (#dsDetailModal) 避免重复创建堆积
+function showModal(title, contentHtml) {
+  let modal = document.getElementById('dsDetailModal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'dsDetailModal';
+    modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);backdrop-filter:blur(4px);z-index:9999;display:flex;align-items:center;justify-content:center;';
+    modal.addEventListener('click', (e) => { if (e.target === modal) modal.style.display = 'none'; });
+    document.body.appendChild(modal);
+  }
+  modal.innerHTML = `
+    <div style="background:var(--panel-solid,#080c14);border:1px solid var(--accent-dim,#45a29e);border-radius:8px;max-width:700px;max-height:80vh;width:90%;display:flex;flex-direction:column;box-shadow:0 0 30px rgba(102,252,241,0.2);">
+      <div style="padding:12px 16px;border-bottom:1px solid var(--accent-dim);display:flex;justify-content:space-between;align-items:center;">
+        <span style="color:var(--accent,#66fcf1);font-size:0.85rem;">${escapeHtml(title)}</span>
+        <button onclick="document.getElementById('dsDetailModal').style.display='none'" style="background:none;border:1px solid var(--accent-dim);color:var(--accent);padding:2px 8px;cursor:pointer;border-radius:3px;">✕</button>
+      </div>
+      <div style="padding:16px;overflow-y:auto;color:var(--text,#d8dce6);font-size:0.8rem;">${contentHtml}</div>
+    </div>`;
+  modal.style.display = 'flex';
+}
+
+// 缓存最近一次 /api/dataset 响应的 entries，供 showDatasetDetail 同步查找
+window._lastDatasetEntries = null;
+
 async function refreshDataset() {
   try {
     const r = await fetch('/api/dataset');
@@ -612,28 +726,123 @@ async function refreshDataset() {
 
     const wrap = document.getElementById('datasetTable');
     if (!d.entries || !d.entries.length) {
+      // 空数据集也要清空缓存，避免 showDatasetDetail 找到陈旧条目
+      window._lastDatasetEntries = [];
       wrap.innerHTML = '<div class="dim">数据集为空。从左侧数据源添加条目。</div>';
       document.getElementById('btnRunPipeline').disabled = true;
       return;
     }
 
+    // 缓存 entries 供 showDatasetDetail 同步查找（避免每次点击都重新 fetch）
+    window._lastDatasetEntries = d.entries;
+
     let html = '';
     d.entries.forEach(e => {
       const typeClass = e.type === 'replay' ? 'replay' : 'text';
       const typeLabel = e.type === 'replay' ? '回填' : '文本';
-      html += `<div class="ds-row" data-id="${e.id}">
+      // 计算 expected hash — 用于点击行时高亮关联轨迹
+      //   text 类型:   id = "text-" + md5[:12]，trajectory.text_hash = md5[:8] → id.slice(5,13)
+      //   replay 类型: trajectory.text_hash = "replay:" + uuid[:8]
+      let expectedHash = '';
+      if (e.type === 'text' && e.id) {
+        expectedHash = e.id.slice(5, 13);
+      } else if (e.type === 'replay' && e.result_uuid) {
+        expectedHash = 'replay:' + e.result_uuid.slice(0, 8);
+      }
+      // editTimestamp 绑定到时间戳 span；row 整体点击 → showDatasetDetail
+      // 删除按钮 ✕ 通过 stopPropagation 阻止冒泡到 row，避免误触详情 modal
+      const tsAttr = (e.timestamp || '').replace(/'/g, "\\'");
+      html += `<div class="ds-row" data-id="${escapeHtml(e.id)}" data-expected-hash="${escapeHtml(expectedHash)}" style="cursor:pointer">
         <span class="ds-type ${typeClass}">${typeLabel}</span>
         <span class="ds-status ${e.status}">${e.status==='pending'?'待处理':e.status==='processed'?'已完成':'跳过'}</span>
-        <span class="ds-preview">${(e.source||'').slice(0,50)}</span>
-        <span class="ds-ts" style="cursor:pointer" title="点击修改时间">${(e.timestamp||'').slice(0,16)}</span>
-        <button class="btn-mini" onclick="removeFromDataset('${e.id}')" style="color:var(--danger)">✕</button>
+        <span class="ds-preview">${escapeHtml((e.source||'').slice(0,50))}</span>
+        <span class="ds-ts" style="cursor:pointer" title="点击修改时间" onclick="event.stopPropagation();editTimestamp('${escapeHtml(e.id)}','${tsAttr}')">${escapeHtml((e.timestamp||'').slice(0,16))}</span>
+        <button class="btn-mini" onclick="event.stopPropagation();removeFromDataset('${escapeHtml(e.id)}')" style="color:var(--danger)">✕</button>
       </div>`;
     });
     wrap.innerHTML = html;
+    // 事件委托: 点击 row (非按钮/时间戳) → 打开详情 modal + 高亮轨迹
+    wrap.querySelectorAll('.ds-row').forEach(row => {
+      row.addEventListener('click', () => {
+        const id = row.getAttribute('data-id');
+        const hash = row.getAttribute('data-expected-hash');
+        if (id) {
+          showDatasetDetail(id);
+          highlightTrajectoryForDatasetEntry(hash);
+        }
+      });
+    });
 
     const hasPending = d.summary.pending > 0;
     document.getElementById('btnRunPipeline').disabled = !hasPending;
   } catch (e) { console.error(e); }
+}
+
+// 点击数据集行 → 弹出详情 modal 显示完整文本
+//   text 类型:   直接读取缓存的 e.text（/api/dataset 已返回全文）
+//   replay 类型: 调用 /api/work-uuid/:uuid/text 实时拉取 work/inputs/{uuid}.txt 原文
+async function showDatasetDetail(id) {
+  const entry = window._lastDatasetEntries?.find(e => e.id === id);
+  if (!entry) { t('未找到数据集条目: ' + id, 'error'); return; }
+
+  // 先弹出骨架 modal（replay 类型异步拉取原文时给用户即时反馈）
+  let content = `
+    <div style="margin-bottom:8px;">
+      <strong>ID:</strong> ${escapeHtml(entry.id)}<br>
+      <strong>类型:</strong> ${escapeHtml(entry.type)}<br>
+      <strong>状态:</strong> ${escapeHtml(entry.status)}<br>
+      <strong>时间:</strong> ${escapeHtml(entry.timestamp)}<br>
+      <strong>来源:</strong> ${escapeHtml(entry.source || '(无)')}
+    </div>`;
+
+  // 文本内容区: text 类型直接取缓存；replay 类型异步拉取
+  let textContent = '';
+  if (entry.type === 'text' && entry.text) {
+    textContent = entry.text;
+    content += `<details open><summary>▶ 文本内容</summary><pre style="white-space:pre-wrap;word-break:break-all;max-height:400px;overflow-y:auto;background:rgba(0,0,0,0.3);padding:8px;border-radius:4px;">${escapeHtml(textContent)}</pre></details>`;
+    showModal('数据集详情: ' + id.slice(0,16) + '...', content);
+  } else if (entry.type === 'replay' && entry.result_uuid) {
+    // 先显示 loading，再异步替换
+    content += `<details open><summary>▶ 文本内容</summary><pre id="dsDetailText" style="white-space:pre-wrap;word-break:break-all;max-height:400px;overflow-y:auto;background:rgba(0,0,0,0.3);padding:8px;border-radius:4px;color:var(--muted);">(读取中...)</pre></details>`;
+    showModal('数据集详情: ' + id.slice(0,16) + '...', content);
+    try {
+      const r = await fetch(`/api/work-uuid/${encodeURIComponent(entry.result_uuid)}/text`);
+      const d = await r.json();
+      textContent = d.text || '(原文未找到，可能已被清理)';
+    } catch (e) {
+      textContent = '(读取失败: ' + e.message + ')';
+    }
+    const pre = document.getElementById('dsDetailText');
+    if (pre) {
+      pre.style.color = '';
+      pre.textContent = textContent;
+    }
+  } else {
+    content += `<details open><summary>▶ 文本内容</summary><pre style="white-space:pre-wrap;word-break:break-all;max-height:400px;overflow-y:auto;background:rgba(0,0,0,0.3);padding:8px;border-radius:4px;">(无文本内容)</pre></details>`;
+    showModal('数据集详情: ' + id.slice(0,16) + '...', content);
+  }
+}
+
+// 高亮轨迹表格中与指定 text_hash 匹配的行，并滚动到第一条
+//   清除旧高亮后再添加新高亮，避免累积
+function highlightTrajectoryForDatasetEntry(expectedHash) {
+  if (!expectedHash) return;
+  // 清除旧高亮
+  document.querySelectorAll('#tableWrap tr.highlight-ds').forEach(tr => {
+    tr.classList.remove('highlight-ds');
+  });
+  // 高亮匹配行 (CSS 属性选择器对特殊字符敏感，expectedHash 仅含 hex/replay: 前缀，安全)
+  const matched = document.querySelectorAll(`#tableWrap tr[data-text-hash="${CSS.escape(expectedHash)}"]`);
+  matched.forEach(tr => {
+    tr.classList.add('highlight-ds');
+  });
+  // 滚动到第一条匹配
+  if (matched.length > 0) {
+    matched[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+    t(`高亮 ${matched.length} 条关联轨迹`, 'info');
+  } else {
+    t('未找到关联轨迹（可能该数据集条目尚未生成轨迹）', 'warn');
+  }
 }
 
 async function removeFromDataset(id) {
@@ -764,11 +973,16 @@ document.getElementById('btnClearTrajectory').addEventListener('click', async ()
 });
 
 // ── 运行管线 ──────────────────────────────────────────────
+// P2 修缮：支持 LIGHT/DEEP 模式切换（默认 LIGHT）
+// LIGHT: jieba 概念图 + 简化流程（1-3s/条）
+// DEEP:  jieba 概念图 + 完整六战士诊断（10-60s/条，需 dowhy）
 document.getElementById('btnRunPipeline').addEventListener('click', () => {
   const btn = document.getElementById('btnRunPipeline');
+  const modeSelect = document.getElementById('traceModeSelect');
+  const traceMode = modeSelect ? modeSelect.value : 'light';
   btn.disabled = true;
-  btn.textContent = '⏳ 运行中...';
-  streamJob('/api/pipeline/run', { project: currentProject }, '运行管线: 处理所有待处理条目')
+  btn.textContent = `⏳ 运行中 (${traceMode.toUpperCase()})...`;
+  streamJob('/api/pipeline/run', { project: currentProject, trace_mode: traceMode }, `运行管线: 处理所有待处理条目 [${traceMode.toUpperCase()}]`)
     .finally(() => {
       btn.disabled = false;
       btn.textContent = '▶ 运行管线 (处理所有待处理条目)';
@@ -1067,6 +1281,9 @@ async function refreshTable() {
       // L3: 八正道 — 神圣轴投影 + 漂移
       'z_福音', 'z_存在', 'z_觉爱', 'z_奥美', 'z_自孕',
       'dz_福音', 'dz_存在', 'dz_觉爱', 'dz_奥美',
+      // TRACE 诊断列（R13-4 修缮：让"系统错位"显形）
+      // trace_error 可能长达 300 字符，单元格里截断显示，完整内容放 title 提示
+      'trace_status', 'trace_mode', 'trace_error',
     ];
     const cols = preferredCols.filter(c => d.columns.includes(c));
     // 按层分组着色
@@ -1075,6 +1292,7 @@ async function refreshTable() {
       ate:'l1', ci_width:'l1', edge_count:'l1', adj_density:'l1', max_delta_nll:'l1',
       refuted_count:'l1', ccm_coverage_pct:'l1',
       z_pca_1:'l2', z_pca_2:'l2', z_pca_3:'l2', secular_entropy:'l2',
+      trace_status:'trace', trace_mode:'trace', trace_error:'trace',
     };
     const isL3 = c => c.startsWith('z_') || c.startsWith('dz_') || c.startsWith('d2z_');
 
@@ -1085,15 +1303,35 @@ async function refreshTable() {
     });
     h += '</tr></thead><tbody>';
     d.rows.forEach(row => {
-      h += '<tr>';
+      // data-text-hash 用于数据集行点击时高亮关联轨迹（与 dataset 的 expectedHash 对应）
+      // data-time-step 便于后续按时间点定位
+      h += `<tr data-text-hash="${escapeHtml(row.text_hash||'')}" data-time-step="${escapeHtml(row.time_step||'')}">`;
       cols.forEach(c => {
         const v = row[c]||'';
         const isNum = !isNaN(parseFloat(v)) && v !== '';
         // dz_/d2z_ 列: 第一行为空是正常的 (差分需两个点)
         const isDiffCol = c.startsWith('dz_') || c.startsWith('d2z_');
         const diffEmpty = isDiffCol && v === '';
-        const display = isNum ? parseFloat(v).toFixed(4) : (v || (diffEmpty ? '—' : ''));
-        h += `<td class="${isNum?'num':''} ${diffEmpty?'dim':''}">${display}</td>`;
+        let display = isNum ? parseFloat(v).toFixed(4) : (v || (diffEmpty ? '—' : ''));
+        // trace_error 列: 截断显示，完整内容放 title（防单元格爆炸）
+        let titleAttr = '';
+        if (c === 'trace_error' && v) {
+          const truncated = v.length > 40 ? v.slice(0, 40) + '…' : v;
+          display = escapeHtml(truncated);
+          titleAttr = ` title="${escapeHtml(v)}"`;
+        } else if (!isNum && v) {
+          display = escapeHtml(display);
+        }
+        // trace_status 列: 加状态色（OK=绿/FAILED=红/PARTIAL=黄/EXTRACT_FAILED=橙/SKIPPED=灰）
+        let statusClass = '';
+        if (c === 'trace_status') {
+          const statusColors = {
+            OK: 'tstat-ok', FAILED: 'tstat-failed', PARTIAL: 'tstat-partial',
+            EXTRACT_FAILED: 'tstat-extract', SKIPPED: 'tstat-skipped',
+          };
+          statusClass = statusColors[v] || '';
+        }
+        h += `<td class="${isNum?'num':''} ${diffEmpty?'dim':''} ${statusClass}"${titleAttr}>${display}</td>`;
       });
       h += '</tr>';
     });
@@ -1102,10 +1340,12 @@ async function refreshTable() {
     const l1c = cols.filter(c => layerMap[c]==='l1').length;
     const l2c = cols.filter(c => layerMap[c]==='l2').length;
     const l3c = cols.filter(c => isL3(c)).length;
+    const traceC = cols.filter(c => layerMap[c]==='trace').length;
     h += `<div style="font-size:0.5rem;color:var(--muted);margin-top:4px">
       <span style="color:var(--accent)">L1:${l1c}列</span>
       <span style="color:var(--accent2);margin-left:8px">L2:${l2c}列</span>
       <span style="color:#c084fc;margin-left:8px">L3:${l3c}列</span>
+      <span style="color:#fbbf24;margin-left:8px">TRACE:${traceC}列</span>
     </div>`;
     document.getElementById('tableWrap').innerHTML = h;
   } catch (e) { document.getElementById('tableWrap').innerHTML = `<p class="dim">错误: ${e.message}</p>`; }
@@ -1124,6 +1364,21 @@ if (btnRefreshTable) btnRefreshTable.addEventListener('click', refreshTable);
 });
 const btnLogPause = document.getElementById('btnLogPause');
 if (btnLogPause) btnLogPause.addEventListener('click', toggleLogPause);
+
+// SSE 手动重连按钮: 自动重连耗尽后启用，允许用户重新触发连接
+const btnReconnect = document.getElementById('btnReconnect');
+if (btnReconnect) {
+  btnReconnect.addEventListener('click', () => {
+    if (!_currentConnectFn) return;
+    btnReconnect.disabled = true;
+    t('⟲ 手动重连...', 'progress');
+    _currentConnectFn().catch(() => {
+      // 重连仍失败，重新启用按钮供再次尝试
+      const btn = document.getElementById('btnReconnect');
+      if (btn) btn.disabled = false;
+    });
+  });
+}
 
 // 暴露内部函数供最小化单元测试
 window.__traceToEdmTestHarness = {

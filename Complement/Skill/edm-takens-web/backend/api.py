@@ -98,7 +98,27 @@ app = FastAPI(title="EDM-Takens Web", version="0.1.0")
 # P2 修复: CORS 生产环境收窄，通过 EDM_CORS_ORIGINS 环境变量配置
 # debt-12.13 收窄: allow_headers 从通配符 ["*"] 改为显式白名单，
 # 避免非预期自定义头（如 X-Forwarded-For 注入）穿透 CORS 检查。
-_EDM_CORS_ORIGINS = os.environ.get("EDM_CORS_ORIGINS", "http://localhost:5173,http://localhost:8000,http://127.0.0.1:5173,http://127.0.0.1:8000").split(",")
+# debt-12.15 隧道支持: 自动读取 tunnel_url.txt，把 trycloudflare 域名加入白名单
+def _load_tunnel_origins():
+    """从 tunnel_url.txt 读取隧道域名，加入 CORS 白名单。
+    隧道模式下前端与 API 同源（都在 https://xxx.trycloudflare.com），
+    同源请求不触发 CORS，但显式加入白名单可支持未来跨子域调用。
+    """
+    try:
+        from pathlib import Path
+        tunnel_file = Path(__file__).resolve().parent.parent / "tunnel_url.txt"
+        if tunnel_file.exists():
+            url = tunnel_file.read_text(encoding="utf-8").strip()
+            if url and "trycloudflare.com" in url:
+                return [url]
+    except Exception:
+        pass
+    return []
+
+_EDM_CORS_ORIGINS = (
+    os.environ.get("EDM_CORS_ORIGINS", "http://localhost:5173,http://localhost:8000,http://127.0.0.1:5173,http://127.0.0.1:8000").split(",")
+    + _load_tunnel_origins()
+)
 _EDM_ALLOWED_HEADERS = [
     "Content-Type",
     "Authorization",
@@ -155,6 +175,8 @@ from routes.history import (
     compare_tasks,
     export_task_json,
     export_task_csv,
+    get_history_detail,
+    preview_archive,
 )
 
 # ── Static frontend serving (debt-Q9):

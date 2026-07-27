@@ -69,7 +69,7 @@ main {
 }
 
 #app .status-card .stat-label {
-  font-size: 0.52rem;
+  font-size: 0.6rem;
   letter-spacing: 0.08em;
 }
 
@@ -199,7 +199,7 @@ main {
 }
 
 #app .drop-zone-label {
-  font-size: clamp(0.62rem, 0.85vw, 0.74rem);
+  font-size: clamp(0.78rem, 1.0vw, 0.88rem);
 }
 
 /* 美化文件输入 */
@@ -310,7 +310,7 @@ main {
 
 #app .config-panel select option,
 #app #datasetSelect option {
-  font-size: clamp(0.76rem, 0.95vw, 0.84rem);
+  font-size: clamp(0.78rem, 1.0vw, 0.88rem);
 }
 
 #app .config-panel input[type="checkbox"] {
@@ -344,11 +344,12 @@ main {
   margin: 4px 0 10px;
 }
 
+/* Round 19 修缮：min-height 28→32px 桌面端，移动端通过 @media 提升至 44px 触控目标 */
 .panel-toolbar .small,
 .panel-toolbar button {
-  min-height: 28px;
-  padding: 5px 10px;
-  font-size: 0.76rem;
+  min-height: 32px;
+  padding: 6px 12px;
+  font-size: clamp(0.7rem, 0.95vw, 0.78rem);
 }
 
 /* 居中式表单面板：让内容（如数据质量预览文本）居中显示 */
@@ -457,11 +458,16 @@ main {
 .panel.centered-form-panel #qualityList {
   text-align: center;
   width: 100%;
+  /* P1 修缮：覆盖 .panel.centered-form-panel > *:not(h2) 的 max-width: 520px 限制
+     特异性 (1,2,0) > (0,2,1)，让 9 列数据表能占满面板宽度，不再被挤成 520px 窄条 */
+  max-width: 100%;
 }
 
 .panel.centered-form-panel .embed-curve-wrap {
   text-align: center;
   width: 100%;
+  /* P1 修缮：同样覆盖 520px 限制，让嵌入维度曲线画布占满面板 */
+  max-width: 100%;
 }
 
 .panel.centered-form-panel .embed-curve-wrap canvas {
@@ -479,10 +485,6 @@ main {
   text-align: center;
   font-size: clamp(0.78rem, 1.0vw, 0.88rem);
   padding: 9px 12px;
-}
-
-#app #datasetSelect option {
-  font-size: clamp(0.82rem, 1.0vw, 0.92rem);
 }
 
 #app #refreshDatasetsBtn {
@@ -724,7 +726,7 @@ main {
 .quality-detail-modal {
   position: fixed;
   inset: 0;
-  z-index: 200;
+  z-index: 10001;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1011,8 +1013,9 @@ footer {
   font-size: 0.85rem;
 }
 
-/* ── 移动端适配：小屏幕下改为单栏堆叠，增大触控区域 ── */
-@media (max-width: 760px) {
+/* ── 移动端适配：小屏幕下改为单栏堆叠，增大触控区域 ──
+   断点统一为 900px（与共享主题 tokusatsu.css 一致），避免平板尺寸下双栏挤压 */
+@media (max-width: 900px) {
   .command-grid,
   .command-grid.three-col {
     grid-template-columns: 1fr;
@@ -1183,7 +1186,7 @@ footer {
 .modal {
   position: fixed;
   inset: 0;
-  z-index: 100;
+  z-index: 10000;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1403,11 +1406,11 @@ footer {
     justify-content: center;
   }
 
-  /* 移动端面板标题：保持与共享主题 panel-header 一致 */
+  /* 移动端面板标题：保持与 900px 断点一致的居中对齐，仅缩小字号 */
   #app .panel h2 {
-    padding: 8px 12px;
-    font-size: 0.66rem;
-    text-align: left;
+    padding: 14px 10px 8px;
+    font-size: clamp(0.78rem, 1.2vw, 0.9rem);
+    text-align: center;
     min-height: auto;
   }
 
@@ -1433,8 +1436,27 @@ footer {
     font-size: 0.78rem;
   }
 
-  button {
+  /* Round 20 修缮：移除激进的 button { width: 100% }，避免关闭按钮(✕)等小图标按钮被撑满。
+     主要操作按钮的触控尺寸由下方 .panel-toolbar .small 等规则统一提升至 44px。 */
+  #app .panel > button,
+  #app .upload-panel button,
+  #app .config-panel button,
+  #app .panel .btn-center {
     width: 100%;
+  }
+
+  /* Round 19 修缮：移动端触控目标提升至 44px，覆盖 .panel-toolbar 与 .small 的高特异性规则 */
+  .panel-toolbar .small,
+  .panel-toolbar button,
+  .history-panel .small,
+  .quality-panel .small,
+  .archive-panel .small,
+  .history-batch-toolbar button,
+  .modal-header button,
+  .quality-detail-header button {
+    min-height: 44px;
+    padding: 10px 16px;
+    font-size: 0.78rem;
   }
 
   .history-batch-toolbar {

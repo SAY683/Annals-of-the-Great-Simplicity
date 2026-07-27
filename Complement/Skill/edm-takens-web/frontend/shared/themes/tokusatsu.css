@@ -494,7 +494,7 @@ body::after {
   .command-grid.three-col { grid-template-columns: 1fr 1fr; }
 }
 
-@media (max-width: 760px) {
+@media (max-width: 900px) {
   .command-grid,
   .command-grid.three-col {
     grid-template-columns: 1fr;

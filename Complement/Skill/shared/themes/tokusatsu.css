@@ -494,7 +494,7 @@ body::after {
   .command-grid.three-col { grid-template-columns: 1fr 1fr; }
 }
 
-@media (max-width: 760px) {
+@media (max-width: 900px) {
   .command-grid,
   .command-grid.three-col {
     grid-template-columns: 1fr;
@@ -1100,12 +1100,13 @@ label {
 }
 
 /* ── SUPER 模式全屏脉冲（已弱化，避免黄色过强） ── */
+/* z-index 9998: 高于普通内容(z~2)与 CRT 扫描线(999)之下，低于 modal(10000) 与 toast(10001) */
 .super-mode-active::before {
   content: "";
   position: fixed;
   inset: 0;
   pointer-events: none;
-  z-index: 9999;
+  z-index: 9998;
   border: 1px solid rgba(255, 159, 67, 0.35);
   box-shadow: inset 0 0 18px rgba(255, 159, 67, 0.05);
   animation: super-pulse 3s ease-in-out infinite;

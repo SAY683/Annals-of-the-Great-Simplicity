@@ -151,9 +151,9 @@ main {
   margin-bottom: 0;
 }
 
-/* 状态墙：无数据时隐藏，避免顶部出现空格子 */
+/* 状态墙：无数据时弱化显示（与 edm-takens-web 一致），避免整面墙消失导致布局跳动 */
 .status-wall.awaiting-data {
-  display: none;
+  opacity: 0.5;
 }
 
 .panel {
@@ -179,6 +179,14 @@ main {
 /* 项目已有自定义图标，禁用共享主题的默认 ◈ 前缀以避免重复 */
 .panel-header::before {
   content: none !important;
+}
+/* Round 19 修缮：仅 inputPanel 的 panel-header 需要 92px 右内边距给 mode-toggle */
+#inputPanel .panel-header {
+  padding-right: 92px;
+}
+/* Round 19 修缮：统一输入框/按钮 min-height 32px（桌面端），避免触控偏小 */
+input[type="text"], input[type="number"], input[type="file"], select, button {
+  min-height: 32px;
 }
 .panel.alert {
   border-color: var(--accent-tokusatsu);
@@ -556,23 +564,14 @@ button.danger:hover:not(:disabled) { background: rgba(255, 77, 77, 0.08); }
   height: auto;
   max-height: none;
 }
+/* Round 19 修缮：jobHistoryTerminal 用响应式高度替代原内联硬编码 160/260px */
+#jobHistoryTerminal {
+  min-height: clamp(160px, 24vh, 260px);
+  max-height: clamp(220px, 32vh, 340px);
+}
 .terminal-line { margin-bottom: 0.3rem; word-break: break-word; }
 .terminal-line .ts { color: var(--muted); margin-right: 0.5rem; }
-.terminal-line .level {
-  display: inline-block;
-  min-width: 56px;
-  text-align: center;
-  border-radius: 3px;
-  font-size: 0.72rem;
-  margin-right: 0.5rem;
-  padding: 0.06rem 0.25rem;
-  font-family: var(--font-mono);
-}
-.terminal-line .level.info { color: var(--accent); background: rgba(102, 252, 241, 0.08); }
-.terminal-line .level.stage { color: #fff; background: var(--accent-dim); }
-.terminal-line .level.error { color: #fff; background: var(--fail); }
-.terminal-line .level.warn { color: var(--warn); background: rgba(242, 201, 76, 0.12); }
-.terminal-line .level.stderr { color: var(--fail); background: rgba(255, 77, 77, 0.08); }
+/* Round 19 修缮：移除 .terminal-line .level 死代码（render.js 实际使用 .log-level 类，由共享主题 tokusatsu.css 渲染） */
 
 /* realtime_log.stream  cockpit 风格 */
 .log-panel { display: flex; flex-direction: column; }
@@ -762,6 +761,28 @@ button.danger:hover:not(:disabled) { background: rgba(255, 77, 77, 0.08); }
 .warrior-status.deployed { color: var(--success); background: rgba(3, 201, 136, 0.1); }
 .warrior-status.fallback { color: var(--warn); background: rgba(242, 201, 76, 0.1); }
 .warrior-status.unavailable { color: var(--muted); background: rgba(111, 120, 136, 0.15); }
+/* Round 17 P2 修缮：Tier-A/B 等级标签样式
+   - 常态弱化(opacity 0.5, 无发光)，与 SECTOR 标签风格一致
+   - hover/focus-within 时亮起，提示用户"四真算法 + 二启发式诊断"的架构等级
+   - Tier-A 用 success 色(绿)，Tier-B 用 warn 色(黄) */
+.warrior-tier {
+  font-size: 0.6rem;
+  padding: 0.1rem 0.35rem;
+  border-radius: 3px;
+  font-family: var(--font-mono);
+  letter-spacing: 0.06em;
+  opacity: 0.5;
+  border: 1px solid transparent;
+  transition: opacity 0.18s, border-color 0.18s, box-shadow 0.18s;
+  margin-right: 0.3rem;
+}
+.warrior-tier.tier-A { color: var(--success); border-color: rgba(3, 201, 136, 0.18); }
+.warrior-tier.tier-B { color: var(--warn); border-color: rgba(242, 201, 76, 0.18); }
+.warrior-card:hover .warrior-tier,
+.warrior-card:focus-within .warrior-tier {
+  opacity: 1;
+  box-shadow: 0 0 6px currentColor;
+}
 .warrior-finding {
   font-size: clamp(0.75rem, 1.05vw, 0.85rem);
   color: var(--text);
@@ -820,16 +841,28 @@ tr:hover td { background: rgba(102, 252, 241, 0.03); }
 .hidden { display: none !important; }
 
 .toast {
-  margin-top: 1rem;
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  /* z-index 10001: 高于 modal(10000) 与 super-mode 边框(9998)，确保 toast 始终可见 */
+  z-index: 10001;
+  max-width: min(90vw, 420px);
+  margin-top: 0;
   padding: 0.85rem 1rem;
   border-radius: 6px;
   font-size: clamp(0.85rem, 1.15vw, 0.95rem);
   display: none;
   border-left: 3px solid;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+  animation: toast-in 0.22s ease-out;
 }
-.toast.info { background: rgba(102, 252, 241, 0.08); border-color: var(--accent); color: var(--accent); }
-.toast.error { background: rgba(255, 77, 77, 0.08); border-color: var(--fail); color: var(--fail); }
-.toast.success { background: rgba(3, 201, 136, 0.08); border-color: var(--success); color: var(--success); }
+@keyframes toast-in {
+  from { opacity: 0; transform: translateX(20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+.toast.info { background: rgba(102, 252, 241, 0.12); border-color: var(--accent); color: var(--accent); }
+.toast.error { background: rgba(255, 77, 77, 0.15); border-color: var(--fail); color: var(--fail); }
+.toast.success { background: rgba(3, 201, 136, 0.12); border-color: var(--success); color: var(--success); }
 
 /* 可折叠详情块 */
 details {
@@ -963,13 +996,46 @@ details > div { padding: 0.75rem; }
 @media (max-width: 768px) {
   #app .base-header {
     grid-template-columns: 1fr;
-    gap: 10px;
+    gap: 8px;
+    padding: 6px 10px;
+    flex-wrap: wrap;
+  }
+
+  #app .base-header .header-left h1 {
+    font-size: clamp(0.9rem, 4vw, 1.15rem);
+    flex-wrap: wrap;
+  }
+
+  #app .base-header .header-left p {
+    font-size: clamp(0.62rem, 2.5vw, 0.72rem);
   }
 
   #app .base-header .header-right {
     justify-content: flex-start;
     flex-wrap: wrap;
-    gap: 8px;
+    gap: 6px;
+    width: 100%;
+  }
+
+  #app .base-header .status-board {
+    font-size: clamp(0.5rem, 2.2vw, 0.58rem);
+    padding: 0.12rem 0.35rem;
+    gap: 6px;
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  #app .base-header .mission-clock {
+    padding: 0.12rem 0.35rem;
+  }
+
+  #app .base-header .mission-clock .clock-value {
+    font-size: clamp(0.62rem, 2.8vw, 0.78rem);
+  }
+
+  #app .base-header .status-dot {
+    font-size: clamp(0.5rem, 2.2vw, 0.58rem);
+    padding: 0.12rem 0.35rem;
   }
 
   #app .base-nav {
@@ -980,25 +1046,130 @@ details > div { padding: 0.75rem; }
   #app .base-nav a {
     flex: 1;
     justify-content: center;
+    font-size: clamp(0.6rem, 2.5vw, 0.72rem);
   }
 
   .scale-control {
     flex: 1 1 auto;
     min-width: 0;
+    font-size: clamp(0.5rem, 2vw, 0.58rem);
   }
 
   .scale-control input[type=range] {
     flex: 1;
     min-width: 0;
+    width: 100%;
   }
 
-  .actions { flex-direction: column; align-items: stretch; }
-  button { width: 100%; text-align: center; }
+  /* 表单与按钮：移动端全宽堆叠 */
+  .actions { flex-direction: column; align-items: stretch; gap: 0.4rem; }
+  button { width: 100%; text-align: center; padding: 0.55rem 0.8rem; font-size: clamp(0.72rem, 3vw, 0.82rem); }
+  .btn-mini { width: auto; padding: 0.35rem 0.55rem; font-size: clamp(0.6rem, 2.5vw, 0.7rem); }
   .mode-toggle { width: 100%; }
-  .mode-toggle label { flex: 1; text-align: center; }
+  .mode-toggle label { flex: 1; text-align: center; padding: 0.45rem 0.5rem; font-size: clamp(0.62rem, 2.8vw, 0.74rem); }
   .param-grid { grid-template-columns: 1fr; }
   .warrior-grid { grid-template-columns: 1fr; }
-  .metric-grid { grid-template-columns: repeat(2, 1fr); }
+  .metric-grid { grid-template-columns: repeat(2, 1fr); gap: 0.4rem; }
+
+  /* 面板内边距收紧 */
+  .panel-body { padding: clamp(0.55rem, 2vw, 0.8rem); }
+  .panel-header { padding: 0.45rem 70px 0.45rem 0.8rem; font-size: clamp(0.68rem, 2.8vw, 0.78rem); }
+
+  /* 输入区收紧 */
+  .input-section { padding: clamp(0.55rem, 2vw, 0.8rem); margin-bottom: 0.55rem; }
+  .input-section .section-label { font-size: clamp(0.68rem, 2.8vw, 0.78rem); }
+  textarea { min-height: clamp(80px, 18vh, 120px); font-size: clamp(0.78rem, 3vw, 0.88rem); }
+
+  /* 模型选择器：移动端堆叠 */
+  .model-device { flex-wrap: wrap; gap: 0.4rem; padding: 0.45rem 0.6rem; }
+  .model-device select { min-width: 100%; font-size: clamp(0.72rem, 3vw, 0.82rem); }
+  .model-device .k { font-size: clamp(0.68rem, 2.8vw, 0.78rem); width: 100%; }
+
+  /* 历史任务卡片：移动端布局 */
+  .terminal-line.job-card {
+    flex-wrap: wrap;
+    gap: 0.3rem;
+    padding: 0.4rem 0.5rem;
+    align-items: flex-start;
+  }
+  .terminal-line.job-card .job-meta {
+    flex: 1 1 100%;
+    order: 2;
+    font-size: clamp(0.62rem, 2.8vw, 0.74rem);
+    word-break: break-all;
+  }
+  .terminal-line.job-card .job-cb {
+    order: 1;
+    flex-shrink: 0;
+    width: 18px;
+    height: 18px;
+  }
+  .terminal-line.job-card .job-actions {
+    order: 3;
+    flex: 1 1 100%;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    font-size: clamp(0.62rem, 2.8vw, 0.72rem);
+  }
+  .terminal-line.job-card .job-actions a {
+    padding: 0.25rem 0.4rem;
+    border-radius: 3px;
+    background: rgba(255,255,255,0.04);
+  }
+  .terminal-line.job-card .job-preview {
+    order: 4;
+    flex: 1 1 100%;
+    font-size: clamp(0.6rem, 2.5vw, 0.7rem) !important;
+  }
+
+  /* 批量工具栏：移动端紧凑 */
+  .batch-toolbar { flex-wrap: wrap; gap: 4px !important; padding: 4px 6px !important; }
+
+  /* 结果面板表格横向滚动 */
+  .result-fullwidth table { font-size: clamp(0.62rem, 2.5vw, 0.74rem); }
+  .result-fullwidth .panel-body { overflow-x: auto; }
+
+  /* 模态框：移动端全屏化 */
+  .modal-content { max-width: 100% !important; max-height: 92vh !important; border-radius: 6px; }
+  .modal-header { padding: 0.55rem 0.7rem; font-size: clamp(0.72rem, 3vw, 0.82rem); flex-wrap: wrap; }
+  .modal-body { padding: 0.55rem 0.7rem; }
+
+  /* 预设按钮栏：移动端堆叠 */
+  .preset-bar { flex-direction: column; align-items: stretch; gap: 0.35rem; }
+  .preset-btn { width: 100%; text-align: center; }
+}
+
+/* ── 超窄屏（手机 ≤480px）专项优化 ── */
+@media (max-width: 480px) {
+  #app { font-size: 14px; }
+  #app .base-header { padding: 5px 8px; gap: 6px; }
+  #app .base-header .header-left h1 { font-size: 0.95rem; gap: 0.3em; }
+  #app .base-header .header-left p { font-size: 0.62rem; }
+  #app .base-header .status-board { gap: 4px; font-size: 0.52rem; padding: 0.1rem 0.3rem; }
+  #app .base-header .mission-clock .clock-value { font-size: 0.68rem; }
+
+  .metric-grid { grid-template-columns: 1fr 1fr; gap: 0.35rem; }
+  .metric .value { font-size: clamp(0.85rem, 5vw, 1.1rem); }
+  .metric .label { font-size: clamp(0.5rem, 2vw, 0.58rem); }
+
+  .panel-header { padding: 0.4rem 60px 0.4rem 0.65rem; font-size: 0.68rem; }
+  .panel-body { padding: 0.5rem; }
+
+  /* 状态墙：2列布局 */
+  .status-wall { grid-template-columns: repeat(2, 1fr) !important; gap: 6px; }
+  .status-card { padding: 0.4rem 0.5rem; }
+
+  /* 模式切换：更紧凑 */
+  .mode-toggle { padding: 2px; }
+  .mode-toggle label { padding: 0.4rem 0.35rem; font-size: 0.62rem; letter-spacing: 0.02em; }
+
+  /* 模型选择器按钮内联 */
+  .model-device { padding: 0.4rem 0.5rem; }
+
+  /* 任务历史卡片进一步紧凑 */
+  .terminal-line.job-card { padding: 0.35rem 0.4rem; }
+  .terminal-line.job-card .job-actions a { padding: 0.2rem 0.35rem; font-size: 0.62rem; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1007,4 +1178,144 @@ details > div { padding: 0.75rem; }
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* ── 历史任务详情模态框（暗色特摄主题） ────────────────────────────── */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.78);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  padding: clamp(0.6rem, 2vw, 1.6rem);
+}
+.modal-content {
+  background:
+    linear-gradient(180deg, rgba(102, 252, 241, 0.04), transparent 80px),
+    var(--panel-2);
+  border: 1px solid var(--accent-dim);
+  border-radius: 10px;
+  box-shadow:
+    0 0 0 1px rgba(102, 252, 241, 0.18),
+    0 20px 60px rgba(0, 0, 0, 0.65),
+    0 0 40px rgba(102, 252, 241, 0.08);
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.7rem 1rem;
+  background: linear-gradient(90deg, rgba(255, 159, 67, 0.08), transparent 35%), var(--panel-3);
+  border-bottom: 1px solid var(--border);
+  font-family: var(--font-mono);
+  color: var(--accent);
+  font-size: clamp(0.82rem, 1.15vw, 0.95rem);
+  letter-spacing: 0.03em;
+  gap: 0.6rem;
+}
+.modal-header #jobDetailTitle {
+  flex: 1;
+  word-break: break-all;
+}
+.modal-body {
+  padding: clamp(0.75rem, 1.4vw, 1.1rem);
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+/* 复用 details 折叠块，但展开内容不嵌套 padding 双层 */
+.modal-body > details > summary {
+  background: var(--panel-3);
+}
+.modal-body > details > pre,
+.modal-body > details > div {
+  padding: 0.75rem 0.85rem;
+  background: var(--bg-elevated);
+}
+.modal-body > details[open] > summary {
+  border-bottom: 1px solid var(--border);
+}
+/* 小型按钮（关闭按钮等） */
+.btn-mini {
+  padding: 0.25rem 0.55rem;
+  font-size: clamp(0.64rem, 0.85vw, 0.72rem);
+  font-family: var(--font-mono);
+  border: 1px solid var(--border-bright);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+.btn-mini:hover {
+  background: rgba(255, 77, 77, 0.08);
+  border-color: var(--fail);
+  color: var(--fail);
+}
+/* 代码 / 文本块：等宽字体 + 横向滚动 */
+.code-block {
+  margin: 0;
+  padding: 0.75rem 0.85rem;
+  background: var(--bg-elevated);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: clamp(0.74rem, 1vw, 0.84rem);
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 45vh;
+  overflow-y: auto;
+  border-radius: 0 0 6px 6px;
+}
+/* 详情模态框内的 metric-grid 卡片紧凑化 */
+#jobDetailResultData .metric-grid {
+  margin-bottom: 0.6rem;
+}
+#jobDetailResultData .metric .value {
+  font-size: clamp(0.95rem, 1.6vw, 1.2rem);
+}
+#jobDetailResultData .param-grid {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  margin-bottom: 0.6rem;
+}
+#jobDetailResultData .detail-empty {
+  color: var(--muted);
+  font-size: clamp(0.78rem, 1.05vw, 0.88rem);
+  padding: 0.5rem 0;
+}
+/* SECTOR-B2 历史项可点击卡片：hover 高亮比普通 terminal-line 更显著，提示可点击查看详情 */
+/* P1 修缮：桌面端补 flex-wrap 与子项换行规则，避免 job-meta 被挤成竖向长条 */
+.terminal-line.job-card {
+  border-left-color: var(--accent-dim);
+  transition: background 0.15s, border-left-color 0.15s, transform 0.1s;
+  flex-wrap: wrap;          /* 允许子项换行（与移动端 768px 断点行为一致） */
+  align-items: center;      /* 换行后 baseline 对齐效果差，改用 center */
+}
+.terminal-line.job-card:hover {
+  background: rgba(102, 252, 241, 0.08);
+  border-left-color: var(--accent);
+  transform: translateX(2px);
+}
+/* job-meta：保证时间戳/ID/状态/耗时横排显示不被挤兑成竖向 */
+.terminal-line.job-card .job-meta {
+  flex: 1 1 auto;           /* 优先占可用空间，允许收缩 */
+  min-width: 180px;         /* 最小可读宽度，避免逐字符换行 */
+  white-space: nowrap;      /* 时间戳/ID/状态不换行 */
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.terminal-line.job-card .job-preview {
+  flex-basis: 100%;         /* 关键：强制 preview 独占一行，触发换行 */
+  border-top: 1px dashed var(--border);
+  padding-top: 0.2rem;
+  margin-top: 0.25rem;
 }

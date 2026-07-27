@@ -12,8 +12,8 @@
  */
 
 // ── 日志状态与配置 ────────────────────────────────────────────────────
-const LOG_LEVELS = ['stage', 'info', 'warn', 'error', 'stderr'];
-const LOG_ICONS = { stage: '▶', info: '◉', warn: '▲', error: '✖', stderr: '⚠' };
+const LOG_LEVELS = ['stage', 'info', 'warn', 'error', 'done', 'stderr'];
+const LOG_ICONS = { stage: '▶', info: '◉', warn: '▲', error: '✖', done: '✓', stderr: '⚠' };
 const MAX_LOG_LINES = 400;
 let activeLogLevels = new Set(LOG_LEVELS);
 let logAutoScroll = true;
@@ -26,11 +26,21 @@ function escapeHtml(str) {
 // 安全数值格式化：null/undefined/NaN 等非数值返回 'N/A'，避免 toFixed 崩溃
 const safeFmt = (v, n = 4) => (v != null && typeof v === 'number' && !isNaN(v)) ? v.toFixed(n) : 'N/A';
 
+let _toastTimer = null;
 function showToast(msg, type) {
   if (!toast) return;
   toast.textContent = msg;
   toast.className = 'toast ' + (type || 'hidden');
   toast.style.display = type ? 'block' : 'none';
+  // Round 17 修缮：error 类型停留 6s，其他 4s 后自动消失
+  if (_toastTimer) clearTimeout(_toastTimer);
+  if (type && type !== 'hidden') {
+    const ms = type === 'error' ? 6000 : 4000;
+    _toastTimer = setTimeout(() => {
+      toast.style.display = 'none';
+      toast.className = 'toast';
+    }, ms);
+  }
 }
 
 // ── 日志渲染（cockpit 风格） ──────────────────────────────────────────
@@ -457,11 +467,18 @@ function renderResult(data) {
     const findings = (card.findings || []).map(f => `<div class="warrior-finding">→ ${escapeHtml(f)}</div>`).join('');
     const rawDetails = card.raw ? `<details><summary>raw metrics</summary><div style="font-family:var(--font-mono);font-size:0.72rem;color:var(--muted);white-space:pre-wrap;">${escapeHtml(JSON.stringify(card.raw, null, 2))}</div></details>` : '';
     // P2-10：warrior_id / name / status 来自后端结果，插入 innerHTML 前必须转义，防止 XSS
+    // Round 17 P2 修缮：渲染 Tier-A/B 等级标签，让"四真算法 + 二启发式诊断"在前端显式化
     const safeWarriorId = escapeHtml(card.warrior_id);
     const safeName = escapeHtml(card.name);
     const safeStatus = escapeHtml(card.status);
+    const safeTier = escapeHtml(card.tier || '');
+    // Tier-A=真算法层(可追溯因果证据)，Tier-B=启发式诊断层(文本特征启发式)
+    // 标签弱化显示，避免抢占主信息；hover/focus 时亮起，与 SECTOR 标签风格一致
+    const tierTag = safeTier
+      ? `<span class="warrior-tier tier-${safeTier}" title="Tier-${safeTier === 'A' ? 'A 真算法层' : 'B 启发式诊断层'}">T${safeTier}</span>`
+      : '';
     div.innerHTML = `
-      <div class="warrior-title">${safeWarriorId} · ${safeName} <span class="warrior-status ${safeStatus}">${safeStatus}</span></div>
+      <div class="warrior-title">${safeWarriorId} · ${safeName} ${tierTag}<span class="warrior-status ${safeStatus}">${safeStatus}</span></div>
       <div class="warrior-metrics">${escapeHtml(metrics)}</div>
       ${findings}
       <div class="warrior-verdict">// ${escapeHtml(card.verdict || 'N/A')}</div>

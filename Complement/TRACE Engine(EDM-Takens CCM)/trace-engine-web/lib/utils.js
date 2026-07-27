@@ -104,12 +104,16 @@ function recordJob(id, mode, status, error = null, meta = {}) {
     const fullText = entryMeta.text;
     entryMeta.textHash = crypto.createHash('sha256').update(fullText).digest('hex');
     entryMeta.textPreview = fullText.slice(0, 200);
+    // R13-3 修缮：记录写盘是否成功，让详情面板能区分"未落盘"vs"已被清理"
+    let inputPersisted = true;
     try {
       ensureDir(INPUTS_DIR);
       fs.writeFileSync(path.join(INPUTS_DIR, `${id}.txt`), fullText, 'utf-8');
     } catch (err) {
+      inputPersisted = false;
       logToFile('warn', `保存任务输入文本失败 job=${id}: ${err.message}`);
     }
+    entryMeta.inputPersisted = inputPersisted;
     delete entryMeta.text;
   }
   const entry = {

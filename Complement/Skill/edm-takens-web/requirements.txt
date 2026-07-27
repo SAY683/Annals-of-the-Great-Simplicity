@@ -1,10 +1,32 @@
-# EDM-Takens Web — Python backend dependencies
-fastapi>=0.110
-uvicorn[standard]>=0.27
-python-multipart>=0.0.9
+# edm-takens-web — Runtime Dependencies
+# =====================================
+# EDM 分析 Web 服务 (FastAPI) — 数据集管理、分析任务编排、历史归档
+# 安装: pip install -r requirements.txt
+#
+# 依赖关系:
+#   - 直接 import edm-takens 算法内核 (同进程)
+#   - 因此需要 edm-takens 的全部依赖 (见 Skill/edm-takens/requirements.txt)
+#   - 本文件仅列出 Web 服务特有的依赖
+
+# ── [web] Web 服务框架 ──
+fastapi>=0.100
+uvicorn[standard]>=0.20    # ASGI 服务器 + uvloop 加速
+python-multipart>=0.0.5    # 文件上传 (multipart/form-data)
+
+# ── [web] 数据处理 ──
+pandas>=1.4                # CSV 读取与数据质量分析
 numpy>=1.22
-scipy>=1.8
-pandas>=1.4
-matplotlib>=3.5
-pyEDM>=1.0
-scikit-learn>=1.0
+
+# ── [core] EDM 算法内核 (继承自 edm-takens) ──
+pyEDM>=1.0                 # C++ 高保真 EDM 实现
+scikit-learn>=1.0          # 降维与聚类
+statsmodels>=0.14          # 平稳性检验
+matplotlib>=3.5            # 图表生成
+
+# ── [opt] 算法优化 (Round 20 新增) ──
+ruptures>=1.1              # Bai-Perron 结构断点检测
+arch>=5.0                  # GARCH 波动率建模
+
+# ── [test] 测试 ──
+pytest>=7.0
+httpx>=0.24                # FastAPI 测试客户端

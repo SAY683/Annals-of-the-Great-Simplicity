@@ -600,12 +600,18 @@ class SacredProjector:
         n = len(names)
         off_diag = []
         degenerate = set()
+        # Phase 2 P1 修缮: 收集 per-axis off-diagonal 最大值
+        # 用于 compute_axis_weights 的 per-axis 自适应降权（替代全局 max_off）
+        per_axis_max_off = [0.0] * n
 
         for i in range(n):
             for j in range(n):
                 if i != j:
-                    off_diag.append(abs(matrix[i, j]))
-                    if abs(matrix[i, j]) > 0.9:
+                    val = abs(matrix[i, j])
+                    off_diag.append(val)
+                    if val > per_axis_max_off[i]:
+                        per_axis_max_off[i] = val
+                    if val > 0.9:
                         degenerate.add(names[i])
                         degenerate.add(names[j])
 
@@ -640,6 +646,7 @@ class SacredProjector:
             "names": names,
             "max_off_diagonal": float(max_off),
             "mean_off_diagonal": float(mean_off),
+            "per_axis_max_off_diagonal": [float(x) for x in per_axis_max_off],  # Phase 2 P1 修缮
             "frobenius_distance": frobenius_distance,
             "axis_independence": independence,
             "degenerate_axes": sorted(degenerate),
@@ -730,6 +737,157 @@ class SacredProjector:
             for j in range(i + 1, Q.shape[1]):
                 Q[:, j] -= np.dot(Q[:, i], Q[:, j]) * Q[:, i]
         return Q
+
+
+# ── Z-Score 归一化器 (Phase 2 算法债务 L3-1) ─────────────────
+
+class ZScoreNormalizer:
+    """
+    Per-project 滚动窗口 z-score 归一化器。
+
+    解决问题 (Round 15 L3-1):
+      原 z_福音/z_吉祥/... 等绝对投影值在不同项目间存在系统性均值差异
+      (项目主题偏向 → 整体投影值偏移)，被 EDM 误判为动力学漂移。
+
+    数学定义:
+      z_score_i = (z_i - μ_rolling) / (σ_rolling + ε)
+      其中 μ_rolling, σ_rolling 为最近 W 个样本的滚动均值/标准差。
+
+    设计选择:
+      - 窗口 W=20: 平衡稳定性(≥30 理想但需小样本可用)与响应性
+      - ε=1e-6: 防止 σ=0 时除零
+      - 样本不足(W不足): 输出 0.0 (中性), 不破坏数据流
+      - 滚动统计 per-axis 独立: 各轴有不同的偏移/尺度
+
+    持久化:
+      - 状态保存到 project_cache_dir/_zscore_state.json
+      - 项目切换时由 bridge.py 重建
+    """
+
+    def __init__(self, window_size: int = 20, eps: float = 1e-6):
+        self.window_size = max(2, window_size)
+        self.eps = eps
+        # per-axis 滚动历史: {axis_name: deque[float]}
+        from collections import deque
+        self._history = {}
+        self._deque_cls = deque
+
+    def update_and_normalize(self, axis_name: str, raw_value: float) -> float:
+        """
+        更新指定轴的滚动统计，并返回 z-score 归一化后的值。
+
+        Args:
+            axis_name: 轴名 (如 "z_福音")
+            raw_value: 原始投影值
+
+        Returns:
+            z-score 归一化值; 样本不足时返回 0.0
+        """
+        if axis_name not in self._history:
+            self._history[axis_name] = self._deque_cls(maxlen=self.window_size)
+
+        hist = self._history[axis_name]
+        hist.append(float(raw_value))
+
+        # 样本不足时返回 0.0 (中性)
+        if len(hist) < 5:
+            return 0.0
+
+        arr = np.array(hist, dtype=np.float64)
+        mean = float(arr.mean())
+        std = float(arr.std(ddof=0))  # 总体标准差(无偏性在滚动窗口下不必要)
+        if std < self.eps:
+            return 0.0  # 退化情况(常数序列)
+        return (float(raw_value) - mean) / (std + self.eps)
+
+    def normalize_batch(self, coords: Dict[str, float]) -> Dict[str, float]:
+        """
+        批量归一化 coords 中的所有 z_*/dz_*/d2z_* 字段。
+
+        Args:
+            coords: 原始投影字典
+
+        Returns:
+            {axis_zscore: value} 字典 (仅包含归一化后的字段)
+        """
+        result = {}
+        for key, val in coords.items():
+            if not key.startswith(("z_", "dz_", "d2z_")):
+                continue
+            if key in ("z_pca_1", "z_pca_2", "z_pca_3"):  # L2 PCA 不在此处归一化
+                continue
+            try:
+                result[f"{key}_zscore"] = self.update_and_normalize(key, float(val))
+            except (TypeError, ValueError):
+                continue
+        return result
+
+    def state_dict(self) -> Dict:
+        """导出状态用于持久化"""
+        return {
+            "window_size": self.window_size,
+            "eps": self.eps,
+            "history": {k: list(v) for k, v in self._history.items()},
+        }
+
+    def load_state_dict(self, state: Dict):
+        """从持久化数据恢复状态"""
+        from collections import deque
+        self.window_size = max(2, int(state.get("window_size", self.window_size)))
+        self.eps = float(state.get("eps", self.eps))
+        self._history = {
+            k: deque(v, maxlen=self.window_size)
+            for k, v in state.get("history", {}).items()
+        }
+
+
+# ── 退化轴自适应降权 (Phase 2 算法债务 L3-2 + Round 16 P1 修缮) ──
+
+def compute_axis_weights(orthogonality_report: Dict) -> Dict[str, float]:
+    """
+    根据正交性报告计算 8 轴的自适应权重（per-axis 真正自适应）。
+
+    解决问题 (Round 15 R-algo_5 + Round 16 P1 修缮):
+      当某些轴近乎共线(degenerate)时，其投影值含大量冗余信息。
+      自适应降权让 EDM 下游能更准确地区分独立信号 vs 冗余信号。
+
+    Round 16 P1 修缮: 改用 per-axis off-diagonal 最大值（而非全局），
+    避免独立轴被过度降权。当 8 轴中只有 1 对高度相关时，
+    原实现会把所有非退化轴全部降到 0.7，违背 per-axis 自适应意图。
+
+    数学定义:
+      - 退化轴 (in degenerate_axes): weight = 0.3
+      - 独立轴 (per_axis_max_off < 0.5): weight = 1.0
+      - 中等轴 (0.5 ≤ per_axis_max_off < 0.9): weight = 0.7
+      阈值源自 layer3_sacred.get_orthogonality_report() 的分级标准
+
+    Args:
+        orthogonality_report: 来自 get_orthogonality_report() 的字典，
+                              必须含 per_axis_max_off_diagonal 字段
+
+    Returns:
+        {axis_name: weight} 字典；无报告时返回空(调用方回退等权重)
+    """
+    if not orthogonality_report or not orthogonality_report.get("available"):
+        return {}
+
+    names = orthogonality_report.get("names", [])
+    degenerate = set(orthogonality_report.get("degenerate_axes", []))
+    per_axis_max_off = orthogonality_report.get("per_axis_max_off_diagonal", [])
+
+    weights = {}
+    for i, name in enumerate(names):
+        full_name = f"z_{name}"
+        if name in degenerate:
+            weights[full_name] = 0.3
+            continue
+        # P1 修缮: 使用 per-axis off-diagonal 最大值
+        axis_max = float(per_axis_max_off[i]) if i < len(per_axis_max_off) else 0.0
+        if axis_max < 0.5:
+            weights[full_name] = 1.0
+        else:  # 0.5 ≤ axis_max < 0.9 (≥0.9 已在 degenerate 中处理)
+            weights[full_name] = 0.7
+    return weights
 
 
 # ── 自检 ────────────────────────────────────────────────────

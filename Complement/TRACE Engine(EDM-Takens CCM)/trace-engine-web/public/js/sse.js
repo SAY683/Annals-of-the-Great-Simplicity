@@ -193,6 +193,7 @@ function dispatchSSEEvent({ event, data }) {
       loadJobHistory();
     } else if (event === 'done') {
       hideStats();
+      log('done', '✓ 任务完成');
       setRunning(false);
       loadJobHistory();
     }

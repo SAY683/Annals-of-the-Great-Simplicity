@@ -311,9 +311,9 @@ def run_secrets_4_and_5(df, columns, target, lib, pred, q=3, r=2):
     results = {}
 
     # Secret 4: Multiview
-    # print("─" * 60)  # 移除纯分隔线，避免Web日志无意义符号
+    print("─" * 60)
     print("  Secret 4: Multiview Embedding Analysis")
-    # print("─" * 60)  # 移除纯分隔线，避免Web日志无意义符号
+    print("─" * 60)
     mv_results = run_multiview_analysis(df, columns, target, lib, pred, E_max=5)
     results['multiview'] = mv_results
 
@@ -334,7 +334,7 @@ def run_secrets_4_and_5(df, columns, target, lib, pred, q=3, r=2):
     # Secret 5: SVD Residual
     print(f"\n{'─' * 60}")
     print("  Secret 5: SVD Residual Monitor")
-    # print("─" * 60)  # 移除纯分隔线，避免Web日志无意义符号
+    print("─" * 60)
 
     monitor = SVDResidualMonitor(baseline_window=20)
     data = df[target].values.astype(float)

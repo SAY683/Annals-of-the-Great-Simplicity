@@ -471,7 +471,7 @@ body::after {
   display: grid;
   grid-template-columns: 360px 1fr;
   gap: clamp(12px, 1.6vw, 20px);
-  align-items: start;
+  align-items: stretch;
 }
 
 /* 所有列都允许收缩到 0，避免内容撑破网格导致布局断裂 */

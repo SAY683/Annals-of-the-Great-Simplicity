@@ -191,9 +191,14 @@ def ccm_causality_test(df, cause_var, effect_var, E, lib_sizes=None,
                                   and spear_p < spearman_p_threshold
                                   and abs(final_rho) > strong_direction_rho)
             else:
-                total_rise, spear_rho, spear_p = 0.0, 0.0, 1.0
+                # P0-2 修缮：len(rhos)<3 时 Spearman 不可计算是合理的，
+                # 但 total_rise 不应静默置零——若 rhos 有 2 个点且明显上升，
+                # 把 total_rise=0.0 会掩盖实际趋势。
+                # 现在：len>=2 时仍计算 total_rise，仅 Spearman 标记为不可用
+                total_rise = float(rhos[-1] - rhos[0]) if len(rhos) >= 2 else 0.0
+                spear_rho, spear_p = 0.0, 1.0
                 final_rho = float(rhos[-1]) if len(rhos) > 0 else 0.0
-                is_converging = False
+                is_converging = False  # Spearman 不可用时无法判定收敛
 
             results[direction_idx] = {
                 'final_rho': final_rho,
@@ -352,7 +357,8 @@ def _benjamini_hochberg(p_values: np.ndarray, q: float = 0.10):
 
 def ccm_batch_test(df, pairs, E, analysis_label: str = 'exploratory',
                     fdr_q: float = 0.10, warn_pair_threshold: int = 5,
-                    lib_sizes=None) -> dict:
+                    lib_sizes=None,
+                    strong_direction_rho: float = 0.2) -> dict:
     """
     Secret 13: run a batch of K(K-1)-style pairwise CCM tests and apply
     multiple-comparison correction to their convergence significance.
@@ -481,7 +487,9 @@ def ccm_batch_test(df, pairs, E, analysis_label: str = 'exploratory',
         # ccm_causality_test's docstring) instead of re-deriving a
         # partial, and in this case buggy, copy of the same conditions.
         # See docs/CHANGELOG.md.
-        strong_direction_rho = 0.2  # matches ccm_causality_test's default
+        # P0-1 修缮：strong_direction_rho 从函数参数透传，不再硬编码 0.2。
+        # 默认值 0.2 与 ccm_causality_test 的默认值保持一致，
+        # 但调用方可显式传入不同值，确保 batch 层与单测层判定门控一致。
         candidates = []
         if fwd.get('spearman_p') is not None and fwd.get('is_converging'):
             candidates.append((fwd['spearman_p'], 'forward', fwd['final_rho']))
