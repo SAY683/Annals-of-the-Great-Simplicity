@@ -1,0 +1,380 @@
+{
+  "events": [
+    {
+      "event": "start",
+      "data": {
+        "_event": "start",
+        "job_id": "job_1785240565993_8f1371",
+        "mode": "light"
+      }
+    },
+    {
+      "event": "log",
+      "data": {
+        "_event": "log",
+        "message": "[TRACE] 启动分析: task_id=badb0551..., mode=light"
+      }
+    },
+    {
+      "event": "log",
+      "data": {
+        "_event": "log",
+        "message": "[TRACE] 命令: python F:\\攻略\\研发测试\\TRACE Engine(EDM-Takens CCM)\\trace-engine-web\\py_bridge.py F:\\攻略\\研发测试\\TRACE Engine(EDM-Takens CCM)\\trace-engine\\examples\\counterfactual_hybrid F:\\攻略\\研发测试\\TRACE Engine(EDM-Takens CCM)\\trace-engine-web\\work\\outputs\\badb0551-b13d-4b3a-b423-94856c19239f light..."
+      }
+    },
+    {
+      "event": "log",
+      "data": {
+        "_event": "log",
+        "message": "[TRACE] ✓ 分析完成: F:\\攻略\\研发测试\\TRACE Engine(EDM-Takens CCM)\\trace-engine-web\\work\\outputs\\badb0551-b13d-4b3a-b423-94856c19239f\\result.json"
+      }
+    },
+    {
+      "event": "log",
+      "data": {
+        "_event": "log",
+        "message": "[Bridge] L1 ✓: ate=0.8923808282296797, edges=12"
+      }
+    },
+    {
+      "event": "log",
+      "data": {
+        "_event": "log",
+        "message": "Loading weights:   0%|          | 0/434 [00:00<?, ?it/s]"
+      }
+    },
+    {
+      "event": "log",
+      "data": {
+        "_event": "log",
+        "message": "Loading weights:   0%|          | 1/434 [00:08<58:52,  8.16s/it]"
+      }
+    },
+    {
+      "event": "log",
+      "data": {
+        "_event": "log",
+        "message": "Loading weights:  23%|██▎       | 100/434 [00:09<00:22, 14.71it/s]"
+      }
+    },
+    {
+      "event": "log",
+      "data": {
+        "_event": "log",
+        "message": "Loading weights:  26%|██▌       | 111/434 [00:10<00:23, 14.00it/s]"
+      }
+    },
+    {
+      "event": "log",
+      "data": {
+        "_event": "log",
+        "message": "Loading weights:  27%|██▋       | 117/434 [00:10<00:21, 14.55it/s]"
+      }
+    },
+    {
+      "event": "log",
+      "data": {
+        "_event": "log",
+        "message": "Loading weights:  28%|██▊       | 123/434 [00:13<00:35,  8.86it/s]\rLoading weights:  29%|██▉       | 126/434 [00:13<00:33,  9.18it/s]"
+      }
+    },
+    {
+      "event": "log",
+      "data": {
+        "_event": "log",
+        "message": "Loading weights:  31%|███▏      | 136/434 [00:14<00:34,  8.56it/s]"
+      }
+    },
+    {
+      "event": "log",
+      "data": {
+        "_event": "log",
+        "message": "Loading weights:  34%|███▍      | 149/434 [00:16<00:34,  8.21it/s]"
+      }
+    },
+    {
+      "event": "log",
+      "data": {
+        "_event": "log",
+        "message": "Loading weights:  38%|███▊      | 165/434 [00:17<00:29,  9.27it/s]"
+      }
+    },
+    {
+      "event": "log",
+      "data": {
+        "_event": "log",
+        "message": "Loading weights:  40%|███▉      | 173/434 [00:19<00:33,  7.78it/s]"
+      }
+    },
+    {
+      "event": "log",
+      "data": {
+        "_event": "log",
+        "message": "Loading weights:  42%|████▏     | 184/434 [00:20<00:32,  7.60it/s]\rLoading weights:  43%|████▎     | 185/434 [00:21<00:32,  7.65it/s]"
+      }
+    },
+    {
+      "event": "log",
+      "data": {
+        "_event": "log",
+        "message": "Loading weights:  45%|████▍     | 195/434 [00:23<00:38,  6.26it/s]\rLoading weights:  47%|████▋     | 203/434 [00:23<00:28,  8.18it/s]"
+      }
+    },
+    {
+      "event": "log",
+      "data": {
+        "_event": "log",
+        "message": "Loading weights:  48%|████▊     | 207/434 [00:24<00:36,  6.26it/s]"
+      }
+    },
+    {
+      "event": "log",
+      "data": {
+        "_event": "log",
+        "message": "Loading weights:  50%|█████     | 217/434 [00:24<00:22,  9.58it/s]"
+      }
+    },
+    {
+      "event": "log",
+      "data": {
+        "_event": "log",
+        "message": "Loading weights:  51%|█████     | 221/434 [00:26<00:34,  6.13it/s]\rLoading weights:  52%|█████▏    | 224/434 [00:27<00:32,  6.38it/s]"
+      }
+    },
+    {
+      "event": "log",
+      "data": {
+        "_event": "log",
+        "message": "Loading weights:  53%|█████▎    | 232/434 [00:27<00:26,  7.51it/s]\rLoading weights:  54%|█████▍    | 234/434 [00:27<00:25,  7.88it/s]"
+      }
+    },
+    {
+      "event": "log",
+      "data": {
+        "_event": "log",
+        "message": "Loading weights:  56%|█████▌    | 243/434 [00:29<00:28,  6.80it/s]"
+      }
+    },
+    {
+      "event": "log",
+      "data": {
+        "_event": "log",
+        "message": "Loading weights:  58%|█████▊    | 250/434 [00:29<00:19,  9.44it/s]"
+      }
+    },
+    {
+      "event": "log",
+      "data": {
+        "_event": "log",
+        "message": "Loading weights:  58%|█████▊    | 253/434 [00:29<00:18,  9.76it/s]"
+      }
+    },
+    {
+      "event": "log",
+      "data": {
+        "_event": "log",
+        "message": "Loading weights:  59%|█████▉    | 256/434 [00:36<01:30,  1.96it/s]\rLoading weights:  59%|█████▉    | 258/434 [00:36<01:19,  2.22it/s]\rLoading weights:  60%|██████    | 262/434 [00:37<00:55,  3.07it/s]"
+      }
+    },
+    {
+      "event": "log",
+      "data": {
+        "_event": "log",
+        "message": "Loading weights:  61%|██████    | 264/434 [00:37<00:47,  3.59it/s]"
+      }
+    },
+    {
+      "event": "log",
+      "data": {
+        "_event": "log",
+        "message": "Loading weights:  62%|██████▏   | 267/434 [00:42<01:57,  1.42it/s]"
+      }
+    },
+    {
+      "event": "log",
+      "data": {
+        "_event": "log",
+        "message": "Loading weights:  62%|██████▏   | 269/434 [00:42<01:35,  1.73it/s]"
+      }
+    },
+    {
+      "event": "log",
+      "data": {
+        "_event": "log",
+        "message": "Loading weights:  65%|██████▍   | 280/434 [00:44<00:49,  3.10it/s]"
+      }
+    },
+    {
+      "event": "log",
+      "data": {
+        "_event": "log",
+        "message": "Loading weights:  67%|██████▋   | 291/434 [00:45<00:27,  5.28it/s]"
+      }
+    },
+    {
+      "event": "log",
+      "data": {
+        "_event": "log",
+        "message": "Loading weights:  68%|██████▊   | 293/434 [00:46<00:34,  4.07it/s]"
+      }
+    },
+    {
+      "event": "log",
+      "data": {
+        "_event": "log",
+        "message": "Loading weights:  70%|██████▉   | 303/434 [00:46<00:19,  6.62it/s]"
+      }
+    },
+    {
+      "event": "log",
+      "data": {
+        "_event": "log",
+        "message": "Loading weights:  70%|███████   | 305/434 [00:46<00:18,  6.95it/s]"
+      }
+    },
+    {
+      "event": "log",
+      "data": {
+        "_event": "log",
+        "message": "Loading weights:  73%|███████▎  | 315/434 [00:47<00:14,  8.15it/s]"
+      }
+    },
+    {
+      "event": "log",
+      "data": {
+        "_event": "log",
+        "message": "Loading weights:  73%|███████▎  | 317/434 [00:48<00:13,  8.45it/s]"
+      }
+    },
+    {
+      "event": "log",
+      "data": {
+        "_event": "log",
+        "message": "Loading weights:  75%|███████▌  | 327/434 [00:48<00:10, 10.58it/s]"
+      }
+    },
+    {
+      "event": "log",
+      "data": {
+        "_event": "log",
+        "message": "Loading weights:  76%|███████▌  | 329/434 [00:49<00:10,  9.60it/s]"
+      }
+    },
+    {
+      "event": "log",
+      "data": {
+        "_event": "log",
+        "message": "Loading weights:  78%|███████▊  | 339/434 [00:49<00:06, 13.87it/s]"
+      }
+    },
+    {
+      "event": "log",
+      "data": {
+        "_event": "log",
+        "message": "Loading weights:  79%|███████▊  | 341/434 [00:49<00:07, 12.19it/s]"
+      }
+    },
+    {
+      "event": "log",
+      "data": {
+        "_event": "log",
+        "message": "Loading weights:  81%|████████  | 351/434 [00:50<00:06, 12.70it/s]"
+      }
+    },
+    {
+      "event": "log",
+      "data": {
+        "_event": "log",
+        "message": "Loading weights:  81%|████████▏ | 353/434 [00:50<00:06, 13.08it/s]"
+      }
+    },
+    {
+      "event": "log",
+      "data": {
+        "_event": "log",
+        "message": "Loading weights:  84%|████████▎ | 363/434 [00:51<00:05, 13.12it/s]"
+      }
+    },
+    {
+      "event": "log",
+      "data": {
+        "_event": "log",
+        "message": "Loading weights:  84%|████████▍ | 365/434 [00:51<00:05, 13.20it/s]"
+      }
+    },
+    {
+      "event": "log",
+      "data": {
+        "_event": "log",
+        "message": "Loading weights:  86%|████████▋ | 375/434 [00:51<00:03, 15.61it/s]"
+      }
+    },
+    {
+      "event": "log",
+      "data": {
+        "_event": "log",
+        "message": "Loading weights:  87%|████████▋ | 377/434 [00:52<00:04, 12.20it/s]"
+      }
+    },
+    {
+      "event": "log",
+      "data": {
+        "_event": "log",
+        "message": "Loading weights:  90%|████████▉ | 389/434 [00:54<00:05,  8.21it/s]"
+      }
+    },
+    {
+      "event": "log",
+      "data": {
+        "_event": "log",
+        "message": "Loading weights:  93%|█████████▎| 405/434 [00:54<00:01, 14.82it/s]"
+      }
+    },
+    {
+      "event": "log",
+      "data": {
+        "_event": "log",
+        "message": "Loading weights:  95%|█████████▍| 411/434 [00:59<00:04,  4.78it/s]"
+      }
+    },
+    {
+      "event": "log",
+      "data": {
+        "_event": "log",
+        "message": "Loading weights:  95%|█████████▌| 414/434 [00:59<00:03,  5.24it/s]"
+      }
+    },
+    {
+      "event": "log",
+      "data": {
+        "_event": "log",
+        "message": "Loading weights:  98%|█████████▊| 424/434 [01:00<00:01,  6.37it/s]"
+      }
+    },
+    {
+      "event": "log",
+      "data": {
+        "_event": "log",
+        "message": "Loading weights: 100%|██████████| 434/434 [01:00<00:00,  7.19it/s]"
+      }
+    },
+    {
+      "event": "done",
+      "data": {
+        "_event": "done",
+        "job_id": "job_1785240565993_8f1371",
+        "success": false,
+        "trajectory_rows": 26,
+        "edm_ready": true
+      }
+    }
+  ],
+  "final": {
+    "_event": "done",
+    "job_id": "job_1785240565993_8f1371",
+    "success": false,
+    "trajectory_rows": 26,
+    "edm_ready": true
+  },
+  "elapsed": 466.2376003265381
+}

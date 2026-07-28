@@ -117,7 +117,10 @@ function resetUI() {
   logStageBadge.textContent = 'IDLE';
   resultPanel.classList.add('hidden');
   progressWrap.style.display = 'block';
-  updateProgress('INIT', 0);
+  // P1 fix (Round 23 §续): 直接重置进度条, 绕过单调递增守卫
+  progressFill.style.width = '0%';
+  stageName.textContent = 'INIT';
+  stagePercent.textContent = '0%';
   showToast('', '');
 }
 
@@ -134,8 +137,12 @@ function updateProgress(stage, progress) {
   stageName.textContent = s;
   logStageBadge.textContent = s;
   const pct = progress !== null ? Math.round(progress * 100) : 0;
-  progressFill.style.width = pct + '%';
-  stagePercent.textContent = pct + '%';
+  // P1 fix (Round 23 §续): 单调递增守卫, 防止SSE事件乱序或阶段切换导致进度回跳
+  // 用户报告"jumps to 100% then back to 50%"问题的兜底修复
+  const currentPct = parseInt(progressFill.style.width) || 0;
+  const finalPct = Math.max(currentPct, pct);
+  progressFill.style.width = finalPct + '%';
+  stagePercent.textContent = finalPct + '%';
 }
 
 function startElapsedTimer() {

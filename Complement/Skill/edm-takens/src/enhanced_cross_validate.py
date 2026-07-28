@@ -135,7 +135,10 @@ def estimate_lyapunov_exponent(data, E, dt=1.0, n_expand=20):
         for k in range(min(n_expand, N - max(i, j) - 1)):
             div[k] = np.sqrt(np.sum((X[i+k+1] - X[j+k+1])**2))
         if div[0] > 1e-12:
-            div_curves.append(np.log(div + 1e-12))
+            # ROUND26 算法审视 P0 修复: 同步 final_interpretation.py:127 的 log(0) 防护
+            # 原 np.log(div + 1e-12) 当 div→0 时引入 -27.6 偏差, 拉低 div_mean 使 λ_max 低估
+            log_div = np.log(div, where=div > 1e-12, out=np.full_like(div, np.nan))
+            div_curves.append(log_div)
 
     if len(div_curves) < 10:
         return {
@@ -146,7 +149,9 @@ def estimate_lyapunov_exponent(data, E, dt=1.0, n_expand=20):
         }
 
     # Average divergence over all pairs
-    div_mean = np.mean(np.array(div_curves), axis=0)
+    # ROUND26 算法审视 P0 修复 (续): div_curves 现含 NaN (div→0 处), 用 nanmean 忽略
+    div_arr = np.array(div_curves)
+    div_mean = np.nanmean(div_arr, axis=0) if np.any(~np.isnan(div_arr)) else np.zeros(n_expand)
     t_div = np.arange(len(div_mean)) * dt
 
     # Fit line to the linear growth region (first half of divergence)
@@ -579,8 +584,14 @@ def plot_enhanced_report(df, all_results, safeguards, output_path):
             # 之前使用 min(i+k, N_div-1) 导致当 i+k >= N_div 时比较自身，
             # log(0 + 1e-12) ≈ -27.6 人为拉平发散曲线尾部，Lyapunov 估计偏低
             max_k = min(20, N_div - max(i, j) - 1)
-            div_ij = [np.log(np.sqrt(np.sum((X_div[i+k] - X_div[j+k])**2)) + 1e-12)
-                      for k in range(max_k)]
+            # ROUND26 算法审视 P0 修复: 同步 log(0) 防护, 用 where 掩码替代 + 1e-12
+            div_ij = []
+            for k in range(max_k):
+                d = np.sqrt(np.sum((X_div[i+k] - X_div[j+k])**2))
+                if d > 1e-12:
+                    div_ij.append(np.log(d))
+                else:
+                    div_ij.append(np.nan)
             div_all.append(div_ij)
 
         if len(div_all) > 3:

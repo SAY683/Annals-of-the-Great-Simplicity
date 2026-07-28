@@ -254,8 +254,15 @@ def _tokenize(text: str) -> list:
         import logging
         jieba.setLogLevel(logging.WARNING)  # 抑制词典加载的 INFO 日志
         _DOMAIN_WORDS = [
+            # 原有：算法推荐系统领域
             "算法推荐", "信息茧房", "观点极化", "社会共识", "公共讨论",
             "用户行为", "算法透明", "推荐系统", "因果推断",
+            # ROUND27: 商业/新闻领域通用词（提升新闻文本分词质量）
+            "供应链", "股价", "高管", "收购", "裁员", "监管", "审计",
+            "财报", "营收", "毛利率", "产能", "供应商", "客户", "订单",
+            "董事会", "股东大会", "敌意收购", "资本运作", "股权结构",
+            "战略评估", "机构投资者", "大宗交易", "看空报告", "评级下调",
+            "流动性危机", "资产剥离", "业务重组", "公司治理",
         ]
         for w in _DOMAIN_WORDS:
             jieba.add_word(w, freq=1000)
@@ -374,6 +381,9 @@ def main():
         "不断", "逐渐", "日益", "越来越", "更加", "极为", "非常",
         "似乎", "好像", "大概", "其实", "实际上", "事实上",
         "因此", "因而", "从而", "于是", "所以", "因为", "由于",
+        "进而", "指出", "表示", "显示", "表明", "说明", "强调",
+        "报道", "获悉", "透露", "证实", "否认", "回应",
+        "当日", "此前", "近期", "届时", "目前", "随后", "此后",
         "但是", "然而", "不过", "只是", "尽管", "虽然",
         "如果", "那么", "假如", "即使", "哪怕", "无论",
         "不仅", "不但", "而且", "并且", "同时", "另外", "此外",
@@ -468,6 +478,10 @@ def main():
             elif directed_count[j, i] > directed_count[i, j]:
                 adj[i, j] = 0
 
+    # P0 fix (Round 22 §3b): 保存归一化前的原始 max_delta_nll,
+    # 否则归一化后 adj.max() 恒为 8.0, 导致所有轨迹行的 max_delta_nll 列完全相同,
+    # 失去区分度. 原始值通过 _extract_data_diagnostics 的 raw_max_delta_nll 参数传入.
+    raw_max_delta_nll = float(adj.max()) if adj.size > 0 else 0.0
     if adj.max() > 0:
         adj = adj / adj.max() * 8.0
 
@@ -618,7 +632,8 @@ def main():
     identifiability = _extract_identifiability(bridge, DoWhy14Adapter)
 
     # 数据与模型诊断
-    data_diagnostics = _extract_data_diagnostics(bridge, tokens, valid_tokens, concept_names, adj)
+    # P0 fix (Round 22 §3b): 传入 raw_max_delta_nll, 避免使用归一化后的 adj.max().
+    data_diagnostics = _extract_data_diagnostics(bridge, tokens, valid_tokens, concept_names, adj, raw_max_delta_nll)
     data_diagnostics["trace_source"] = "cooccurrence-web"
     data_diagnostics["analysis_mode"] = mode
 
@@ -764,6 +779,89 @@ def _extract_identifiability(bridge, adapter):
     return info
 
 
+def _bca_bootstrap_ci(bootstrap_estimates, original_estimate, jackknife_estimates,
+                      confidence_level=0.95):
+    """BCa (Bias-Corrected and accelerated) bootstrap 置信区间。
+
+    ROUND26 算法审视 P1-1 修复: 百分位法→BCa, 小样本下减少偏差。
+
+    百分位法 CI 在以下情况下有偏 (Efron & Tibshirani 1993, Ch. 14):
+      1. 偏差: bootstrap 分布中心 ≠ 原始估计量时,百分位法不修正偏差
+      2. 偏度: 统计量抽样分布偏斜时,百分位法不对称覆盖
+      3. 小样本: N < 50 时偏差与偏度影响被放大
+
+    BCa 通过两个校正系数修正:
+      - z0: 偏差校正,基于 bootstrap 估计 < 原始估计的比例
+      - a:  加速度系数,基于 jackknife 估计的影响函数
+
+    Args:
+        bootstrap_estimates: bootstrap 重采样得到的统计量序列 (ate_bootstrap)
+        original_estimate:   原始样本上的统计量 (theta_hat),必须与 bootstrap
+                             使用同一统计量定义
+        jackknife_estimates: leave-one-out jackknife 估计序列,用于计算加速度 a
+        confidence_level:    置信水平,默认 0.95
+
+    Returns:
+        [ci_lo, ci_hi] 列表;若无法计算 (样本不足/退化) 返回 None。
+    """
+    from scipy.stats import norm
+
+    boot = np.asarray(bootstrap_estimates, dtype=float)
+    n_boot = len(boot)
+    if n_boot < 2:
+        return None
+
+    # ── z0: 偏差修正 ──
+    # Phi^-1( (#{boot < theta_hat} + 0.5*#{boot == theta_hat}) / n_boot )
+    n_less = float(np.sum(boot < original_estimate))
+    n_eq = float(np.sum(boot == original_estimate))
+    prop = (n_less + 0.5 * n_eq) / n_boot
+    # 边界保护: prop=0 → norm.ppf(0)=-inf, prop=1 → norm.ppf(1)=+inf
+    # 用 0.5/n_boot 的极小偏移避免退化 (Efron & Tibshirani 1993 §14.3 推荐)
+    if prop <= 0:
+        prop = 0.5 / n_boot
+    elif prop >= 1:
+        prop = 1.0 - 0.5 / n_boot
+    z0 = norm.ppf(prop)
+
+    # ── a: 加速度因子 (jackknife) ──
+    # a = sum((theta_dot - theta_(i))^3) / (6 * (sum((theta_dot - theta_(i))^2))^1.5)
+    jack = np.asarray(jackknife_estimates, dtype=float)
+    jack_mean = np.mean(jack)
+    diff = jack_mean - jack
+    denom = 6.0 * (np.sum(diff ** 2) ** 1.5)
+    if denom == 0 or not np.isfinite(denom):
+        # 退化: jackknife 估计全一致 (常数数据) → a=0, 退化为 BC (仅偏差修正)
+        a = 0.0
+    else:
+        a = float(np.sum(diff ** 3) / denom)
+
+    # ── 调整分位数 ──
+    alpha = 1.0 - confidence_level
+    z_lo = norm.ppf(alpha / 2.0)
+    z_hi = norm.ppf(1.0 - alpha / 2.0)
+
+    def _adjust(z_alpha):
+        denom_adj = 1.0 - a * (z0 + z_alpha)
+        if denom_adj == 0 or not np.isfinite(denom_adj):
+            # 退化: 回退到百分位法分位数
+            return None
+        return norm.cdf(z0 + (z0 + z_alpha) / denom_adj)
+
+    alpha1 = _adjust(z_lo)
+    alpha2 = _adjust(z_hi)
+    # 任一端无法调整 → 回退到未校正的百分位 (仍优于报错)
+    if alpha1 is None or alpha2 is None:
+        alpha1, alpha2 = alpha / 2.0, 1.0 - alpha / 2.0
+    # 裁剪到 [0, 1] 防止 norm.cdf 数值溢出导致越界
+    alpha1 = max(0.0, min(1.0, alpha1))
+    alpha2 = max(0.0, min(1.0, alpha2))
+
+    ci_lo = float(np.percentile(boot, alpha1 * 100.0))
+    ci_hi = float(np.percentile(boot, alpha2 * 100.0))
+    return [ci_lo, ci_hi]
+
+
 def _run_stability_analysis(bridge, tokens, concept_names, window_size, threshold, max_concepts, estimate, valid_filter=None):
     """执行轻量稳定性与鲁棒性分析（bootstrap 边稳定性、ATE 置换检验、K-fold CV）。"""
     from _token_filters import is_valid_concept
@@ -906,20 +1004,60 @@ def _run_stability_analysis(bridge, tokens, concept_names, window_size, threshol
                 pass
 
     per_edge = {k: float(np.mean(v)) for k, v in edge_stability.items() if v}
-    # P0修复: 增加 bootstrap 百分位法 CI (2.5% 和 97.5% 分位数)
+    # ROUND26 算法审视 P1-1 修复: 百分位法→BCa, 小样本下减少偏差
+    # 原 P0 修复使用百分位法 (np.percentile 2.5%/97.5%) 构建 95% CI;
+    # 当 bootstrap 分布有偏/偏斜时 (treatment 为计数变量时常见),
+    # 百分位法覆盖率偏离名义 95%。BCa 通过 z0 (偏差修正) + a (加速度,
+    # jackknife) 校正两端分位数。若 BCa 无法计算 (退化数据/jackknife
+    # 不可用), 回退到百分位法以保持向后兼容。
     ate_bootstrap_ci = None
+    ate_bootstrap_method = None
     if ate_bootstrap:
+        ate_bootstrap_method = "percentile"  # 默认回退值
         ate_bootstrap_ci = [
             float(np.percentile(ate_bootstrap, 2.5)),
             float(np.percentile(ate_bootstrap, 97.5)),
         ]
+        # 尝试升级到 BCa: 需要原始 OLS 估计 + jackknife 估计
+        # 使用与 bootstrap 相同的统计量定义 (未调整 OLS treatment 系数),
+        # 而非 DoWhy estimate.value (语义不同, 见下方 ate_bootstrap_type 注释)
+        try:
+            covariates_full = [c for c in df.columns
+                               if c not in (treatment_col, outcome_col)]
+            X_full = df[[treatment_col] + covariates_full].values
+            y_full = df[outcome_col].values
+            X_full_int = np.hstack([np.ones((X_full.shape[0], 1)), X_full])
+            theta_hat = float(np.linalg.lstsq(X_full_int, y_full, rcond=None)[0][1])
+            # Jackknife: leave-one-out OLS treatment 系数
+            n_rows_jk = df.shape[0]
+            jack_estimates = []
+            for i in range(n_rows_jk):
+                mask_jk = np.ones(n_rows_jk, dtype=bool)
+                mask_jk[i] = False
+                X_jk = df.loc[mask_jk, [treatment_col] + covariates_full].values
+                y_jk = df.loc[mask_jk, outcome_col].values
+                X_jk_int = np.hstack([np.ones((X_jk.shape[0], 1)), X_jk])
+                # 至少需要 (协变量数+2) 行才能求解; 行数不足跳过该 jackknife 点
+                if X_jk_int.shape[0] < X_jk_int.shape[1] + 1:
+                    continue
+                coef_jk = np.linalg.lstsq(X_jk_int, y_jk, rcond=None)[0][1]
+                jack_estimates.append(float(coef_jk))
+            if len(jack_estimates) >= 3:
+                bca_ci = _bca_bootstrap_ci(ate_bootstrap, theta_hat,
+                                           jack_estimates, confidence_level=0.95)
+                if bca_ci is not None:
+                    ate_bootstrap_ci = bca_ci
+                    ate_bootstrap_method = "bca"
+        except Exception:
+            # BCa 计算失败时静默回退到百分位法 (保持向后兼容)
+            pass
     return {
         "edge_stability_mean": float(np.mean(list(per_edge.values()))) if per_edge else 0.0,
         "edge_stability_std": float(np.std(list(per_edge.values()))) if per_edge else 0.0,
         "edge_stability_per_edge": per_edge,
         "ate_bootstrap_std": float(np.std(ate_bootstrap)) if ate_bootstrap else None,
-        "ate_bootstrap_ci": ate_bootstrap_ci,  # P0修复: 百分位法 95% CI
-        "ate_bootstrap_method": "percentile" if ate_bootstrap_ci else None,
+        "ate_bootstrap_ci": ate_bootstrap_ci,  # ROUND26 P1-1: BCa 95% CI (回退百分位法)
+        "ate_bootstrap_method": ate_bootstrap_method,
         # P1修复: 标注 bootstrap 估计的语义类型
         # "unadjusted_ols" = 未调整 OLS 系数 (dY/dT)，与 DoWhy backdoor 调整后 ATE 语义不同
         # 两者符号可相反（Simpson 悖论），数值差异反映混杂偏倚
@@ -932,8 +1070,24 @@ def _run_stability_analysis(bridge, tokens, concept_names, window_size, threshol
     }
 
 
-def _extract_data_diagnostics(bridge, tokens, valid_tokens, concept_names, adj):
-    """生成数据与模型级诊断指标。"""
+def _extract_data_diagnostics(bridge, tokens, valid_tokens, concept_names, adj, raw_max_delta_nll=None):
+    """生成数据与模型级诊断指标。
+
+    P0 fix (Round 22 §3b): raw_max_delta_nll 为归一化前的原始 ΔNLL 最大值.
+    若未提供 (旧调用方), 回退到 adj.max() (归一化后, 恒为 8.0).
+    """
+    if raw_max_delta_nll is None:
+        raw_max_delta_nll = float(adj.max()) if adj.size > 0 else 0.0
+    # P0 fix (Round 23 §1): 添加 signal_type 字段区分信号语义.
+    # py_bridge.py (LIGHT/DEEP) 的 adj 由共现计数构建 (adj[a,b] += 1.0),
+    # raw_max_delta_nll 实为 "最大共现计数" 而非真实 ΔNLL.
+    # 保留字段名 max_delta_nll 以维持下游 (trace-to-edm config.py /
+    # csv_builder.py) 兼容, 但通过 signal_type="co_occurrence" 显式标注语义,
+    # 避免数学审计时的语义混淆.
+    # SUPER 模式 (llama_worker.py) 的 adj 来自 LLaMA counterfactual probing,
+    # 为真实 ΔNLL, signal_type="delta_nll".
+    # simulation 标志只影响 data_df 来源 (SEM 生成 vs 真实观测), 不影响 adj
+    # 构建方式, 因此 LIGHT/DEEP 下始终为 co_occurrence.
     diagnostics = {
         "raw_tokens": len(tokens),
         "valid_concept_tokens": len(valid_tokens),
@@ -941,7 +1095,8 @@ def _extract_data_diagnostics(bridge, tokens, valid_tokens, concept_names, adj):
         "unique_concepts": len(concept_names),
         "concept_coverage": round(len(valid_tokens) / max(len(tokens), 1), 4),
         "adj_density": round(float((adj > 0).sum()) / max(adj.size, 1), 4),
-        "max_delta_nll": round(float(adj.max()), 3),
+        "max_delta_nll": round(float(raw_max_delta_nll), 3),
+        "signal_type": "co_occurrence",
         "bpe_type": getattr(bridge, "bpe_type", "unknown"),
         "unk_rate": round(float(getattr(bridge, "unk_rate", 0.0)), 4),
         "n_concepts_after_aggregate": len(bridge.concept_names),

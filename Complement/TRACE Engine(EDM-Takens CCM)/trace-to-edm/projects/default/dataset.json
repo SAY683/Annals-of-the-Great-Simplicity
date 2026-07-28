@@ -1,202 +1,238 @@
 {
   "entries": [
     {
-      "id": "text-d5746d50b6ce",
+      "id": "f6401fb4-de85-4382-8bda-4163791c69c5",
+      "type": "replay",
+      "source": "",
+      "timestamp": "2026-07-20 04:22",
+      "status": "processed",
+      "added_at": "2026-07-27 20:22",
+      "result_uuid": "f6401fb4-de85-4382-8bda-4163791c69c5"
+    },
+    {
+      "id": "e0182399-fd23-4640-8882-11ab9f9e86a3",
+      "type": "replay",
+      "source": "",
+      "timestamp": "2026-07-20 13:12",
+      "status": "processed",
+      "added_at": "2026-07-27 20:22",
+      "result_uuid": "e0182399-fd23-4640-8882-11ab9f9e86a3"
+    },
+    {
+      "id": "ccce6b7b-b2db-4d65-a5db-c502647f032b",
+      "type": "replay",
+      "source": "",
+      "timestamp": "2026-07-20 22:03",
+      "status": "processed",
+      "added_at": "2026-07-27 20:22",
+      "result_uuid": "ccce6b7b-b2db-4d65-a5db-c502647f032b"
+    },
+    {
+      "id": "be248772-fcea-4584-9846-5eb6774b173b",
+      "type": "replay",
+      "source": "",
+      "timestamp": "2026-07-21 06:53",
+      "status": "processed",
+      "added_at": "2026-07-27 20:22",
+      "result_uuid": "be248772-fcea-4584-9846-5eb6774b173b"
+    },
+    {
+      "id": "bd48fe0d-7141-4664-b86c-d2f56ae50d1e",
+      "type": "replay",
+      "source": "",
+      "timestamp": "2026-07-21 15:44",
+      "status": "processed",
+      "added_at": "2026-07-27 20:22",
+      "result_uuid": "bd48fe0d-7141-4664-b86c-d2f56ae50d1e"
+    },
+    {
+      "id": "7d231399-ee2a-4e2c-b7e1-a12c591a5e2d",
+      "type": "replay",
+      "source": "",
+      "timestamp": "2026-07-22 00:34",
+      "status": "processed",
+      "added_at": "2026-07-27 20:22",
+      "result_uuid": "7d231399-ee2a-4e2c-b7e1-a12c591a5e2d"
+    },
+    {
+      "id": "71d65db2-54da-4770-b10f-514e96af0178",
+      "type": "replay",
+      "source": "",
+      "timestamp": "2026-07-22 09:25",
+      "status": "processed",
+      "added_at": "2026-07-27 20:22",
+      "result_uuid": "71d65db2-54da-4770-b10f-514e96af0178"
+    },
+    {
+      "id": "61b25357-88eb-4eb6-a781-1faf76eaa761",
+      "type": "replay",
+      "source": "",
+      "timestamp": "2026-07-22 18:15",
+      "status": "processed",
+      "added_at": "2026-07-27 20:22",
+      "result_uuid": "61b25357-88eb-4eb6-a781-1faf76eaa761"
+    },
+    {
+      "id": "557ef729-ea1f-4ea3-aca7-e01b878a18df",
+      "type": "replay",
+      "source": "",
+      "timestamp": "2026-07-23 03:06",
+      "status": "processed",
+      "added_at": "2026-07-27 20:22",
+      "result_uuid": "557ef729-ea1f-4ea3-aca7-e01b878a18df"
+    },
+    {
+      "id": "296487f3-6a08-4556-af15-3d7836d2a8ce",
+      "type": "replay",
+      "source": "",
+      "timestamp": "2026-07-23 11:56",
+      "status": "processed",
+      "added_at": "2026-07-27 20:22",
+      "result_uuid": "296487f3-6a08-4556-af15-3d7836d2a8ce"
+    },
+    {
+      "id": "15c2b110-fbc5-462e-85e2-d665d3869c5a",
+      "type": "replay",
+      "source": "",
+      "timestamp": "2026-07-23 20:47",
+      "status": "processed",
+      "added_at": "2026-07-27 20:22",
+      "result_uuid": "15c2b110-fbc5-462e-85e2-d665d3869c5a"
+    },
+    {
+      "id": "fd6a512c-a8c4-43b4-89a9-a134bcd35517",
+      "type": "replay",
+      "source": "",
+      "timestamp": "2026-07-24 05:37",
+      "status": "processed",
+      "added_at": "2026-07-27 20:22",
+      "result_uuid": "fd6a512c-a8c4-43b4-89a9-a134bcd35517"
+    },
+    {
+      "id": "f96a70c4-a9ba-44b0-8bb7-739c439bd6f8",
+      "type": "replay",
+      "source": "",
+      "timestamp": "2026-07-24 14:28",
+      "status": "processed",
+      "added_at": "2026-07-27 20:22",
+      "result_uuid": "f96a70c4-a9ba-44b0-8bb7-739c439bd6f8"
+    },
+    {
+      "id": "e34b20f4-6f86-414a-8b9c-6eccf5f20b3c",
+      "type": "replay",
+      "source": "",
+      "timestamp": "2026-07-24 23:18",
+      "status": "processed",
+      "added_at": "2026-07-27 20:22",
+      "result_uuid": "e34b20f4-6f86-414a-8b9c-6eccf5f20b3c"
+    },
+    {
+      "id": "e06c9275-7e8f-48a2-af7e-f8913d9768a5",
+      "type": "replay",
+      "source": "",
+      "timestamp": "2026-07-25 08:09",
+      "status": "processed",
+      "added_at": "2026-07-27 20:22",
+      "result_uuid": "e06c9275-7e8f-48a2-af7e-f8913d9768a5"
+    },
+    {
+      "id": "cb9e23ba-d6dd-4ce9-b5f1-7def3682ac49",
+      "type": "replay",
+      "source": "",
+      "timestamp": "2026-07-25 16:59",
+      "status": "processed",
+      "added_at": "2026-07-27 20:22",
+      "result_uuid": "cb9e23ba-d6dd-4ce9-b5f1-7def3682ac49"
+    },
+    {
+      "id": "bf0161c0-c0e0-4790-b590-dec2cf6716e2",
+      "type": "replay",
+      "source": "",
+      "timestamp": "2026-07-26 01:50",
+      "status": "processed",
+      "added_at": "2026-07-27 20:22",
+      "result_uuid": "bf0161c0-c0e0-4790-b590-dec2cf6716e2"
+    },
+    {
+      "id": "afeab6f6-2caf-4974-b529-e346d0a56b30",
+      "type": "replay",
+      "source": "",
+      "timestamp": "2026-07-26 10:40",
+      "status": "processed",
+      "added_at": "2026-07-27 20:22",
+      "result_uuid": "afeab6f6-2caf-4974-b529-e346d0a56b30"
+    },
+    {
+      "id": "98a18948-d64c-4aaa-9461-4f00558d9dc2",
+      "type": "replay",
+      "source": "",
+      "timestamp": "2026-07-26 19:31",
+      "status": "processed",
+      "added_at": "2026-07-27 20:22",
+      "result_uuid": "98a18948-d64c-4aaa-9461-4f00558d9dc2"
+    },
+    {
+      "id": "de5f7add-2ebb-4610-b69d-2722c5a5ea37",
+      "type": "replay",
+      "source": "",
+      "timestamp": "2026-07-27 04:22",
+      "status": "processed",
+      "added_at": "2026-07-27 20:22",
+      "result_uuid": "de5f7add-2ebb-4610-b69d-2722c5a5ea37"
+    },
+    {
+      "id": "text-a2f615cc4aea",
       "type": "text",
       "source": "手动输入",
-      "timestamp": "2026-07-13 23:01",
+      "timestamp": "2026-07-27T23:47",
       "status": "processed",
-      "added_at": "2026-07-21 14:07",
-      "text": "[2026-07-21][外交]外交部就菲律宾在仁爱礁蓄意挑衅提出严正交涉：外交部边海司负责人紧急召见菲驻华大使，明确指出仁爱礁是中国南沙群岛的一部分，对菲方袭击中国海警执法人员的行为提出严正交涉。（来源：新华社）"
+      "added_at": "2026-07-28 07:47",
+      "text": "测试文本 A"
     },
     {
-      "id": "text-c608f7318b5a",
+      "id": "text-94016a016a63",
       "type": "text",
       "source": "手动输入",
-      "timestamp": "2026-07-14 11:01",
+      "timestamp": "2026-07-27T23:47",
       "status": "processed",
-      "added_at": "2026-07-21 14:07",
-      "text": "[2026-07-21][国际]刚果（金）埃博拉确诊病例超2400例：刚果（金）卫生部发布最新疫情报告，该国本轮埃博拉疫情累计确诊病例已升至2423例，其中死亡967例，疫情防控形势严峻。（来源：新华社）"
+      "added_at": "2026-07-28 07:47",
+      "text": "测试文本 B"
     },
     {
-      "id": "text-9267fb2f40b3",
+      "id": "text-ef3ee869ada0",
       "type": "text",
       "source": "手动输入",
-      "timestamp": "2026-07-14 23:01",
+      "timestamp": "2026-07-27T23:47",
       "status": "processed",
-      "added_at": "2026-07-21 14:07",
-      "text": "[2026-07-21][经济]我国将安排220亿元支持老旧营运货车报废更新：交通运输部在国新办新闻发布会上表示，2026年继续实施老旧营运货车报废更新政策，并安排220亿元资金予以支持。（来源：新华社）"
+      "added_at": "2026-07-28 07:47",
+      "text": "测试文本 C"
     },
     {
-      "id": "text-7c3f0ac77086",
+      "id": "text-35cac6f522b8",
       "type": "text",
       "source": "手动输入",
-      "timestamp": "2026-07-15 11:01",
+      "timestamp": "2026-07-28T00:14",
       "status": "processed",
-      "added_at": "2026-07-21 14:07",
-      "text": "[2026-07-20][政务]李强主持召开国务院常务会议：会议听取2025年度中央预算执行和其他财政收支审计查出问题整改工作建议汇报，并研究建立地方财政补贴负面清单管理机制。（来源：新华社）"
+      "added_at": "2026-07-28 08:14",
+      "text": "测试文本A影响测试文本B"
     },
     {
-      "id": "text-a10b0ffd3e3c",
+      "id": "text-3f8fa4465666",
       "type": "text",
       "source": "手动输入",
-      "timestamp": "2026-07-15 23:01",
+      "timestamp": "2026-07-28T00:14",
       "status": "processed",
-      "added_at": "2026-07-21 14:07",
-      "text": "[2026-07-20][经济]上半年规模以上工业增加值同比增长5.4%：国务院新闻办公室举行新闻发布会介绍2026年上半年工业和信息化发展情况，数据显示我国工业经济持续恢复向好。（来源：新华社）"
+      "added_at": "2026-07-28 08:14",
+      "text": "测试文本C导致测试文本D"
     },
     {
-      "id": "text-67a1efc426f1",
+      "id": "text-6c8a340f05b4",
       "type": "text",
       "source": "手动输入",
-      "timestamp": "2026-07-16 11:01",
+      "timestamp": "2026-07-28T00:14",
       "status": "processed",
-      "added_at": "2026-07-21 14:07",
-      "text": "[2026-07-20][社会]重庆彭水山体崩塌孤石爆破作业首爆成功：现场救援指挥部确认，彭水山体崩塌孤石爆破作业首爆成功，后续救援工作已正式进入深度救援阶段。（来源：新华社）"
-    },
-    {
-      "id": "text-558a24e43bff",
-      "type": "text",
-      "source": "手动输入",
-      "timestamp": "2026-07-16 23:01",
-      "status": "processed",
-      "added_at": "2026-07-21 14:07",
-      "text": "[2026-07-20][贸易]我国允许非洲建交国符合要求的咖啡豆输华：海关总署发布公告，自2026年7月20日起，来自非洲53个建交国的咖啡豆在符合相关检疫要求的前提下，均可向中国出口。（来源：新华社）"
-    },
-    {
-      "id": "text-e5d74512a7b3",
-      "type": "text",
-      "source": "手动输入",
-      "timestamp": "2026-07-17 11:01",
-      "status": "processed",
-      "added_at": "2026-07-21 14:07",
-      "text": "[2026-07-20][外交]外交部介绍上合组织成员国外长会议安排：外交部发言人表示，上合组织成员国外长会议将于7月23日至24日举行，中方期待会议进一步推动各领域务实合作。（来源：新华社）"
-    },
-    {
-      "id": "text-0f961b424cb9",
-      "type": "text",
-      "source": "手动输入",
-      "timestamp": "2026-07-17 23:01",
-      "status": "processed",
-      "added_at": "2026-07-21 14:07",
-      "text": "[2026-07-17][科技]2026世界人工智能大会暨人工智能全球治理高级别会议在上海举行：国家主席习近平出席大会开幕式并发表主旨讲话，强调中国致力于推动人工智能向善普惠发展。（来源：新华社）"
-    },
-    {
-      "id": "text-ea5d4b29736a",
-      "type": "text",
-      "source": "手动输入",
-      "timestamp": "2026-07-18 11:01",
-      "status": "processed",
-      "added_at": "2026-07-21 14:07",
-      "text": "[2026-07-17][港澳]香港特区立法会通过《皇岗口岸港方口岸区条例草案》：香港特区政府对此表示欢迎，指出草案顺利通过是落实中央相关授权、推进跨境基础设施互联互通的重要一步。（来源：新华社）"
-    },
-    {
-      "id": "text-bf6e95e4ba82",
-      "type": "text",
-      "source": "手动输入",
-      "timestamp": "2026-07-18 23:01",
-      "status": "processed",
-      "added_at": "2026-07-21 14:07",
-      "text": "[2026-07-16][国际]国际社会积极评价中国推动人工智能向善普惠发展：新华社发布特稿指出，中国在人工智能全球治理方面发挥了独特且富有远见的引领作用，获得国际社会广泛认可。（来源：新华社）"
-    },
-    {
-      "id": "text-131737dba5b1",
-      "type": "text",
-      "source": "手动输入",
-      "timestamp": "2026-07-19 11:01",
-      "status": "processed",
-      "added_at": "2026-07-21 14:07",
-      "text": "[2026-07-16][文化]“宋韵千年礼行天下”宋代礼制文化展在河北博物院开展：展览设置“复兴礼乐”“礼俗交融”两大板块，汇集多家文博机构收藏的珍贵文物，系统展现宋代礼制文化。（来源：新华社）"
-    },
-    {
-      "id": "text-93e7e4534de8",
-      "type": "text",
-      "source": "手动输入",
-      "timestamp": "2026-07-19 23:01",
-      "status": "processed",
-      "added_at": "2026-07-21 14:07",
-      "text": "[2026-07-16][文化]山西五台山古建色彩密码受关注：新华社报道聚焦山西五台山景区显通寺等古建筑，深度解析黄色等缤纷色彩在古建顶部、台基及正殿中所象征的庄严与正统营造密码。（来源：新华社）"
-    },
-    {
-      "id": "text-7db41b1f6159",
-      "type": "text",
-      "source": "手动输入",
-      "timestamp": "2026-07-20 11:01",
-      "status": "processed",
-      "added_at": "2026-07-21 14:07",
-      "text": "[2026-07-17][体育]日本羽毛球公开赛国羽多人晋级八强：2026年日本羽毛球公开赛在东京进行各单项第二轮较量，石宇奇逆转过关，中国羽毛球队共有7名（对）选手顺利晋级八强。（来源：新华社）"
-    },
-    {
-      "id": "text-2e361bf6d1a6",
-      "type": "text",
-      "source": "手动输入",
-      "timestamp": "2026-07-20 23:01",
-      "status": "processed",
-      "added_at": "2026-07-21 14:07",
-      "text": "[2026-07-10][文旅]2026年全国暑期文化和旅游消费季正式启动：相关部门联合启动消费季活动，推出多项惠民促消费措施，旨在进一步激发暑期文旅市场活力，促进消费扩容提质。（来源：新华社）"
-    },
-    {
-      "id": "text-5ceeb52d8e9f",
-      "type": "text",
-      "source": "手动输入",
-      "timestamp": "2026-07-26T23:40",
-      "status": "processed",
-      "added_at": "2026-07-27 07:40",
-      "text": "外交部就菲律宾在仁爱礁蓄意挑衅提出严正交涉"
-    },
-    {
-      "id": "text-a788579a2238",
-      "type": "text",
-      "source": "手动输入",
-      "timestamp": "2026-07-27T00:24",
-      "status": "processed",
-      "added_at": "2026-07-27 08:24",
-      "text": "因为神创造天地，所以万物存在。由于人犯罪，因此需要救赎。这导致基督降生。"
-    },
-    {
-      "id": "text-f9021fc731d7",
-      "type": "text",
-      "source": "手动输入",
-      "timestamp": "2026-07-27T02:08",
-      "status": "processed",
-      "added_at": "2026-07-27 10:08",
-      "text": "测试数据集条目 - 经济政策分析 2026-07-27"
-    },
-    {
-      "id": "text-aa2c6deedfec",
-      "type": "text",
-      "source": "近年来我国经济政策在稳增长与防风险之间寻求动态平衡。货币政策方面，央行通过降准降息释放流动性，但通胀压力与汇率稳定构成约束。财政政策方面，新增专项债额度向基建倾",
-      "timestamp": "2026-07-27 10:14",
-      "status": "processed",
-      "added_at": "2026-07-27 10:14",
-      "text": "近年来我国经济政策在稳增长与防风险之间寻求动态平衡。货币政策方面，央行通过降准降息释放流动性，但通胀压力与汇率稳定构成约束。财政政策方面，新增专项债额度向基建倾斜，同时减税降费支持制造业。房地产领域因城施策的策略在一线与三四线城市产生分化效应。消费端复苏弱于预期，居民储蓄意愿上升。"
-    },
-    {
-      "id": "text-8dd46ff132b0",
-      "type": "text",
-      "source": "AI 大模型的 scaling law 表明模型性能随参数量、数据量、算力呈幂律提升。然而近期研究指出，过度参数化可能导致泛化能力下降，尤其在分布外样本上。因果",
-      "timestamp": "2026-07-27 10:15",
-      "status": "processed",
-      "added_at": "2026-07-27 10:15",
-      "text": "AI 大模型的 scaling law 表明模型性能随参数量、数据量、算力呈幂律提升。然而近期研究指出，过度参数化可能导致泛化能力下降，尤其在分布外样本上。因果推断框架被引入以区分相关性与因果性，DoWhy 库提供反事实分析能力。CCM 方法则从非线性动力学角度验证变量间的因果关系。"
-    },
-    {
-      "id": "text-184241e79259",
-      "type": "text",
-      "source": "因果推断与机器学习的融合是当前研究热点。DoWhy 框架通过 Pearl 的结构因果模型统一了潜在结果与图模型方法。CCM 收敛交叉映射从非线性动力学角度验证因",
-      "timestamp": "2026-07-27 10:18",
-      "status": "processed",
-      "added_at": "2026-07-27 10:18",
-      "text": "因果推断与机器学习的融合是当前研究热点。DoWhy 框架通过 Pearl 的结构因果模型统一了潜在结果与图模型方法。CCM 收敛交叉映射从非线性动力学角度验证因果性，特别适用于复杂生态系统。HAVOK 框架通过 Koopman 理论将非线性系统线性化，揭示隐藏的强迫项。这些方法的融合为因果发现提供了多视角验证。"
-    },
-    {
-      "id": "text-a9c29bd00616",
-      "type": "text",
-      "source": "手动输入",
-      "timestamp": "2026-07-27T03:45",
-      "status": "processed",
-      "added_at": "2026-07-27 11:45",
-      "text": "福音传播通过符号传递实现群体认同，这种认同强化了社会凝聚。"
+      "added_at": "2026-07-28 08:14",
+      "text": "测试文本E与测试文本F相关"
     }
   ]
 }

@@ -82,6 +82,32 @@ def _safe_float(value: Any, default: float = 0.0) -> float:
     return default
 
 
+def _safe_percent(value: Any, default: float = 0.0, lo: float = 0.0, hi: float = 100.0) -> float:
+    """安全转换为百分比 float, 并做值域守卫.
+
+    P0 fix (Round 24 §1): 旧任务 result.json 中 six_warriors.ccm.metrics.CCM_coverage
+    可能存储了错误的天文数字 (如 11023194846674.63, 疑似 id() 内存地址或浮点溢出).
+    本函数对超出 [lo, hi] 值域的值回退为 default, 避免污染下游 EDM 时间序列.
+
+    同时处理:
+      - 百分比字符串 '12.2%' → 12.2
+      - 小数 0.122 → 12.2 (若 lo=0, hi=100 且 value<1.0, 视为比例转百分比)
+      - None/非数值 → default
+    """
+    if value is None:
+        return default
+    v = _safe_float(value, default=None)
+    if v is None:
+        return default
+    # 若值域为 [0, 100] 且原始值 < 1.0, 视为比例转百分比
+    if lo == 0.0 and hi == 100.0 and 0.0 < v < 1.0:
+        v = v * 100.0
+    # 值域守卫: 超出范围的值回退
+    if v < lo or v > hi:
+        return default
+    return v
+
+
 def _safe_int(value: Any, default: int = 0) -> int:
     """安全转换为 int"""
     if value is None:
@@ -168,6 +194,12 @@ def extract_meta_scm_params(result_json_path: Path) -> Dict[str, Any]:
         else:
             params[col_name] = raw
 
+    # P0 fix (Round 24 §1): ccm_coverage_pct 值域守卫
+    # 旧任务 result.json 中 CCM_coverage 可能存储了天文数字 (如 1.1e13),
+    # 疑似 id() 内存地址或浮点溢出. 强制限制到 [0, 100] 值域, 超出回退 0.0.
+    if "ccm_coverage_pct" in params:
+        params["ccm_coverage_pct"] = _safe_percent(params["ccm_coverage_pct"], default=0.0, lo=0.0, hi=100.0)
+
     # ── 阶段 2：计算列（json_path 为 None 的字段） ──
 
     # ci_width: CI 上界 - 下界（P1-g：统一默认值 0.0，不再返回 None）
@@ -184,8 +216,12 @@ def extract_meta_scm_params(result_json_path: Path) -> Dict[str, Any]:
         params["refuted_count"] = sum(
             1 for r in refutations if isinstance(r, dict) and r.get("refuted", False)
         )
+        # P1 修缮 (Round 23 §审计): refutations_attempted 记录尝试数, 区分
+        # LIGHT (0/0 未尝试) 与 DEEP/SUPER (0/3 全通过) 的语义差异
+        params["refutations_attempted"] = len(refutations)
     else:
         params["refuted_count"] = 0
+        params["refutations_attempted"] = 0
 
     # concept_count: 概念节点数
     concepts = data.get("concepts", [])
@@ -194,6 +230,16 @@ def extract_meta_scm_params(result_json_path: Path) -> Dict[str, Any]:
     # ccm_verdict: CCM 判定文本
     ccm_verdict = _deep_get(data, "six_warriors.ccm.verdict", "N/A")
     params["ccm_verdict"] = ccm_verdict if ccm_verdict else "N/A"
+
+    # P1 修缮 (Round 23 §审计): ccm_algorithm_run 标注是否调用了真实 ccm_with_convergence.
+    # six_warriors.py 的 _deploy_ccm 当前仅做启发式覆盖率统计, 从未调用真实 CCM 算法.
+    # verdict 语义:
+    #   VERIFIABLE → 真实 CCM 已运行并验证 (当前代码中不会出现, 但保留为未来扩展)
+    #   HEURISTIC_FALLBACK → 启发式回退 (非真实 CCM)
+    #   ELIGIBLE_BUT_NOT_RUN → 符合条件但未运行真实 CCM
+    #   NARRATIVE_TEXT → 不符合条件 (概念频率 < 3)
+    #   N/A → CCM 战士未部署 (LIGHT 模式跳过 six_warriors)
+    params["ccm_algorithm_run"] = 1 if params["ccm_verdict"] == "VERIFIABLE" else 0
 
     # HAVOK 状态 + 线性占比（P1-g：优先从结构化字段提取，回退到文本正则）
     havok = _deep_get(data, "six_warriors.havok", {})

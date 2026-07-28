@@ -253,14 +253,30 @@ def main():
 
     n_nonzero = int((adj_matrix > 0).sum())
     max_dnl = float(adj_matrix.max())
-    log(f"  Adjacency: {T}x{T}, {n_nonzero} non-zero edges, max ΔNLL={max_dnl:.3f}")
+    # ALG-07 修复: max_delta_nll 归一化
+    # 原始 ΔNLL 是绝对值, 受 token 数和文本长度影响, 不同模型/文本下数值不可比。
+    # 归一化为 max_dnl / total_tokens, 表示"每 token 平均最强因果信号强度"。
+    # 保留原始 max_dnl 字段以维持向后兼容, 新增 max_delta_nll_normalized 字段。
+    total_tokens = int(T) if T > 0 else 1
+    max_dnl_normalized = max_dnl / total_tokens if total_tokens > 0 else 0.0
+    log(f"  Adjacency: {T}x{T}, {n_nonzero} non-zero edges, max ΔNLL={max_dnl:.3f} (normalized={max_dnl_normalized:.6f}/token)")
 
     # 保存 TRACE 缓存，供 run_cli.py real 复用并确保六战士诊断使用同一数据
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
     np.save(str(CACHE_DIR / "real_adj.npy"), adj_matrix)
     (CACHE_DIR / "real_tokens.json").write_text(
         json.dumps(all_tokens, ensure_ascii=False), encoding='utf-8')
-    log(f"  TRACE cache saved: {CACHE_DIR}/real_adj.npy, real_tokens.json")
+    # MOD-01: 保存缓存元数据（含文本 hash），供 run_cli.py 检测缓存失效
+    cache_meta = {
+        "text_hash": TEXT_HASH,
+        "text_file": str(TEXT_FILE.name),
+        "model_dir": str(MODEL_DIR.name),
+        "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S"),
+        "n_tokens": int(T),
+    }
+    (CACHE_DIR / "real_cache_meta.json").write_text(
+        json.dumps(cache_meta, ensure_ascii=False, indent=2), encoding='utf-8')
+    log(f"  TRACE cache saved: {CACHE_DIR}/real_adj.npy, real_tokens.json (hash={TEXT_HASH})")
 
     # ═══════════════════════════════════════════════════════════════
     # Step 2: DoWhy Bridge
@@ -348,6 +364,9 @@ def main():
                 for e in bridge.significant_edges
             ],
             "max_delta_nll": float(max_dnl),
+            # ALG-07 修复: 新增归一化字段, 供跨模型/文本比较
+            "max_delta_nll_normalized": float(max_dnl_normalized),
+            "total_tokens": int(T),
             "auditor": {
                 "verdict": str(report.verdict),
                 "n_fail": int(report.n_fail),

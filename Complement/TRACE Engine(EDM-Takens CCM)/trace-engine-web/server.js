@@ -4,7 +4,7 @@
  * 仅保留 app 创建、中间件挂载、路由挂载、监听、gracefulShutdown。
  * 实际逻辑分布在 lib/、services/、routes/、middleware/ 模块中。
  *
- * 端点（20 routes，全部保持向后兼容）:
+ * 端点（26 routes，全部保持向后兼容）:
  *   POST /api/analyze-text         分析纯文本 (JSON: {text, mode})
  *   POST /api/analyze-file         上传文本文件分析 (multipart: file, mode)
  *   GET  /api/analyze-stream?id=   SSE 实时流（阶段+日志+结果）
@@ -54,6 +54,7 @@ const {
   validateSkillDir,
   checkPythonEnv,
   loadBridgeParamSchema,
+  loadPresets,
   startCacheTtlSweeper,
 } = utils;
 
@@ -83,6 +84,12 @@ const PROBED_LLAMA_MODELS = llamaWorkerSvc.probeLlamaModels();
 // 加载桥接参数 Schema（debt-16：优先 build_bridge_schema.py，回退 schema/bridge_schema.json）
 const BRIDGE_PARAM_SCHEMA = loadBridgeParamSchema(null, PROBED_LLAMA_MODELS);
 const SUPER_BRIDGE_PARAM_SCHEMA = loadBridgeParamSchema('llama', PROBED_LLAMA_MODELS);
+
+// SYS-02: 启动时预加载并缓存 presets，避免每次 /api/config、/api/presets、
+// /api/schema 请求都 spawnSync 子进程（Python 冷启动 + 15s 超时开销）。
+// presets.yaml 是静态文件，进程生命周期内无需刷新。
+const PRESETS_CACHE = loadPresets();
+logToFile('info', `presets 启动缓存完成 (${Object.keys(PRESETS_CACHE).length} 套预设)`);
 
 // Skill 目录校验
 const skillValidation = validateSkillDir();

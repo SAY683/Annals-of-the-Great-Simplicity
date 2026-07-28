@@ -999,11 +999,15 @@ async function refreshChart() {
   if (!canvas) return;
   // 高 DPI 渲染 — 消除模糊
   const dpr = window.devicePixelRatio || 1;
-  const rect = canvas.getBoundingClientRect();
-  canvas.width = rect.width * dpr;
-  canvas.height = rect.height * dpr;
-  canvas.style.width = rect.width + 'px';
-  canvas.style.height = rect.height + 'px';
+  let rect = canvas.getBoundingClientRect();
+  // 某些缩放比例下 canvas 自身 rect 高度可能为 0, 回退到父容器
+  if (!rect || rect.height < 1) {
+    rect = (canvas.parentElement || canvas).getBoundingClientRect();
+  }
+  canvas.width = Math.max(1, rect.width) * dpr;
+  canvas.height = Math.max(1, rect.height) * dpr;
+  canvas.style.width = '100%';
+  canvas.style.height = '100%';
   const ctx = canvas.getContext('2d');
   ctx.scale(dpr, dpr);
   const W = rect.width, H = rect.height;
@@ -1100,9 +1104,25 @@ async function refreshChart() {
   } catch (e) { console.error('Chart error:', e); }
 }
 
+// P1 fix (Round 26 §4): 趋势图响应式重绘 — 窗口/容器缩放时自动适配
+let chartResizeObserver = null;
+function observeChartResize() {
+  const canvas = document.getElementById('trendChart');
+  if (!canvas) return;
+  if (chartResizeObserver) chartResizeObserver.disconnect();
+  chartResizeObserver = new ResizeObserver(() => {
+    window.requestAnimationFrame(refreshChart);
+  });
+  // 观察父容器而非 canvas 自身, 避免某些缩放比例下 canvas 高度为 0
+  chartResizeObserver.observe(canvas.parentElement || canvas);
+}
+window.addEventListener('resize', () => {
+  window.requestAnimationFrame(refreshChart);
+});
 document.getElementById('btnRefreshChart').addEventListener('click', refreshChart);
+observeChartResize();
 
-// ── EDM 触发 (带反馈检测) ────────────────────────────────
+// ── EDM 触发 (带反馈检测) ─────────────────────────────────
 
 // 元审计 P0 修缮: 反馈环真正兑现
 // 将检测到非线性突变的时间点文本加入数据集，并标记为 DEEP 模式待再分析
@@ -1357,32 +1377,24 @@ if (btnClearTerm) btnClearTerm.addEventListener('click', tClear);
 const btnRefreshTable = document.getElementById('btnRefreshTable');
 if (btnRefreshTable) btnRefreshTable.addEventListener('click', refreshTable);
 
-// P2 (§20.12): 一键导出人话版 Markdown 报告 (轨迹数据 → 中文解读 .md)
+// P2 (§20.12): 一键生成人话版 Markdown 报告 (轨迹数据 → 中文解读 .md)
+// 报告写入项目 reports/ 目录，并在新标签页中打开供查阅（非浏览器下载）
 const btnExportMd = document.getElementById('btnExportMd');
 if (btnExportMd) {
   btnExportMd.addEventListener('click', async () => {
     try {
       t('◉ 正在生成人话版 Markdown 报告...', 'info');
       btnExportMd.disabled = true;
-      const originalText = btnExportMd.textContent;
       btnExportMd.textContent = '⏳ 生成中...';
       const res = await fetch('/api/trajectory/export/md');
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      // 从 Content-Disposition 提取文件名
-      const cd = res.headers.get('Content-Disposition') || '';
-      const m = cd.match(/filename="([^"]+)"/);
-      a.download = m ? m[1] : `trajectory_report_${Date.now()}.md`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      t('✓ 人话版报告已下载', 'done');
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || '生成失败');
+      t(`✓ 人话版报告已生成: ${data.path}`, 'done');
+      // 在新标签页打开 HTML 版报告；如不可用则回退 Markdown 版
+      window.open(data.html_url || data.report_url || '/api/trajectory/report', '_blank');
     } catch (e) {
-      t(`✖ 导出失败: ${e.message}`, 'error');
+      t(`✖ 生成失败: ${e.message}`, 'error');
     } finally {
       btnExportMd.disabled = false;
       btnExportMd.textContent = '📝人话版';

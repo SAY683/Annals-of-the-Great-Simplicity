@@ -34,9 +34,10 @@ def _lorenz_x(n=2000, dt=0.01, sigma=10, rho=28, beta=8/3, seed=42):
     x[0] = 1.0
     y, z = 1.0, 1.0
     for i in range(1, n):
-        dx = sigma * (y - x)
-        dy = x * (rho - z) - y
-        dz = x * y - beta * z
+        # 修复: 使用标量 x[i-1] 而非整个数组 x, 避免 ValueError
+        dx = sigma * (y - x[i-1])
+        dy = x[i-1] * (rho - z) - y
+        dz = x[i-1] * y - beta * z
         x[i] = x[i-1] + dx * dt
         y += dy * dt
         z += dz * dt

@@ -187,6 +187,62 @@ def _deploy_trace(adj_matrix, token_list, bridge=None) -> WarriorCard:
 # 🔵 CCM — 流形力场 (自包含实现)
 # ══════════════════════════════════════════════════════════════════════
 
+def _build_ccm_timeseries(adj_matrix, token_list, concept_names=None, window=20):
+    """ALG-02: 从 token 序列构建 CCM 时间序列 DataFrame
+
+    选取邻接矩阵中最强因果边, 用滑动窗口计数构建 cause/effect 时间序列,
+    供 ccm_with_convergence 真算法使用。
+
+    Returns: (df, cause_name, effect_name) 或 (None, cause_name, effect_name)
+    """
+    try:
+        import pandas as pd
+    except ImportError:
+        return None, None, None
+
+    adj = np.asarray(adj_matrix)
+    if adj.ndim != 2 or adj.shape[0] != adj.shape[1] or adj.shape[0] == 0:
+        return None, None, None
+
+    # 概念名对齐
+    names = concept_names if concept_names is not None else token_list
+    if names is None or len(names) != adj.shape[0]:
+        if token_list and len(token_list) >= adj.shape[0]:
+            names = token_list[:adj.shape[0]]
+        else:
+            return None, None, None
+
+    # 找最强因果边 (上三角, 避免自环)
+    max_val, max_i, max_j = 0.0, -1, -1
+    for i in range(len(names)):
+        for j in range(i + 1, len(names)):
+            v = float(adj[i, j])
+            if v > max_val:
+                max_val, max_i, max_j = v, i, j
+    if max_i < 0:
+        return None, None, None
+
+    cause_name, effect_name = names[max_i], names[max_j]
+
+    # 滑动窗口计数 → 时间序列
+    n_windows = max(0, len(token_list) - window + 1)
+    if n_windows < 30:
+        return None, cause_name, effect_name  # 数据不足
+
+    cause_counts = []
+    effect_counts = []
+    for w in range(n_windows):
+        wt = token_list[w:w + window]
+        cause_counts.append(wt.count(cause_name))
+        effect_counts.append(wt.count(effect_name))
+
+    df = pd.DataFrame({
+        cause_name: cause_counts,
+        effect_name: effect_counts,
+    })
+    return df, cause_name, effect_name
+
+
 def _deploy_ccm(adj_matrix, token_list, concept_names=None) -> WarriorCard:
     card = WarriorCard("CCM", "流形力场", "测谎仪", color="🔵", tier="B")
 
@@ -226,22 +282,73 @@ def _deploy_ccm(adj_matrix, token_list, concept_names=None) -> WarriorCard:
         # 原实现仅依据 _CCM_AVAILABLE 就标 VERIFIABLE，但本函数始终未调用真算法
         # ——仅做覆盖率统计。这会误导用户认为已执行交叉映射验证。
         # 修复: 区分三层语义
-        #   ELIGIBLE_BUT_NOT_RUN  — 满足 CCM 数据条件，但未调用真算法（本函数常态）
+        #   ELIGIBLE_BUT_NOT_RUN  — 满足 CCM 数据条件，但真算法调用失败或数据不足
         #   HEURISTIC_FALLBACK    — 真算法不可用，仅启发式统计
-        #   VERIFIABLE            — 仅当本函数实际调用 ccm_with_convergence 成功后设置
-        #                       （当前实现未调用，故永不标 VERIFIABLE；如需真验证，
-        #                        应在 _deploy_ccm 中调用 ccm_with_convergence 并捕获结果）
+        #   VERIFIABLE            — 本函数实际调用 ccm_with_convergence 成功且收敛
         card.status = "deployed" if _CCM_AVAILABLE else "fallback"
         card.findings = [
             f"CCM 覆盖 {ccm_ratio:.1%} — 满足交叉映射数据条件",
         ]
         if _CCM_AVAILABLE:
-            # 真算法可导入，但本函数未实际调用 → 明确标注
-            card.verdict = "ELIGIBLE_BUT_NOT_RUN"
-            card.findings.append(
-                "ℹ 真算法可导入但本诊断未实际运行 ccm_with_convergence；"
-                "如需真实验证，应在 counterfactual_bridge 中显式调用并捕获 ρ/rho 曲线"
-            )
+            # ALG-02 修复: 实际调用 ccm_with_convergence 真算法
+            try:
+                df_ccm, cause_name, effect_name = _build_ccm_timeseries(
+                    adj_matrix, token_list, concept_names
+                )
+                if df_ccm is not None and len(df_ccm) >= 30 and cause_name and effect_name:
+                    E = min(5, max(2, len(df_ccm) // 10))
+                    ccm_result = ccm_with_convergence(
+                        df_ccm, cause_name, effect_name, E
+                    )
+                    # ALG-02 修复 (审视报告修正): 返回 dict 顶层无 'converging',
+                    # 收敛判定在 forward/reverse 子字典的 'is_converging' 字段
+                    fwd_conv = (isinstance(ccm_result, dict)
+                                and isinstance(ccm_result.get('forward'), dict)
+                                and ccm_result['forward'].get('is_converging', False))
+                    rev_conv = (isinstance(ccm_result, dict)
+                                and isinstance(ccm_result.get('reverse'), dict)
+                                and ccm_result['reverse'].get('is_converging', False))
+                    if fwd_conv or rev_conv:
+                        card.verdict = "VERIFIABLE"
+                        # 优先取收敛方向的 rho
+                        if fwd_conv:
+                            rho_val = ccm_result['forward'].get('final_rho', 'N/A')
+                            _dir = "forward"
+                        else:
+                            rho_val = ccm_result['reverse'].get('final_rho', 'N/A')
+                            _dir = "reverse"
+                        card.findings.append(
+                            f"✓ ccm_with_convergence 成功收敛: "
+                            f"{cause_name}→{effect_name} ({_dir}), ρ={rho_val}, E={E}"
+                        )
+                        card.metrics["ccm_cause"] = cause_name
+                        card.metrics["ccm_effect"] = effect_name
+                        card.metrics["ccm_rho"] = str(rho_val)
+                        card.metrics["ccm_E"] = E
+                        card.metrics["ccm_direction"] = _dir
+                    else:
+                        card.verdict = "ELIGIBLE_BUT_NOT_RUN"
+                        card.findings.append(
+                            f"ℹ ccm_with_convergence 已运行但未收敛: "
+                            f"{cause_name}→{effect_name} (结果: {ccm_result})"
+                        )
+                else:
+                    card.verdict = "ELIGIBLE_BUT_NOT_RUN"
+                    _reason = "无有效时间序列" if df_ccm is None else f"窗口数不足({len(df_ccm) if df_ccm is not None else 0}<30)"
+                    if cause_name and effect_name:
+                        card.findings.append(
+                            f"ℹ 最强边 {cause_name}→{effect_name} 数据不足({_reason}), "
+                            f"未运行 ccm_with_convergence"
+                        )
+                    else:
+                        card.findings.append(
+                            "ℹ 未找到有效因果边, 未运行 ccm_with_convergence"
+                        )
+            except Exception as ccm_err:
+                card.verdict = "ELIGIBLE_BUT_NOT_RUN"
+                card.findings.append(
+                    f"ℹ ccm_with_convergence 调用异常: {str(ccm_err)[:120]}"
+                )
         else:
             card.verdict = "HEURISTIC_FALLBACK"
             card.findings.append("⚠ 启发式回退: edm-takens 真算法不可用，仅做覆盖率统计")

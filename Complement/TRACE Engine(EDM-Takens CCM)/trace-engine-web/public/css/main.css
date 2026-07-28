@@ -126,6 +126,10 @@ main {
 /* 结果面板内部：表格和参数网格利用全宽 */
 .result-fullwidth .panel-body {
   width: 100%;
+  /* P1 fix (Round 22 §2b): result_summary.json 面板无固定高度, overflow-y: auto
+     会在触控屏上捕获滑动却不滚动, 导致用户无法上下滑动页面. 显式声明
+     touch-action: pan-y 让垂直滑动穿透到外层页面滚动. */
+  touch-action: pan-y;
 }
 
 .result-fullwidth table {
@@ -1261,6 +1265,13 @@ details > div { padding: 0.75rem; }
   border-color: var(--fail);
   color: var(--fail);
 }
+/* 2D/3D 拓扑切换按钮：避免继承 btn-mini 的红色 hover */
+.topo-toggle-btn:hover,
+#mainTopoToggle:hover {
+  background: rgba(102, 252, 241, 0.08) !important;
+  border-color: var(--accent) !important;
+  color: var(--accent) !important;
+}
 /* 代码 / 文本块：等宽字体 + 横向滚动 */
 .code-block {
   margin: 0;
@@ -1294,11 +1305,16 @@ details > div { padding: 0.75rem; }
 }
 /* SECTOR-B2 历史项可点击卡片：hover 高亮比普通 terminal-line 更显著，提示可点击查看详情 */
 /* P1 修缮：桌面端补 flex-wrap 与子项换行规则，避免 job-meta 被挤成竖向长条 */
+/* P1 fix (Round 26 §6): 历史任务条目极度紧凑化, 消除条目间大段空隙 */
 .terminal-line.job-card {
   border-left-color: var(--accent-dim);
   transition: background 0.15s, border-left-color 0.15s, transform 0.1s;
-  flex-wrap: wrap;          /* 允许子项换行（与移动端 768px 断点行为一致） */
-  align-items: center;      /* 换行后 baseline 对齐效果差，改用 center */
+  flex-wrap: wrap;
+  align-items: center;
+  padding: 0.15rem 0.3rem !important;
+  margin-bottom: 0.05rem !important;
+  line-height: 1.25;
+  min-height: 22px;
 }
 .terminal-line.job-card:hover {
   background: rgba(102, 252, 241, 0.08);
@@ -1307,15 +1323,51 @@ details > div { padding: 0.75rem; }
 }
 /* job-meta：保证时间戳/ID/状态/耗时横排显示不被挤兑成竖向 */
 .terminal-line.job-card .job-meta {
-  flex: 1 1 auto;           /* 优先占可用空间，允许收缩 */
-  min-width: 180px;         /* 最小可读宽度，避免逐字符换行 */
-  white-space: nowrap;      /* 时间戳/ID/状态不换行 */
+  flex: 1 1 auto;
+  min-width: 180px;
+  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  font-size: clamp(0.68rem, 0.9vw, 0.76rem);
 }
 .terminal-line.job-card .job-preview {
-  flex-basis: 100%;         /* 关键：强制 preview 独占一行，触发换行 */
+  flex-basis: 100%;
   border-top: 1px dashed var(--border);
-  padding-top: 0.2rem;
-  margin-top: 0.25rem;
+  padding-top: 0.15rem;
+  margin-top: 0.15rem;
+  line-height: 1.35;
+  font-size: clamp(0.62rem, 0.85vw, 0.72rem);
+}
+/* 动作链接更紧凑 */
+.terminal-line.job-card .job-actions a {
+  padding: 0.05rem 0.2rem;
+  font-size: clamp(0.58rem, 0.78vw, 0.68rem);
+}
+
+/* ── 任务历史面板进一步紧凑化 (Round 27) ───────────────────────────── */
+#jobHistoryTerminal .terminal-line {
+  padding: 0.12rem 0.35rem;
+  margin-bottom: 0.04rem;
+  line-height: 1.25;
+}
+#jobHistoryTerminal .terminal-line.job-card {
+  padding: 0.1rem 0.25rem !important;
+  margin-bottom: 0.04rem !important;
+  line-height: 1.2;
+  min-height: 20px;
+}
+#jobHistoryTerminal .batch-toolbar {
+  min-height: 22px;
+  padding: 2px 6px !important;
+  margin-bottom: 2px !important;
+  gap: 6px !important;
+}
+#jobHistoryTerminal .terminal-line.job-card .job-meta {
+  font-size: clamp(0.64rem, 0.85vw, 0.74rem);
+}
+#jobHistoryTerminal .terminal-line.job-card .job-preview {
+  margin-top: 0.05rem;
+  padding-top: 0.1rem;
+  line-height: 1.25;
+  font-size: clamp(0.6rem, 0.82vw, 0.7rem);
 }

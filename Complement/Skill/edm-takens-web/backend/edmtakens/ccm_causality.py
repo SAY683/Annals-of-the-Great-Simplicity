@@ -182,23 +182,35 @@ def ccm_causality_test(df, cause_var, effect_var, E, lib_sizes=None,
             # pipeline.py's printed "converging=True/False"), and without
             # this floor THOSE call sites could be. See
             # docs/CHANGELOG.md (Round 11) for the full repro.
-            if len(rhos) >= 3:
-                total_rise = float(rhos[-1] - rhos[0])
-                spear_rho, spear_p = spearmanr(lib_sizes_arr, rhos)
-                final_rho = float(rhos[-1])
+            # P0-3 修缮: 小 lib_size 时 CCM 可能返回 NaN（阴影流形点不足）。
+            # 原实现直接用 rhos[-1]-rhos[0]，若 rhos[0]=NaN 则 total_rise=NaN，
+            # spearmanr 传入含 NaN 数组也返回 (NaN, NaN)，导致 is_converging 恒为 False。
+            # 修复：先过滤 NaN，用有效子集计算收敛指标。
+            valid_mask = ~np.isnan(rhos)
+            n_valid = int(valid_mask.sum())
+            if n_valid >= 3:
+                rhos_valid = rhos[valid_mask]
+                lib_sizes_valid = lib_sizes_arr[valid_mask]
+                total_rise = float(rhos_valid[-1] - rhos_valid[0])
+                spear_rho, spear_p = spearmanr(lib_sizes_valid, rhos_valid)
+                final_rho = float(rhos_valid[-1])
                 is_converging = (total_rise > rise_threshold
                                   and spear_rho > spearman_threshold
                                   and spear_p < spearman_p_threshold
                                   and abs(final_rho) > strong_direction_rho)
-            else:
-                # P0-2 修缮：len(rhos)<3 时 Spearman 不可计算是合理的，
-                # 但 total_rise 不应静默置零——若 rhos 有 2 个点且明显上升，
-                # 把 total_rise=0.0 会掩盖实际趋势。
-                # 现在：len>=2 时仍计算 total_rise，仅 Spearman 标记为不可用
-                total_rise = float(rhos[-1] - rhos[0]) if len(rhos) >= 2 else 0.0
+            elif n_valid >= 2:
+                # P0-2 修缮：有效点 2 个时 Spearman 不可计算，
+                # 但 total_rise 仍应反映实际趋势，不应静默置零。
+                rhos_valid = rhos[valid_mask]
+                total_rise = float(rhos_valid[-1] - rhos_valid[0])
                 spear_rho, spear_p = 0.0, 1.0
-                final_rho = float(rhos[-1]) if len(rhos) > 0 else 0.0
+                final_rho = float(rhos_valid[-1])
                 is_converging = False  # Spearman 不可用时无法判定收敛
+            else:
+                total_rise = 0.0
+                spear_rho, spear_p = 0.0, 1.0
+                final_rho = float(rhos[valid_mask][0]) if n_valid == 1 else 0.0
+                is_converging = False
 
             results[direction_idx] = {
                 'final_rho': final_rho,

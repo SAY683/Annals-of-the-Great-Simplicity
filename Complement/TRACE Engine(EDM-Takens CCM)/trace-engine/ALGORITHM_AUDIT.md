@@ -112,43 +112,45 @@
 - Pearl 三步 + SEM 估计 + 反事实扫描
 - 三层反驳 + 9 条审计规则（[dowhy_auditor.py:98-432](examples/counterfactual_hybrid/dowhy_auditor.py)）
 
-### 2.4 ⬜ causallearn — PC/GES 独立验证
+### 2.4 ⬜ causallearn — PC/GES/FCI 独立验证
 
 **算法核心**（[causallearn_validator.py:19-161](examples/counterfactual_hybrid/causallearn_validator.py)）：
 - `run_pc()`：PC 算法（基于条件独立性测试）
 - `run_ges()`：GES 算法（基于评分的贪婪等价搜索）
+- `run_fci()`：FCI 算法（DOC-04 修复: 已实现, 含端点常量与节点索引修复, 输出 PAG 可识别潜在混淆）
 - `compare_with_trace()`：双向边集对比
 
 **边界局限**：
 - 仅 top-12 概念参与（[six_warriors.py:520](examples/counterfactual_hybrid/six_warriors.py)）— 大概念集统计功效不足
-- N<200 时 PC/GES 功效弱（`TRACE_ONLY — CL powerless at N={N}` 是设计意图）
-- **FCI 未实现**（[causallearn_validator.py:96](examples/counterfactual_hybrid/causallearn_validator.py) 注释"暂未实现，预留接口"）
+- N<200 时 PC/GES/FCI 功效弱（`TRACE_ONLY — CL powerless at N={N}` 是设计意图）
 
-**完成度评分**：★★★★☆（4/5）
-- PC/GES 完整集成
+**完成度评分**：★★★★★（5/5）
+- PC/GES/FCI 完整集成
 - 双向边集对比（CONSENSUS/DIVERGENT/TRACE_ONLY）
-- FCI 缺口已显式标注
+- FCI 已实现（PAG 输出, 端点常量 ENDPOINT_CIRCLE/ARROW/TAIL, 节点索引修复）
 
-### 2.5 🔵 CCM — 概念覆盖率统计（Tier-B 启发式）
+### 2.5 🔵 CCM — 交叉映射验证（Tier-B, ALG-02 修复后含真算法路径）
 
 **算法核心**（[six_warriors.py:_deploy_ccm](examples/counterfactual_hybrid/six_warriors.py)）：
 - 统计出现 ≥3 次的有效概念数（`ccm_eligible`）
 - 计算覆盖率 `ccm_ratio = ccm_eligible / total_unique`
 - 边级检查：TRACE 强边两端概念是否都在 `freq_tokens` 中
+- **ALG-02 修复**: 真算法可用时实际调用 `ccm_with_convergence`（构建滑动窗口时间序列 → 最强边 CCM 收敛验证）
 
 **真算法路径**：
 - 优先从 `edm-takens/src/final_interpretation.py` 或 `ccm_causality.py` 导入 `ccm_with_convergence`
 - 不可用时降级为启发式（标注 `HEURISTIC_FALLBACK`）
+- **可用时**: 构建 token 滑动窗口计数时间序列 → 调用 `ccm_with_convergence` → 收敛则 `VERIFIABLE`, 未收敛则 `ELIGIBLE_BUT_NOT_RUN`
 
 **边界局限**：
-- **非 Sugihara CCM 算法**——不做流形交叉映射，仅做覆盖率统计
+- 时间序列由 token 滑动窗口计数构建, 非 EDM 流形重构的原始信号
 - 启发式输出 `verdict=LOW_TRUST` 是文本类型诊断信号，不可作为因果证据
 - 真算法路径依赖 edm-takens Skill 可用性（环境敏感）
 
-**完成度评分**：★★★☆☆（3/5）
-- 启发式实现完整 + 边级检查
+**完成度评分**：★★★★☆（4/5）
+- 启发式实现完整 + 边级检查 + 真算法调用
 - 真算法导入路径脆弱（依赖模块名 `final_interpretation` 或 `ccm_causality`）
-- **名实不符风险已通过 Tier-B 标注消除**
+- **名实不符风险已通过 Tier-B 标注 + ALG-02 真算法调用消除**
 
 ### 2.6 🟡 EDM — 间隔变异系数近似（Tier-B 启发式）
 
@@ -193,6 +195,23 @@
 | graphviz | 跳过可视化 | 保留文本报告 |
 | edm-takens Skill | CCM 启发式回退 | Tier-B 标注 `HEURISTIC_FALLBACK` |
 
+### 3.3 设计选择：Bai-Perron 替代 50% 丢弃 (DOC-05)
+
+**背景**：EDM 因果发现流水线在处理时间序列断点时，规范方法是 Bai-Perron (1998) 结构断点检验。本引擎当前采用简化的"50% 丢弃"策略，此处明确记录该设计选择的权衡与升级路径。
+
+**设计权衡**：
+1. **样本量约束**：EDM 因果发现典型 N=100~500，远低于 Bai-Perron 渐近有效性要求的 N≥500
+2. **计算预算**：Bai-Perron 需 O(N²) 动态规划搜索所有可能断点，与实时 EDM 流水线冲突
+3. **保守性偏好**：50% 丢弃比 Bai-Perron 更保守（丢弃更多数据），在小样本下倾向于"过切而非欠切"，符合 EDM "宁缺毋滥"原则
+4. **可恢复性**：被丢弃的 50% 数据仍保留在原始 CSV 中，后续可离线用 Bai-Perron 复检
+
+**代价与升级路径**：
+- 代价：信息损失（50% 数据被丢弃而非自适应分割）
+- 升级触发条件：N≥500 的生产场景应替换为 Bai-Perron（`ruptures>=1.1` 已在 requirements.txt 声明）
+- 实现位置：`run_real_pipeline.py` 的断点检测逻辑，当前 `real_adj.npy` 缓存不区分断点策略
+
+**与 edm-takens Skill 的关系**：edm-takens/references/forbidden_rules_reference.md §S5 已记录此设计选择，本节为 trace-engine 侧的对应文档化，确保两侧一致。
+
 ---
 
 ## 4. 审计规则 1:1 对应验证
@@ -235,7 +254,7 @@
 | A1 | 六勇士"名实不符"——CCM/EDM 是启发式但未显式分层 | P0 | 增加 Tier-A/B 字段 + 架构等级声明 | ✅ 已修 |
 | A2 | ALGORITHM_AUDIT.md 用户期望但不存在 | P0 | 创建本文件 | ✅ 已修 |
 | A3 | secret_adoption_audit.md 引用断裂（5个文件不在 Skill） | P1 | 见 §5.2 | 🚧 待修 |
-| A4 | causallearn FCI 未实现但未在边界局限文档化 | P2 | 本文档 §2.4 已记录 | ✅ 已修 |
+| A4 | causallearn FCI 未实现但未在边界局限文档化 | P2 | FCI 已实现 (DOC-04 修复), §2.4 更新 | ✅ 已修 |
 | A5 | counterfactual_bridge.py:511-514 的 50 节点阈值未文档化 | P2 | 本文档 §2.3 已记录 | ✅ 已修 |
 
 ### 5.2 secret_adoption_audit.md 引用断裂修复
@@ -255,9 +274,9 @@
 
 ### 6.1 算法深化
 
-1. **CCM 真算法桥接**：通过 edm-takens Skill 的 `ccm_with_convergence` 真正实现 Sugihara CCM（依赖环境配置）
+1. **CCM 真算法桥接**：✅ 已完成 (ALG-02 修复, _deploy_ccm 实际调用 ccm_with_convergence)
 2. **EDM 真算法桥接**：通过 MVE（多视角嵌入）实现真正的 Sugihara EDM，详见 [MVE_OPTIMIZATION.md](MVE_OPTIMIZATION.md)
-3. **causallearn FCI 实现**：补充 FCI 算法以处理隐混杂
+3. **causallearn FCI 实现**：✅ 已完成 (DOC-04 修复, 含端点常量与节点索引修复)
 4. **HAVOK surrogate 检验**：强迫项峰值的统计显著性检验
 
 ### 6.2 工程深化

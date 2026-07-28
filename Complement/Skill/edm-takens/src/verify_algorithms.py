@@ -803,7 +803,9 @@ class GameDataVerification:
                 'edm_nl': is_nl, 'havok_kurt': sh.kurtosis_vr_,
                 'havok_r': sh.r_, 'havok_expl_var': sh.explained_var_,
                 'havok_r2': sh.regression_r2_,
-                'max_eig': np.max(np.abs(sh.eigenvalues_d_)),
+                # 空数组保护: 退化模型 (E=2 + 短序列) 可能产生空 eigenvalues_d_
+                # 参考 enhanced_cross_validate.py:634-638 的同类保护模式
+                'max_eig': float(np.max(np.abs(sh.eigenvalues_d_))) if hasattr(sh, 'eigenvalues_d_') and sh.eigenvalues_d_ is not None and len(sh.eigenvalues_d_) > 0 else 0.0,
                 'hankel_ratio': ratio,
             })
 

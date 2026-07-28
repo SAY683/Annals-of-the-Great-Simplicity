@@ -449,7 +449,17 @@ function loadResultSchema() {
 // 优先通过 build_bridge_schema.py --presets-only 读取 presets（与 engine 对齐），
 // 失败则回退到 schema/bridge_schema.json 中的 presets 段，
 // 最终硬编码兜底。
+//
+// SYS-02 修复: 启动时缓存 presets，避免每次 /api/config、/api/presets、
+// /api/schema 请求都 spawnSync 子进程（每次 15s 超时 + Python 冷启动开销）。
+// presets 内容在进程生命周期内不变（presets.yaml 是静态文件），
+// 首次调用 loadPresets() 后缓存结果，后续直接返回缓存。
+let _presetsCache = null;
 function loadPresets() {
+  // SYS-02: 命中缓存直接返回，避免重复 spawnSync
+  if (_presetsCache !== null) {
+    return _presetsCache;
+  }
   // 优先尝试 trace-engine/build_bridge_schema.py（与 loadBridgeParamSchema 一致）
   const schemaScript = path.resolve(CONFIG.skillDir, '..', '..', 'build_bridge_schema.py');
   if (fs.existsSync(schemaScript)) {
@@ -463,7 +473,8 @@ function loadPresets() {
         const presets = JSON.parse(result.stdout);
         if (presets && Object.keys(presets).length > 0) {
           logToFile('info', `已从 presets.yaml 加载预设 (${Object.keys(presets).length} 套)`);
-          return presets;
+          _presetsCache = presets;
+          return _presetsCache;
         }
       }
       logToFile('warn', `build_bridge_schema.py --presets-only 失败: ${result.stderr || 'unknown'}`);
@@ -475,7 +486,10 @@ function loadPresets() {
   const fallbackFile = path.resolve(__dirname, '..', 'schema', 'bridge_schema.json');
   try {
     const raw = JSON.parse(fs.readFileSync(fallbackFile, 'utf-8'));
-    if (raw.presets) return raw.presets;
+    if (raw.presets) {
+      _presetsCache = raw.presets;
+      return _presetsCache;
+    }
   } catch (_) {}
   // 最终硬编码兜底
   const base = {
@@ -489,13 +503,19 @@ function loadPresets() {
     filter_percentile: 85,
     random_state: 42,
   };
-  return {
+  _presetsCache = {
     default: { ...base, threshold: 0.03, window_size: 8, max_segments: 4, classical_mode: false, min_valid_tokens: 10 },
     sensitive: { ...base, threshold: 0.3, window_size: 6, max_concepts: 16, concept_min_freq: 2, max_segments: 3, classical_mode: false, min_valid_tokens: 8 },
     broad: { ...base, threshold: 0.8, window_size: 12, max_concepts: 24, max_segments: 6, classical_mode: false, min_valid_tokens: 12 },
     deep: { ...base, threshold: 0.2, window_size: 8, max_concepts: 24, max_edges_for_dowhy: 15, filter_mode: 'percentile', filter_percentile: 80, max_segments: 4, classical_mode: false, min_valid_tokens: 10 },
     llama: { threshold: 0.01, window_size: 128, max_segments: 3, max_concepts: 12, concept_min_freq: 1, max_edges_for_dowhy: 12, filter_mode: 'topn', filter_percentile: 85, random_state: 42, classical_mode: false, min_valid_tokens: 10 },
   };
+  return _presetsCache;
+}
+
+// SYS-02: 显式失效缓存（presets.yaml 文件变更后调用）
+function invalidatePresetsCache() {
+  _presetsCache = null;
 }
 
 module.exports = {
@@ -515,6 +535,7 @@ module.exports = {
   loadBridgeParamSchema,
   loadResultSchema,
   loadPresets,
+  invalidatePresetsCache,
   // 校验
   validateAnalysisInput,
   isValidId,

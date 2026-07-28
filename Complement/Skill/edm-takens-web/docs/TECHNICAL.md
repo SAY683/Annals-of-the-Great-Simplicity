@@ -42,7 +42,7 @@ edm-takens-web/
 │   ├── routes/             # API 路由（express.Router 模式）
 │   │   ├── datasets.py     # 数据集管理（7 端点）
 │   │   ├── analyze.py      # 分析执行（6 端点）
-│   │   └── history.py      # 历史与归档（12 端点）
+│   │   └── history.py      # 历史与归档（16 端点）
 │   ├── services/           # 业务逻辑层
 │   │   ├── file_management.py  # 文件管理 + CSV解析 + 路径安全
 │   │   └── summary_builder.py  # 报告摘要生成
@@ -76,6 +76,44 @@ edm-takens-web/
 ```
 
 ## 3. 核心 API
+
+### 3.0 API 端点总表（共 29 端点）
+
+> 元审计 Q12+ 同步 (2026-07-25)：补齐 `/api/datasets`、`/api/datasets/{filename}/columns`、`/api/datasets/{filename}/recommend`、`/api/analyze/stream`、`/api/results/{image_path}`、`/api/history/{task_id}`、`/api/archives/{task_id}/preview`、`/api/history/{task_id}/export/md`、`/api/history/{task_id}/export/html` 等遗漏端点。
+
+| # | 方法 | 端点 | 说明 | 路由文件 |
+|---|------|------|------|----------|
+| 1 | GET | `/api/health` | 健康检查（返回 status + 时间戳） | datasets.py |
+| 2 | GET | `/api/datasets` | 列出已上传的 CSV 数据集 | datasets.py |
+| 3 | POST | `/api/upload` | 上传 CSV 文件（multipart/form-data，≤50MB） | datasets.py |
+| 4 | GET | `/api/datasets/{filename}/columns` | 列出列名、数值列、预览与推荐目标列 | datasets.py |
+| 5 | GET | `/api/datasets/{filename}/recommend` | 自动分析强度推荐（light/medium/heavy） | datasets.py |
+| 6 | GET | `/api/datasets/{filename}/quality` | 每列 EDM 就绪度诊断（缺失率/自相关/平稳性等） | datasets.py |
+| 7 | GET | `/api/datasets/{filename}/embed_curve` | 嵌入维度曲线（E_values + rho_values + optimal_E） | datasets.py |
+| 8 | POST | `/api/analyze` | 阻塞式分析（一次性返回 summary + 图片 + 日志） | analyze.py |
+| 9 | GET | `/api/analyze/stream` | 流式分析（NDJSON，便捷端点，内部创建 Job） | analyze.py |
+| 10 | POST | `/api/analyze/jobs` | 创建异步分析任务（返回 job_id） | analyze.py |
+| 11 | GET | `/api/analyze/jobs/{job_id}` | 轮询任务状态与日志（limit_logs 限制日志条数） | analyze.py |
+| 12 | GET | `/api/analyze/jobs/{job_id}/stream` | 流式日志（NDJSON：log/result/error 事件） | analyze.py |
+| 13 | GET | `/api/results/{image_path:path}` | 获取结果图片（按 task_id 分目录） | analyze.py |
+| 14 | GET | `/api/history` | 列出历史任务 | history.py |
+| 15 | GET | `/api/history/{task_id}` | 单任务完整数据（config + params + images + summary） | history.py |
+| 16 | POST | `/api/history/{task_id}/archive` | 打包任务为 zip 并移入 archive/ | history.py |
+| 17 | GET | `/api/history/{task_id}/download` | 下载任务 zip | history.py |
+| 18 | DELETE | `/api/history/{task_id}` | 删除任务目录及其归档 | history.py |
+| 19 | POST | `/api/history/cleanup` | 按天数/总大小上限清理（支持 dry_run 预览） | history.py |
+| 20 | POST | `/api/history/batch` | 批量归档/删除/下载 | history.py |
+| 21 | POST | `/api/history/compare` | 两两任务对比 | history.py |
+| 22 | GET | `/api/history/{task_id}/export/json` | 下载任务摘要 JSON | history.py |
+| 23 | GET | `/api/history/{task_id}/export/csv` | 下载任务摘要 CSV | history.py |
+| 24 | GET | `/api/history/{task_id}/export/md` | 导出人话版 Markdown 报告（浏览器直接展示） | history.py |
+| 25 | GET | `/api/history/{task_id}/export/html` | 导出人话版报告 HTML（暗色主题） | history.py |
+| 26 | GET | `/api/archives` | 列出归档 | history.py |
+| 27 | POST | `/api/archives/{task_id}/restore` | 恢复归档到活跃历史 | history.py |
+| 28 | GET | `/api/archives/{task_id}/preview` | 预览归档内容（临时解压，不删原 zip） | history.py |
+| 29 | DELETE | `/api/archives/{task_id}` | 删除归档 zip | history.py |
+
+> 注：`GET /` 与 `GET /{path:path}`（api.py 中的 SPA 静态托管回退）不计入 29 个 API 端点之列。
 
 ### 3.1 健康检查
 

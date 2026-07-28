@@ -86,7 +86,7 @@ R = Result()
 # ── 验证步骤 ────────────────────────────────────────────────
 def verify_directory_structure():
     """1. 目录结构完整性。"""
-    print("\n[1/6] 验证目录结构完整性")
+    print("\n[1/7] 验证目录结构完整性")
 
     # 顶层 Python 模块
     for name in EXPECTED_PY_MODULES:
@@ -138,7 +138,7 @@ def verify_directory_structure():
 
 def verify_sacred_texts():
     """2. sacred_texts/ 8 本经书存在。"""
-    print("\n[2/6] 验证 sacred_texts/ 8 本经书")
+    print("\n[2/7] 验证 sacred_texts/ 8 本经书")
     sacred_dir = HERE / "sacred_texts"
     if not sacred_dir.exists():
         R.fail(f"sacred_texts/ 目录不存在")
@@ -158,7 +158,7 @@ def verify_sacred_texts():
 
 def verify_config_portable_detection():
     """3. config.py 便携式布局探测正确。"""
-    print("\n[3/6] 验证 config.py 便携式布局探测")
+    print("\n[3/7] 验证 config.py 便携式布局探测")
     try:
         # 切换 CWD 到 HERE 以模拟便携式运行
         original_cwd = os.getcwd()
@@ -224,7 +224,7 @@ def verify_config_portable_detection():
 
 def verify_python_imports():
     """4. Python 模块导入正常。"""
-    print("\n[4/6] 验证 Python 模块导入")
+    print("\n[4/7] 验证 Python 模块导入")
     original_cwd = os.getcwd()
     os.chdir(HERE)
     sys.path.insert(0, str(HERE))
@@ -254,7 +254,7 @@ def verify_python_imports():
 
 def verify_server_js_syntax():
     """5. server.js 语法正确。"""
-    print("\n[5/6] 验证 server.js 语法")
+    print("\n[5/7] 验证 server.js 语法")
     server_js = HERE / "server.js"
     if not server_js.exists():
         R.fail("server.js 不存在")
@@ -277,9 +277,50 @@ def verify_server_js_syntax():
         R.warn(f"无法验证 server.js 语法: {e}")
 
 
+def verify_default_project_cleanliness():
+    """7. default 项目数据清洁度检查 (CHK-02).
+
+    default 项目是便携式模板项目，不应残留 text-* 测试条目。
+    若存在 text-* 条目，说明开发期的测试数据未清理，会污染便携式分发。
+    """
+    print("\n[7/7] 验证 default 项目数据清洁度")
+    default_dir = HERE / "projects" / "default"
+    dataset_path = default_dir / "dataset.json"
+    if not dataset_path.exists():
+        R.ok("projects/default/dataset.json 不存在（首次运行时自动创建）")
+        return
+
+    try:
+        with open(dataset_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except Exception as e:
+        R.fail(f"读取 projects/default/dataset.json 失败: {e}")
+        return
+
+    entries = data.get("entries", [])
+    if not isinstance(entries, list):
+        R.fail(f"projects/default/dataset.json entries 字段非数组")
+        return
+
+    # CHK-02: default 项目不应包含 text-* 测试条目
+    text_entries = [
+        e for e in entries
+        if isinstance(e, dict) and isinstance(e.get("id", ""), str)
+        and e["id"].startswith("text-")
+    ]
+    if not text_entries:
+        R.ok(f"default 项目无 text-* 测试条目 (共 {len(entries)} 条 replay 条目)")
+    else:
+        sample_ids = ", ".join(e["id"] for e in text_entries[:5])
+        R.fail(
+            f"default 项目包含 {len(text_entries)} 条 text-* 测试条目（便携式分发前应清理）。"
+            f" 示例 id: {sample_ids}"
+        )
+
+
 def verify_trace_engine_web_bridge():
     """6. 与 trace-engine-web 的路径对接正确。"""
-    print("\n[6/6] 验证与 trace-engine-web 路径对接")
+    print("\n[6/7] 验证与 trace-engine-web 路径对接")
     trace_web = HERE.parent / "trace-engine-web"
     if not trace_web.exists():
         R.fail(f"trace-engine-web 不存在: {trace_web}")
@@ -322,6 +363,7 @@ def main():
     verify_python_imports()
     verify_server_js_syntax()
     verify_trace_engine_web_bridge()
+    verify_default_project_cleanliness()
 
     print("\n" + "=" * 60)
     print(f"通过: {len(R.passed)}  警告: {len(R.warnings)}  失败: {len(R.failed)}")

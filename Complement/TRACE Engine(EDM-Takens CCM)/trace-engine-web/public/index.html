@@ -7,9 +7,9 @@
   <title>TRACE Engine // Causal Inference Terminal</title>
   <!-- debt-09：CSS 拆分为 theme.css（主题变量）+ main.css（样式） -->
   <!-- 共享特摄防卫队基地主题 -->
-  <link rel="stylesheet" href="shared/themes/tokusatsu.css?v=20260727e">
-  <link rel="stylesheet" href="/css/theme.css?v=20260727e">
-  <link rel="stylesheet" href="/css/main.css?v=20260727e">
+  <link rel="stylesheet" href="shared/themes/tokusatsu.css?v=20260728a">
+  <link rel="stylesheet" href="/css/theme.css?v=20260728a">
+  <link rel="stylesheet" href="/css/main.css?v=20260728a">
 </head>
 <body data-self-port="3000">
   <div class="crt-overlay" aria-hidden="true"></div>
@@ -263,8 +263,25 @@
           <tbody id="conceptFreqBody"></tbody>
         </table>
 
-        <h3 class="section-title">// ADJACENCY MATRIX HEATMAP</h3>
-        <div id="adjMatrixWrap"></div>
+        <h3 class="section-title" style="display:flex;justify-content:space-between;align-items:center;">
+          // CONCEPT TOPOLOGY
+          <button id="mainTopoToggle" class="btn-mini secondary">3D 拓扑</button>
+        </h3>
+        <div id="mainMatrixView">
+          <h3 class="section-title">// ADJACENCY MATRIX HEATMAP</h3>
+          <div id="adjMatrixWrap"></div>
+        </div>
+        <div id="mainTopologyView" class="hidden">
+          <h3 class="section-title">// 3D CAUSAL TOPOLOGY (高维空间拓扑)</h3>
+          <div id="topologyWrap" style="position:relative;width:100%;height:min(50vh,420px);border:1px solid var(--border);border-radius:6px;overflow:hidden;background:#05070a;">
+            <canvas id="topologyCanvas" style="width:100%;height:100%;display:block;"></canvas>
+            <div style="position:absolute;top:6px;right:8px;display:flex;gap:6px;">
+              <button id="topoPauseBtn" class="btn-mini secondary topo-pause-btn" title="暂停/继续旋转">⏸</button>
+              <button id="topoResetBtn" class="btn-mini secondary topo-reset-btn" title="重置视角">⟲</button>
+            </div>
+            <div style="position:absolute;bottom:6px;left:8px;font-size:0.6rem;color:var(--muted);">拖拽旋转 · 滚轮缩放 · 节点大小=出现频次 · 边粗细=因果强度</div>
+          </div>
+        </div>
 
         <h3 class="section-title">// STABILITY & ROBUSTNESS</h3>
         <div id="stabilityPanel"></div>
@@ -303,11 +320,11 @@
        jobs.js 处理任务历史；app.js 最后加载，声明 DOM 引用、附加监听器、执行初始化。 -->
   </div>
 
-  <script src="/js/schema.js?v=20260727e"></script>
-  <script src="/js/sse.js?v=20260727e"></script>
-  <script src="/js/render.js?v=20260727e"></script>
-  <script src="/js/jobs.js?v=20260727e"></script>
-  <script src="/js/app.js?v=20260727e"></script>
+  <script src="/js/schema.js?v=20260728a"></script>
+  <script src="/js/sse.js?v=20260728a"></script>
+  <script src="/js/render.js?v=20260728a"></script>
+  <script src="/js/jobs.js?v=20260728a"></script>
+  <script src="/js/app.js?v=20260728a"></script>
   <!-- P1-2 (§20.12): BASE 导航隧道模式自适应, 替代 9 处硬编码 127.0.0.1:PORT -->
   <script>
   (function () {
@@ -350,6 +367,9 @@
       } else {
         // 本地模式: 保持 127.0.0.1:PORT
         a.href = 'http://127.0.0.1:' + port;
+        // P1 fix (Round 22 §4): 跨项目跳转在新标签页打开, 避免中断当前页 SSE 实时汇报.
+        a.target = '_blank';
+        a.rel = 'noopener';
       }
     });
   })();

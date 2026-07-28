@@ -101,13 +101,14 @@ def _model_config_path():
         from project_manager import get_project_manager
         return get_project_manager().current_cache_dir / "_active_model.txt"
     except Exception:
-        # 回退：项目上下文不可用时（如模块独立测试），使用全局 cache
+        # ENG-04 修复: 项目上下文不可用时，回退到默认项目 cache 目录 (而非全局 data/cache/)
+        # 原实现回退到全局 CACHE_DIR / "_active_model.txt"，违反项目隔离
         try:
-            from config import CACHE_DIR
-            return CACHE_DIR / "_active_model.txt"
+            from config import MODEL_CACHE_DIR
+            return MODEL_CACHE_DIR / "_active_model.txt"
         except Exception:
             from pathlib import Path
-            return Path("data/cache/_active_model.txt")
+            return Path("projects/default/cache/_active_model.txt")
 
 def _load_model_config():
     global _ACTIVE_MODEL
@@ -154,7 +155,35 @@ def set_active_model(key):
         _SACRED_VECTORS = None  # Q9 P1-15 修复：切换模型时重置八正道向量缓存，防止 1.5B↔3B 维度不匹配
         return True
     return False
-def list_models(): return [{"key": k, **v} for k, v in MODEL_REGISTRY.items()]
+def list_models():
+    """返回模型列表，描述根据 torch.cuda.is_available() 动态调整 (DES-04)。
+
+    对 quantize=True 的模型（如 qwen2.5-3b），description 会反映实际运行时设备:
+      - CUDA 可用: "3B 精度 (CUDA:4-bit量化 ~2.8GB)"
+      - 仅 CPU:    "3B 精度 (CPU:FP32 ~6GB)"
+    避免 description 同时列出两种模式让用户误以为会同时加载。
+    """
+    try:
+        import torch
+        cuda_available = torch.cuda.is_available()
+    except Exception:
+        cuda_available = False
+
+    result = []
+    for k, v in MODEL_REGISTRY.items():
+        entry = {"key": k, **v}
+        # DES-04: quantize 模型描述根据 CUDA 可用性动态调整
+        if v.get("quantize", False):
+            if cuda_available:
+                entry["description"] = "3B 精度 (CUDA:4-bit量化 ~2.8GB)"
+                entry["device"] = "cuda"
+            else:
+                entry["description"] = "3B 精度 (CPU:FP32 ~6GB)"
+                entry["device"] = "cpu"
+        else:
+            entry["device"] = "cuda" if cuda_available else "cpu"
+        result.append(entry)
+    return result
 
 # ── 全局模型缓存 ────────────────────────────────────────────
 _MODEL = None

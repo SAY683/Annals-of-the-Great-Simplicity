@@ -136,6 +136,10 @@ class TrajectoryCSV:
 
         P0 修缮：对历史行补 LEGACY 标记，让新增的 trace_status 列在旧行也有显式值，
         避免"全 0 行"误导用户以为是算法失败。
+
+        P0 fix (Round 24 §1): 列错位检测守卫.
+        旧数据行可能在表头更新前写入, 导致值与新表头错位.
+        通过 consensus_direction 列的值域验证检测错位行, 拒绝加载.
         """
         with open(self.csv_path, "r", encoding="utf-8", newline="") as f:
             reader = csv.DictReader(f)
@@ -148,13 +152,21 @@ class TrajectoryCSV:
                     k: v for k, v in row.items()
                     if k is not None and not k.startswith(self._INTERNAL_FIELD_PREFIX)
                 }
+                # P0 fix (Round 24 §1): 列错位检测
+                # consensus_direction 只能是 positive/negative/ambiguous/空
+                # 如果该列出现数字, 说明 CSV 表头与数据行错位, 拒绝加载该行
+                cd_val = clean_row.get("consensus_direction", "")
+                if cd_val and cd_val not in ("positive", "negative", "ambiguous"):
+                    if VERBOSE:
+                        print(f"[CSV] ⚠ 跳过错位行 (consensus_direction=\"{cd_val}\")")
+                    continue
                 # P0 修缮：历史行没有 trace_status 列时补 LEGACY 标记
                 # LEGACY 表示该行在新诊断标记引入之前写入，TRACE 实际状态未知
-                if "trace_status" not in clean_row:
+                if "trace_status" not in clean_row or not clean_row.get("trace_status"):
                     clean_row["trace_status"] = "LEGACY"
                     clean_row.setdefault("trace_error", "")
                 # P2 修缮：历史行没有 trace_mode 列时补 unknown
-                if "trace_mode" not in clean_row:
+                if "trace_mode" not in clean_row or not clean_row.get("trace_mode"):
                     clean_row["trace_mode"] = "unknown"
                 self._rows.append(clean_row)
                 # 更新实例级已知列（同样跳过 _ 前缀）

@@ -13,6 +13,7 @@ import subprocess
 
 _PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
 _FRONTEND_DIR = os.path.join(_PROJECT_ROOT, "frontend")
+_DIST_DIR = os.path.join(_FRONTEND_DIR, "dist")
 _BACKEND_CMD = [sys.executable, "run_backend.py"]
 _NPM = shutil.which("npm") or "npm"
 _FRONTEND_CMD = [_NPM, "run", "dev"]
@@ -79,7 +80,31 @@ def main():
     if backend.poll() is not None:
         print("[!] 后端进程已意外退出。")
         return
-    print("[OK] 后端已就绪: http://localhost:8000")
+    print("[OK] 后端已就绪: http://127.0.0.1:8000")
+
+    # P1 fix (Round 22 §1): 若 frontend/dist 已构建，后端会通过 StaticFiles
+    # 直接服务前端，无需再启动 Vite 开发服务器。避免日志提示 5173 但
+    # 实际页面在 8000 的混淆。
+    frontend = None
+    if os.path.isdir(_DIST_DIR):
+        print(f"[OK] 检测到 frontend/dist，前端由后端 StaticFiles 提供")
+        print(f"[OK] 前端访问地址: http://127.0.0.1:8000/")
+        print("\n[*] 按 Ctrl+C 停止所有服务\n")
+        try:
+            while backend.poll() is None:
+                time.sleep(0.5)
+        except KeyboardInterrupt:
+            print("\n[*] 收到中断信号，正在停止...")
+        finally:
+            if backend.poll() is None:
+                backend.terminate()
+                try:
+                    backend.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    backend.kill()
+                    backend.wait(timeout=5)
+                print("[-] 后端已停止")
+        return
 
     frontend = subprocess.Popen(
         _FRONTEND_CMD,
@@ -92,7 +117,8 @@ def main():
 
     ready_fe = _wait_for_port("127.0.0.1", 5173, timeout=30.0)
     if ready_fe:
-        print("[OK] 前端已就绪: http://localhost:5173")
+        print("[OK] 前端已就绪: http://127.0.0.1:5173 (开发模式)")
+        print("[OK] 也可通过后端 http://127.0.0.1:8000/ 访问 (自动重定向)")
     else:
         print("[!] 前端未能在预期时间内就绪（若 5173 被占，Vite 会自动换端口）。")
 
@@ -105,7 +131,7 @@ def main():
         print("\n[*] 收到中断信号，正在停止...")
     finally:
         for p, name in [(backend, "后端"), (frontend, "前端")]:
-            if p.poll() is None:
+            if p and p.poll() is None:
                 p.terminate()
                 try:
                     p.wait(timeout=5)

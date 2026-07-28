@@ -125,9 +125,16 @@ def simplex_predict(series, E, lib, pred, tau=1, Tp=1):
             continue
 
         # Weights
+        # ROUND26 算法审视 P2-2 修复: d_min→0 退化时用均匀权重替代距离权重
+        # 当所有距离≤1e-15 (重复点/常数段), 距离权重退化为1-NN (w[0]=1,其余≈0),
+        # 丧失 simplex 投影的加权平均平滑效果。Sugihara & May 1990 要求 E+1
+        # 邻居形成单纯形; 退化场景下均匀权重 (算术平均) 更符合数学语义。
         d_min = dists[0]
-        w = np.exp(-dists / max(d_min, 1e-15))
-        w = w / w.sum()
+        if d_min < 1e-15:
+            w = np.ones(len(dists)) / len(dists)
+        else:
+            w = np.exp(-dists / d_min)
+            w = w / w.sum()
 
         # Predict: neighbor lib_indices[idx] is start of vector
         # The value at time t corresponds to x[lib_indices[idx] + E - 1]
@@ -454,7 +461,7 @@ def SMapPredictNonlinear(series, E, Tp=1, tau=1, lib=None, pred=None,
 # ═══════════════════════════════════════════════════════════════
 
 def CCM(series_cause, series_effect, E, Tp=0, tau=1,
-        libSizes=None, sample=30, rng=None):
+        libSizes=None, sample=30, rng=None, out_of_sample=True):
     """Convergent Cross Mapping.
 
     Tests whether cause -> effect by building M_effect (shadow manifold
@@ -472,6 +479,14 @@ def CCM(series_cause, series_effect, E, Tp=0, tau=1,
         Candidate effect time series.
     E : int
         Embedding dimension.
+    out_of_sample : bool
+        ROUND26 算法审视 P1-2 修复: in-sample→out-of-sample, 避免ρ高估。
+        若 True (默认), 将每个 bootstrap library 子集拆分为 train/test
+        两半: 用 train 构建 shadow manifold (KDTree), 在 test 上评估 ρ,
+        避免 in-sample 评估导致的系统性 ρ 高估 (Sugihara et al. 2012
+        要求 out-of-sample cross-map skill)。当 library 过小 (< 2*(E+2))
+        时自动回退到 in-sample 以保证足够评估点。若 False, 保留原 in-sample
+        逻辑 (向后兼容)。
     Tp : int
         Time-to-prediction (0 for concurrent).
     tau : int
@@ -529,23 +544,52 @@ def CCM(series_cause, series_effect, E, Tp=0, tau=1,
         # debt-21: 移除 min(sample, 10) 硬编码上限——该上限静默忽略了用户
         # 指定的 sample 参数（默认 30 只跑了 10 次），导致 CCM 收敛性
         # 评估的统计功效不足。现在完整尊重用户传入的 sample 值。
+        #
+        # ROUND26 算法审视 P1-2 修复: in-sample→out-of-sample, 避免ρ高估。
+        # 当 out_of_sample=True 且 lib_size 足够大 (>= 2*(E+2)) 时, 将
+        # bootstrap library 拆分为 train/test 两半: KDTree 建在 train 上,
+        # ρ 在 test 上评估, 消除 in-sample 数据重用导致的系统性 ρ 高估
+        # (Sugihara et al. 2012 要求 out-of-sample cross-map skill)。
+        # library 过小时回退到 in-sample 以保留足够评估点。
         rhos = []
+        use_oos = out_of_sample and lib_size >= 2 * (E + 2)
         for _ in range(sample):
             lib_idx = np.sort(_rng.choice(N, size=lib_size, replace=False))
-            X_lib = X_effect[lib_idx]
-            tree = KDTree(X_lib)
+
+            if use_oos:
+                # Out-of-sample: 拆分 train/test, 消除 in-sample ρ 高估
+                n_train = lib_size // 2
+                shuffled = lib_idx.copy()
+                _rng.shuffle(shuffled)
+                train_idx = np.sort(shuffled[:n_train])
+                test_idx = np.sort(shuffled[n_train:])
+                X_tree = X_effect[train_idx]
+                tree = KDTree(X_tree)
+                query_idx = test_idx      # query 目标 = test 集
+                tree_idx = train_idx      # 邻居索引映射回原序列的基准
+                n_query = len(test_idx)
+                k_max = min(E + 2, n_train)
+            else:
+                # In-sample (原逻辑, 向后兼容 / 小 library 回退)
+                X_tree = X_effect[lib_idx]
+                tree = KDTree(X_tree)
+                query_idx = lib_idx       # query 目标 = library 自身
+                tree_idx = lib_idx
+                n_query = lib_size
+                k_max = min(E + 2, lib_size)
 
             preds = []
             obs = []
-            # Predict cause values for all library points (in-sample cross-map)
-            for i in range(lib_size):
-                target = X_lib[i]
-                k = min(E + 2, lib_size)
-                dists, idxs = tree.query(target, k=k)
+            # Cross-map: 用 tree 中的邻居预测 query 点的 cause 值
+            for i in range(n_query):
+                target = X_effect[query_idx[i]]
+                dists, idxs = tree.query(target, k=k_max)
 
                 dists = np.atleast_1d(dists)
                 idxs = np.atleast_1d(idxs)
 
+                # In-sample 路径需排除自身 (距离 ~0); out-of-sample 路径
+                # query 点不在 tree 中, 不会有自身匹配, 但保留过滤无害
                 good = dists > 1e-15
                 if not good.any():
                     good = np.ones(len(dists), dtype=bool)
@@ -558,11 +602,11 @@ def CCM(series_cause, series_effect, E, Tp=0, tau=1,
                 w = np.exp(-dists / max(dists[0], 1e-15))
                 w = w / w.sum()
 
-                # Cross-map: each neighbor index in lib_idx maps to original index
+                # Cross-map: 邻居在 tree_idx 中的索引映射回原时间序列位置
                 cause_vals = []
                 w_valid = []
                 for j, idx in enumerate(idxs):
-                    orig_idx = lib_idx[idx]  # original position in time series
+                    orig_idx = tree_idx[idx]  # original position in time series
                     if orig_idx + Tp < n:
                         cause_vals.append(cause[orig_idx + Tp])
                         w_valid.append(w[j])
@@ -574,8 +618,8 @@ def CCM(series_cause, series_effect, E, Tp=0, tau=1,
                 w_valid = w_valid / w_valid.sum()
                 pred = np.dot(w_valid, cause_vals)
 
-                # Observed: cause value at the original index
-                orig_i = lib_idx[i]
+                # Observed: cause value at the query point's original index
+                orig_i = query_idx[i]
                 if orig_i + Tp < n:
                     preds.append(pred)
                     obs.append(cause[orig_i + Tp])

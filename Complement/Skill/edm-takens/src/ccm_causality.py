@@ -182,23 +182,35 @@ def ccm_causality_test(df, cause_var, effect_var, E, lib_sizes=None,
             # pipeline.py's printed "converging=True/False"), and without
             # this floor THOSE call sites could be. See
             # docs/CHANGELOG.md (Round 11) for the full repro.
-            if len(rhos) >= 3:
-                total_rise = float(rhos[-1] - rhos[0])
-                spear_rho, spear_p = spearmanr(lib_sizes_arr, rhos)
-                final_rho = float(rhos[-1])
+            # P0-3 修缮: 小 lib_size 时 CCM 可能返回 NaN（阴影流形点不足）。
+            # 原实现直接用 rhos[-1]-rhos[0]，若 rhos[0]=NaN 则 total_rise=NaN，
+            # spearmanr 传入含 NaN 数组也返回 (NaN, NaN)，导致 is_converging 恒为 False。
+            # 修复：先过滤 NaN，用有效子集计算收敛指标。
+            valid_mask = ~np.isnan(rhos)
+            n_valid = int(valid_mask.sum())
+            if n_valid >= 3:
+                rhos_valid = rhos[valid_mask]
+                lib_sizes_valid = lib_sizes_arr[valid_mask]
+                total_rise = float(rhos_valid[-1] - rhos_valid[0])
+                spear_rho, spear_p = spearmanr(lib_sizes_valid, rhos_valid)
+                final_rho = float(rhos_valid[-1])
                 is_converging = (total_rise > rise_threshold
                                   and spear_rho > spearman_threshold
                                   and spear_p < spearman_p_threshold
                                   and abs(final_rho) > strong_direction_rho)
-            else:
-                # P0-2 修缮：len(rhos)<3 时 Spearman 不可计算是合理的，
-                # 但 total_rise 不应静默置零——若 rhos 有 2 个点且明显上升，
-                # 把 total_rise=0.0 会掩盖实际趋势。
-                # 现在：len>=2 时仍计算 total_rise，仅 Spearman 标记为不可用
-                total_rise = float(rhos[-1] - rhos[0]) if len(rhos) >= 2 else 0.0
+            elif n_valid >= 2:
+                # P0-2 修缮：有效点 2 个时 Spearman 不可计算，
+                # 但 total_rise 仍应反映实际趋势，不应静默置零。
+                rhos_valid = rhos[valid_mask]
+                total_rise = float(rhos_valid[-1] - rhos_valid[0])
                 spear_rho, spear_p = 0.0, 1.0
-                final_rho = float(rhos[-1]) if len(rhos) > 0 else 0.0
+                final_rho = float(rhos_valid[-1])
                 is_converging = False  # Spearman 不可用时无法判定收敛
+            else:
+                total_rise = 0.0
+                spear_rho, spear_p = 0.0, 1.0
+                final_rho = float(rhos[valid_mask][0]) if n_valid == 1 else 0.0
+                is_converging = False
 
             results[direction_idx] = {
                 'final_rho': final_rho,
@@ -259,6 +271,10 @@ def ccm_causality_test(df, cause_var, effect_var, E, lib_sizes=None,
         'forward': fwd, 'reverse': rev,
         'verdict': verdict, 'direction': direction_label,
         'disclaimer': common_driver_disclaimer(),
+        # ALG-09 修复: 结构化 disclaimer 为 disclaimer_text + disclaimer_level 字段
+        # 下游消费方应优先读取 disclaimer_text (结构化) 而非 disclaimer (遗留字符串)
+        'disclaimer_text': common_driver_disclaimer(),
+        'disclaimer_level': 'escalated' if _count_significant_pairs_for_disclaimer(fwd, rev) >= 3 else 'base',
     }
 
 
@@ -293,6 +309,9 @@ def common_driver_disclaimer(n_significant_pairs: int = 1) -> str:
     unconditionally (see ccm_causality_test()'s 'disclaimer' key, and
     final_interpretation.py / enhanced_cross_validate.py's CCM report
     sections, which print it alongside the verdict).
+
+    ALG-09 修复: 此函数返回字符串保留向后兼容。
+    结构化字段通过 disclaimer_text + disclaimer_level 暴露在 ccm_causality_test() 返回 dict 中。
     """
     base = (
         "CCM detects dynamical coupling (mutual encoding between "
@@ -317,11 +336,29 @@ def common_driver_disclaimer(n_significant_pairs: int = 1) -> str:
     return base
 
 
+def _count_significant_pairs_for_disclaimer(fwd_result, rev_result) -> int:
+    """
+    ALG-09 辅助函数: 判定当前 CCM 结果是否触发 escalated disclaimer 等级。
+
+    单次 ccm_causality_test 调用只测试一对变量, 但当 forward 和 reverse
+    都收敛时, 视为 2 对显著配对 (双向因果), 接近 escalated 阈值 3。
+    此函数供 disclaimer_level 字段使用, 不影响 disclaimer 字符串本身。
+
+    ALG-09 修正 (审视报告): 字段名为 'is_converging' 而非 'converging'。
+    """
+    count = 0
+    if isinstance(fwd_result, dict) and fwd_result.get('is_converging'):
+        count += 1
+    if isinstance(rev_result, dict) and rev_result.get('is_converging'):
+        count += 1
+    return count
+
+
 # ================================================================
 # Secret 13: Multiple Comparison Correction for CCM
 # ================================================================
 
-def _benjamini_hochberg(p_values: np.ndarray, q: float = 0.10):
+def _benjamini_hochberg(p_values: np.ndarray, q: float = 0.05):
     """
     Benjamini & Hochberg (1995) FDR step-up procedure, hand-implemented
     (no statsmodels dependency — unlike Secret 8's ADF/KPSS, BH/Bonferroni
@@ -331,6 +368,16 @@ def _benjamini_hochberg(p_values: np.ndarray, q: float = 0.10):
 
     Sort p-values ascending; find the largest k such that
     p(k) <= (k/n)*q; reject all hypotheses with p <= p(k).
+
+    ROUND26 算法审视 P1-3 修复: q=0.10→0.05, 减少假阳性。
+    默认 q 从 0.10 改为 0.05, 与 single-test α=0.05 一致 (Benjamini &
+    Hochberg 1995 原文推荐 q=0.05 作为标准探索性分析水平)。q 的选择依据:
+      - q=0.05: 标准探索性分析 (与 α=0.05 single-test 一致),假发现率
+        控制在 5%,适合 CCM 因果发现场景 (K=5 对时期望 0.25 个假发现)
+      - q=0.10: 更宽松,适合早期探索,但假发现率翻倍;仅在探索性极强的
+        场景或样本量不足以支持 q=0.05 时显式传入
+      - q=0.01: 验证性分析
+    调用方可通过显式传 q=0.10 保留旧行为。
 
     Returns (reject: bool array in original order, threshold_p: the
     largest p-value that was still rejected, or 0.0 if none were).
@@ -356,7 +403,7 @@ def _benjamini_hochberg(p_values: np.ndarray, q: float = 0.10):
 
 
 def ccm_batch_test(df, pairs, E, analysis_label: str = 'exploratory',
-                    fdr_q: float = 0.10, warn_pair_threshold: int = 5,
+                    fdr_q: float = 0.05, warn_pair_threshold: int = 5,
                     lib_sizes=None,
                     strong_direction_rho: float = 0.2) -> dict:
     """
@@ -376,8 +423,11 @@ def ccm_batch_test(df, pairs, E, analysis_label: str = 'exploratory',
 
     Correction method depends on `analysis_label` (matching
     `sensitivity_config.AnalysisConfig`'s existing analysis-type concept):
-      'exploratory'    -> Benjamini-Hochberg FDR (q=0.10): allows a 10%
-                          false-discovery rate to preserve power.
+      'exploratory'    -> Benjamini-Hochberg FDR (q=0.05, ROUND26 P1-3
+                          修复: 原 q=0.10 偏宽松, 改为 0.05 与 single-test
+                          α=0.05 一致, 减少假阳性; 旧行为可显式传 fdr_q=0.10):
+                          allows a 5% false-discovery rate to balance
+                          power 与 严格性。
       'confirmatory'   -> Bonferroni (alpha/K): strict family-wise
                           error-rate control.
       'preregistered'  -> no correction (hypotheses specified before

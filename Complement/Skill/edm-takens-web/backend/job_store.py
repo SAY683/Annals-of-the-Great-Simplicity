@@ -210,23 +210,28 @@ class PersistentJobStore(JobStore):
         self._lock = threading.Lock()
         self._active_jobs: Dict[str, Job] = {}
         self._ensure_schema()
-        # P0 修复: 后端进程崩溃后重启时，将所有遗留的 running 状态任务
-        # 标记为 error，避免任务永久卡在 running 状态。该操作幂等：
-        # 仅影响 status='running' 的行，重复调用无副作用。
+        # ROB-03 修复: 后端进程被强杀后重启时，将所有遗留的 running 状态任务
+        # 标记为 interrupted（而非 error），以准确区分"任务自身执行出错"与
+        # "任务因后端重启而被中断"。该操作幂等：仅影响 status='running' 的行，
+        # 重复调用无副作用。
         self.recover()
 
     def recover(self) -> int:
-        """将所有遗留的 running 状态任务标记为 error。
+        """将所有遗留的 running 状态任务标记为 interrupted。
 
-        后端进程崩溃后重启时调用。崩溃前处于 running 的任务无法继续执行，
-        会被永久卡住；本方法将它们一次性标记为 error，错误信息标注为
+        ROB-03: 后端进程被强杀（kill -9 / 崩溃 / 容器重启）后重启时调用。
+        崩溃前处于 running 的任务无法继续执行，会被永久卡住；本方法将它们
+        一次性标记为 ``interrupted``，错误信息标注为
         "Backend process restarted while task was running"。
 
-        幂等性：仅更新 status='running' 的行，已为 error/done 的行不受影响，
-        因此多次调用不会产生副作用。
+        与 ``error`` 的区别：``interrupted`` 表示任务本身未出错，只是因为
+        后端进程重启而被迫中断，便于运维与用户区分故障来源。
+
+        幂等性：仅更新 status='running' 的行，已为 interrupted/error/done
+        的行不受影响，因此多次调用不会产生副作用。
 
         Returns:
-            被恢复（标记为 error）的任务数量。
+            被恢复（标记为 interrupted）的任务数量。
         """
         recovered = 0
         with self._connect() as conn:
@@ -244,7 +249,7 @@ class PersistentJobStore(JobStore):
                 WHERE status = ?
                 """,
                 (
-                    "error",
+                    "interrupted",
                     "Backend process restarted while task was running",
                     time.time(),
                     "running",
@@ -255,7 +260,7 @@ class PersistentJobStore(JobStore):
         if recovered:
             print(
                 f"[JobStore] recover(): marked {recovered} stuck 'running' "
-                f"job(s) as 'error' (Backend process restarted while task was running)."
+                f"job(s) as 'interrupted' (Backend process restarted while task was running)."
             )
         return recovered
 
@@ -367,7 +372,9 @@ class PersistentJobStore(JobStore):
     def _persist(self, job: Job):
         self._insert_job(job)
         with self._lock:
-            if job.status in ("done", "error"):
+            # ROB-03: "interrupted" 也属于终态，需从活跃任务缓存中移除，
+            # 避免被中断的任务长期占用内存。
+            if job.status in ("done", "error", "interrupted"):
                 self._active_jobs.pop(job.id, None)
 
     def _load_job(self, job_id: str) -> Optional[Job]:
@@ -396,7 +403,8 @@ class PersistentJobStore(JobStore):
         job.created_at = created_at
         job.updated_at = updated_at
         # Completed jobs have no live queue; mark done so event loops exit cleanly.
-        if status in ("done", "error"):
+        # ROB-03: "interrupted" 也属于终态，标记 _done 以便事件循环正常退出。
+        if status in ("done", "error", "interrupted"):
             job._done.set()
         return job
 
@@ -408,11 +416,12 @@ class PersistentJobStore(JobStore):
         with self._lock:
             self._active_jobs[job_id] = job
             # Prune oldest completed jobs if we exceed max_history.
+            # ROB-03: "interrupted" 也属于终态，纳入可清理范围。
             completed = sorted(
                 [
                     (jid, j)
                     for jid, j in self._active_jobs.items()
-                    if j.status in ("done", "error")
+                    if j.status in ("done", "error", "interrupted")
                 ],
                 key=lambda kv: kv[1].updated_at,
             )

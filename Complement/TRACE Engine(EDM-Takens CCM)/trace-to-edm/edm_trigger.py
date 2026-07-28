@@ -46,6 +46,33 @@ class EDMTrigger:
       5. 返回分析结果摘要
     """
 
+    # INT-02 修复: 原始列→管道别名映射表, 供日志披露与下游解读
+    # EDM 管道直接使用原始列名作为 target_col, 此映射披露语义等价关系
+    VARIABLE_MAPPING = {
+        # Layer 1: 元 SCM
+        "ate": "result",              # 因果效应估计 → EDM 目标变量
+        "adj_density": "graph_density",
+        "max_delta_nll": "max_signal",
+        "ci_width": "uncertainty",
+        "edge_count": "complexity",
+        "ccm_coverage_pct": "ccm_coverage",
+        # Layer 2: 世俗语义 PCA
+        "z_pca_1": "secular_axis_1",
+        "z_pca_2": "secular_axis_2",
+        "z_pca_3": "secular_axis_3",
+        "secular_entropy": "diversity",
+        # Layer 3: 八正道 (示例, 完整列表见 list_recommended_targets)
+        "z_福音": "gospel_projection",
+        "z_存在": "existence_projection",
+        "z_觉爱": "wisdom_projection",
+    }
+
+    # ENG-09 / ROB-01 修复: HTTP 调用重试与断路器配置
+    _RETRY_ATTEMPTS = 3          # 最多重试次数 (含首次调用)
+    _RETRY_BACKOFF_SECONDS = [1, 2, 4]  # 指数退避间隔 (1s/2s/4s)
+    _CIRCUIT_FAILURE_THRESHOLD = 5  # 连续失败 5 次后熔断
+    _CIRCUIT_RESET_SECONDS = 60   # 熔断后 60s 内短路所有请求
+
     def __init__(self, csv_path: Optional[Path] = None):
         # 优先使用传入路径, 否则从项目管理器获取当前项目 CSV
         if csv_path:
@@ -57,6 +84,9 @@ class EDMTrigger:
             except Exception:
                 self.csv_path = TRAJECTORY_CSV
         self.api_base = EDM_API_URL.replace("localhost", "127.0.0.1").rstrip("/")
+        # ROB-01 断路器状态 (实例级, 跨方法共享)
+        self._circuit_failures = 0   # 连续失败计数
+        self._circuit_open_until = 0.0  # 熔断到期时间戳 (time.monotonic)
 
     def check_readiness(self) -> Dict:
         """
@@ -132,7 +162,7 @@ class EDMTrigger:
 
     def _api_call(self, method: str, endpoint: str, data: Optional[Dict] = None) -> Dict:
         """
-        调用 EDM-Takens Web API。
+        调用 EDM-Takens Web API (ENG-09/ROB-01: 含重试 + 断路器)。
 
         Args:
             method: "GET" or "POST"
@@ -141,23 +171,72 @@ class EDMTrigger:
 
         Returns:
             解析后的 JSON 响应
+
+        ENG-09 修复: 原 implementation 仅 timeout=10s 无重试, 瞬时网络抖动即失败。
+        现添加 3 次指数退避重试 (1s/2s/4s), 仅对连接级/超时级错误重试 (4xx/5xx 不重试)。
+
+        ROB-01 修复: 原 implementation edm-takens-web 临时不可用时直接返回 500。
+        现添加断路器: 连续 5 次失败后短路 60s, 期间所有请求立即返回熔断错误,
+        避免雪崩式重试压垮下游服务。
         """
+        # ROB-01: 断路器开路检查
+        now = time.monotonic()
+        if self._circuit_open_until > now:
+            remaining = self._circuit_open_until - now
+            return {
+                "error": f"断路器开路中, {remaining:.0f}s 后重试 (edm-takens-web 连续失败 ≥{self._CIRCUIT_FAILURE_THRESHOLD}次)",
+                "success": False,
+                "circuit_open": True,
+            }
+
         url = f"{self.api_base}{endpoint}"
+        last_error = None
 
-        if method == "POST" and data:
-            form_data = urllib.parse.urlencode(data).encode("utf-8")
-            req = urllib.request.Request(url, data=form_data, method="POST")
-            req.add_header("Content-Type", "application/x-www-form-urlencoded")
-        else:
-            req = urllib.request.Request(url, method=method)
+        # ENG-09: 3 次指数退避重试
+        for attempt in range(self._RETRY_ATTEMPTS):
+            if method == "POST" and data:
+                form_data = urllib.parse.urlencode(data).encode("utf-8")
+                req = urllib.request.Request(url, data=form_data, method="POST")
+                req.add_header("Content-Type", "application/x-www-form-urlencoded")
+            else:
+                req = urllib.request.Request(url, method=method)
 
-        try:
-            with urllib.request.urlopen(req, timeout=10) as resp:
-                return json.loads(resp.read().decode("utf-8"))
-        except urllib.error.URLError as e:
-            return {"error": f"API 调用失败: {e}", "success": False}
-        except json.JSONDecodeError as e:
-            return {"error": f"JSON 解析失败: {e}", "success": False}
+            try:
+                with urllib.request.urlopen(req, timeout=10) as resp:
+                    result = json.loads(resp.read().decode("utf-8"))
+                    # 成功: 重置断路器失败计数
+                    self._circuit_failures = 0
+                    return result
+            except urllib.error.HTTPError as e:
+                # HTTP 错误 (4xx/5xx): 不重试, 直接返回 (业务级错误非瞬时故障)
+                self._record_circuit_failure()
+                return {"error": f"API HTTP 错误: {e.code} {e.reason}", "success": False}
+            except (urllib.error.URLError, TimeoutError, OSError) as e:
+                # 连接级/超时级错误: 可重试的瞬时故障
+                last_error = e
+                if attempt < self._RETRY_ATTEMPTS - 1:
+                    backoff = self._RETRY_BACKOFF_SECONDS[attempt]
+                    if VERBOSE:
+                        print(f"[EDM] 调用失败 (尝试 {attempt+1}/{self._RETRY_ATTEMPTS}), {backoff}s 后重试: {e}")
+                    time.sleep(backoff)
+                # 最后一次尝试失败后落到下方断路器记录
+            except json.JSONDecodeError as e:
+                # JSON 解析失败: 不重试 (响应体非预期格式)
+                self._record_circuit_failure()
+                return {"error": f"JSON 解析失败: {e}", "success": False}
+
+        # 所有重试均失败: 记录断路器失败
+        self._record_circuit_failure()
+        return {"error": f"API 调用失败 (重试 {self._RETRY_ATTEMPTS} 次后仍失败): {last_error}", "success": False}
+
+    def _record_circuit_failure(self):
+        """ROB-01: 记录一次失败, 达到阈值后开路断路器"""
+        self._circuit_failures += 1
+        if self._circuit_failures >= self._CIRCUIT_FAILURE_THRESHOLD:
+            self._circuit_open_until = time.monotonic() + self._CIRCUIT_RESET_SECONDS
+            if VERBOSE:
+                print(f"[EDM] ⚠ 断路器已开路: 连续失败 {self._circuit_failures} 次, "
+                      f"短路 {self._CIRCUIT_RESET_SECONDS}s")
 
     def submit_job(
         self,
@@ -179,6 +258,13 @@ class EDMTrigger:
         """
         # 先复制 CSV (可能带时间过滤)
         self.copy_to_edm_data(time_start=time_start, time_end=time_end)
+
+        # INT-02 修复: 记录原始列→管道别名映射, 供日志披露与下游解读
+        if VERBOSE:
+            print(f"[EDM] 变量映射 (原始列→管道别名):")
+            for orig, alias in self.VARIABLE_MAPPING.items():
+                marker = " ← target" if orig == target_col else ""
+                print(f"  {orig} → {alias}{marker}")
 
         # 提交分析任务
         result = self._api_call("POST", "/api/analyze/jobs", {

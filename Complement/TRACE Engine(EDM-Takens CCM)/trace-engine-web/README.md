@@ -114,30 +114,38 @@ SUPER 模式使用独立的常驻 Python Worker [`llama_worker.py`](./llama_work
 - **模型切换**：默认 `shehui-llama`（27M 轻量），可选 `shenji-llama`（469M）或 `shehui-llama-v4-archive`（470M 旧版归档）。轻量模型推理速度极快（~800 pps），470M 级模型速度较慢（~10-40 pps）但因果视野更广（1024 tokens）。使用 `llama` 预设（`threshold=0.01`）可检出非零因果边。
 - **接口限制**：SUPER 模式仅支持 `/api/analyze-stream` 流式接口；`/api/analyze-text`、`/api/analyze-file` 会返回 `SUPER_REQUIRES_STREAM`。`/api/retry/:id` 会返回 `SUPER_RETRY_NOT_SUPPORTED`，请在前端重新提交分析。
 
-### 后端端点
+### 后端端点（共 26 端点）
 
-| 方法 | 端点 | 说明 |
-|------|------|------|
-| GET | `/` | 前端页面 |
-| GET/POST | `/api/analyze-stream` | SSE 流式分析（POST 用于长文本避免 URL 超限） |
-| POST | `/api/analyze-text` | 同步分析纯文本 `{text, mode, config}` |
-| POST | `/api/analyze-file` | 同步分析上传文件 `multipart/form-data: file, mode, config` |
-| POST | `/api/cancel/:id` | 取消正在运行的任务 |
-| GET | `/api/result/:id` | 获取 JSON 结果 |
-| GET | `/api/report/:id` | 获取 Markdown 报告 |
-| GET | `/api/jobs` | 任务历史与活跃任务 |
-| GET | `/api/jobs/export` | 导出任务历史 JSON |
-| POST | `/api/jobs/clear` | 清空任务历史 |
-| GET | `/api/jobs/:id` | 单任务状态与结果路径 |
-| POST | `/api/retry/:id` | 重试失败/超时/已取消任务 |
-| GET | `/api/health` | 健康检查（含 Skill 就绪与磁盘可写性） |
-| GET | `/api/config` | 当前服务端配置 |
-| GET | `/api/queue` | 当前队列与并发状态 |
-| GET | `/api/version` | 服务版本与识别信息 |
-| GET | `/api/presets` | 参数预设 |
-| GET | `/api/schema` | 桥接参数 Schema（用于前端表单与多云校验） |
-| GET | `/api/metrics` | 运行时指标（活跃任务、历史状态统计等） |
-| POST | `/api/admin/cleanup` | 手动触发输出目录 TTL 清理 |
+> 元审计 Q12+ 同步 (2026-07-25)：补齐 `/api/models`、`/api/jobs/batch-delete`、`DELETE /api/jobs/:id`、`/api/jobs/:id/detail`、`/api/jobs/:id/export/md` 共 5 个遗漏端点，并将 `/api/analyze-stream` 的 GET/POST 拆分为独立条目。
+
+| # | 方法 | 端点 | 说明 |
+|---|------|------|------|
+| 1 | GET | `/` | 前端页面（express.static 托管） |
+| 2 | GET | `/api/analyze-stream` | SSE 流式分析（短文本探针 GET） |
+| 3 | POST | `/api/analyze-stream` | SSE 流式分析（POST 用于长文本避免 URL 超限） |
+| 4 | POST | `/api/analyze-text` | 同步分析纯文本 `{text, mode, config}` |
+| 5 | POST | `/api/analyze-file` | 同步分析上传文件 `multipart/form-data: file, mode, config` |
+| 6 | POST | `/api/cancel/:id` | 取消正在运行的任务 |
+| 7 | GET | `/api/result/:id` | 获取 JSON 结果 |
+| 8 | GET | `/api/report/:id` | 获取 Markdown 报告 |
+| 9 | POST | `/api/retry/:id` | 重试失败/超时/已取消任务 |
+| 10 | GET | `/api/jobs` | 任务历史与活跃任务 |
+| 11 | GET | `/api/jobs/export` | 导出任务历史 JSON |
+| 12 | POST | `/api/jobs/clear` | 清空任务历史（管理员） |
+| 13 | POST | `/api/jobs/batch-delete` | 批量删除任务历史（跳过运行中任务） |
+| 14 | DELETE | `/api/jobs/:id` | 删除单条任务历史（运行中任务不可删） |
+| 15 | GET | `/api/jobs/:id` | 单任务状态与结果路径 |
+| 16 | GET | `/api/jobs/:id/detail` | 单任务详情聚合（元数据 + 输入文本 + result.json + report.md） |
+| 17 | GET | `/api/jobs/:id/export/md` | 导出人话版 Markdown 因果推断报告 |
+| 18 | GET | `/api/health` | 健康检查（含 Skill 就绪与磁盘可写性） |
+| 19 | GET | `/api/config` | 当前服务端配置 |
+| 20 | GET | `/api/models` | 已探测的 LLaMA 模型列表（30s 超时） |
+| 21 | GET | `/api/queue` | 当前队列与并发状态 |
+| 22 | GET | `/api/version` | 服务版本与识别信息 |
+| 23 | GET | `/api/presets` | 参数预设 |
+| 24 | GET | `/api/schema` | 桥接参数 Schema（用于前端表单与多云校验） |
+| 25 | GET | `/api/metrics` | 运行时指标（活跃任务、历史状态统计等） |
+| 26 | POST | `/api/admin/cleanup` | 手动触发输出目录 TTL 清理 |
 
 ### API 鉴权（debt-12）
 

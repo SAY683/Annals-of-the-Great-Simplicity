@@ -267,7 +267,7 @@
 - 问题：浏览器 :3100 → :8000 跨域被阻拦 (CORS)
 - 修复：[server.js:553-583](trace-to-edm/server.js) 新增 `GET /api/edm/poll/:jobId` 代理端点
 - 修复：[app.js:864,880](trace-to-edm/public/js/app.js) `fetch("localhost:8000")` → `fetch("/api/edm/poll/")`
-- 端点总数：25 → 26
+- 端点总数：25 → 26 (ROUND26 注: 后续 R13+/R20+/R26 持续新增, 现为 33 端点, 详见 MICROSERVICE_API_DESIGN.md §6.1)
 
 ### 实测发现与修复
 
@@ -310,7 +310,7 @@
 | [META_AUDIT_CHANGELOG.md](META_AUDIT_CHANGELOG.md) | 本文档：五项目 12 维度修缮 CHANGELOG | 2026-07-20 |
 | [ALGORITHM_MATHEMATICAL_AUDIT.md](ALGORITHM_MATHEMATICAL_AUDIT.md) | 五项目算法/数学正确性深度审计 | 2026-07-20 |
 | [NEWCOMER_PLAYBOOK.md](NEWCOMER_PLAYBOOK.md) | 新手端到端验收剧本（7 幕） | 2026-07-20 |
-| [MICROSERVICE_API_DESIGN.md](MICROSERVICE_API_DESIGN.md) | 五项目 70 端点（25+20+25）微服务 API 契约 + 前端重连 | 2026-07-20 |
+| [MICROSERVICE_API_DESIGN.md](MICROSERVICE_API_DESIGN.md) | 五项目 88 端点（33+26+29）微服务 API 契约 + 前端重连 | 2026-07-20 (ROUND26 校正) |
 | [TOKUSATSU_DASHBOARD_DESIGN.md](TOKUSATSU_DASHBOARD_DESIGN.md) | 特摄风仪表盘 UI/UX 设计稿 | 2026-07-20 |
 | [trace-engine/ALGORITHM_AUDIT.md](trace-engine/ALGORITHM_AUDIT.md) | TRACE 引擎六勇士 Tier-A/B 架构审计 | 2026-07-20（P0-3 修缮） |
 | [trace-engine/secret_adoption_audit.md](trace-engine/secret_adoption_audit.md) | TRACE 主项目设计规则采纳审计 | 2026-07-10（P1 修缮 2026-07-20） |
@@ -2811,4 +2811,56 @@ Round 13 API 契约测试
 - R20.12-D1 ~ D4 (论文置信度升级路径, 见 §20.12.1)
 - D2 (skip-trace 完整模式重跑, 需 ~30 min × 40 新闻)
 - D4 (edm-takens-web CCM 收敛曲线 PNG 落盘, 后端改造)
+
+---
+
+## §12.12 ROUND26 全量修缮 (2026-07-28)
+
+> **元问题反思**: 本轮修缮源于对"缜密计划 vs 执行完整性鸿沟"的元反思。之前AI制作的程序存在系统性错误模式: 声明-实现鸿沟(注释说已实现但代码从未调用)、跨文件失同步(presets.yaml改0.03但test留0.3)、形式服从(改端点数字但绕过算法正确性)、元认知盲区(修复后不验证运行时行为)。详见 `ROUND26_META_THINKING.md` 和 `ROUND26_ALGORITHM_REVIEW.md`。
+
+### 12.12.1 修缮清单 (40项 + 元反思 + 算法审视)
+
+| 类别 | 编号 | 修复内容 | 验证方法 | 状态 |
+|------|------|---------|---------|------|
+| **P0 算法** | ALG-01 | test_presets.py 3处断言 0.3→0.03 匹配 presets.yaml | pytest 6/6 PASSED | ✅ |
+| **P1 算法** | ALG-02 | _deploy_ccm 实际调用 ccm_with_convergence 真算法 (含字段名修正: converging→is_converging) | pytest 9/9 PASSED + 算法审视验证 | ✅ |
+| **P1 集成** | INT-01 | trace-to-edm BASE导航 href 改为 JS运行时动态生成 | 静态读取确认 | ✅ |
+| **P1 集成** | INT-02 | edm_trigger.py 添加 VARIABLE_MAPPING + 日志披露 | 代码读取确认 | ✅ |
+| **P1 工程** | ENG-01 | trace-to-edm server.js header 31→33 端点 | grep 验证 | ✅ |
+| **P1 工程** | ENG-02 | trace-engine-web server.js header 20→26 routes | grep 验证 | ✅ |
+| **P1 工程** | ENG-03 | 三大Web项目CSS缓存戳统一 20260728a | grep 验证 | ✅ |
+| **P1 文档** | DOC-01/02/03 | 三大Web项目README端点表同步 (33/26/29) | 端点数对比验证 | ✅ |
+| **P1 文档** | DOC-04 | ALGORITHM_AUDIT.md FCI 状态更新为已实现 (4→5星) | 静态读取确认 | ✅ |
+| **P2 算法** | ALG-03~06 | SUPER稳定性与DEEP对齐 (bootstrap 30→200, +1修正, 反事实评估, intercept列) | py_compile + grep 验证 | ✅ |
+| **P2 算法** | ALG-07 | max_delta_nll 归一化 (新增 normalized + total_tokens 字段) | 代码读取确认 | ✅ |
+| **P2 算法** | ALG-08 | 4模块新增pytest (surrogate_test/data_quality/router/analysis_profiles) | 70/70 PASSED | ✅ |
+| **P2 算法** | ALG-09 | common_driver_disclaimer 结构化 (disclaimer_text + disclaimer_level) | pytest 2/2 PASSED | ✅ |
+| **P2 工程** | ENG-04~10 | _active_model路径隔离/CORS/重试断路器/字段分类/.gitignore | 代码读取确认 | ✅ |
+| **P2 健壮** | ROB-01/03 | HTTP调用熔断 + 启动时running→interrupted | 代码读取确认 | ✅ |
+| **P2 安全** | SEC-01/AUD-03 | CORS收紧 + 路径遍历防护 | py_compile 验证 | ✅ |
+| **P2 文档** | DOC-05 | Bai-Perron替代50%丢弃的4点权衡说明 | 静态读取确认 | ✅ |
+| **元反思** | META | ROUND26_META_THINKING.md (5种系统性错误模式) + project_memory 追加6条教训 | 文档创建确认 | ✅ |
+| **算法审视** | REVIEW | ROUND26_ALGORITHM_REVIEW.md (1 P0 + 4 P1 + 4 P2 + 4 P3) + 字段名错误修复 | 审视报告确认 | ✅ |
+| **便携式同步** | SYNC | 五大项目同步至Complement (348文件, 110复制, 模型保护) | verify_portable 11/11 PASS | ✅ |
+| **文档同步** | DOC | MICROSERVICE_API_DESIGN.md 端点数 84→88 校正 + META_AUDIT_CHANGELOG §12.12 | grep 验证 | ✅ |
+
+### 12.12.2 算法审视关键发现
+
+| 严重度 | 文件 | 问题 | 状态 |
+|--------|------|------|------|
+| P0 | enhanced_cross_validate.py:138,582 | Lyapunov log(0) 防护不一致 (final_interpretation.py已修但交叉验证路径未同步) | ⏳ 待修 (转P3) |
+| P1 | py_bridge.py:914-927 | Bootstrap CI 用百分位法而非 BCa (小样本有偏) | ⏳ 待修 (转P3) |
+| P1 | _numpy_edm.py:540-541 | CCM 用 in-sample cross-map 导致 ρ 高估 | ⏳ 待修 (转P3) |
+| P1 | ccm_causality.py:347 | BH-FDR 默认 q=0.10 偏宽松 | ⏳ 待修 (转P3) |
+| P1 | edm_tau_optimization.py:12-43 | AMI 用 histogram-based 而非 KSG 估计器 | ⏳ 待修 (转P3) |
+| **已修** | six_warriors.py:303-310 | ALG-02 字段名 converging→is_converging | ✅ 本轮修复 |
+| **已修** | ccm_causality.py:335 | ALG-09 字段名 converging→is_converging | ✅ 本轮修复 |
+
+### 12.12.3 元反思: 系统性错误模式
+
+1. **声明-实现鸿沟**: ALG-02 注释说"真算法可导入但本诊断未实际运行", 但从未调用 → 本轮实际调用
+2. **跨文件失同步**: ALG-01 presets.yaml改0.03但test留0.3; ALG-09 字段名converging vs is_converging → 本轮全部同步
+3. **形式服从**: 改端点数字/缓存戳等表面形式, 但绕过算法正确性 → 本轮算法审视补齐
+4. **元认知盲区**: 修复后不验证运行时行为 → 本轮每个修复都Edit→Read→运行验证→标记完成
+5. **缜密计划的元问题**: 计划看起来完整, 但实际只执行了容易验证的部分 → 本轮全量推进+算法审视+元思考归档
 

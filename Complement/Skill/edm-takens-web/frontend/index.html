@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>EDM-Takens Web</title>
-  <link rel="stylesheet" href="shared/themes/tokusatsu.css?v=20260727e" />
+  <link rel="stylesheet" href="shared/themes/tokusatsu.css?v=20260728a" />
 </head>
 <body data-self-port="8000">
   <div id="app">
@@ -262,6 +262,9 @@
         }
       } else {
         a.href = 'http://127.0.0.1:' + port;
+        // P1 fix (Round 22 §4): 跨项目跳转在新标签页打开, 避免中断当前页 SSE 实时汇报.
+        a.target = '_blank';
+        a.rel = 'noopener';
       }
     });
   })();

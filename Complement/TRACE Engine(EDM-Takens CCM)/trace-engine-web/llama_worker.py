@@ -384,7 +384,11 @@ def _run_super_stability(bridge, tokens, config, estimate):
     - ATE 稳定性直接在 bridge.data_df 上做行级 resample
     """
     rng = np.random.default_rng(42)
-    n_bootstrap = 30
+    # ALG-03修复: SUPER 轻量模式将 n_bootstrap/n_permutation 从 30/20 提升到 200/200。
+    # 减采样原因：SUPER 定位为快速稳定性扫描（DEEP 模式为 1000/1000），
+    # 200 次已能给出可接受的百分位 CI 与置换 p 值精度，同时控制 token 序列 bootstrap 的算力开销。
+    n_bootstrap = 200
+    n_permutation = 200
     edge_stability = {}
     ate_bootstrap = []
 
@@ -443,7 +447,9 @@ def _run_super_stability(bridge, tokens, config, estimate):
                 boot_df = df.iloc[idx]
                 X = boot_df[[treatment_col] + covariates].values
                 y = boot_df[outcome_col].values
-                coef = np.linalg.lstsq(X, y, rcond=None)[0][0]
+                # ALG-06修复: 添加 intercept 列 (全1)，treatment 系数索引变为 1，避免估计偏差
+                X_intercept = np.hstack([np.ones((X.shape[0], 1)), X])
+                coef = np.linalg.lstsq(X_intercept, y, rcond=None)[0][1]
                 ate_bootstrap.append(float(coef))
         except Exception:
             pass
@@ -453,14 +459,21 @@ def _run_super_stability(bridge, tokens, config, estimate):
     if df is not None and treatment_col in df.columns and outcome_col in df.columns:
         try:
             orig_ate = float(estimate.value) if estimate else 0.0
-            for _ in range(20):
+            for _ in range(n_permutation):
                 perm_df = df.copy()
                 perm_df[treatment_col] = rng.permutation(perm_df[treatment_col].values)
                 X = perm_df[[treatment_col] + [c for c in df.columns if c not in (treatment_col, outcome_col)]].values
                 y = perm_df[outcome_col].values
-                coef = np.linalg.lstsq(X, y, rcond=None)[0][0]
+                # ALG-06修复: 添加 intercept 列，treatment 系数索引变为 1
+                X_intercept = np.hstack([np.ones((X.shape[0], 1)), X])
+                coef = np.linalg.lstsq(X_intercept, y, rcond=None)[0][1]
                 permutation_ates.append(float(coef))
-            p_value = np.mean([abs(a) >= abs(orig_ate) for a in permutation_ates]) if permutation_ates else None
+            # ALG-04修复: p值 +1 修正 (count+1)/(n+1)，避免 p=0 且确保零假设下 p 均匀分布 (Phipson & Smyth 2010)
+            if permutation_ates:
+                count_extreme = int(np.sum([abs(a) >= abs(orig_ate) for a in permutation_ates]))
+                p_value = (count_extreme + 1) / (len(permutation_ates) + 1)
+            else:
+                p_value = None
         except Exception:
             pass
 
@@ -468,16 +481,32 @@ def _run_super_stability(bridge, tokens, config, estimate):
     n_folds = 3
     n_rows = df.shape[0] if df is not None else 0
     if df is not None and n_rows >= n_folds * 2:
-        fold_size = n_rows // n_folds
-        for fold in range(n_folds):
+        # ALG-05修复: 用 array_split 划分折，避免漏样本，与 DEEP 模式一致
+        all_indices = np.arange(n_rows)
+        fold_indices = np.array_split(all_indices, n_folds)
+        for test_idx in fold_indices:
             mask = np.ones(n_rows, dtype=bool)
-            mask[fold * fold_size:(fold + 1) * fold_size] = False
+            mask[test_idx] = False
             try:
                 train_df = df.iloc[mask]
-                X = train_df[[treatment_col] + [c for c in df.columns if c not in (treatment_col, outcome_col)]].values
-                y = train_df[outcome_col].values
-                coef = np.linalg.lstsq(X, y, rcond=None)[0][0]
-                cv_ates.append(float(coef))
+                test_df = df.iloc[~mask]
+                X_train = train_df[[treatment_col] + [c for c in df.columns if c not in (treatment_col, outcome_col)]].values
+                y_train = train_df[outcome_col].values
+                # ALG-06修复: 添加 intercept 列
+                X_train_int = np.hstack([np.ones((X_train.shape[0], 1)), X_train])
+                coef = np.linalg.lstsq(X_train_int, y_train, rcond=None)[0]
+                # ALG-05修复: 改为反事实评估 (treatment=1 vs treatment=0 的预测差均值)
+                # 原代码 np.mean(y_pred) 计算的是 Y 预测均值，非真正的 ATE
+                X_test = test_df[[treatment_col] + [c for c in df.columns if c not in (treatment_col, outcome_col)]].values
+                X_test_t1 = X_test.copy()
+                X_test_t1[:, 0] = 1.0  # treatment=1
+                X_test_t0 = X_test.copy()
+                X_test_t0[:, 0] = 0.0  # treatment=0
+                X_test_t1_int = np.hstack([np.ones((X_test_t1.shape[0], 1)), X_test_t1])
+                X_test_t0_int = np.hstack([np.ones((X_test_t0.shape[0], 1)), X_test_t0])
+                y1_pred = X_test_t1_int @ coef
+                y0_pred = X_test_t0_int @ coef
+                cv_ates.append(float(np.mean(y1_pred - y0_pred)))
             except Exception:
                 pass
 
@@ -786,7 +815,10 @@ def compute_trace(
             if now - last_stats_time >= 3.0:
                 stats(processed_pairs, total_pairs_est, now - t0)
                 last_stats_time = now
-            progress = (si + ti / L) / n_segments if n_segments else 0
+            # P1 fix (Round 22 §2): 将 TRACE 内部 [0,1] 进度映射到全局 stage 区间 [0.2, 0.5],
+            # 避免循环内 progress 达到 1.0 后, bridge 阶段跳回 0.5 造成 "100%→50%→95%" 回跳.
+            _internal = (si + ti / L) / n_segments if n_segments else 0
+            progress = 0.2 + _internal * (0.5 - 0.2)
             if (progress - last_progress >= 0.02 and now - last_progress_time >= 0.5) or now - last_heartbeat >= 30:
                 stage("trace", f"TRACE 计算中... segment {si+1}/{n_segments}, token {ti}/{L}, 已运行 {now - t0:.1f}s", round(progress, 2))
                 last_progress = progress
@@ -1041,7 +1073,7 @@ def run_super_job(job: dict):
     stage("stability", "稳定性与鲁棒性分析 (bootstrap / permutation / CV)...", 0.95)
     stability_analysis = {}
     try:
-        log("info", "SUPER 稳定性分析启动: n_bootstrap=30, n_permutation=20, n_folds=3")
+        log("info", "SUPER 稳定性分析启动: n_bootstrap=200, n_permutation=200, n_folds=3")
         stability_analysis = _run_super_stability(bridge, tokens, config, bridge.estimate_result)
         log("info", f"稳定性分析完成: edge_stability_mean={stability_analysis.get('edge_stability_mean', 0):.3f}")
     except Exception as e:
@@ -1050,11 +1082,40 @@ def run_super_job(job: dict):
 
     # 7. 组装结果
     timer.begin("finalize")
-    stage("finalize", "生成 SUPER 报告...", 0.95)
+    # P1 fix (Round 22 §2): finalize 阶段从 0.95 递增到 0.98, 避免结果已生成仍显示 95%.
+    stage("finalize", "生成 SUPER 报告...", 0.96)
     est = bridge.estimate_result
     ci = DoWhy14Adapter.get_confidence_interval(est) if est else [None, None]
     identifiable = DoWhy14Adapter.is_identifiable(bridge.identified_estimand) if bridge.identified_estimand else False
     concept_frequencies = dict(Counter(bridge.concept_map.values())) if bridge.concept_map else {}
+
+    # P0 fix (Round 23 §1): SUPER 模式 data_diagnostics 注入 max_delta_nll + signal_type.
+    # SUPER 模式 adj_matrix 来自 LLaMA counterfactual probing, 元素为真实 ΔNLL 值
+    # (未经归一化), 因此 adj_matrix.max() 即为归一化前的原始 max_delta_nll.
+    # 此前 token_diagnostics 仅含 n_tokens/n_segments/unk_ratio 等, 缺失 max_delta_nll,
+    # 导致 trace-to-edm L1 层 max_delta_nll 列对 SUPER 任务恒为 0.0 (默认回退值).
+    super_max_delta_nll = round(float(adj_matrix.max()), 3) if adj_matrix.size > 0 else 0.0
+    super_adj_density = round(float((adj_matrix > 0).sum()) / max(adj_matrix.size, 1), 4)
+
+    # P2 修缮 (Round 23 §9): 新增 max_delta_nll_concept_level
+    # max_delta_nll 是 token-level (adj_matrix.max()), 但下游 EDM/DoWhy 使用 concept-level 聚合矩阵.
+    # bridge.significant_edges 的 strength 即为 concept-level 聚合后的 ΔNLL 值.
+    # 同时记录 concept-level 边数, 供下游判断信号稀疏度.
+    concept_edges = getattr(bridge, 'significant_edges', []) or []
+    if concept_edges:
+        # significant_edges: list of (source, target, strength) tuples, 已按 strength 降序排列
+        max_delta_nll_concept_level = round(float(max(e[2] for e in concept_edges)), 3)
+    else:
+        max_delta_nll_concept_level = 0.0
+
+    enriched_diagnostics = {
+        **token_diagnostics,
+        "max_delta_nll": super_max_delta_nll,
+        "max_delta_nll_concept_level": max_delta_nll_concept_level,  # P2: concept-level 对照
+        "concept_level_edge_count": len(concept_edges),  # P2: 边数供稀疏度判断
+        "adj_density": super_adj_density,
+        "signal_type": "delta_nll",  # SUPER 模式为真实 ΔNLL, 区分于 LIGHT 模式的 co_occurrence
+    }
 
     result = {
         "success": True,
@@ -1063,6 +1124,10 @@ def run_super_job(job: dict):
         "text_hash": text_hash,
         "concepts": [c for c in bridge.concept_names if c != "<other>"],
         "concept_frequencies": {k: v for k, v in concept_frequencies.items() if k != "<other>"},
+        # P1 fix (Round 24 §4): 补全 adjacency_matrix, 让前端热力词矩阵在 SUPER 模式也能显示.
+        # SUPER 模式的 adj_matrix 来自 LLaMA counterfactual probing (真实 ΔNLL),
+        # 比 LIGHT/DEEP 的共现计数更有价值, 应当呈现给用户.
+        "adjacency_matrix": adj_matrix.tolist() if adj_matrix is not None else [],
         "n_significant_edges": len(bridge.significant_edges),
         "top_edges": [
             {"source": e[0], "target": e[1], "strength": e[2], "direction": "→"}
@@ -1085,7 +1150,7 @@ def run_super_job(job: dict):
         } if audit else None,
         "stability_analysis": stability_analysis,
         "execution_profile": timer.profile(),
-        "data_diagnostics": token_diagnostics,
+        "data_diagnostics": enriched_diagnostics,
         "environment_diagnostics": env_diag,
         "algorithm_sufficiency": sufficiency,
         "threshold": bridge.threshold,
@@ -1098,8 +1163,13 @@ def run_super_job(job: dict):
     timer.end()
 
     _validate_result(result)
-    emit({"type": "result", "payload": result})
+    # P1 fix (Round 22 §2): 结果发送前递增到 0.98, 确保前端在收到 result 事件时
+    # 看到的进度条接近完成, 而非卡在 95%.
+    stage("finalize", "结果序列化...", 0.98)
+    # P1 fix (Round 24 §5): 在 emit result 之前发出 100% 进度,
+    # 否则前端收到 result 后 setRunning(false) 隐藏进度条, done 事件的 1.0 不显示.
     stage("done", "SUPER 分析完成", 1.0)
+    emit({"type": "result", "payload": result})
 
 
 # ══════════════════════════════════════════════════════════════════════

@@ -47,7 +47,7 @@ main {
 
 .status-wall {
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 8px;
   margin-bottom: 14px;
   transition: opacity 0.2s ease;
@@ -89,6 +89,13 @@ main {
 #app .status-card:has(.stat-value:empty),
 #app .status-card:has(.stat-value[data-empty="true"]) {
   opacity: 0.65;
+}
+
+/* P1 fix: 三栏等高且不塌陷，避免空态时中栏被压缩 */
+.command-grid,
+.command-grid.three-col {
+  align-items: stretch;
+  min-height: 0;
 }
 
 .panel {
@@ -163,7 +170,7 @@ main {
   flex-direction: column !important;
   align-items: center !important;
   text-align: center !important;
-  padding: clamp(6px, 0.9vw, 10px) clamp(10px, 1.4vw, 14px) clamp(8px, 1.2vw, 12px);
+  padding: clamp(5px, 0.7vw, 8px) clamp(10px, 1.4vw, 14px) clamp(6px, 1vw, 10px);
 }
 
 #app .upload-panel > *:not(h2) {
@@ -288,7 +295,12 @@ main {
   flex-direction: column !important;
   align-items: center !important;
   text-align: center !important;
-  padding-bottom: clamp(16px, 2.5vw, 26px);
+  padding: clamp(5px, 0.7vw, 8px) clamp(10px, 1.4vw, 14px) clamp(10px, 1.6vw, 18px);
+}
+
+/* 数据质量等矮面板：减少 padding，避免长条突兀 */
+#app .quality-panel {
+  padding: clamp(5px, 0.7vw, 8px) clamp(10px, 1.4vw, 14px) clamp(8px, 1.2vw, 12px);
 }
 
 #app .config-panel .config-placeholder {
@@ -532,27 +544,78 @@ main {
 #columnInfo {
   color: var(--muted);
   margin-bottom: 12px;
-  font-size: 0.95rem;
+  /* P1 修复 (Round 24 §2): 字体使用 clamp() 响应式缩放, 与其他配置列元素一致,
+     避免长数据列名 (如 "时序, 太姬, 玄姬, 美姬, 希姬, 祈姬, 妙姬") 在固定字号下
+     撑出长条. 同时开启 word-break 让长串列名自动换行. */
+  font-size: clamp(0.7rem, 0.9vw, 0.82rem);
+  line-height: 1.45;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+/* P1 修复 (Round 24 §2): columnInfo 内的 "行数: X | 数值列: ..." 段落
+   使用 flex 布局让各项独立换行, 避免单一长行撑出长条 */
+#columnInfo .col-info-line {
+  display: block;
+  margin: 3px 0;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  font-size: clamp(0.7rem, 0.92vw, 0.8rem);
+}
+
+#columnInfo strong {
+  color: var(--dept-color);
+  font-size: clamp(0.7rem, 0.92vw, 0.8rem);
+  word-break: break-all;
 }
 
 .recommendation-box {
   background: var(--panel-solid);
   border: 1px solid var(--border);
   border-radius: 8px;
-  padding: clamp(10px, 1.5vw, 14px);
+  padding: clamp(8px, 1.2vw, 12px);
   margin: 8px 0 16px;
   color: var(--muted);
-  font-size: 0.9rem;
-  line-height: 1.55;
+  /* P1 修复 (Round 25 §3): 统一字体大小, 与 #columnInfo 协调, 消除"偏大不等" */
+  font-size: clamp(0.7rem, 0.92vw, 0.8rem);
+  line-height: 1.5;
 }
 
 .recommendation-box strong {
   color: var(--dept-color);
+  font-size: clamp(0.7rem, 0.92vw, 0.8rem);
 }
 
 .recommendation-box ul {
   margin: 6px 0 0;
   padding-left: 18px;
+}
+
+/* P1 修复 (Round 24 §2): 数值列名以 chip 形式紧凑排列, 自动换行 */
+#columnInfo .col-info-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 6px;
+  margin-top: 6px;
+  justify-content: center;
+}
+
+#columnInfo .col-chip {
+  display: inline-block;
+  font-size: clamp(0.68rem, 0.9vw, 0.78rem);
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(var(--dept-color-rgb, 0, 255, 157), 0.08);
+  border: 1px solid rgba(var(--dept-color-rgb, 0, 255, 157), 0.2);
+  color: var(--dept-color);
+  word-break: keep-all;
+  white-space: nowrap;
+  line-height: 1.4;
+}
+
+.recommendation-box ul li {
+  font-size: clamp(0.68rem, 0.9vw, 0.78rem);
+  margin-bottom: 3px;
 }
 
 .history-panel .small,
@@ -853,11 +916,154 @@ main {
   max-width: 100%;
 }
 
+.human-report-cards {
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid rgba(var(--dept-color-rgb), 0.25);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.32);
+  box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.25);
+  max-height: 70vh;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+.human-report-cards::-webkit-scrollbar {
+  width: 6px;
+}
+.human-report-cards::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 3px;
+}
+.human-report-cards::-webkit-scrollbar-thumb {
+  background: rgba(var(--dept-color-rgb), 0.25);
+  border-radius: 3px;
+}
+.human-report-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.human-report-header h3 {
+  margin: 0;
+  font-size: clamp(0.78rem, 1.05vw, 0.9rem);
+  color: var(--dept-color);
+}
+.human-report-header .human-report-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.human-report-header a {
+  font-size: clamp(0.62rem, 0.85vw, 0.72rem);
+  color: var(--muted);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.human-report-header a:hover {
+  color: var(--dept-color);
+}
+.human-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 10px;
+}
+.human-card {
+  background: var(--panel-solid);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--dept-color);
+  border-radius: 6px;
+  padding: 10px 12px;
+  text-align: left;
+}
+.human-card-title {
+  margin: 0 0 8px;
+  font-size: clamp(0.72rem, 0.95vw, 0.82rem);
+  font-weight: 700;
+  color: var(--dept-color);
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.human-card-title .card-icon {
+  font-size: 0.95em;
+  opacity: 0.9;
+}
+.human-card-body {
+  font-size: clamp(0.66rem, 0.88vw, 0.76rem);
+  line-height: 1.5;
+  color: var(--text);
+}
+.human-card-body p {
+  margin: 0 0 6px;
+}
+.human-card-body ul {
+  margin: 4px 0;
+  padding-left: 16px;
+}
+.human-card-body li {
+  margin-bottom: 3px;
+}
+.human-card-body blockquote {
+  margin: 6px 0;
+  padding: 6px 10px;
+  border-left: 2px solid var(--dept-color);
+  background: rgba(var(--dept-color-rgb), 0.06);
+  color: var(--muted);
+}
+.human-card-body code {
+  background: rgba(255, 255, 255, 0.08);
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-family: var(--font-mono);
+  color: var(--dept-color-dim);
+}
+.human-card-body table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: clamp(0.62rem, 0.82vw, 0.72rem);
+  margin: 6px 0 8px;
+  table-layout: fixed;
+}
+.human-card-body th,
+.human-card-body td {
+  border: 1px solid var(--border);
+  padding: 3px 5px;
+  text-align: left;
+  vertical-align: middle;
+  line-height: 1.35;
+  word-break: break-word;
+}
+.human-card-body th {
+  background: rgba(var(--dept-color-rgb), 0.08);
+  color: var(--dept-color);
+  font-weight: 600;
+}
+.human-card-body tr:nth-child(even) td {
+  background: rgba(255, 255, 255, 0.02);
+}
+.human-card-body strong {
+  color: var(--dept-color-dim);
+}
+.human-card-body em {
+  color: var(--muted);
+  font-style: italic;
+}
+
 /* 中栏：quality-panel 和 result-panel 垂直排列 */
 .col-mid {
   display: flex;
   flex-direction: column;
   gap: clamp(12px, 1.6vw, 20px);
+  min-height: 280px;
+  flex: 1 1 auto;
 }
 
 /* 左栏：面板垂直排列 */
@@ -881,9 +1087,13 @@ main {
 }
 
 /* 终端面板：固定 max-height，内部滚动，不随日志增长无限撑高 */
+/* P1 fix (Round 22 §5): 增加 display:flex 让 log-view 的 flex:1 生效,
+   否则 log-view 高度由内容撑开, 用户只能看到两行. 同时增大 max-height. */
 .col-right .terminal-panel {
-  max-height: min(45vh, 480px);
-  min-height: 160px;
+  max-height: min(60vh, 560px);
+  min-height: 200px;
+  display: flex;
+  flex-direction: column;
 }
 
 /* 结果面板：允许自然增长，不限制最大高度，确保图片完整展示 */
@@ -891,23 +1101,69 @@ main {
   max-height: none;
 }
 
+/* P1 fix (Round 26 §7): 空态时中栏不再塌陷, 保持视觉平衡 */
+#qualityList,
+#historyList,
+#archiveList,
+#summary,
+#images {
+  width: 100%;
+}
+
 #qualityList,
 #historyList,
 #archiveList {
   max-height: min(40vh, 420px);
+  min-height: 80px;
   overflow-y: auto;
   overflow-x: hidden;
   padding-right: 4px;
-  width: 100%;
 }
 
 /* 结果摘要区有适当高度限制 */
 #summary {
   max-height: min(35vh, 360px);
+  min-height: 60px;
   overflow-y: auto;
   overflow-x: hidden;
   padding-right: 4px;
-  width: 100%;
+}
+
+/* 空态提示统一风格 */
+#qualityList:empty::before,
+#historyList:empty::before,
+#archiveList:empty::before,
+#summary:empty::before,
+#columnInfo:empty::before {
+  content: attr(data-placeholder);
+  display: block;
+  padding: 14px;
+  text-align: center;
+  color: var(--muted);
+  font-size: clamp(0.72rem, 0.95vw, 0.82rem);
+  opacity: 0.7;
+}
+
+/* 未运行时中栏占位提示 */
+.quality-placeholder,
+.result-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 120px;
+  text-align: center;
+  color: var(--muted);
+  font-size: clamp(0.74rem, 0.98vw, 0.84rem);
+  opacity: 0.8;
+  gap: 6px;
+}
+.quality-placeholder::before,
+.result-placeholder::before {
+  content: '◉';
+  font-size: 1.4rem;
+  color: var(--dept-color);
+  opacity: 0.4;
 }
 
 /* 图片区域：完整展示图片，不限制高度，页面自然滚动 */
@@ -938,6 +1194,44 @@ main {
 
 #summary {
   margin-top: 10px;
+}
+
+/* P1 fix (Round 22 §5): "初始化分析任务..." 等提示文字居中 */
+#summary > p:first-child {
+  text-align: center;
+  padding: clamp(0.8rem, 2vh, 1.5rem) 0;
+}
+
+/* P1 fix (Round 22 §5): 进度条样式 */
+#jobProgress {
+  width: 100%;
+  height: 8px;
+  -webkit-appearance: none;
+  appearance: none;
+  border: 1px solid var(--border, #2a3a4a);
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.4);
+  margin: 8px 0;
+  overflow: hidden;
+}
+#jobProgress::-webkit-progress-bar {
+  background: rgba(0, 0, 0, 0.4);
+  border-radius: 4px;
+}
+#jobProgress::-webkit-progress-value {
+  background: linear-gradient(90deg, var(--accent, #00ff88), var(--accent-tokusatsu, #ff9f43));
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+#jobProgress::-moz-progress-bar {
+  background: linear-gradient(90deg, var(--accent, #00ff88), var(--accent-tokusatsu, #ff9f43));
+  border-radius: 4px;
+}
+#jobProgressLabel {
+  font-size: clamp(0.66rem, 0.86vw, 0.76rem);
+  color: var(--muted, #5e6a7d);
+  text-align: center;
+  margin-bottom: 6px;
 }
 
 #summary h4 {
@@ -1283,6 +1577,100 @@ footer {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: clamp(14px, 2vw, 24px);
+}
+
+/* P1 修复 (Round 24 §3): 动态对比网格 — 根据任务数量自适应列数 */
+.compare-grid.compare-grid-2 { grid-template-columns: repeat(2, 1fr); }
+.compare-grid.compare-grid-3 { grid-template-columns: repeat(3, 1fr); }
+.compare-grid.compare-grid-4 { grid-template-columns: repeat(2, 1fr); }
+.compare-grid.compare-grid-5,
+.compare-grid.compare-grid-6 { grid-template-columns: repeat(3, 1fr); }
+.compare-grid.compare-grid-7,
+.compare-grid.compare-grid-8 { grid-template-columns: repeat(4, 1fr); }
+
+.compare-header-info {
+  color: var(--muted);
+  font-size: clamp(0.72rem, 0.95vw, 0.84rem);
+  margin-bottom: 10px;
+}
+
+.compare-meta {
+  font-size: clamp(0.66rem, 0.85vw, 0.76rem);
+  color: var(--muted);
+  margin-bottom: 8px;
+  word-break: break-all;
+}
+
+.compare-section {
+  margin-bottom: 10px;
+  font-size: clamp(0.68rem, 0.88vw, 0.78rem);
+}
+
+.compare-section strong {
+  color: var(--dept-color);
+  display: block;
+  margin-bottom: 4px;
+}
+
+.compare-section ul {
+  margin: 0;
+  padding-left: 16px;
+  word-break: break-word;
+}
+
+.compare-section li {
+  margin-bottom: 3px;
+  line-height: 1.4;
+}
+
+/* 横向对比表 */
+.compare-table-wrap {
+  margin-top: 18px;
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel-solid);
+}
+
+.compare-table-wrap h4 {
+  margin: 0;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  color: var(--dept-color);
+  font-size: clamp(0.78rem, 1.05vw, 0.92rem);
+}
+
+.compare-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: clamp(0.66rem, 0.85vw, 0.76rem);
+  table-layout: auto;
+}
+
+.compare-table th,
+.compare-table td {
+  border: 1px solid var(--border);
+  padding: 6px 10px;
+  text-align: left;
+  vertical-align: top;
+  word-break: break-word;
+  line-height: 1.4;
+}
+
+.compare-table th {
+  background: var(--panel-solid);
+  color: var(--dept-color);
+  font-size: clamp(0.64rem, 0.82vw, 0.74rem);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.compare-table td.key {
+  color: var(--dept-color);
+  font-family: var(--font-mono);
+  font-weight: 600;
+  white-space: nowrap;
+  background: rgba(var(--dept-color-rgb, 0, 255, 157), 0.04);
 }
 
 .compare-side {

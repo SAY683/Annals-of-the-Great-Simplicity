@@ -99,6 +99,11 @@ app = FastAPI(title="EDM-Takens Web", version="0.1.0")
 # debt-12.13 收窄: allow_headers 从通配符 ["*"] 改为显式白名单，
 # 避免非预期自定义头（如 X-Forwarded-For 注入）穿透 CORS 检查。
 # debt-12.15 隧道支持: 自动读取 tunnel_url.txt，把 trycloudflare 域名加入白名单
+#
+# SEC-01 修复: allow_credentials=True 与 allow_origins=["*"] 同时使用是
+# 危险的配置错误（浏览器会拒绝，且语义上等价于"任意源可携带凭证访问"）。
+# 此处显式列出允许的源，并对环境变量输入做通配符过滤，确保即便运维
+# 误配 EDM_CORS_ORIGINS="*"，也不会与 allow_credentials=True 形成危险组合。
 def _load_tunnel_origins():
     """从 tunnel_url.txt 读取隧道域名，加入 CORS 白名单。
     隧道模式下前端与 API 同源（都在 https://xxx.trycloudflare.com），
@@ -115,8 +120,38 @@ def _load_tunnel_origins():
         pass
     return []
 
-_EDM_CORS_ORIGINS = (
-    os.environ.get("EDM_CORS_ORIGINS", "http://localhost:5173,http://localhost:8000,http://127.0.0.1:5173,http://127.0.0.1:8000").split(",")
+
+def _filter_cors_origins(raw_origins):
+    """SEC-01: 过滤掉通配符 origin，防止 allow_credentials=True 与通配符共存。
+
+    浏览器规范禁止 allow_credentials=True 与 allow_origins=["*"] 同时使用，
+    且通配符 origin 在凭证模式下语义危险（任意站点可携带 Cookie 访问 API）。
+    本函数剔除 "*" 及其它通配模式，仅保留明确的具体源。
+    """
+    filtered = []
+    for origin in raw_origins:
+        origin = origin.strip()
+        if not origin:
+            continue
+        # 剔除纯通配符 "*"
+        if origin == "*":
+            print(f"[CORS] SEC-01: 拒绝通配符 origin '*' (与 allow_credentials=True 不兼容)")
+            continue
+        # 剔除含通配符的 origin（如 "*.example.com"）
+        if "*" in origin:
+            print(f"[CORS] SEC-01: 拒绝含通配符的 origin '{origin}'")
+            continue
+        filtered.append(origin)
+    return filtered
+
+
+# SEC-01: 默认仅允许本地开发源；生产环境通过 EDM_CORS_ORIGINS 显式配置。
+# 即便环境变量误配为 "*"，_filter_cors_origins 也会将其剔除。
+_EDM_CORS_ORIGINS = _filter_cors_origins(
+    os.environ.get(
+        "EDM_CORS_ORIGINS",
+        "http://localhost:5173,http://localhost:8000,http://127.0.0.1:5173,http://127.0.0.1:8000",
+    ).split(",")
     + _load_tunnel_origins()
 )
 _EDM_ALLOWED_HEADERS = [

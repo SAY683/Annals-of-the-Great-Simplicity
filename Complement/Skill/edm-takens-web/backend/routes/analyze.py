@@ -22,6 +22,7 @@ from services.file_management import (
     _select_variables,
     _resolve_analysis_params,
     _check_target_quality,
+    _safe_task_path,
 )
 
 router = APIRouter()
@@ -190,10 +191,19 @@ def analyze_stream(
 @router.get("/api/results/{image_path:path}", dependencies=[Depends(require_auth_optional)])
 def get_image(image_path: str):
     """Serve a result image, optionally nested under a task directory."""
-    requested = os.path.abspath(os.path.join(RESULTS_DIR, image_path))
-    root = os.path.abspath(RESULTS_DIR)
-    if not requested.startswith(root + os.sep) and requested != root:
+    # AUD-03: 路径遍历防护 — 复用 _safe_task_path 统一的安全检查函数，
+    # 防止 "../../../etc/passwd" 等路径遍历攻击逃逸出 RESULTS_DIR。
+    # _safe_task_path 会将 image_path 拼接到 RESULTS_DIR 下并做 abspath 规范化，
+    # 若解析结果不在 RESULTS_DIR 子树内则返回 None。
+    requested = _safe_task_path(image_path, RESULTS_DIR)
+    if not requested:
+        raise HTTPException(status_code=400, detail="Invalid image path")
+    # 额外防护：拒绝请求根目录本身（image_path 为空或 "."），
+    # 以及拒绝请求目录（FileResponse 不应服务目录）。
+    if requested == os.path.abspath(RESULTS_DIR):
         raise HTTPException(status_code=400, detail="Invalid image path")
     if not os.path.exists(requested):
         raise HTTPException(status_code=404, detail="Image not found")
+    if os.path.isdir(requested):
+        raise HTTPException(status_code=400, detail="Invalid image path")
     return FileResponse(requested)

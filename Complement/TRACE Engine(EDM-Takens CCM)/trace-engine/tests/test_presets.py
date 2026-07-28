@@ -77,8 +77,8 @@ def test_simple_yaml_parse():
     assert raw["trace2dowhy"]["threshold"] == 0.03
     # 顶层 concept_min_freq = 2
     assert raw["trace2dowhy"]["concept_min_freq"] == 2
-    # standard 场景 threshold = 0.3
-    assert raw["presets"]["standard"]["trace2dowhy"]["threshold"] == 0.3
+    # standard 场景 threshold = 0.03 (ALG-01修复: 与顶层默认值和模型文档推荐一致, 原0.3疑似笔误)
+    assert raw["presets"]["standard"]["trace2dowhy"]["threshold"] == 0.03
     # llama 场景 threshold = 0.01
     assert raw["presets"]["llama"]["trace2dowhy"]["threshold"] == 0.01
     # 布尔值解析：classical_mode = false
@@ -94,8 +94,8 @@ def test_simple_yaml_parse():
 def test_load_presets_standard():
     """验证 standard 预设加载（深合并路径）"""
     p = load_presets("standard")
-    # standard 场景覆盖 trace2dowhy.threshold 为 0.3
-    assert p.trace2dowhy.threshold == 0.3
+    # standard 场景覆盖 trace2dowhy.threshold 为 0.03 (ALG-01修复: 与模型文档推荐一致)
+    assert p.trace2dowhy.threshold == 0.03
     assert p.trace2dowhy.concept_min_freq == 3
     assert p.trace2dowhy.max_edges_for_dowhy == 8
     # 未被 standard 覆盖的字段保留基础值
@@ -134,8 +134,8 @@ def test_load_presets_unknown_fallback():
     """验证未知预设回退到 standard 场景"""
     p = load_presets("nonexistent_preset_xyz")
     # load_presets 在预设不存在时返回 raw['presets']['standard']
-    # standard 场景 threshold=0.3（与顶层默认 0.03 区分）
-    assert p.trace2dowhy.threshold == 0.3
+    # standard 场景 threshold=0.03 (ALG-01修复); 用 concept_min_freq=3 区分顶层默认值 2
+    assert p.trace2dowhy.threshold == 0.03
     assert p.trace2dowhy.concept_min_freq == 3
 
 

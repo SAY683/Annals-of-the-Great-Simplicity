@@ -428,8 +428,18 @@ router.get('/:id/export/md', async (req, res) => {
   lines.push(`_报告由 TRACE Engine Web 自动生成于 ${fmtTs(new Date().toISOString())}._`);
 
   const mdContent = lines.join('\n');
+
+  // P1 fix (Round 25 §2): 人话版报告落盘到任务输出目录, 方便文件系统查阅.
+  // 用户要求: "应当等同于我们的日志在项目的文件夹中，进行生成"
+  try {
+    const humanReportPath = path.join(OUTPUT_DIR, id, 'human_report.md');
+    await fs.promises.writeFile(humanReportPath, mdContent, 'utf-8');
+  } catch (e) {
+    // 落盘失败不影响浏览器展示
+  }
+
+  // P2 fix (Round 24 §10): 改为直接展示 (text/markdown), 不触发浏览器下载.
   res.setHeader('Content-Type', 'text/markdown; charset=utf-8');
-  res.setHeader('Content-Disposition', `attachment; filename="${id}_report.md"`);
   res.send(mdContent);
 });
 

@@ -1,8 +1,8 @@
 # 五大项目微服务 API 路由方案 + 前端鲁棒性 + 网页关闭重连机制
 
 > 范围：`f:\攻略\研发测试\.skills` 下五个项目（edm-takens、edm-takens-web、trace-engine、trace-engine-web、trace-to-edm）。
-> 目标：在 **不破坏现有 29 + 24 + 31 端点** 的前提下，沉淀一份微服务 API 路由契约、前端鲁棒性方案与网页关闭重连机制，作为后续渐进式微服务化的蓝图。
-> 备注：原始任务卡列 trace-to-edm 为 13 端点，Q5 盘点为 25 端点，Q8+ 新增 `/api/edm/poll/:id` 代理端点（CORS 修复），Round 12 续新增 `/api/version`（版本查询），R13+ 新增 `/api/replay-uuids`、`/api/work-uuid/:uuid/text`、`/api/pipeline/run` 等端点，现为 31 端点。edm-takens-web 经 routes/* 细化为 29 端点。trace-engine-web 经 routes/* 拆分为 24 端点（system=8 / jobs=7 / analysis=8 / admin=1）。
+> 目标：在 **不破坏现有 33 + 26 + 29 端点** 的前提下，沉淀一份微服务 API 路由契约、前端鲁棒性方案与网页关闭重连机制，作为后续渐进式微服务化的蓝图。
+> 备注：原始任务卡列 trace-to-edm 为 13 端点，Q5 盘点为 25 端点，Q8+ 新增 `/api/edm/poll/:id` 代理端点（CORS 修复），Round 12 续新增 `/api/version`（版本查询），R13+ 新增 `/api/replay-uuids`、`/api/work-uuid/:uuid/text`、`/api/pipeline/run` 等端点，ROUND26 同步后为 33 端点。edm-takens-web 经 routes/* 细化为 29 端点。trace-engine-web 经 routes/* 拆分为 26 端点（system=8 / jobs=8 / analysis=8 / admin=1 + 1 静态 `GET /`，ROUND26 校正）。
 
 ---
 
@@ -15,8 +15,8 @@
 | **edm-takens** | 算法内核（无独立 API） | Python 3.13 | — | EDM-Takens 流水线（CCM、EmbedDimension、Havok、SovereignHavok、SurrogateTest、AdaptivePipeline）。作为 Python 模块被 `edm-takens-web` 直接 `import` 调用。 | 0 |
 | **edm-takens-web** | EDM 分析 Web 服务 | FastAPI / Uvicorn | 8000 | 数据集管理、EDM 分析任务编排、历史归档、结果导出。 | 29 |
 | **trace-engine** | 算法内核（无独立 API） | Python 3.13 | — | TRACE 引擎（六战士 + 反事实桥 + DoWhy 适配 + Pearl 反事实）。作为子进程被 `trace-engine-web` 通过 `py_bridge.py` 调用。 | 0 |
-| **trace-engine-web** | 文本因果分析 Web 服务 | Express + SSE | 3000 | 文本分析（LIGHT/DEEP/SUPER）、SSE 流式、结果缓存、LLaMA Worker 调度、任务历史。 | 24 |
-| **trace-to-edm** | 桥接编排服务 | Express + SSE | 3100 | 三层桥接（L1 元SCM / L2 世俗语义 PCA / L3 八正道）、文本管线 Mode A、回填管线 Mode B、EDM 触发与轮询代理、项目与数据集管理、版本查询。 | 31 |
+| **trace-engine-web** | 文本因果分析 Web 服务 | Express + SSE | 3000 | 文本分析（LIGHT/DEEP/SUPER）、SSE 流式、结果缓存、LLaMA Worker 调度、任务历史。 | 26 |
+| **trace-to-edm** | 桥接编排服务 | Express + SSE | 3100 | 三层桥接（L1 元SCM / L2 世俗语义 PCA / L3 八正道）、文本管线 Mode A、回填管线 Mode B、EDM 触发与轮询代理、项目与数据集管理、版本查询。 | 33 |
 
 ### 1.2 服务间通信拓扑
 
@@ -60,7 +60,7 @@
 | **只读型（Read-Only）** | 纯查询，无副作用 | `GET /api/health`、`GET /api/datasets`、`GET /api/history`、`GET /api/jobs`、`GET /api/schema` | 28 |
 | **治理型（Governance）** | 清理、归档、批量操作、模型切换 | `POST /api/admin/cleanup`、`POST /api/history/cleanup`、`POST /api/jobs/clear`、`POST /api/models/activate` | 10 |
 
-> 总计 84 端点（edm-takens-web 29 + trace-engine-web 24 + trace-to-edm 31，Round 13.4 对账后，Round 19 校正 §6.1 表格与此一致）。
+> 总计 88 端点（edm-takens-web 29 + trace-engine-web 26 + trace-to-edm 33，ROUND26 同步对账后校正）。
 
 ### 1.4 服务绑定地址规范（Round 19 新增）
 
@@ -84,7 +84,7 @@
 
 ## 2. API 路由层级体系
 
-将现有 84 个端点按职能归入 5 个逻辑层。**层级不是物理部署**，同一服务可跨多层（如 edm-takens-web 同时提供 L1/L2/L3/L4/L5 端点）。这是后续抽出独立微服务的拆分依据。
+将现有 88 个端点按职能归入 5 个逻辑层。**层级不是物理部署**，同一服务可跨多层（如 edm-takens-web 同时提供 L1/L2/L3/L4/L5 端点）。这是后续抽出独立微服务的拆分依据。
 
 ### 2.1 L1 — 基础设施层（Health / Config / Schema）
 
@@ -666,7 +666,7 @@ async function fetchResult(jobId) {
 
 **动作项**：
 1. 为 edm-takens-web 启用 FastAPI 自带的 OpenAPI 生成（`/docs`、`/openapi.json`），补充 Pydantic 模型。
-2. 为 trace-engine-web 与 trace-to-edm 编写手写 `openapi.yaml`，覆盖所有 84 端点。
+2. 为 trace-engine-web 与 trace-to-edm 编写手写 `openapi.yaml`，覆盖所有 88 端点。
 3. 统一错误响应格式：
    ```json
    { "success": false, "error": "...", "code": "VALIDATION_FAILED", "field": "filename", "traceId": "..." }
@@ -721,9 +721,9 @@ async function fetchResult(jobId) {
 | 项目 | 现有端点数 | 微服务化后保留 | 备注 |
 |------|-----------|--------------|------|
 | edm-takens-web | 29 | 29 | 仅补 OpenAPI 文档，不改路由 (Round 19 校正: 25→29) |
-| trace-engine-web | 24 | 24 | 仅补 OpenAPI 文档，不改路由 (Round 19 校正: 23→24) |
-| trace-to-edm | 31 | 31 | 仅补 OpenAPI 文档，不改路由 (Round 19 校正: 29→31, 与 server.js header 一致) |
-| **合计** | **84** | **84** | 网关层只做转发，不重写路径 (Round 19 校正: 77→84) |
+| trace-engine-web | 26 | 26 | 仅补 OpenAPI 文档，不改路由 (ROUND26 校正: 24→26, 含 batch-delete/export/md 等) |
+| trace-to-edm | 33 | 33 | 仅补 OpenAPI 文档，不改路由 (ROUND26 校正: 31→33, 与 server.js header 一致) |
+| **合计** | **88** | **88** | 网关层只做转发，不重写路径 (ROUND26 校正: 84→88) |
 
 ### 6.2 渐进式策略
 
@@ -808,7 +808,7 @@ async function fetchResult(jobId) {
 
 ---
 
-## 附录 A：84 端点全量索引（按服务 + 层级）
+## 附录 A：88 端点全量索引（按服务 + 层级）
 
 ### A.1 edm-takens-web（29 端点）
 
@@ -841,13 +841,16 @@ async function fetchResult(jobId) {
 | L4 | `/api/history/compare` | POST | history.py |
 | L4 | `/api/history/{task_id}/export/json` | GET | history.py |
 | L4 | `/api/history/{task_id}/export/csv` | GET | history.py |
-| L1 | `/` | GET | api.py（SPA 根） |
-| L1 | `/{path:path}` | GET | api.py（SPA fallback） |
+| L4 | `/api/history/{task_id}/export/md` | GET | history.py |
+| L4 | `/api/history/{task_id}/export/html` | GET | history.py |
 
-### A.2 trace-engine-web（24 端点）
+> 注：`GET /` 与 `GET /{path:path}`（api.py 中的 SPA 静态托管回退）不计入 29 个 API 端点之列，与 TECHNICAL.md §3.0 一致。
+
+### A.2 trace-engine-web（26 端点）
 
 | 层级 | 端点 | 方法 | 文件 |
 |------|------|------|------|
+| L1 | `/` | GET | server.js（express.static 前端页面） |
 | L1 | `/api/health` | GET | system.js |
 | L1 | `/api/config` | GET | system.js |
 | L1 | `/api/version` | GET | system.js |
@@ -868,48 +871,51 @@ async function fetchResult(jobId) {
 | L4 | `/api/jobs/export` | GET | jobs.js |
 | L4 | `/api/jobs/:id` | GET | jobs.js |
 | L4 | `/api/jobs/:id/detail` | GET | jobs.js |
+| L4 | `/api/jobs/:id/export/md` | GET | jobs.js |
 | L5 | `/api/jobs/clear` | POST | jobs.js |
 | L5 | `/api/jobs/batch-delete` | POST | jobs.js |
 | L5 | `/api/jobs/:id` | DELETE | jobs.js |
 | L5 | `/api/admin/cleanup` | POST | admin.js |
 
-### A.3 trace-to-edm（31 端点）
+### A.3 trace-to-edm（33 端点）
 
-> 行号同步至 2026-07-27（Round 13.4 后 server.js 端点计数 31，含 /api/health、/api/version、/api/orthogonality、/api/inputs、/api/edm/poll/:jobId、/api/work-uuid/:uuid/text 等新增端点）。
+> 行号同步至 2026-07-28（server.js 端点计数 33，含 /api/health、/api/version、/api/orthogonality、/api/inputs、/api/edm/poll/:jobId、/api/trajectory/export/md、/api/trajectory/report、/api/work-uuid/:uuid/text 等端点）。
 
 | 层级 | 端点 | 方法 | 行号 |
 |------|------|------|------|
-| L1 | `/api/health` | GET | 363 |
-| L1 | `/api/version` | GET | 369 |
-| L1 | `/api/status` | GET | 381 |
-| L1 | `/api/orthogonality` | GET | 434 |
-| L2 | `/api/trajectory` | GET | 456 |
-| L5 | `/api/trajectory/clear` | POST | 461 |
-| L3 | `/api/run` | POST | 482 |
-| L3 | `/api/replay` | POST | 575 |
-| L3 | `/api/edm/trigger` | POST | 664 |
-| L3 | `/api/edm/poll/:jobId` | GET | 723 |
-| L4 | `/api/jobs` | GET | 758 |
-| L4 | `/api/inputs` | GET | 794 |
-| L2 | `/api/dataset` | GET | 816 |
-| L2 | `/api/dataset/add` | POST | 825 |
-| L2 | `/api/dataset/add-text` | POST | 835 |
-| L2 | `/api/dataset/remove` | POST | 855 |
-| L5 | `/api/dataset/clear-processed` | POST | 860 |
-| L5 | `/api/dataset/reset` | POST | 865 |
-| L2 | `/api/dataset/update-ts` | POST | 870 |
-| L3 | `/api/pipeline/run` | POST | 1017 |
-| L2 | `/api/models` | GET | 1108 |
-| L5 | `/api/models/activate` | POST | 1122 |
-| L2 | `/api/projects` | GET | 1161 |
-| L2 | `/api/projects` | POST | 1174 |
-| L2 | `/api/projects/activate` | PUT | 1186 |
-| L2 | `/api/projects/:name` | DELETE | 1199 |
-| L2 | `/api/work-scan` | GET | 1211 |
-| L2 | `/api/work-uuid/:uuid` | DELETE | 1220 |
-| L5 | `/api/work-clean` | POST | 1243 |
-| L3 | `/api/replay-uuids` | POST | 1271 |
-| L2 | `/api/work-uuid/:uuid/text` | GET | 1345 |
+| L1 | `/api/health` | GET | 1035 |
+| L1 | `/api/version` | GET | 1041 |
+| L1 | `/api/status` | GET | 1053 |
+| L1 | `/api/orthogonality` | GET | 1106 |
+| L2 | `/api/trajectory` | GET | 1128 |
+| L5 | `/api/trajectory/clear` | POST | 1133 |
+| L4 | `/api/trajectory/export/md` | GET | 1154 |
+| L4 | `/api/trajectory/report` | GET | 1173 |
+| L3 | `/api/run` | POST | 1192 |
+| L3 | `/api/replay` | POST | 1285 |
+| L3 | `/api/edm/trigger` | POST | 1374 |
+| L3 | `/api/edm/poll/:jobId` | GET | 1460 |
+| L4 | `/api/jobs` | GET | 1495 |
+| L4 | `/api/inputs` | GET | 1531 |
+| L2 | `/api/dataset` | GET | 1553 |
+| L2 | `/api/dataset/add` | POST | 1562 |
+| L2 | `/api/dataset/add-text` | POST | 1572 |
+| L2 | `/api/dataset/remove` | POST | 1592 |
+| L5 | `/api/dataset/clear-processed` | POST | 1597 |
+| L5 | `/api/dataset/reset` | POST | 1602 |
+| L2 | `/api/dataset/update-ts` | POST | 1607 |
+| L3 | `/api/pipeline/run` | POST | 1754 |
+| L2 | `/api/models` | GET | 1845 |
+| L5 | `/api/models/activate` | POST | 1859 |
+| L2 | `/api/projects` | GET | 1898 |
+| L2 | `/api/projects` | POST | 1919 |
+| L2 | `/api/projects/activate` | PUT | 1933 |
+| L2 | `/api/projects/:name` | DELETE | 1948 |
+| L2 | `/api/work-scan` | GET | 1964 |
+| L2 | `/api/work-uuid/:uuid` | DELETE | 1973 |
+| L5 | `/api/work-clean` | POST | 1996 |
+| L3 | `/api/replay-uuids` | POST | 2024 |
+| L2 | `/api/work-uuid/:uuid/text` | GET | 2098 |
 
 ---
 

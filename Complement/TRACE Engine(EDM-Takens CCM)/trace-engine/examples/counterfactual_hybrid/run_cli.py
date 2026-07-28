@@ -275,12 +275,48 @@ def cmd_real(preset="llama"):
     # 检查是否有缓存的 TRACE 结果
     adj_cache = CACHE_DIR / "real_adj.npy"
     tokens_cache = CACHE_DIR / "real_tokens.json"
+    meta_cache = CACHE_DIR / "real_cache_meta.json"
 
     if not adj_cache.exists() or not tokens_cache.exists():
         log_warn(f"未找到 TRACE 缓存文件 ({CACHE_DIR})")
         log_info("请先运行 TRACE 管线生成缓存，或运行:")
         log_info("  python run_real_pipeline.py")
         return
+
+    # MOD-01: 缓存版本检查 — 基于文本 hash 检测缓存失效
+    import hashlib, json as _json
+    def _compute_text_hash(filepath):
+        h = hashlib.sha256()
+        with open(filepath, 'rb') as f:
+            for chunk in iter(lambda: f.read(8192), b''):
+                h.update(chunk)
+        return h.hexdigest()[:16]
+
+    if meta_cache.exists():
+        try:
+            meta = _json.loads(meta_cache.read_text(encoding='utf-8'))
+            cached_hash = meta.get('text_hash', '')
+            # 尝试找到当前文本文件
+            data_dir = paths.data_dir()
+            current_text = None
+            candidate = data_dir / meta.get('text_file', '政治意识.txt')
+            if candidate.exists():
+                current_text = candidate
+            else:
+                txts = list(data_dir.rglob("*.txt")) if data_dir.exists() else []
+                if txts:
+                    current_text = txts[0]
+            if current_text and cached_hash:
+                current_hash = _compute_text_hash(current_text)
+                if current_hash != cached_hash:
+                    log_warn(f"TRACE 缓存已失效（文本内容变更: {cached_hash} → {current_hash}）")
+                    log_info("请重新运行: python run_real_pipeline.py")
+                    return
+                log_info(f"TRACE 缓存有效 (hash={cached_hash})")
+        except Exception as e:
+            log_warn(f"缓存元数据读取失败 ({e})，继续使用缓存")
+    else:
+        log_warn("未找到缓存元数据 (real_cache_meta.json)，建议重新运行 run_real_pipeline.py")
 
     import numpy as np, json
     sys.path.insert(0, str(SKILL_DIR))

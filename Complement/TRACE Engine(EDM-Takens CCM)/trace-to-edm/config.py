@@ -103,8 +103,28 @@ TRAJECTORY_CSV = OUTPUTS_DIR / "narrative_meta_trajectories.csv"  # 向后兼容
 
 # 项目目录
 PROJECTS_DIR = PROJECT_ROOT / "projects"
-MODEL_CACHE_DIR = CACHE_DIR
+# ENG-04 修复: _active_model.txt 按项目隔离
+# 原实现 MODEL_CACHE_DIR = CACHE_DIR 指向全局 data/cache/，
+# 导致所有项目共享同一个 _active_model.txt，项目 A 切换模型后项目 B 也受影响。
+# 现改为指向默认项目的 cache 目录；运行时通过 project_manager.current_cache_dir 动态解析。
+# 注意: 此处不能在导入时调用 project_manager (循环依赖)，故仅提供静态默认路径。
+MODEL_CACHE_DIR = PROJECTS_DIR / "default" / "cache"
 PCA_CACHE_FILE = CACHE_DIR / "_pca_state.pkl"
+
+
+def get_active_model_path():
+    """
+    ENG-04: 获取当前活动模型的持久化路径 (项目级隔离)。
+
+    返回: projects/{active_project}/cache/_active_model.txt
+    优先使用 project_manager 的当前项目 cache 目录；
+    若项目上下文不可用 (如模块独立测试)，回退到默认项目 cache 目录。
+    """
+    try:
+        from project_manager import get_project_manager
+        return get_project_manager().current_cache_dir / "_active_model.txt"
+    except Exception:
+        return MODEL_CACHE_DIR / "_active_model.txt"
 
 # ── 输入 CSV 列名 ───────────────────────────────────────────
 INPUT_COL_TIMESTAMP = "timestamp"
@@ -127,6 +147,13 @@ LAYER1_COLUMNS = [
     ("edge_count",           "n_significant_edges",   0,      "显著因果边数"),
     ("adj_density",          "data_diagnostics.adj_density", 0.0, "邻接矩阵密度"),
     ("max_delta_nll",        "data_diagnostics.max_delta_nll", 0.0, "最强因果信号"),
+    # P1 修缮 (Round 23 §审计): signal_type 区分 LIGHT/DEEP (co_occurrence) 与 SUPER (delta_nll)
+    # 避免下游 EDM 将不同语义单位的 max_delta_nll 视为同质时间序列
+    ("signal_type",          "data_diagnostics.signal_type", "unknown", "信号类型 (co_occurrence/delta_nll)"),
+    # P2 修缮 (Round 23 §9): max_delta_nll 是 token-level, 下游 EDM 使用 concept-level 聚合
+    # 新增 concept-level 对照字段, 供下游判断 token vs concept 层级信号差异
+    ("max_delta_nll_concept_level", "data_diagnostics.max_delta_nll_concept_level", 0.0, "concept-level 最强ΔNLL (仅SUPER)"),
+    ("concept_level_edge_count", "data_diagnostics.concept_level_edge_count", 0, "concept-level 边数 (仅SUPER)"),
 
     # 数据诊断
     ("concept_coverage",     "data_diagnostics.concept_coverage", 0.0, "概念覆盖率"),
@@ -136,6 +163,11 @@ LAYER1_COLUMNS = [
     # 六战士: CCM
     ("ccm_coverage_pct",     "six_warriors.ccm.metrics.CCM_coverage", 0.0, "CCM 覆盖率"),
     ("ccm_verdict",          None,                    "N/A",  "CCM 判定"),        # 计算列
+    # P1 修缮 (Round 23 §审计): refutations_attempted 区分 LIGHT (0/0 未尝试) 与 DEEP/SUPER (0/3 全通过)
+    ("refutations_attempted", None,                   0,      "反驳测试尝试数 (0或3)"),  # 计算列
+    # P1 修缮 (Round 23 §审计): ccm_algorithm_run 标注是否调用了真实 ccm_with_convergence
+    # 当前实现仅做启发式覆盖率, 真实 CCM 从未调用; verdict=VERIFIABLE 时为 1
+    ("ccm_algorithm_run",    None,                    0,      "真实CCM算法是否运行 (0/1)"),  # 计算列
 
     # 六战士: EDM
     ("edm_rho_high",         "six_warriors.edm.metrics.rho_high", 0, "高可预测性概念数"),

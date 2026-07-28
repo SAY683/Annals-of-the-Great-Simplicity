@@ -134,18 +134,60 @@ def _build_summary(
         }
 
     # P1 修复项 4：暴露 post-audit verdict 给前端。
+    # P0 fix (Round 23 §续): AuditReport.warnings/failures 是整数计数器而非消息列表,
+    # 真正的消息在 findings 里。暴露计数 + 消息列表双字段, 避免下游误迭代整数。
     post_audit_obj = pipe_dict.get("post_audit")
     if post_audit_obj is not None:
         summary["post_audit_verdict"] = getattr(post_audit_obj, "verdict", None)
         summary["post_audit_passed"] = getattr(post_audit_obj, "passed", None)
-        summary["post_audit_warnings"] = getattr(post_audit_obj, "warnings", None)
-        summary["post_audit_failures"] = getattr(post_audit_obj, "failures", None)
+        summary["post_audit_warning_count"] = int(getattr(post_audit_obj, "warnings", 0) or 0)
+        summary["post_audit_failure_count"] = int(getattr(post_audit_obj, "failures", 0) or 0)
+        # 从 findings 提取实际消息 (只取 WARN/FAIL 状态的)
+        findings = getattr(post_audit_obj, "findings", []) or []
+        warn_msgs = []
+        fail_msgs = []
+        for f in findings:
+            status = getattr(f, "status", "")
+            msg = getattr(f, "message", "")
+            secret = getattr(f, "secret_ref", "")
+            entry = f"[{secret}] {msg}" if secret else msg
+            if status == "WARN":
+                warn_msgs.append(entry)
+            elif status == "FAIL":
+                fail_msgs.append(entry)
+        summary["post_audit_warnings"] = warn_msgs
+        summary["post_audit_failures"] = fail_msgs
 
     # Pull interpretation key takeaways if available
     if isinstance(interp, dict):
         for key in ["stability_tier", "heavy_tailed_variables", "n_ccm_significant"]:
             if key in interp:
                 summary[key] = interp[key]
+        # P1 修复 (Round 24 §1): 暴露更多解释数据供人话版报告使用.
+        # 此前仅提取 3 个字段, 导致 markdown 报告缺失 "图谱解析" 章节
+        # (无法解读 dynamics_interpretation.png) 以及李雅普诺夫/变量分析.
+        for key in [
+            "lyapunov_reliable_variables",
+            "available_variables",
+            "skipped_variables",
+            "unit",
+            "n_samples",
+        ]:
+            if key in interp:
+                summary[key] = interp[key]
+        # ccm_results 包含方向判定 (forward/reverse/bidirectional) — 比 ccm_batch
+        # 中的 significant_corrected 更直观, 单独暴露供人话版报告使用.
+        if "ccm_results" in interp and isinstance(interp["ccm_results"], list):
+            summary["ccm_directions"] = [
+                {
+                    "cause": r.get("cause"),
+                    "effect": r.get("effect"),
+                    "direction": r.get("direction"),
+                    "verdict": r.get("verdict"),
+                }
+                for r in interp["ccm_results"]
+                if isinstance(r, dict)
+            ]
 
     return summary
 

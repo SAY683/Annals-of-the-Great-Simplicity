@@ -19,7 +19,7 @@ async function loadJobHistory() {
     // P1-c：批量选择工具栏
     const batchToolbar = document.createElement('div');
     batchToolbar.className = 'batch-toolbar';
-    batchToolbar.style.cssText = 'display:flex;align-items:center;gap:8px;padding:4px 8px;border-bottom:1px solid var(--border,rgba(255,255,255,0.1));margin-bottom:4px;font-size:clamp(0.64rem,0.85vw,0.72rem);';
+    batchToolbar.style.cssText = 'display:flex;align-items:center;gap:6px;padding:2px 6px;border-bottom:1px solid var(--border,rgba(255,255,255,0.1));margin-bottom:2px;font-size:clamp(0.6rem,0.82vw,0.7rem);';
 
     const selectAllCb = document.createElement('input');
     selectAllCb.type = 'checkbox';
@@ -76,14 +76,14 @@ async function loadJobHistory() {
         const retryBtn = retryable
           ? ` <a href="#" class="retry-link" data-id="${j.id}" style="color:var(--accent);text-decoration:none;">[RETRY]</a>`
           : '';
-        const deleteBtn = ` <a href="#" class="delete-link" data-id="${j.id}" style="color:var(--danger,#ff4444);text-decoration:none;margin-left:6px;">[DEL]</a>`;
+        const deleteBtn = ` <a href="#" class="delete-link" data-id="${j.id}" style="color:var(--danger,#ff4444);text-decoration:none;margin-left:3px;">[DEL]</a>`;
         // 显式"详情"链接：提供独立可点击目标，避免与 checkbox/链接的点击区域冲突
-        const detailBtn = ` <a href="#" class="detail-link" data-id="${j.id}" style="color:var(--accent-tokusatsu,#ff9f43);text-decoration:none;margin-left:6px;font-weight:600;">[详情]</a>`;
+        const detailBtn = ` <a href="#" class="detail-link" data-id="${j.id}" style="color:var(--accent-tokusatsu,#ff9f43);text-decoration:none;margin-left:3px;font-weight:600;">[详情]</a>`;
         // 截断 textPreview 至 200 字符作为摘要（任务详情模态框入口提示）
         const previewRaw = j.textPreview || '';
         const preview = previewRaw.length > 200 ? previewRaw.slice(0, 200) + '…' : previewRaw;
         const previewHtml = preview
-          ? `<div class="job-preview" style="color:var(--muted);font-size:clamp(0.68rem,0.92vw,0.78rem);margin-top:0.2rem;opacity:0.75;line-height:1.45;">${escapeHtml(preview)}</div>`
+          ? `<div class="job-preview" style="color:var(--muted);font-size:clamp(0.62rem,0.85vw,0.72rem);margin-top:0.05rem;opacity:0.75;line-height:1.25;">${escapeHtml(preview)}</div>`
           : '';
 
         const row = addLine(
@@ -271,7 +271,7 @@ async function viewJobDetail(id) {
     exportMdBtn.className = 'btn-mini';
     exportMdBtn.style.cssText = 'margin-right:0.4rem;padding:0.25rem 0.6rem;font-size:0.72rem;background:rgba(0,255,136,0.08);border:1px solid var(--accent,#00ff88);color:var(--accent,#00ff88);';
     exportMdBtn.textContent = '📝 人话版';
-    exportMdBtn.title = '导出人话版 Markdown 报告';
+    exportMdBtn.title = '在新标签页查看人话版 Markdown 报告';
     const closeBtn = document.getElementById('jobDetailClose');
     if (closeBtn && closeBtn.parentNode) {
       closeBtn.parentNode.insertBefore(exportMdBtn, closeBtn);
@@ -279,14 +279,10 @@ async function viewJobDetail(id) {
     exportMdBtn.addEventListener('click', () => {
       const tid = exportMdBtn.dataset.taskId;
       if (!tid) return;
-      // 直接触发下载
-      const a = document.createElement('a');
-      a.href = `/api/jobs/${tid}/export/md`;
-      a.download = `${tid}_report.md`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      if (typeof log === 'function') log('info', `已请求导出人话版报告: ${tid.slice(0, 8)}…`);
+      // P2 fix (Round 24 §10): 改为新标签页直接查看, 不触发浏览器下载
+      // report.md 已在 OUTPUT_DIR/<id>/report.md 落盘, export/md 端点返回 text/markdown
+      window.open(`/api/jobs/${tid}/export/md`, '_blank');
+      if (typeof log === 'function') log('info', `已在新标签页打开人话版报告: ${tid.slice(0, 8)}…`);
     });
   }
   exportMdBtn.dataset.taskId = id;
@@ -330,6 +326,27 @@ async function viewJobDetail(id) {
     // 结果数据
     if (d.result) {
       resultData.innerHTML = renderResultMetrics(d.result);
+      // 绑定详情页 2D/3D 拓扑切换与 Canvas 渲染
+      if (typeof setupTopologyToggle === 'function') {
+        const detailMatrixView = document.getElementById('detailMatrixView');
+        const detailTopologyView = document.getElementById('detailTopologyView');
+        const detailTopologyWrap = document.getElementById('detailTopologyWrap');
+        const detailTopologyCanvas = document.getElementById('detailTopologyCanvas');
+        const detailTopoToggle = document.getElementById('detailTopoToggle');
+        const detailTopoPauseBtn = document.getElementById('detailTopoPauseBtn');
+        const detailTopoResetBtn = document.getElementById('detailTopoResetBtn');
+        if (detailMatrixView && detailTopologyView) {
+          setupTopologyToggle(d.result, {
+            matrixView: detailMatrixView,
+            topologyView: detailTopologyView,
+            wrap: detailTopologyWrap,
+            canvas: detailTopologyCanvas,
+            toggleBtn: detailTopoToggle,
+            pauseBtn: detailTopoPauseBtn,
+            resetBtn: detailTopoResetBtn
+          });
+        }
+      }
     } else if (diag.resultExists === false) {
       const ttlHint = diag.outputTtlMs
         ? `TTL=${Math.round(diag.outputTtlMs / 3600000)}h`
@@ -385,10 +402,41 @@ function renderResultMetrics(r) {
   const refutedVal = r.refutations
     ? `${r.refutations.filter(x => x.refuted).length}/${r.refutations.length}`
     : '-';
+  // P2 修缮 (Round 23 §8): 历史任务也显示语义徽章, 与 render.js 保持一致
+  // 区分 LIGHT(0/0 未测试) vs DEEP/SUPER(0/3 全通过)
+  const refutationsAttempted = r.refutations ? r.refutations.length : 0;
+  const refutedSemantic = refutationsAttempted === 0
+    ? '<span class="badge warn" title="LIGHT模式跳过反驳测试">未测试</span>'
+    : (r.refutations.filter(x => x.refuted).length === 0
+        ? '<span class="badge pass" title="3次反驳测试全部通过">3/3 通过</span>'
+        : `<span class="badge fail">${r.refutations.filter(x => x.refuted).length}/3 被反驳</span>`);
   const modeVal = (r.analysis_mode || 'light').toUpperCase();
   const durationVal = r.execution_profile && r.execution_profile.total_ms != null
     ? `${safeFmt(r.execution_profile.total_ms / 1000, 2)}s`
     : '-';
+  // P2 修缮 (Round 23 §8): signal_type 语义徽章 (区分共现计数 vs 真实ΔNLL)
+  const diag = r.data_diagnostics || {};
+  const signalType = diag.signal_type;
+  let signalBadge = '';
+  if (signalType === 'delta_nll') {
+    signalBadge = '<span class="badge pass" title="SUPER模式真实ΔNLL">真实ΔNLL</span>';
+  } else if (signalType === 'co_occurrence') {
+    signalBadge = '<span class="badge warn" title="LIGHT/DEEP模式共现计数">共现计数</span>';
+  }
+  // P2 修缮 (Round 23 §8): CCM verdict 语义徽章
+  const sixWarriors = r.six_warriors || {};
+  const ccmCard = sixWarriors.ccm || {};
+  const ccmVerdict = ccmCard.verdict;
+  let ccmBadge = '';
+  if (ccmVerdict === 'VERIFIABLE') {
+    ccmBadge = '<span class="badge pass" title="真实CCM算法已运行">真CCM已验证</span>';
+  } else if (ccmVerdict === 'ELIGIBLE_BUT_NOT_RUN') {
+    ccmBadge = '<span class="badge warn" title="真算法可导入但未实际调用">启发式覆盖率</span>';
+  } else if (ccmVerdict === 'HEURISTIC_FALLBACK') {
+    ccmBadge = '<span class="badge warn" title="启发式回退, 非真实CCM">启发式回退</span>';
+  } else if (ccmVerdict === 'NARRATIVE_TEXT') {
+    ccmBadge = '<span class="badge warn" title="概念稀疏, 不符合CCM条件">概念稀疏</span>';
+  }
 
   const metrics = [
     { label: 'CONCEPTS', value: conceptsVal },
@@ -404,6 +452,14 @@ function renderResultMetrics(r) {
     `<div class="metric"><div class="value">${escapeHtml(String(m.value))}</div><div class="label">${m.label}</div></div>`
   ).join('');
   let html = `<div class="metric-grid">${metricsHtml}</div>`;
+
+  // P2 修缮 (Round 23 §8): 语义徽章行 (signal_type / refutations / CCM verdict)
+  const badgesHtml = [signalBadge, refutedSemantic, ccmBadge].filter(Boolean).join(' ');
+  if (badgesHtml) {
+    html += `<div style="display:flex;flex-wrap:wrap;gap:0.4rem;align-items:center;margin:0.5rem 0;padding:0.4rem 0.6rem;border:1px solid var(--border,rgba(255,255,255,0.1));border-radius:4px;background:rgba(0,0,0,0.2);">
+      <span style="font-family:var(--font-mono);color:var(--muted);font-size:clamp(0.64rem,0.85vw,0.72rem);">SEMANTICS:</span>${badgesHtml}
+    </div>`;
+  }
 
   // 关键参数网格
   const params = [
@@ -438,6 +494,80 @@ function renderResultMetrics(r) {
     }).join('');
     html += `<h3 class="section-title">// REFUTATION TESTS</h3>` +
       `<table><thead><tr><th>METHOD</th><th>ORIGINAL</th><th>NEW EFFECT</th><th>VERDICT</th></tr></thead><tbody>${refuteRows}</tbody></table>`;
+  }
+
+  // P1 fix (Round 25 §1 + Round 27): 历史记录补全热力词矩阵图，并支持 2D/3D 切换
+  // 用户反馈: "记录点击时，缺失热力词矩阵图（如同我们正常的运行的信息呈现）"
+  const matrixHtml = (typeof buildAdjacencyMatrixHTML === 'function') ? buildAdjacencyMatrixHTML(r) : '';
+  const hasConcepts = (r.concepts || []).length >= 2;
+  if (matrixHtml || hasConcepts) {
+    html += `<h3 class="section-title" style="display:flex;justify-content:space-between;align-items:center;">
+      // CONCEPT TOPOLOGY
+      <button class="btn-mini topo-toggle-btn" id="detailTopoToggle">3D 拓扑</button>
+    </h3>`;
+    html += `<div id="detailMatrixView">${matrixHtml || '<div class="empty-state">无邻接矩阵数据</div>'}</div>`;
+    html += `<div id="detailTopologyView" class="hidden">
+      <h3 class="section-title">// 3D CAUSAL TOPOLOGY (高维空间拓扑)</h3>
+      <div id="detailTopologyWrap" style="position:relative;width:100%;height:min(50vh,420px);border:1px solid var(--border);border-radius:6px;overflow:hidden;background:#05070a;">
+        <canvas id="detailTopologyCanvas" style="width:100%;height:100%;display:block;"></canvas>
+        <div style="position:absolute;top:6px;right:8px;display:flex;gap:6px;">
+          <button id="detailTopoPauseBtn" class="btn-mini secondary topo-pause-btn" title="暂停/继续旋转">⏸</button>
+          <button id="detailTopoResetBtn" class="btn-mini secondary topo-reset-btn" title="重置视角">⟲</button>
+        </div>
+        <div style="position:absolute;bottom:6px;left:8px;font-size:0.6rem;color:var(--muted);">拖拽旋转 · 滚轮缩放 · 节点大小=出现频次 · 边粗细=因果强度</div>
+      </div>
+    </div>`;
+  }
+
+  // P1 fix (Round 25 §1): 补全反事实扫描 (SUPER 模式核心特征)
+  if (r.counterfactual_scan && r.counterfactual_scan.length > 0) {
+    const cfRows = r.counterfactual_scan.slice(0, 10).map(c =>
+      `<tr><td>${escapeHtml(c.source || '?')}</td><td>${escapeHtml(c.target || '?')}</td><td>${safeFmt(c.trace_dnl, 3)}</td><td>${safeFmt(c.ite, 2)}</td><td>${safeFmt(c.observed, 1)}</td><td>${safeFmt(c.counterfactual, 1)}</td></tr>`
+    ).join('');
+    html += `<h3 class="section-title">// COUNTERFACTUAL SCAN (反事实扫描, top 10)</h3>` +
+      `<table><thead><tr><th>EDGE</th><th>→</th><th>ΔNLL</th><th>ITE</th><th>OBSERVED</th><th>COUNTERFACT</th></tr></thead><tbody>${cfRows}</tbody></table>`;
+  }
+
+  // P1 fix (Round 25 §1): 补全六战士摘要 (SUPER 模式应比 LIGHT/DEEP 呈现更多信息)
+  const sw = r.six_warriors || {};
+  const swCards = [];
+  if (sw.ccm) {
+    const m = sw.ccm.metrics || {};
+    swCards.push(`<div class="param"><span class="k">CCM Coverage</span><span class="v">${safeFmt(m.CCM_coverage, 1)}%</span></div>`);
+    if (sw.ccm.verdict) swCards.push(`<div class="param"><span class="k">CCM Verdict</span><span class="v">${escapeHtml(sw.ccm.verdict)}</span></div>`);
+  }
+  if (sw.edm) {
+    const m = sw.edm.metrics || {};
+    swCards.push(`<div class="param"><span class="k">EDM ρ_high</span><span class="v">${safeFmt(m.rho_high, 3)}</span></div>`);
+    swCards.push(`<div class="param"><span class="k">EDM ρ_mid</span><span class="v">${safeFmt(m.rho_mid, 3)}</span></div>`);
+  }
+  if (sw.havok) {
+    const m = sw.havok.metrics || {};
+    swCards.push(`<div class="param"><span class="k">HAVOK Linear%</span><span class="v">${safeFmt(m.linear_pct, 1)}%</span></div>`);
+  }
+  if (sw.causallearn) {
+    const m = sw.causallearn.metrics || {};
+    swCards.push(`<div class="param"><span class="k">CausalLearn Agree</span><span class="v">${safeFmt(m.Agree, 2)}</span></div>`);
+  }
+  if (swCards.length > 0) {
+    html += `<h3 class="section-title">// SIX WARRIORS (六战士摘要)</h3><div class="param-grid">${swCards.join('')}</div>`;
+  }
+
+  // P1 fix (Round 25 §1): 补全稳定性分析
+  const stab = r.stability_analysis || {};
+  if (Object.keys(stab).length > 0) {
+    const stabItems = [
+      { k: 'Edge Stability', v: stab.edge_stability_mean },
+      { k: 'Permutation p', v: stab.permutation_p_value },
+      { k: 'ATE Bootstrap Std', v: stab.ate_bootstrap_std },
+      { k: 'CV Folds', v: stab.cv_folds },
+    ].filter(x => x.v != null);
+    if (stabItems.length > 0) {
+      const stabHtml = stabItems.map(x =>
+        `<div class="param"><span class="k">${escapeHtml(x.k)}</span><span class="v">${typeof x.v === 'number' ? safeFmt(x.v, 4) : escapeHtml(String(x.v))}</span></div>`
+      ).join('');
+      html += `<h3 class="section-title">// STABILITY ANALYSIS</h3><div class="param-grid">${stabHtml}</div>`;
+    }
   }
 
   return html;

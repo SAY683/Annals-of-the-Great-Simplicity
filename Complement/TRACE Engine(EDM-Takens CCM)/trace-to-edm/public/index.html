@@ -4,9 +4,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>trace-to-edm 操纵台</title>
-  <link rel="stylesheet" href="shared/themes/tokusatsu.css?v=20260727e" />
-  <link rel="stylesheet" href="/css/override.css?v=20260727e" />
-  <link rel="stylesheet" href="/css/main.css?v=20260727e" />
+  <link rel="stylesheet" href="shared/themes/tokusatsu.css?v=20260728a" />
+  <link rel="stylesheet" href="/css/override.css?v=20260728a" />
+  <link rel="stylesheet" href="/css/main.css?v=20260728a" />
   <!-- 内联兜底：确保 header 紧凑化优先于任何缓存或主题覆盖 -->
   <style>
     .base-header { padding: 8px 14px !important; margin-bottom: 12px !important; gap: 12px !important; }
@@ -33,9 +33,9 @@
       <div class="header-right">
         <nav class="base-nav" id="baseNav">
           <span class="nav-label">BASE</span>
-          <a data-port="3000" href="http://127.0.0.1:3000"><span class="nav-dot" style="color:#ff9f43"></span>CMD</a>
+          <a data-port="3000" href="#"><span class="nav-dot" style="color:#ff9f43"></span>CMD</a>
           <a class="active" data-port="3100" href="/"><span class="nav-dot"></span>RELAY</a>
-          <a data-port="8000" href="http://127.0.0.1:8000"><span class="nav-dot" style="color:#00ff9d"></span>OBS</a>
+          <a data-port="8000" href="#"><span class="nav-dot" style="color:#00ff9d"></span>OBS</a>
         </nav>
         <div class="mission-clock" id="missionClock">
           <span class="clock-label">MISSION CLOCK</span>
@@ -280,7 +280,7 @@
             <span class="hud-corner bl"></span>
             <span class="hud-corner br"></span>
             <span class="sector-label">SECTOR-B4</span>
-            <h2><span class="panel-icon">◉</span> 轨迹数据 <button id="btnRefreshTable" class="btn-mini">刷新</button><button id="btnExportMd" class="btn-mini" style="color:var(--accent,#00ff88);border-color:var(--accent,#00ff88);" title="导出人话版 Markdown 报告">📝人话版</button></h2>
+            <h2><span class="panel-icon">◉</span> 轨迹数据 <button id="btnRefreshTable" class="btn-mini">刷新</button><button id="btnExportMd" class="btn-mini" style="color:var(--accent,#00ff88);border-color:var(--accent,#00ff88);" title="生成人话版报告到项目 reports/ 目录并在新标签页查看">📝人话版</button></h2>
             <div class="table-wrap" id="tableWrap">
               <p class="dim">点击刷新加载...</p>
             </div>
@@ -291,8 +291,8 @@
     </main>
   </div>
 
-  <script src="/js/logCockpit.js?v=20260727e"></script>
-  <script src="/js/app.js?v=20260727e"></script>
+  <script src="/js/logCockpit.js?v=20260728e"></script>
+  <script src="/js/app.js?v=20260728e"></script>
   <!-- P1-2 (§20.12): BASE 导航隧道模式自适应, 替代 9 处硬编码 127.0.0.1:PORT -->
   <script>
   (function () {
@@ -332,6 +332,9 @@
         }
       } else {
         a.href = 'http://127.0.0.1:' + port;
+        // P1 fix (Round 22 §4): 跨项目跳转在新标签页打开, 避免中断当前页 SSE 实时汇报.
+        a.target = '_blank';
+        a.rel = 'noopener';
       }
     });
   })();

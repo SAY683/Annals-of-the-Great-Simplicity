@@ -181,9 +181,14 @@ async function checkNavHealth() {
 async function loadDatasetColumns(filename) {
   try {
     const info = await apiJson(`/datasets/${encodeURIComponent(filename)}/columns`)
+    // P1 修复 (Round 24 §2): 配置列信息使用分行布局, 避免长串列名撑出长条.
+    // 数值列名以 chip 形式独立换行, 不再是一行长文本.
+    const numericCols = info.numeric_columns || []
+    const colsChips = numericCols.map((c) => `<span class="col-chip">${escapeHtml(c)}</span>`).join('')
     $('#columnInfo').innerHTML = `
-      <strong>${escapeHtml(filename)}</strong><br/>
-      行数: ${info.rows} &nbsp;|&nbsp; 数值列: ${escapeHtml(info.numeric_columns.join(', '))}
+      <div class="col-info-line"><strong>${escapeHtml(filename)}</strong></div>
+      <div class="col-info-line">行数: ${info.rows} &nbsp;|&nbsp; 数值列: ${numericCols.length} 个</div>
+      ${colsChips ? `<div class="col-info-chips">${colsChips}</div>` : ''}
     `
     const targetSel = $('#targetSelect')
     targetSel.innerHTML = ''
@@ -456,7 +461,8 @@ async function runAnalysis() {
     }
   }
 
-  $('#summary').innerHTML = '<p>初始化分析任务...</p>'
+  // P1 fix (Round 22 §5): 添加进度条, 让用户在长时间运行中看到实时进度
+  $('#summary').innerHTML = '<p>初始化分析任务...</p><div id="jobProgressLabel">准备中...</div><progress id="jobProgress" max="100" value="0"></progress>'
   $('#images').innerHTML = ''
   $('#runBtn').disabled = true
   clearTerminal()
@@ -491,12 +497,92 @@ async function runAnalysis() {
   // stream briefly disconnects.
   let finalData = null
   let streamError = null
+  // P1 修复 (Round 24 §3): 重写进度条逻辑 — 通过解析日志中的 STAGE 标记
+  // 区分 EDM 流水线的三个阶段 (Pipeline / Cross-Validation / Interpretation),
+  // 在各阶段内根据子阶段标记更新进度, 不再恒卡 90%.
+  // 阶段映射:
+  //   pending            → 5%
+  //   Stage 1: Pipeline  → 10-40% (env/audit/HAVOK/CCM)
+  //   Stage 2: Cross-Val → 40-70% (3 safeguards)
+  //   Stage 3: Interp    → 70-95% (EDM/HAVOK/CCM interpretation)
+  //   done               → 100%
+  //   error              → 100%
+  const STAGE_PATTERNS = [
+    { re: /STAGE\s*1\s*\/\s*3.*Pipeline/i, min: 10, max: 40, label: 'Stage 1: 流水线 (环境+审计+HAVOK+CCM)' },
+    { re: /STAGE\s*2\s*\/\s*3.*Cross.?Validation/i, min: 40, max: 70, label: 'Stage 2: 交叉验证 (3 重保险)' },
+    { re: /STAGE\s*3\s*\/\s*3.*Interpretation/i, min: 70, max: 95, label: 'Stage 3: 动力学解释' },
+  ]
+  // 子阶段标记 (用于在主阶段内细分进度)
+  const SUBSTAGE_PATTERNS = [
+    { re: /PHASE\s*1.*Individual Variable Dynamics/i, bump: 5 },
+    { re: /PHASE\s*2.*Causal Structure/i, bump: 5 },
+    { re: /AUDIT|审计/i, bump: 3 },
+    { re: /HAVOK|SovereignHAVOK/i, bump: 3 },
+    { re: /CCM|Convergent Cross Mapping/i, bump: 3 },
+    { re: /Visualization saved|图已保存/i, bump: 5 },
+    { re: /Config saved|配置已保存/i, bump: 2 },
+    { re: /Interpretation complete/i, bump: 5 },
+  ]
+  const updateProgress = (status, logs) => {
+    const bar = $('#jobProgress')
+    const label = $('#jobProgressLabel')
+    if (!bar || !label) return
+    let pct = 0
+    let text = '准备中...'
+    if (status === 'pending') {
+      pct = 5
+      text = '排队中...'
+    } else if (status === 'running') {
+      const lines = logs || []
+      // 1. 找到当前所处的最高阶段
+      let currentStageIdx = -1
+      for (let i = 0; i < STAGE_PATTERNS.length; i++) {
+        const hasStage = lines.some((l) => STAGE_PATTERNS[i].re.test(l))
+        if (hasStage) currentStageIdx = i
+      }
+      if (currentStageIdx === -1) {
+        // 还没进入 Stage 1, 仍在准备阶段
+        pct = 8
+        text = '运行中: 初始化环境...'
+      } else {
+        const stage = STAGE_PATTERNS[currentStageIdx]
+        // 2. 在当前阶段内, 通过子阶段标记细分
+        let bumpTotal = 0
+        for (const sp of SUBSTAGE_PATTERNS) {
+          if (lines.some((l) => sp.re.test(l))) bumpTotal += sp.bump
+        }
+        // 3. 用日志行数微调 (在阶段区间内插值, 避免恒卡)
+        const logProgress = Math.min(1, lines.length / 200)
+        const stageRange = stage.max - stage.min
+        // 子阶段 bump 不超过阶段范围的 60%, 剩余 40% 给日志微调
+        const bumpCapped = Math.min(stageRange * 0.6, bumpTotal)
+        pct = Math.min(stage.max - 1, stage.min + bumpCapped + logProgress * (stageRange * 0.4))
+        pct = Math.round(pct)
+        text = `运行中: ${stage.label} (${pct}%)`
+      }
+    } else if (status === 'done') {
+      pct = 100
+      text = '完成 ✓'
+    } else if (status === 'error') {
+      pct = 100
+      text = '失败 ✗'
+    } else if (status === 'interrupted') {
+      // ROB-03: 后端重启导致任务被中断，视为终态停止轮询
+      pct = 100
+      text = '已中断 ⚠'
+    }
+    bar.value = pct
+    label.textContent = text
+  }
   const pollInterval = setInterval(async () => {
     const data = await pollJobStatus(jobId, (data) => {
       setTerminalStatus(data.status)
+      updateProgress(data.status, data.logs)
     })
-    if (data && (data.status === 'done' || data.status === 'error')) {
+    // ROB-03: "interrupted" 也是终态，需停止轮询，否则会无限轮询被中断的任务
+    if (data && (data.status === 'done' || data.status === 'error' || data.status === 'interrupted')) {
       clearInterval(pollInterval)
+      updateProgress(data.status, data.logs)
     }
   }, 2000)
 
@@ -547,6 +633,11 @@ async function runAnalysis() {
           streamError = data.error
           appendTerminal(`ERROR: ${data.error}`, 'error')
           $('#summary').innerHTML = `<p class="error">运行失败: ${data.error}</p>`
+        } else if (data.status === 'interrupted') {
+          // ROB-03: 后端重启导致任务被中断
+          streamError = data.error || '任务因后端重启而被中断'
+          appendTerminal(`INTERRUPTED: ${streamError}`, 'error')
+          $('#summary').innerHTML = `<p class="error">任务被中断: ${escapeHtml(streamError)}</p>`
         }
       }
     }
@@ -558,6 +649,26 @@ async function runAnalysis() {
         ? `项目: ${finalData.summary.project_name}`
         : `task ${finalData.task_id}`
       $('#summary').insertAdjacentHTML('afterbegin', `<p class="success">分析成功: ${finalData.filename} <span class="dim">(${nameText})</span></p>`)
+      // P1 fix (Round 26 §8): 人话版默认内联卡片渲染，保留原文链接
+      const exportBar = document.createElement('div')
+      exportBar.style.cssText = 'display:flex;gap:8px;justify-content:center;margin:8px 0;flex-wrap:wrap;'
+      const btnMd = document.createElement('button')
+      btnMd.className = 'small export-md-btn'
+      btnMd.title = '在结果面板下方内联渲染人话版卡片'
+      btnMd.textContent = '📝 人话版'
+      btnMd.addEventListener('click', () => renderHumanReportInline(finalData.task_id))
+      const btnJson = document.createElement('button')
+      btnJson.className = 'small'
+      btnJson.textContent = '⬇ JSON'
+      btnJson.addEventListener('click', () => downloadExport(finalData.task_id, 'json'))
+      const btnCsv = document.createElement('button')
+      btnCsv.className = 'small'
+      btnCsv.textContent = '⬇ CSV'
+      btnCsv.addEventListener('click', () => downloadExport(finalData.task_id, 'csv'))
+      exportBar.appendChild(btnMd)
+      exportBar.appendChild(btnJson)
+      exportBar.appendChild(btnCsv)
+      $('#summary').insertBefore(exportBar, $('#summary').firstChild)
       setTerminalStatus('done')
       loadHistory()
     } else if (streamError) {
@@ -759,9 +870,9 @@ async function loadHistory() {
     container.querySelectorAll('.export-csv-btn').forEach((btn) => {
       btn.addEventListener('click', () => downloadExport(btn.dataset.task, 'csv'))
     })
-    // P2 (§20.12): 一键导出人话版 Markdown 报告
+    // P2 (§20.12): 一键导出人话版 Markdown 报告 — 默认内联卡片渲染
     container.querySelectorAll('.export-md-btn').forEach((btn) => {
-      btn.addEventListener('click', () => downloadExport(btn.dataset.task, 'md'))
+      btn.addEventListener('click', () => renderHumanReportInline(btn.dataset.task))
     })
   } catch (e) {
     container.innerHTML = `<p class="error">加载历史失败: ${e.message}</p>`
@@ -844,6 +955,162 @@ async function downloadExport(taskId, format) {
   )
 }
 
+// P1 fix (Round 26 §8): 人话版在新标签页直接查看
+function openHumanReport(taskId) {
+  window.open(`${API_PREFIX}/history/${encodeURIComponent(taskId)}/export/md`, '_blank')
+}
+
+// P1 fix (Round 26 §8): Markdown → 卡片式 HTML 内联渲染, 避免黑色白字文字墙
+async function renderHumanReportInline(taskId) {
+  try {
+    const res = await fetch(`${API_PREFIX}/history/${encodeURIComponent(taskId)}/export/md`)
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    const md = await res.text()
+    const html = markdownToCards(md, taskId)
+    const host = document.getElementById('summary')
+    if (host) {
+      // 移除已存在的人话版卡片，避免重复渲染
+      const existing = host.querySelector('.human-report-cards')
+      if (existing) existing.remove()
+      const wrapper = document.createElement('div')
+      wrapper.className = 'human-report-cards'
+      wrapper.innerHTML = `
+        <div class="human-report-header">
+          <h3>// 人话版解读</h3>
+          <div class="human-report-meta">
+            <a href="${API_PREFIX}/history/${encodeURIComponent(taskId)}/export/md" target="_blank" rel="noopener">新标签页查看原文</a>
+            <button class="small" onclick="this.closest('.human-report-cards').remove()">收起</button>
+          </div>
+        </div>
+        ${html}
+      `
+      host.appendChild(wrapper)
+      wrapper.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+  } catch (e) {
+    appendTerminal(`人话版加载失败: ${e.message}`, 'error')
+  }
+}
+
+const HUMAN_CARD_ICONS = {
+  '概览': '◎',
+  '稳定性诊断': '◈',
+  '稳定性诊断 (HAVOK)': '◈',
+  '各变量 EDM 预测技能': '◉',
+  'CCM 因果链': '⇄',
+  'CCM 因果链 (Sugihara 因果关系)': '⇄',
+  '图谱解析': '▣',
+  '图谱解析 (dynamics_interpretation.png)': '▣',
+  '八正道审计': '✓',
+  '八正道审计 (Eightfold Path Audit)': '✓',
+  '数据质量与采样充分性': '◆',
+  '配置参数附录': '⚙',
+  '一句话总结': '★',
+}
+
+function markdownToCards(md, taskId) {
+  // 按 H2 切分章节, 每个 H2 渲染为一张卡片
+  const lines = md.split('\n')
+  const sections = []
+  let current = { title: '概览', body: [] }
+  lines.forEach((line) => {
+    const h2 = line.match(/^##\s+(.*)/)
+    const h1 = line.match(/^#\s+(.*)/)
+    if (h1) {
+      if (current.body.length) sections.push(current)
+      current = { title: h1[1].replace(/^EDM-Takens\s+分析报告:\s*/, '').trim() || '概览', body: [] }
+    } else if (h2) {
+      if (current.body.length) sections.push(current)
+      current = { title: h2[1].trim(), body: [] }
+    } else {
+      current.body.push(line)
+    }
+  })
+  if (current.body.length) sections.push(current)
+
+  const escape = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
+  const renderInline = (s) => {
+    return escape(s)
+      .replace(/`([^`]+)`/g, '<code>$1</code>')
+      .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+      .replace(/_([^_]+)_/g, '<em>$1</em>')
+      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>')
+  }
+
+  const parseTable = (rows) => {
+    // rows: array of raw markdown lines forming a table
+    if (rows.length < 2) return null
+    const header = rows[0].split('|').map((c) => c.trim()).filter((c) => c !== '')
+    const bodyRows = rows.slice(2).filter((r) => r.trim().startsWith('|'))
+    if (!header.length || !bodyRows.length) return null
+    const cells = bodyRows.map((r) => r.split('|').map((c) => c.trim()).filter((c) => c !== ''))
+    return { header, cells }
+  }
+
+  let out = '<div class="human-cards-grid">'
+  sections.forEach((sec) => {
+    const bodyHtml = []
+    const bodyLines = sec.body
+    let i = 0
+    while (i < bodyLines.length) {
+      const line = bodyLines[i]
+      const trimmed = line.trim()
+      if (trimmed === '') {
+        i += 1
+        continue
+      }
+      // 表格：|...|
+      if (trimmed.startsWith('|') && trimmed.endsWith('|')) {
+        const tableLines = []
+        while (i < bodyLines.length && bodyLines[i].trim().startsWith('|')) {
+          tableLines.push(bodyLines[i].trim())
+          i += 1
+        }
+        const table = parseTable(tableLines)
+        if (table) {
+          const th = table.header.map((h) => `<th>${renderInline(h)}</th>`).join('')
+          const tr = table.cells.map((row) => `<tr>${row.map((c) => `<td>${renderInline(c)}</td>`).join('')}</tr>`).join('')
+          bodyHtml.push(`<table><thead><tr>${th}</tr></thead><tbody>${tr}</tbody></table>`)
+        } else {
+          bodyHtml.push(`<p>${renderInline(trimmed)}</p>`)
+        }
+        continue
+      }
+      // 无序列表
+      if (/^[-*]\s+/.test(trimmed)) {
+        const listItems = []
+        while (i < bodyLines.length && (/^[-*]\s+/.test(bodyLines[i].trim()) || (/^\s{2,}/.test(bodyLines[i]) && bodyLines[i].trim() !== ''))) {
+          const raw = bodyLines[i].trim()
+          if (/^[-*]\s+/.test(raw)) {
+            listItems.push(raw.replace(/^[-*]\s+/, ''))
+          } else {
+            listItems.push(raw)
+          }
+          i += 1
+        }
+        bodyHtml.push('<ul>' + listItems.map((li) => `<li>${renderInline(li)}</li>`).join('') + '</ul>')
+        continue
+      }
+      // 引用块
+      const quote = trimmed.match(/^>\s*(.*)/)
+      if (quote) {
+        bodyHtml.push(`<blockquote>${renderInline(quote[1])}</blockquote>`)
+        i += 1
+        continue
+      }
+      // 普通段落
+      bodyHtml.push(`<p>${renderInline(trimmed)}</p>`)
+      i += 1
+    }
+
+    const icon = HUMAN_CARD_ICONS[sec.title] || '▸'
+    const titleHtml = `<span class="card-icon">${icon}</span><span>${escape(sec.title)}</span>`
+    out += `<div class="human-card"><h4 class="human-card-title">${titleHtml}</h4><div class="human-card-body">${bodyHtml.join('')}</div></div>`
+  })
+  out += '</div>'
+  return out
+}
+
 function getSelectedHistoryIds() {
   return Array.from($('#historyList').querySelectorAll('.history-checkbox input:checked')).map((cb) => cb.value)
 }
@@ -852,7 +1119,8 @@ function updateBatchToolbar() {
   const ids = getSelectedHistoryIds()
   $('#historyBatchCount').textContent = `已选 ${ids.length} 项`
   const compareBtn = $('#compareSelectedBtn')
-  compareBtn.disabled = ids.length !== 2
+  // P1 修复 (Round 24 §3): 允许 2-8 个任务对比, 不再要求恰好 2 个
+  compareBtn.disabled = ids.length < 2 || ids.length > 8
   // 同步全选复选框状态
   const allCbs = $('#historyList').querySelectorAll('.history-checkbox input[type="checkbox"]')
   const selectAllCb = $('#selectAllHistory')
@@ -938,18 +1206,22 @@ async function runBatchAction(action) {
 
 async function openCompareModal() {
   const ids = getSelectedHistoryIds()
-  if (ids.length !== 2) {
-    alert('请恰好选择两项任务进行对比')
+  // P1 修复 (Round 24 §3): 支持 2-8 个任务对比, 不再要求恰好 2 个
+  if (ids.length < 2) {
+    alert('请至少选择两项任务进行对比')
     return
   }
-  const [leftId, rightId] = ids
+  if (ids.length > 8) {
+    alert('最多支持 8 个任务同时对比, 请取消部分选择')
+    return
+  }
   $('#compareModal').style.display = 'flex'
   $('#compareBody').innerHTML = '正在加载对比数据...'
   try {
     const data = await apiJson('/history/compare', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ left_id: leftId, right_id: rightId }),
+      body: JSON.stringify({ task_ids: ids }),
     })
     renderCompare(data)
   } catch (e) {
@@ -962,37 +1234,120 @@ function closeCompareModal() {
 }
 
 function renderCompare(data) {
-  const renderSide = (task, title) => {
+  // P1 修复 (Round 24 §3): 重写对比渲染, 支持任意数量 (2-8) 任务的对比.
+  // 后端返回 summaries 数组, 同时保留 left_task/right_task 兼容旧前端.
+  const summaries = data.summaries || []
+  // 兼容回退: 若 summaries 为空, 尝试从 left_task/right_task 构建
+  if (summaries.length === 0) {
+    const left = data.left || data.left_task
+    const right = data.right || data.right_task
+    if (left) summaries.push(left)
+    if (right) summaries.push(right)
+  }
+  const count = summaries.length
+  if (count === 0) {
+    $('#compareBody').innerHTML = '<p class="error">无可对比的任务数据</p>'
+    return
+  }
+  // 任务编号 A/B/C/D... 用于标题
+  const labelOf = (idx) => String.fromCharCode(65 + idx) // A, B, C, ...
+  const renderSide = (task, idx) => {
+    const title = `任务 ${labelOf(idx)}`
     const etitle = escapeHtml(title)
     if (!task) return `<div class="compare-side"><h4>${etitle}</h4><p class="dim">无数据</p></div>`
-    // 后端 _task_summary() 返回 {task_id, updated_at, images, config}，无 summary 字段；
-    // 这里展示任务配置信息（config），为空时给出提示。
     const config = task.config || {}
+    const params = task.params || {}
     const images = (task.images || []).map((img) => {
       const src = `${API_PREFIX}/results/${encodeURIComponent(task.task_id)}/${encodeURIComponent(img)}`
       const eimg = escapeHtml(img)
       return `<img src="${src}" alt="${eimg}" title="${eimg}" />`
     }).join('')
-    const configHtml = Object.entries(config).map(([k, v]) => {
-      const ek = escapeHtml(k)
-      if (typeof v === 'object') return `<li><strong>${ek}:</strong> <pre>${escapeHtml(JSON.stringify(v, null, 2))}</pre></li>`
-      return `<li><strong>${ek}:</strong> ${escapeHtml(v)}</li>`
-    }).join('')
+    // 配置信息 (紧凑显示)
+    const configEntries = Object.entries(config)
+    const configHtml = configEntries.length
+      ? configEntries.map(([k, v]) => {
+          const ek = escapeHtml(k)
+          const ev = typeof v === 'object'
+            ? escapeHtml(JSON.stringify(v))
+            : escapeHtml(String(v))
+          return `<li><strong>${ek}</strong>: <span class="dim">${ev}</span></li>`
+        }).join('')
+      : '<li class="dim">无配置信息</li>'
+    // 任务输入参数
+    const paramEntries = Object.entries(params)
+    const paramsHtml = paramEntries.length
+      ? paramEntries.map(([k, v]) => {
+          const ek = escapeHtml(k)
+          const ev = typeof v === 'object'
+            ? escapeHtml(JSON.stringify(v))
+            : escapeHtml(String(v))
+          return `<li><strong>${ek}</strong>: <span class="dim">${ev}</span></li>`
+        }).join('')
+      : ''
+    // 更新时间
+    const updated = task.updated_at
+      ? new Date(task.updated_at * 1000).toLocaleString('zh-CN')
+      : '-'
     return `
       <div class="compare-side">
-        <h4>${etitle}: ${escapeHtml(task.task_id)}</h4>
-        <div class="compare-summary"><ul>${configHtml || '<li class="dim">无配置信息</li>'}</ul></div>
+        <h4>${etitle}: <code>${escapeHtml(task.task_id)}</code></h4>
+        <div class="compare-meta">更新: ${escapeHtml(updated)} | 图片: ${(task.images || []).length} 张</div>
+        <div class="compare-section">
+          <strong>任务参数</strong>
+          <ul>${paramsHtml || '<li class="dim">无</li>'}</ul>
+        </div>
+        <div class="compare-section">
+          <strong>运行配置</strong>
+          <ul>${configHtml}</ul>
+        </div>
         <div class="compare-images">${images || '<span class="dim">无图片</span>'}</div>
       </div>
     `
   }
-  const left = data.left || data.left_task
-  const right = data.right || data.right_task
+  const sidesHtml = summaries.map((task, idx) => renderSide(task, idx)).join('')
+  // 横向对比表 (关键参数对照)
+  const compareTable = (() => {
+    // 收集所有任务的 config+params 字段并集
+    const allKeys = new Set()
+    summaries.forEach((task) => {
+      const config = task.config || {}
+      const params = task.params || {}
+      Object.keys(config).forEach((k) => allKeys.add(k))
+      Object.keys(params).forEach((k) => allKeys.add(k))
+    })
+    if (allKeys.size === 0) return ''
+    const rows = Array.from(allKeys).sort().map((key) => {
+      const cells = summaries.map((task) => {
+        const config = task.config || {}
+        const params = task.params || {}
+        const v = (key in config) ? config[key] : (key in params ? params[key] : null)
+        if (v === null || v === undefined) return '<td class="dim">-</td>'
+        const ev = typeof v === 'object'
+          ? escapeHtml(JSON.stringify(v))
+          : escapeHtml(String(v))
+        return `<td>${ev}</td>`
+      }).join('')
+      return `<tr><td class="key">${escapeHtml(key)}</td>${cells}</tr>`
+    }).join('')
+    const headerCells = summaries
+      .map((_, idx) => `<th>任务 ${labelOf(idx)}</th>`)
+      .join('')
+    return `
+      <div class="compare-table-wrap">
+        <h4>参数横向对照</h4>
+        <table class="compare-table">
+          <thead><tr><th>参数</th>${headerCells}</tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    `
+  })()
   $('#compareBody').innerHTML = `
-    <div class="compare-grid">
-      ${renderSide(left, '任务 A')}
-      ${renderSide(right, '任务 B')}
+    <div class="compare-header-info">共 ${count} 个任务对比</div>
+    <div class="compare-grid compare-grid-${count}">
+      ${sidesHtml}
     </div>
+    ${compareTable}
   `
 }
 

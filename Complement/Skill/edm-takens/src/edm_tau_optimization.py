@@ -9,36 +9,89 @@ Fallbacks: ACF 1/e crossing, then default tau=1.
 import numpy as np
 import warnings
 
-def compute_ami(series, max_lag, bins=16):
+def compute_ami(series, max_lag, bins=16, mi_estimator='ksg'):
     """Average Mutual Information I(tau) vs lag - measures nonlinear dependence.
-    
+
+    ROUND26 算法审视 P1-4 修复: histogram→KSG(如可用), 提高MI估计精度。
+    新增 mi_estimator 参数, 默认尝试 KSG 估计器, 失败回退 histogram:
+      - 'ksg' (默认): Kraskov-Stögbauer-Grassberger 估计器 (Kraskov et al.
+        2004), 基于 k-NN 距离, 渐近无偏, 无 bin 参数, 方差小。通过
+        sklearn.feature_selection.mutual_info_regression 实现。若 sklearn
+        不可用则自动回退到 histogram 并发出 warning。
+      - 'histogram': 原 2D-histogram 估计器, 依赖 bins 参数, 小样本下
+        偏差大 (N=50, bins=16 → 256 bin, 平均 0.2 样本/bin, 严重稀疏)。
+
     Args:
         series: 1D time series
         max_lag: maximum lag to compute
-        bins: histogram bins for density estimation
-    
+        bins: histogram bins for density estimation (仅 mi_estimator='histogram')
+        mi_estimator: 'ksg' (默认, 推荐) 或 'histogram'
+
     Returns:
         (lags, ami_values) arrays
     """
     series = np.asarray(series, dtype=float)
     n = len(series)
-    ser_min, ser_max = series.min(), series.max()
-    edges = np.linspace(ser_min, ser_max, bins + 1)
-    
-    # 2D histogram for joint distribution at each lag
+
+    # 判断是否可用 KSG 估计器
+    use_ksg = (mi_estimator == 'ksg')
+    _mutual_info_regression = None
+    if use_ksg:
+        try:
+            from sklearn.feature_selection import mutual_info_regression
+            _mutual_info_regression = mutual_info_regression
+        except ImportError:
+            use_ksg = False
+            warnings.warn(
+                "sklearn 不可用, 回退到 histogram-based AMI 估计器。"
+                "KSG 估计器 (sklearn.feature_selection.mutual_info_regression) "
+                "基于 k-NN 距离, 渐近无偏, 对小样本更精确; "
+                "建议 pip install scikit-learn 以启用。",
+                stacklevel=2)
+
     ami = np.zeros(max_lag + 1)
-    for lag in range(max_lag + 1):
-        x = series[:n - lag]
-        y = series[lag:]
-        joint, _, _ = np.histogram2d(x, y, bins=[edges, edges])
-        # Q9 P1-17 修复: epsilon 在归一化前添加，确保概率和严格为 1
-        joint_safe = joint + 1e-12
-        joint_p = joint_safe / joint_safe.sum()
-        px = joint_p.sum(axis=1)
-        py = joint_p.sum(axis=0)
-        # I = sum p(x,y) * log(p(x,y) / (p(x) * p(y)))
-        outer = np.outer(px, py)
-        ami[lag] = np.sum(joint_p * np.log(joint_p / (outer + 1e-12)))
+    if use_ksg:
+        # KSG 估计器: 基于 k-NN 距离, 无 bin 参数, 渐近无偏 (Kraskov 2004)
+        # sklearn.feature_selection.mutual_info_regression 内部实现 KSG,
+        # 估计每个 feature 与连续 target 之间的 MI。
+        for lag in range(max_lag + 1):
+            x = series[:n - lag].reshape(-1, 1)
+            y = series[lag:]
+            if len(x) < 5:
+                # 样本过少, KSG 的 k-NN 估计不可靠
+                ami[lag] = 0.0
+                continue
+            try:
+                # n_neighbors=3 (KSG 默认 k, 适合小样本); random_state=0 可复现
+                # sklearn 内部会对数据添加微小噪声以处理 ties, random_state 固定之
+                mi = float(_mutual_info_regression(
+                    x, y, n_neighbors=3, random_state=0)[0])
+                ami[lag] = max(0.0, mi)  # MI 非负; 估计器可能返回微小负值
+            except Exception:
+                # KSG 估计失败 (如数据全常数/方差为零) → 该 lag 置 0
+                ami[lag] = 0.0
+    else:
+        # Histogram-based 估计器 (原实现, 保留向后兼容)
+        # 局限性: bins=16 硬编码, N=50 时 256 bin 平均 0.2 样本/bin,
+        # 稀疏 bin + 1e-12 平滑引入系统性偏差, 可能产生伪局部最小值。
+        # 升级路径: 安装 scikit-learn 并使用 mi_estimator='ksg'。
+        ser_min, ser_max = series.min(), series.max()
+        edges = np.linspace(ser_min, ser_max, bins + 1)
+
+        # 2D histogram for joint distribution at each lag
+        for lag in range(max_lag + 1):
+            x = series[:n - lag]
+            y = series[lag:]
+            joint, _, _ = np.histogram2d(x, y, bins=[edges, edges])
+            # Q9 P1-17 修复: epsilon 在归一化前添加，确保概率和严格为 1
+            joint_safe = joint + 1e-12
+            joint_p = joint_safe / joint_safe.sum()
+            px = joint_p.sum(axis=1)
+            py = joint_p.sum(axis=0)
+            # I = sum p(x,y) * log(p(x,y) / (p(x) * p(y)))
+            outer = np.outer(px, py)
+            ami[lag] = np.sum(joint_p * np.log(joint_p / (outer + 1e-12)))
+
     lags = np.arange(max_lag + 1)
     return lags, ami
 

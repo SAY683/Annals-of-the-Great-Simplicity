@@ -96,6 +96,8 @@ class SovereignHAVOK:
         self.truncation_method = truncation_method
         self.regression_method = regression_method
         self.ridge_alpha = ridge_alpha
+        # ROUND26 P2-3: 条件数自适应正则化标志
+        self._auto_ridge_triggered = False
 
         # ── 拟合后填充的内部状态 ──
         self.r_ = None              # 自动截断阶数
@@ -460,13 +462,23 @@ class SovereignHAVOK:
         Theta = np.column_stack([v, self.forcing_])
 
         # Solve: Theta @ Xi = dv_dt  ->  Xi.shape = (r x r-1)
-        if self.regression_method == "ridge":
+        # ROUND26 算法审视 P2-3 修复: 条件数自适应正则化
+        # cond(Theta) > 1e10 时 Theta.T@Theta 病态, lstsq 的 rcond=None 自动
+        # 截断可能保留过小奇异值导致 Xi 方差爆炸。此时自动切换到 ridge 回归
+        # (Tikhonov 正则化), 抑制小奇异值放大。阈值 1e10 依据: cond(Theta²)=
+        # cond(Theta)², 1e10²=1e20 已超 float64 有效精度 (~1e16)。
+        cond_theta = float(np.linalg.cond(Theta))
+        if self.regression_method == "ridge" or cond_theta > 1e10:
+            if self.regression_method != "ridge" and cond_theta > 1e10:
+                # 自动切换: 记录到 diagnose() 报告
+                self._auto_ridge_triggered = True
             # Ridge regression (L2 regularization)
             # Xi = (Theta^T @ Theta + alpha*I)^(-1) @ Theta^T @ dv_dt
             n_features = Theta.shape[1]
             I_reg = np.eye(n_features)
             Xi = pinv(Theta.T @ Theta + self.ridge_alpha * I_reg) @ Theta.T @ dv_dt
         else:
+            self._auto_ridge_triggered = False
             Xi, residuals, rank, s_lstsq = lstsq(Theta, dv_dt, rcond=None)
 
         # Xi = [A_part | B_part]^T, A_part:(r-1)x(r-1), B_part:(1)x(r-1)
@@ -690,6 +702,8 @@ class SovereignHAVOK:
             "max_eigenvalue_d_raw": float(max_growth),
             "min_eigenvalue_d_raw": float(min_growth),
             "condition_number_raw": float(np.linalg.cond(self.A_)),
+            # ROUND26 P2-3: 条件数自适应正则化标志
+            "auto_ridge_triggered": bool(self._auto_ridge_triggered),
         }
 
     def report(self) -> str:

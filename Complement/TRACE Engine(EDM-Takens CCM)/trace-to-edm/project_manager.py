@@ -71,6 +71,10 @@ class ProjectManager:
         """确保所有已注册项目的目录存在"""
         for name in self._index["projects"]:
             (PROJECTS_DIR / name).mkdir(parents=True, exist_ok=True)
+            # ENG-04 修复: 确保每个项目的 inputs/outputs/cache 子目录存在
+            # 原实现仅在 create() 时创建子目录，default 项目(预注册)缺少 cache/ 子目录，
+            # 导致 _active_model.txt 无处写入而回退到全局 data/cache/
+            self._ensure_project_dirs(name)
 
     def _csv_path(self, name: str) -> Path:
         return PROJECTS_DIR / name / "narrative_meta_trajectories.csv"

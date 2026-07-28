@@ -110,7 +110,10 @@
 .work-scan-table th { font-size: 0.55rem; }
 
 .work-scan-wrap {
-  max-height: min(32vh, 280px);
+  /* P1 fix (Round 22 §3): 原 32vh 过窄, 用户只能看到两行. 提升到 56vh,
+     与 dataset-table-wrap 的 52vh 协调, 给数据源栏目足够展示空间. */
+  max-height: min(56vh, 520px);
+  min-height: 240px;
   overflow-y: auto;
   overflow-x: hidden;
   padding-right: 4px;
@@ -419,49 +422,73 @@
 /* ── 布局等高：让左栏终端跟随右栏底部，紧凑化 ── */
 .command-grid {
   align-items: stretch;
+  min-height: 0;
 }
 .command-grid > .col-left,
 .command-grid > .col-right {
   display: flex;
   flex-direction: column;
   gap: clamp(12px, 1.6vw, 20px);
+  min-height: 0;
 }
 .command-grid > .col-left .panel,
 .command-grid > .col-right .panel {
   margin-bottom: 0;
+  min-height: 0;
 }
-/* 终端面板填满左栏剩余高度，跟随右栏底部 */
+/* 终端面板填满左栏剩余高度，但避免自身被拉成“长条”
+   Round 26 §2: 面板整体加 max-height 上限; 内部 terminal 继承上限并内部滚动. */
 .command-grid > .col-left .panel.log-cockpit {
-  flex: 1;
+  flex: 1 1 auto;
   display: flex;
   flex-direction: column;
+  min-height: 0;
+  max-height: min(56vh, 520px);
 }
 .command-grid > .col-left .panel.log-cockpit .log-view.terminal {
-  flex: 1;
+  flex: 1 1 auto;
   height: auto;
-  max-height: none;
-  min-height: 180px;
+  min-height: 0;
+  max-height: min(48vh, 420px);
+  overflow-y: auto;
+  resize: none;
 }
 .terminal-line {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
   white-space: pre-wrap;
   word-break: break-all;
+  /* P1 fix (Round 26 §1): 压缩行高, 避免单条日志变成"长条" */
+  line-height: 1.35;
+  padding: 1px 0;
+  min-height: 18px;
+  max-height: 72px;
+  overflow: hidden;
 }
 .terminal-line .log-icon {
   flex-shrink: 0;
   width: 1.1rem;
   text-align: center;
+  font-size: 0.62rem;
 }
 .terminal-line .log-level {
-  font-size: 0.6rem;
+  font-size: 0.55rem;
   font-weight: 700;
-  margin-right: 6px;
+  margin-right: 2px;
   opacity: 0.95;
-  min-width: 48px;
+  min-width: 42px;
 }
 .terminal-line .log-ts {
   color: var(--term-dim);
-  margin-right: 6px;
-  font-size: 0.6rem;
+  margin-right: 2px;
+  font-size: 0.55rem;
+  flex-shrink: 0;
+}
+.terminal-line .log-msg {
+  flex: 1;
+  min-width: 0;
+  font-size: clamp(0.66rem, 0.88vw, 0.76rem);
 }
 .terminal-line.dim { color: var(--term-dim); }
 .terminal-line.info { color: #9ab; }
@@ -607,11 +634,8 @@ tr:hover td { background: #151d28; }
   flex: 1;
 }
 
-/* 扫描列表：内部滚动，不无限撑高 */
+/* 扫描列表：依赖外层 work-scan-wrap 滚动, 避免双重滚动条. */
 .ws-list {
-  max-height: min(35vh, 320px);
-  overflow-y: auto;
-  overflow-x: hidden;
   padding-right: 4px;
 }
 
@@ -687,7 +711,9 @@ tr:hover td { background: #151d28; }
 /* ── SUPER 模式徽章动画 ─────────────────── */
 .chart-wrap {
   width: 100%;
-  max-height: 320px;
+  height: min(36vh, 320px);
+  min-height: 220px;
+  position: relative;
   overflow: hidden;
   border-radius: 6px;
   background: var(--panel-solid);
@@ -695,9 +721,7 @@ tr:hover td { background: #151d28; }
 
 .chart-wrap canvas {
   width: 100%;
-  height: auto;
-  max-width: 100%;
-  max-height: 320px;
+  height: 100%;
   display: block;
 }
 
@@ -748,7 +772,7 @@ td[title] { font-family: 'JetBrains Mono', 'Consolas', monospace; font-size: 0.6
   .base-header .base-nav { width: 100%; order: -1; }
   .btn { width: 100%; }
   .terminal { height: 200px; }
-  .chart-wrap, .chart-wrap canvas { max-height: 220px; }
+  .chart-wrap { height: min(34vh, 220px); min-height: 160px; }
 }
 
 /* ── 数据集 → 轨迹高亮追溯 ─────────────────── */

@@ -469,32 +469,181 @@ async function runSuperAnalysisStream(text, outputId, bridgeConfig, res) {
   }
 }
 
+// INT-04: buildSuperReport 复用 bridge.report() 的更丰富模板。
+// 原 buildSuperReport 仅输出 6 行摘要，丢失了 SUPER 模式独有的六战士、稳定性、
+// 反事实扫描、数据诊断等高价值信息。扩展后与 py_bridge.py / counterfactual_bridge.py
+// 的 report() 模板对齐，让用户在 /api/report/:id 拿到的 Markdown 与 LIGHT/DEEP 同等丰富。
 function buildSuperReport(payload) {
   const lines = [];
+  const fmt = (v, d = 4) => (typeof v === 'number' && Number.isFinite(v)) ? v.toFixed(d) : 'N/A';
+  const concepts = Array.isArray(payload.concepts) ? payload.concepts : [];
+  const topEdges = Array.isArray(payload.top_edges) ? payload.top_edges : [];
+  const refutations = Array.isArray(payload.refutations) ? payload.refutations : [];
+  const scan = Array.isArray(payload.counterfactual_scan) ? payload.counterfactual_scan : [];
+  const sixWarriors = (payload.six_warriors && typeof payload.six_warriors === 'object') ? payload.six_warriors : {};
+  const auditor = payload.auditor || null;
+  const stability = payload.stability_analysis || {};
+  const diag = payload.data_diagnostics || {};
+  const execProfile = payload.execution_profile || {};
+
   lines.push('# TRACE SUPER 模式分析报告');
   lines.push('');
   lines.push(`**分析模型**: ${payload.model || 'shehui-llama'}`);
-  lines.push(`**概念数量**: ${(payload.concepts || []).length}`);
-  lines.push(`**显著因果边**: ${payload.n_significant_edges || 0}`);
-  lines.push(`**ATE**: ${payload.ate !== null ? payload.ate.toFixed(3) : 'N/A'}`);
-  lines.push(`**可识别性**: ${payload.identifiable ? '是' : '否'}`);
+  lines.push(`**分析模式**: ${payload.analysis_mode || 'super'}`);
+  if (payload.text_hash) lines.push(`**文本哈希**: ${payload.text_hash}`);
+  lines.push(`**后端**: ${payload.backend || 'DoWhy'}${payload.simulation ? ' (模拟)' : ''}`);
   lines.push('');
-  lines.push('## 核心概念');
-  (payload.concepts || []).forEach((c) => lines.push(`- ${c}`));
+
+  // 1. 因果图摘要
+  lines.push('## 1. 因果图摘要');
+  lines.push(`- 概念节点: ${concepts.length}`);
+  lines.push(`- 显著因果边: ${payload.n_significant_edges || 0}`);
+  lines.push(`- 阈值 (threshold): ${payload.threshold != null ? payload.threshold : 'N/A'}`);
+  lines.push(`- 窗口大小 (window_size): ${payload.window_size != null ? payload.window_size : 'N/A'}`);
+  lines.push(`- 最大概念数 (max_concepts): ${payload.max_concepts != null ? payload.max_concepts : 'N/A'}`);
+  if (diag.signal_type) lines.push(`- 信号类型: ${diag.signal_type}${diag.signal_type === 'delta_nll' ? ' (真实 ΔNLL)' : ' (共现计数)'}`);
+  if (diag.max_delta_nll != null) lines.push(`- 最大 ΔNLL: ${diag.max_delta_nll}`);
+  if (diag.adj_density != null) lines.push(`- 图密度 (adj_density): ${diag.adj_density}`);
+  if (diag.concept_level_edge_count != null) lines.push(`- 概念级边数: ${diag.concept_level_edge_count}`);
   lines.push('');
-  lines.push('## Top 因果边');
-  (payload.top_edges || []).forEach((e) => {
-    const s = typeof e.strength === 'number' ? e.strength.toFixed(3) : 'N/A';
-    lines.push(`- ${e.source || '?'} → ${e.target || '?'} (ΔNLL=${s})`);
-  });
+
+  // 2. Top 因果边
+  if (topEdges.length > 0) {
+    lines.push('## 2. Top 因果边 (TRACE ΔNLL)');
+    lines.push('| # | 原因 | 结果 | ΔNLL | 方向 |');
+    lines.push('|---|------|------|------|------|');
+    topEdges.slice(0, 10).forEach((e, i) => {
+      const s = typeof e.strength === 'number' ? e.strength.toFixed(3) : 'N/A';
+      lines.push(`| ${i + 1} | ${e.source || '?'} | ${e.target || '?'} | ${s} | ${e.direction || '→'} |`);
+    });
+    lines.push('');
+  }
+
+  // 3. 因果效应识别
+  lines.push('## 3. 因果效应识别');
+  lines.push(`- 处理变量 (treatment): ${payload.treatment || 'N/A'}`);
+  lines.push(`- 结果变量 (outcome): ${payload.outcome || 'N/A'}`);
+  lines.push(`- 可识别: ${payload.identifiable ? '✓ 是' : '✗ 否'}`);
   lines.push('');
-  lines.push('## 审计结果');
-  if (payload.auditor) {
-    lines.push(`- 裁决: ${payload.auditor.verdict}`);
-    lines.push(`- PASS/WARN/FAIL: ${payload.auditor.n_pass}/${payload.auditor.n_warn}/${payload.auditor.n_fail}`);
+
+  // 4. 因果效应估计
+  lines.push('## 4. 因果效应估计');
+  lines.push(`- 效应量 (ATE): ${payload.ate != null ? fmt(payload.ate) : 'N/A'}`);
+  if (Array.isArray(payload.confidence_interval) && payload.confidence_interval.length === 2) {
+    const ciLo = payload.confidence_interval[0];
+    const ciHi = payload.confidence_interval[1];
+    lines.push(`- 95% CI: [${ciLo != null ? fmt(ciLo) : 'N/A'}, ${ciHi != null ? fmt(ciHi) : 'N/A'}]`);
+  }
+  lines.push('');
+
+  // 5. 反驳测试
+  if (refutations.length > 0) {
+    const nRefuted = refutations.filter(r => r.refuted).length;
+    lines.push('## 5. 反驳测试');
+    lines.push(`- 结论: ${nRefuted}/${refutations.length} 被反驳 ${nRefuted >= 2 ? '⚠️ 效应不稳定' : '✓ 效应稳健'}`);
+    lines.push('');
+    lines.push('| 反驳方法 | 新效应 | 是否反驳 | 指标 |');
+    lines.push('|---------|--------|---------|------|');
+    refutations.forEach(r => {
+      const ne = r.new_effect != null ? fmt(r.new_effect) : 'N/A';
+      const verdict = r.refuted ? '⚠️ 反驳' : '✓ 稳健';
+      const metric = r.display_metric != null ? `${r.display_label || '指标'}=${(r.display_metric * 100).toFixed(1)}%` : '—';
+      lines.push(`| ${r.method || '?'} | ${ne} | ${verdict} | ${metric} |`);
+    });
+    lines.push('');
+  }
+
+  // 6. 反事实扫描
+  if (scan.length > 0) {
+    lines.push('## 6. 反事实扫描（Top 边）');
+    lines.push('| 原因 → 结果 | TRACE ΔNLL | ITE | 观测 | 反事实 |');
+    lines.push('|------------|-----------|-----|------|--------|');
+    scan.slice(0, 10).forEach(r => {
+      lines.push(
+        `| ${r.source || '?'} → ${r.target || '?'} `
+        + `| ${r.trace_dnl != null ? fmt(r.trace_dnl, 2) : 'N/A'} `
+        + `| ${r.ite != null ? fmt(r.ite) : 'N/A'} `
+        + `| ${r.observed != null ? fmt(r.observed) : 'N/A'} `
+        + `| ${r.counterfactual != null ? fmt(r.counterfactual) : 'N/A'} |`
+      );
+    });
+    lines.push('');
+  }
+
+  // 7. 六战士诊断
+  const warriorKeys = Object.keys(sixWarriors);
+  if (warriorKeys.length > 0) {
+    const deployed = warriorKeys.filter(k => sixWarriors[k] && sixWarriors[k].status === 'deployed').length;
+    lines.push('## 7. 六战士诊断');
+    lines.push(`- 部署: ${deployed}/${warriorKeys.length} deployed`);
+    lines.push('');
+    lines.push('| 战士 | 状态 | 裁决 | 关键发现 |');
+    lines.push('|------|------|------|---------|');
+    warriorKeys.forEach(k => {
+      const w = sixWarriors[k];
+      const name = w.name || k;
+      const status = w.status || '?';
+      const verdict = w.verdict || '—';
+      const finding = (Array.isArray(w.findings) && w.findings.length > 0) ? w.findings[0] : '—';
+      lines.push(`| ${name} | ${status} | ${verdict} | ${String(finding).slice(0, 60)} |`);
+    });
+    lines.push('');
+  }
+
+  // 8. 审计结果
+  lines.push('## 8. 审计结果');
+  if (auditor) {
+    lines.push(`- 裁决: ${auditor.verdict || 'N/A'}`);
+    lines.push(`- PASS/WARN/FAIL: ${auditor.n_pass || 0}/${auditor.n_warn || 0}/${auditor.n_fail || 0}`);
   } else {
     lines.push('- 审计不可用');
   }
+  lines.push('');
+
+  // 9. 稳定性分析
+  if (stability && Object.keys(stability).length > 0) {
+    lines.push('## 9. 稳定性分析');
+    if (stability.edge_stability_mean != null) lines.push(`- 边稳定性均值: ${fmt(stability.edge_stability_mean, 3)}`);
+    if (stability.edge_stability_std != null) lines.push(`- 边稳定性标准差: ${fmt(stability.edge_stability_std, 3)}`);
+    if (stability.ate_bootstrap_ci && Array.isArray(stability.ate_bootstrap_ci)) {
+      lines.push(`- ATE bootstrap CI: [${fmt(stability.ate_bootstrap_ci[0])}, ${fmt(stability.ate_bootstrap_ci[1])}] (${stability.ate_bootstrap_method || 'percentile'})`);
+    }
+    if (stability.permutation_p_value != null) lines.push(`- 置换检验 p 值: ${fmt(stability.permutation_p_value, 4)} (n=${stability.permutation_n || '?'})`);
+    if (stability.cv_ate_mean != null) lines.push(`- K-fold CV ATE 均值: ${fmt(stability.cv_ate_mean)} (std=${stability.cv_ate_std != null ? fmt(stability.cv_ate_std) : 'N/A'})`);
+    lines.push('');
+  }
+
+  // 10. 数据诊断
+  if (diag && Object.keys(diag).length > 0) {
+    lines.push('## 10. 数据诊断');
+    if (diag.raw_tokens != null) lines.push(`- 原始 token 数: ${diag.raw_tokens}`);
+    if (diag.valid_concept_tokens != null) lines.push(`- 有效概念 token 数: ${diag.valid_concept_tokens}`);
+    if (diag.concept_coverage != null) lines.push(`- 概念覆盖率: ${(diag.concept_coverage * 100).toFixed(1)}%`);
+    if (diag.unk_rate != null) lines.push(`- 未知词比例 (unk_rate): ${diag.unk_rate}`);
+    if (diag.condition_number != null) lines.push(`- 条件数: ${diag.condition_number}`);
+    if (diag.max_correlation != null) lines.push(`- 最大相关系数: ${diag.max_correlation}`);
+    lines.push('');
+  }
+
+  // 11. 执行时间
+  if (execProfile && Object.keys(execProfile).length > 0) {
+    lines.push('## 11. 执行时间');
+    const totalMs = execProfile.total_ms != null ? execProfile.total_ms : (execProfile.total || 0);
+    if (totalMs > 0) lines.push(`- 总耗时: ${(totalMs / 1000).toFixed(2)}s (${totalMs}ms)`);
+    if (Array.isArray(execProfile.stages) && execProfile.stages.length > 0) {
+      lines.push('');
+      lines.push('| 阶段 | 耗时 (ms) |');
+      lines.push('|------|----------|');
+      execProfile.stages.forEach(s => {
+        lines.push(`| ${s.stage || s.name || '?'} | ${s.ms || 0} |`);
+      });
+    }
+    lines.push('');
+  }
+
+  lines.push('---');
+  lines.push(`_报告由 trace-engine-web SUPER 模式自动生成 · 模型: ${payload.model || 'shehui-llama'} · 模板对齐 counterfactual_bridge.report()_`);
+
   return lines.join('\n');
 }
 
