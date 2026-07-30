@@ -82,14 +82,18 @@ async function loadJobHistory() {
         // 截断 textPreview 至 200 字符作为摘要（任务详情模态框入口提示）
         const previewRaw = j.textPreview || '';
         const preview = previewRaw.length > 200 ? previewRaw.slice(0, 200) + '…' : previewRaw;
+        // P0 修复 (2026-07-29): preview 不再使用内联样式，完全由 CSS 控制，
+        // 避免 inline style 覆盖 .terminal-line.job-card .job-preview 的 flex/width/margin。
         const previewHtml = preview
-          ? `<div class="job-preview" style="color:var(--muted);font-size:clamp(0.62rem,0.85vw,0.72rem);margin-top:0.05rem;opacity:0.75;line-height:1.25;">${escapeHtml(preview)}</div>`
+          ? `<div class="job-preview">${escapeHtml(preview)}</div>`
           : '';
 
         const row = addLine(
-          `<input type="checkbox" class="job-cb" data-id="${j.id}" style="accent-color:var(--accent,#00ff88);margin-right:4px;">` +
-          `<span class="job-meta" style="flex:1;min-width:0;">[${ts}] ${j.id.slice(0, 8)}… ${mode} ${j.status}${dur}${errMark}</span>` +
-          `<span class="job-actions" style="flex-shrink:0;">${retryBtn}${deleteBtn}${detailBtn}</span>` +
+          `<div class="job-card-row">` +
+          `<input type="checkbox" class="job-cb" data-id="${j.id}">` +
+          `<span class="job-meta">[${ts}] ${j.id.slice(0, 8)}… ${mode} ${j.status}${dur}${errMark}</span>` +
+          `<span class="job-actions">${retryBtn}${deleteBtn}${detailBtn}</span>` +
+          `</div>` +
           previewHtml
         );
         // 改造为可点击卡片：cursor:pointer + hover 高亮，点击触发详情模态框
@@ -332,18 +336,28 @@ async function viewJobDetail(id) {
         const detailTopologyView = document.getElementById('detailTopologyView');
         const detailTopologyWrap = document.getElementById('detailTopologyWrap');
         const detailTopologyCanvas = document.getElementById('detailTopologyCanvas');
+        const detailTopology2DView = document.getElementById('detailTopology2DView');
+        const detailTopology2DWrap = document.getElementById('detailTopology2DWrap');
+        const detailTopology2DCanvas = document.getElementById('detailTopology2DCanvas');
         const detailTopoToggle = document.getElementById('detailTopoToggle');
+        const detailTopo2DToggle = document.getElementById('detailTopo2DToggle');
         const detailTopoPauseBtn = document.getElementById('detailTopoPauseBtn');
         const detailTopoResetBtn = document.getElementById('detailTopoResetBtn');
+        const detailTopo2DResetBtn = document.getElementById('detailTopo2DResetBtn');
         if (detailMatrixView && detailTopologyView) {
           setupTopologyToggle(d.result, {
             matrixView: detailMatrixView,
             topologyView: detailTopologyView,
+            topology2DView: detailTopology2DView,
             wrap: detailTopologyWrap,
             canvas: detailTopologyCanvas,
+            wrap2D: detailTopology2DWrap,
+            canvas2D: detailTopology2DCanvas,
             toggleBtn: detailTopoToggle,
+            toggle2DBtn: detailTopo2DToggle,
             pauseBtn: detailTopoPauseBtn,
-            resetBtn: detailTopoResetBtn
+            resetBtn: detailTopoResetBtn,
+            reset2DBtn: detailTopo2DResetBtn
           });
         }
       }
@@ -501,9 +515,12 @@ function renderResultMetrics(r) {
   const matrixHtml = (typeof buildAdjacencyMatrixHTML === 'function') ? buildAdjacencyMatrixHTML(r) : '';
   const hasConcepts = (r.concepts || []).length >= 2;
   if (matrixHtml || hasConcepts) {
-    html += `<h3 class="section-title" style="display:flex;justify-content:space-between;align-items:center;">
-      // CONCEPT TOPOLOGY
-      <button class="btn-mini topo-toggle-btn" id="detailTopoToggle">3D 拓扑</button>
+    html += `<h3 class="section-title" style="display:flex;justify-content:space-between;align-items:center;gap:0.5rem;flex-wrap:wrap;">
+      <span>// CONCEPT TOPOLOGY</span>
+      <span style="display:flex;gap:6px;">
+        <button class="btn-mini topo-toggle-btn" id="detailTopoToggle" title="切换到 3D 拓扑">3D 拓扑</button>
+        <button class="btn-mini topo-toggle-btn hidden" id="detailTopo2DToggle" title="切换到 2D 网络图谱">2D 网络</button>
+      </span>
     </h3>`;
     html += `<div id="detailMatrixView">${matrixHtml || '<div class="empty-state">无邻接矩阵数据</div>'}</div>`;
     html += `<div id="detailTopologyView" class="hidden">
@@ -514,7 +531,17 @@ function renderResultMetrics(r) {
           <button id="detailTopoPauseBtn" class="btn-mini secondary topo-pause-btn" title="暂停/继续旋转">⏸</button>
           <button id="detailTopoResetBtn" class="btn-mini secondary topo-reset-btn" title="重置视角">⟲</button>
         </div>
-        <div style="position:absolute;bottom:6px;left:8px;font-size:0.6rem;color:var(--muted);">拖拽旋转 · 滚轮缩放 · 节点大小=出现频次 · 边粗细=因果强度</div>
+        <div style="position:absolute;bottom:6px;left:8px;font-size:0.6rem;color:var(--muted);">拖拽旋转 · 滚轮缩放 · 点击节点坍缩为 2D 网络 · 节点大小=出现频次 · 边粗细=因果强度</div>
+      </div>
+    </div>`;
+    html += `<div id="detailTopology2DView" class="hidden">
+      <h3 class="section-title">// 2D CAUSAL NETWORK (坍缩网络图谱)</h3>
+      <div id="detailTopology2DWrap" style="position:relative;width:100%;height:min(50vh,420px);border:1px solid var(--border);border-radius:6px;overflow:hidden;background:#05070a;">
+        <canvas id="detailTopology2DCanvas" style="width:100%;height:100%;display:block;"></canvas>
+        <div style="position:absolute;top:6px;right:8px;display:flex;gap:6px;">
+          <button id="detailTopo2DResetBtn" class="btn-mini secondary topo-2d-reset-btn" title="重置布局">⟲</button>
+        </div>
+        <div style="position:absolute;bottom:6px;left:8px;font-size:0.6rem;color:var(--muted);">拖拽节点 · 滚轮缩放 · 点击高亮邻居 · 2D 力导向网络 · 边=因果链接</div>
       </div>
     </div>`;
   }

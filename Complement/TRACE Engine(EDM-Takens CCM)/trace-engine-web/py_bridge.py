@@ -33,11 +33,16 @@ from pathlib import Path
 if 'TQDM_DISABLE' not in os.environ:
     os.environ['TQDM_DISABLE'] = '1'
 
-# P2: 抑制 pandas 可选依赖版本警告 (numexpr/bottleneck)
-# 这些警告不影响功能，但会在 Web UI 实时日志中显示为噪声
+# P2: 抑制 pandas / dowhy / causallearn 等第三方库在 Web UI 实时日志中产生的噪声警告
+# 这些警告不影响因果推断结果，但会被前端渲染为大量 ⚠ stderr 行，误导用户以为报错。
 import warnings as _warnings
 _warnings.filterwarnings('ignore', message=r".*Pandas requires version.*")
 _warnings.filterwarnings('ignore', category=UserWarning, module=r"pandas\..*")
+_warnings.filterwarnings('ignore', category=FutureWarning, module=r"dowhy.*")
+_warnings.filterwarnings('ignore', category=FutureWarning, module=r"causallearn.*")
+_warnings.filterwarnings('ignore', category=FutureWarning, module=r"sklearn.*")
+_warnings.filterwarnings('ignore', category=DeprecationWarning, module=r"dowhy.*")
+_warnings.filterwarnings('ignore', category=DeprecationWarning, module=r"causallearn.*")
 
 import numpy as np
 
@@ -535,7 +540,11 @@ def main():
     else:
         # DEEP 模式：DoWhy bootstrap 估计可能耗时 1-5 分钟，
         # 后台线程每 5 秒向终端日志发射心跳 "⏳ ... 已运行 Ns"
-        estimate = _heartbeat_log("Bootstrap 估计 ATE")(lambda: bridge.estimate())
+        # P0 性能优化 (2026-07-29): 限制 bootstrap 次数为 100，避免大模型/长文本时阻塞过久。
+        deep_sim_count = 100
+        estimate = _heartbeat_log(f"Bootstrap 估计 ATE (n={deep_sim_count})")(lambda: bridge.estimate(
+            method_params={'num_simulations': deep_sim_count}
+        ))
         ci = DoWhy14Adapter.get_confidence_interval(estimate)
         confidence_method = "bootstrap" if not bridge.simulation else "SEM-analytic"
         _log("info", f"ATE={estimate.value:.4f}, 95% CI=[{ci[0]:.4f}, {ci[1]:.4f}]")
@@ -545,7 +554,9 @@ def main():
     if run_refuters:
         timer.start("refute")
         _stage("refute", "正在运行反驳测试 (3 refuters)...", 0.80)
-        refutations = _heartbeat_log("反驳测试 (3 refuters)")(lambda: bridge.refute())
+        refutations = _heartbeat_log(f"反驳测试 (3 refuters, n={deep_sim_count})")(lambda: bridge.refute(
+            num_simulations=deep_sim_count
+        ))
         n_refuted = sum(1 for r in refutations.values()
                         if bool(getattr(getattr(r, '_check', None), 'refuted',
                                         getattr(r, 'refuted', False))))

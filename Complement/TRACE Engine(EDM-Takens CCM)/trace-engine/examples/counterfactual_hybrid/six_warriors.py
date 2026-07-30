@@ -558,7 +558,17 @@ def _deploy_havok(adj_matrix, token_list=None) -> WarriorCard:
         }
         card.status = "deployed"
 
-        if nonlinear_energy > 0.25:
+        # P2 负控制实验修复: 增加 forcing_raw 噪声检测
+        # 纯噪声数据 forcing_raw ≈ 0.514,真实线性信号 forcing_raw ≈ 0.027
+        # 原 verdict 逻辑仅基于 nonlinear_energy,纯噪声(linear_92%)被判为 LINEAR_DOMINANT
+        # 修复:forcing_raw > 0.3 时判定为 NOISE_DOMINANT,避免负控制假阳性
+        if forcing_raw > 0.3 and nonlinear_energy > 0.05:
+            card.findings = [
+                f"噪声主导 (forcing={forcing_raw:.3f} > 0.3) — 信号无 coherent 结构",
+                f"SVD r={r}/{len(s)}, linear={linear_energy:.0%}, nonlinear={nonlinear_energy:.0%}",
+            ]
+            card.verdict = "NOISE_DOMINANT — 信号无因果结构"
+        elif nonlinear_energy > 0.25:
             card.findings = [
                 f"非线性显著 ({nonlinear_energy:.0%}) — 文本中有逻辑突变",
                 f"SVD r={r}/{len(s)}, forcing={forcing_raw:.3f}",
@@ -576,7 +586,7 @@ def _deploy_havok(adj_matrix, token_list=None) -> WarriorCard:
         else:
             card.findings = [
                 f"线性主导 ({linear_energy:.0%}) — 因果流强度平稳",
-                f"SVD r={r}/{len(s)} — 低维吸引子",
+                f"SVD r={r}/{len(s)} — 低维吸引子, forcing={forcing_raw:.3f}",
             ]
             card.verdict = "LINEAR_DOMINANT — 时间线叙事"
 
@@ -683,6 +693,33 @@ def _deploy_causallearn(bridge) -> WarriorCard:
 
         sub_data = raw[:, sub_idx]
         sub_names = [bridge.concept_names[i] for i in sub_idx]
+
+        # P0 修复 (2026-07-29): 概念数据可能因 token 重复或完全线性相关导致
+        # 协方差矩阵奇异，PC/GES 的 fisherz test 报 "Data correlation matrix is singular"。
+        # 预处理：检测并移除重复列，若仍奇异则注入极小抖动（不影响结构）。
+        sub_data = np.asarray(sub_data, dtype=float)
+        # 去重列
+        unique_idx = []
+        seen_cols = set()
+        for col_i in range(sub_data.shape[1]):
+            col_tuple = tuple(np.round(sub_data[:, col_i], 8))
+            if col_tuple not in seen_cols:
+                seen_cols.add(col_tuple)
+                unique_idx.append(col_i)
+        if len(unique_idx) < sub_data.shape[1]:
+            sub_data = sub_data[:, unique_idx]
+            sub_names = [sub_names[i] for i in unique_idx]
+        # 奇异检测：协方差矩阵条件数过大或行列式为 0
+        try:
+            cov = np.cov(sub_data, rowvar=False)
+            eigvals = np.linalg.eigvalsh(cov)
+            cond = np.max(eigvals) / (np.min(eigvals[eigvals > 0]) if np.any(eigvals > 0) else 1e-12)
+        except Exception:
+            cond = float('inf')
+        if cond > 1e12 or not np.isfinite(cond):
+            jitter_std = max(1e-6, np.std(sub_data) * 1e-4)
+            sub_data = sub_data + np.random.default_rng(42).normal(0, jitter_std, size=sub_data.shape)
+            card.findings.append(f"数据注入 {jitter_std:.2e} 抖动以修复奇异矩阵")
 
         # PC (fast: alpha=0.01)
         from causallearn.search.ConstraintBased.PC import pc as _pc_alg

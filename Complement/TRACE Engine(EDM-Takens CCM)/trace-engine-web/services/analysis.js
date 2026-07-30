@@ -15,6 +15,7 @@ const llamaWorkerSvc = require('./llamaWorker');
 const {
   CONFIG,
   WORK_DIR,
+  INPUTS_DIR,
   OUTPUT_DIR,
   activeJobs,
   activeJobResponses,
@@ -64,11 +65,24 @@ function runPythonAnalysisStream(text, outputId, mode, bridgeConfig, res, schema
   activeJobResponses.set(outputId, { res, mode });
   logToFile('info', `启动分析 job=${outputId} mode=${mode} text_len=${text.length}`);
 
+  // P0 硬修复 (2026-07-29): Windows 下 Python 子进程 stdin 默认按系统代码页
+  // (GBK) 解码，导致中文文本传入后乱码、有效词数变为 0。改为将文本写入
+  // UTF-8 临时文件，通过命令行第 5 参数传给 py_bridge，从根本上规避 stdin
+  // 编码问题，同时复用已有的 INPUTS_DIR TTL 清理机制。
+  const inputFilePath = path.join(INPUTS_DIR, `${outputId}.txt`);
+  try {
+    fs.writeFileSync(inputFilePath, text, 'utf-8');
+  } catch (err) {
+    logToFile('error', `写入输入文件失败 job=${outputId}: ${err.message}`);
+    if (!resClosed) sendSSE(res, 'error', { message: `写入输入文件失败: ${err.message}` });
+    recordJob(outputId, mode, 'error', err.message);
+    return;
+  }
+
   const args = [pyScript, skillDir, outDir, mode];
   const cfg = bridgeConfig || CONFIG.bridgeConfig || '';
-  if (cfg) {
-    args.push(cfg);
-  }
+  args.push(cfg || '{}');
+  args.push(inputFilePath);
 
   const py = spawn(CONFIG.pythonCmd, args, {
     env: {
@@ -87,6 +101,7 @@ function runPythonAnalysisStream(text, outputId, mode, bridgeConfig, res, schema
   let stdoutBuffer = '';
   let timeoutId = null;
   let finished = false;
+  let resClosed = false;
 
   const cleanupTimeout = () => {
     if (timeoutId) {
@@ -110,9 +125,6 @@ function runPythonAnalysisStream(text, outputId, mode, bridgeConfig, res, schema
     recordJob(outputId, mode, 'timeout');
   }, jobTimeout);
 
-  py.stdin.write(text, 'utf-8');
-  py.stdin.end();
-
   // P2-9 + 元审计 P1 修缮：SSE 客户端断开的宽限期机制
   // 之前 res.on('close') 立即取消任务，客户端重连后只能取 /api/result/:id
   // 现增加动态宽限期：客户端断开后不立即 kill 进程，
@@ -120,9 +132,8 @@ function runPythonAnalysisStream(text, outputId, mode, bridgeConfig, res, schema
   // 宽限期后仍未重连则真正清理资源（避免僵尸进程）
   // P1 修缮：根据模式动态调整宽限期，DEEP/SUPER 需要更长时间
   const gracePeriod = mode === 'super' ? 600000 : mode === 'deep' ? 120000 : 30000;
-  // P0 修缮：标记 res 是否已关闭，避免向已关闭的流写入 result/error 事件
+  // P0 修缮：标记 res 是否已关闭，避免向已关闭的 SSE 流写入 result/error 事件
   // 这是"任务完成但前端看不到结论"的根因——SSE 断开后 sendSSE 仍尝试写入
-  let resClosed = false;
   res.on('close', () => {
     if (finished) return;
     resClosed = true;
@@ -659,9 +670,15 @@ function runPythonAnalysisSync(text, outputId, mode = 'light', bridgeConfig = ''
 
     recordJob(outputId, mode, 'running', null, { text, config: bridgeConfig || CONFIG.bridgeConfig || '' });
 
+    // P0 硬修复 (2026-07-29): Windows Python 子进程 stdin 编码问题，
+    // 与 runPythonAnalysisStream 保持一致：文本写入 UTF-8 文件后通过参数传入。
+    const inputFilePath = path.join(INPUTS_DIR, `${outputId}.txt`);
+    fs.writeFileSync(inputFilePath, text, 'utf-8');
+
     const args = [pyScript, skillDir, outDir, mode];
     const cfg = bridgeConfig || CONFIG.bridgeConfig || '';
-    if (cfg) args.push(cfg);
+    args.push(cfg || '{}');
+    args.push(inputFilePath);
 
     const py = spawn(CONFIG.pythonCmd, args, {
       env: { ...process.env, PYTHONIOENCODING: 'utf-8' },
@@ -673,9 +690,6 @@ function runPythonAnalysisSync(text, outputId, mode = 'light', bridgeConfig = ''
     let stdout = '';
     let stderr = '';
     let finished = false;
-
-    py.stdin.write(text, 'utf-8');
-    py.stdin.end();
 
     py.stdout.on('data', (data) => { stdout += data.toString('utf-8'); });
     py.stderr.on('data', (data) => { stderr += data.toString('utf-8'); });

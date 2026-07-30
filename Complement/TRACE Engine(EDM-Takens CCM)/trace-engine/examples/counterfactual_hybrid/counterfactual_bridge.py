@@ -84,34 +84,81 @@ def is_pandas_available() -> bool:
         return False
 
 
-# ── 模块级导入（供 bridge 代码直接使用；可用性由上述函数判断）─────────
-# 保留 CausalModel/pd/graphviz/nx 名称供本模块内部使用；缺失时为 None。
-try:
-    from dowhy import CausalModel
-except ImportError:
-    CausalModel = None
-
-try:
-    import pandas as pd
-except ImportError:
-    pd = None
-
-try:
-    import graphviz
-except ImportError:
-    graphviz = None
-
-try:
-    import networkx as nx
-except ImportError:
-    nx = None
+# ── 模块级导入（惰性化 — P1-A 优化：避免 LIGHT 模式被 DoWhy/causallearn 导入拖慢 60-70s）───
+# 原 implementation 在模块加载时无条件 import dowhy/pandas/graphviz/networkx,
+# 即使 LIGHT 模式不需要这些库,也会触发 ~60-70s 的重导入开销。
+# 优化策略:不声明模块级变量,实际导入延迟到首次属性访问时（通过 __getattr__）。
+# 注意:不能写 CausalModel = None,否则 __getattr__ 不会触发（属性已存在为 None）。
+# 兼容性:is_dowhy_available() 等探测函数已带 lru_cache,首次调用时才触发 import。
 
 
-# ── 兼容别名（保持 _DOWHY_AVAILABLE 等旧名可用，debt-05 双轨）──────────
-_DOWHY_AVAILABLE = is_dowhy_available()
-_CAUSALLEARN_AVAILABLE = is_causallearn_available()
-_GRAPHVIZ_AVAILABLE = is_graphviz_available()
-_PANDAS_AVAILABLE = is_pandas_available()
+def __getattr__(name):
+    """模块级惰性导入（Python 3.7+）。
+
+    当外部代码访问 counterfactual_bridge.CausalModel / pd / graphviz / nx 时,
+    才触发实际 import。LIGHT 模式不访问这些名称,完全跳过 DoWhy/causallearn 加载,
+    将 LIGHT 模式延迟从 ~84s 降低到 ~10-15s（仅 jieba + statsmodels + 基础库）。
+
+    注意:模块级不能声明同名变量(如 CausalModel=None),否则 __getattr__ 不触发。
+    """
+    if name == "CausalModel":
+        try:
+            from dowhy import CausalModel
+            globals()["CausalModel"] = CausalModel  # 缓存到模块字典,后续访问直接命中
+            return CausalModel
+        except ImportError:
+            globals()["CausalModel"] = None  # 缓存 None,避免重复尝试
+            return None
+    if name == "pd":
+        import pandas
+        globals()["pd"] = pandas
+        return pandas
+    if name == "graphviz":
+        try:
+            import graphviz
+            globals()["graphviz"] = graphviz
+            return graphviz
+        except ImportError:
+            globals()["graphviz"] = None
+            return None
+    if name == "nx":
+        try:
+            import networkx
+            globals()["nx"] = networkx
+            return networkx
+        except ImportError:
+            globals()["nx"] = None
+            return None
+    # _X_AVAILABLE 兼容:首次访问时触发惰性探测
+    if name == "_DOWHY_AVAILABLE":
+        _resolve_availability_flags()
+        return globals()["_DOWHY_AVAILABLE"]
+    if name == "_CAUSALLEARN_AVAILABLE":
+        _resolve_availability_flags()
+        return globals()["_CAUSALLEARN_AVAILABLE"]
+    if name == "_GRAPHVIZ_AVAILABLE":
+        _resolve_availability_flags()
+        return globals()["_GRAPHVIZ_AVAILABLE"]
+    if name == "_PANDAS_AVAILABLE":
+        _resolve_availability_flags()
+        return globals()["_PANDAS_AVAILABLE"]
+    raise AttributeError(f"module 'counterfactual_bridge' has no attribute {name!r}")
+
+
+# ── 兼容别名（保持 _DOWHY_AVAILABLE 等旧名可用,debt-05 双轨）──────────
+# P1-A 优化:不在此处赋值,通过 __getattr__ 惰性解析。
+# 旧代码访问 _DOWHY_AVAILABLE 时,触发 __getattr__ → _resolve_availability_flags()。
+# 注意:不能写 _DOWHY_AVAILABLE = None,否则 __getattr__ 不触发。
+
+
+def _resolve_availability_flags():
+    """首次访问 _X_AVAILABLE 时调用,触发惰性探测并缓存结果。"""
+    if "_DOWHY_AVAILABLE" not in globals() or globals().get("_DOWHY_AVAILABLE") is None and "_AVAILABILITY_RESOLVED" not in globals():
+        globals()["_DOWHY_AVAILABLE"] = is_dowhy_available()
+        globals()["_CAUSALLEARN_AVAILABLE"] = is_causallearn_available()
+        globals()["_GRAPHVIZ_AVAILABLE"] = is_graphviz_available()
+        globals()["_PANDAS_AVAILABLE"] = is_pandas_available()
+        globals()["_AVAILABILITY_RESOLVED"] = True
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -210,6 +257,9 @@ class TRACE2DoWhy:
         self.tokenizer = tokenizer
         self.threshold = threshold
         self.concept_min_freq = concept_min_freq
+        # P1-A 优化:首次实例化 TRACE2DoWhy 时触发惰性可用性探测。
+        # 这确保 _DOWHY_AVAILABLE 等变量在使用前被解析,同时避免模块加载时的 import 开销。
+        _resolve_availability_flags()
         self.simulation = simulation or not _DOWHY_AVAILABLE
         self.rng = np.random.default_rng(random_state)
 
@@ -404,9 +454,17 @@ class TRACE2DoWhy:
         从概念邻接矩阵构建因果模型。
         如果 DoWhy 可用，创建正式的 CausalModel；
         否则使用模拟模式。
-
-        v2 改进: 同时估计线性 SEM 系数，用于 Pearl 反事实推理。
         """
+        # P0 修复 (2026-07-29): 模块级 __getattr__ 不对模块内部代码生效,
+        # 必须在方法内部显式 import 才能让 'CausalModel' 名称解析成功.
+        # 重复 import 几乎零开销 (Python 缓存到 sys.modules).
+        if "CausalModel" not in globals():
+            try:
+                from dowhy import CausalModel
+                globals()["CausalModel"] = CausalModel
+            except ImportError:
+                globals()["CausalModel"] = None
+        # v2 改进: 同时估计线性 SEM 系数，用于 Pearl 反事实推理。
         if self.concept_adj is None:
             self.aggregate_concepts()
 
@@ -561,6 +619,11 @@ class TRACE2DoWhy:
         'for i in range(j)' 对任意排序邻接矩阵的索引错误。
         如果检测到环，则使用 5 次迭代近似。
         """
+        # P0 修复 (2026-07-29): 模块级 __getattr__ 不对模块内部代码生效,
+        # 必须显式 import pandas 才能让 'pd' 名称解析成功.
+        if "pd" not in globals():
+            import pandas
+            globals()["pd"] = pandas
         data = np.zeros((n_samples, n_concepts))
         # σ=1.0 增强外生噪声，避免 OLS 设计矩阵接近奇异
         noise = self.rng.normal(0, 1.0, (n_samples, n_concepts))
@@ -663,7 +726,7 @@ class TRACE2DoWhy:
     # ── 步骤 3: 估计因果效应 ─────────────────────────────────────────
 
     def estimate(self, method: str = "backdoor.linear_regression",
-                 confidence_intervals: bool = True):
+                 confidence_intervals: bool = True, **kwargs):
         """
         估计因果效应的大小和置信区间。
 
@@ -673,6 +736,9 @@ class TRACE2DoWhy:
             DoWhy 估计方法名。
         confidence_intervals : bool
             是否计算置信区间。关闭可显著加速 LIGHT 模式。
+        **kwargs
+            透传给 model.estimate_effect，例如 method_params={'num_simulations': 200}
+            用于在 SUPER 模式减少 bootstrap 次数、提升响应速度。
 
         DoWhy 0.14 兼容: 使用 get_confidence_intervals() 获取 CI。
         注意: 如果 identify() 回退到 SimulationEstimand，estimate() 也会
@@ -705,6 +771,7 @@ class TRACE2DoWhy:
                 self.identified_estimand,
                 method_name=method,
                 confidence_intervals=confidence_intervals,
+                **kwargs,
             )
 
         ci = DoWhy14Adapter.get_confidence_interval(self.estimate_result)
@@ -715,7 +782,7 @@ class TRACE2DoWhy:
 
     # ── 步骤 4: 反驳测试 ─────────────────────────────────────────────
 
-    def refute(self, progress_callback=None) -> dict:
+    def refute(self, progress_callback=None, **kwargs) -> dict:
         """
         三层反驳测试。DoWhy 0.14 兼容: 用偏差度判断 refuted。
 
@@ -724,6 +791,9 @@ class TRACE2DoWhy:
         progress_callback : callable or None
             可选的进度回调，签名为 callback(idx: int, total: int, label: str)。
             在每次反驳测试前调用，用于 Web UI 实时进度显示。
+        **kwargs
+            透传给 model.refute_estimate，例如 num_simulations=200
+            用于在 SUPER 模式减少重采样次数、提升响应速度。
         """
         if self.estimate_result is None:
             self.estimate()
@@ -758,6 +828,7 @@ class TRACE2DoWhy:
                         self.identified_estimand,
                         self.estimate_result,
                         method_name=method_name,
+                        **kwargs,
                     )
                     check = DoWhy14Adapter.check_refuted(
                         self.estimate_result, result, method_name=method_name)
@@ -941,6 +1012,14 @@ class TRACE2DoWhy:
         -------
         str: 输出文件路径，或错误信息
         """
+        # P0 修复 (2026-07-29): 模块级 __getattr__ 不对模块内部代码生效,
+        # 必须显式 import graphviz 才能让 'graphviz' 名称解析成功.
+        if "graphviz" not in globals():
+            try:
+                import graphviz
+                globals()["graphviz"] = graphviz
+            except ImportError:
+                globals()["graphviz"] = None
         if not _GRAPHVIZ_AVAILABLE:
             return "[graphviz 未安装] pip install graphviz"
 

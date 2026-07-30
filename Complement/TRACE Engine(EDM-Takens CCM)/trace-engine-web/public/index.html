@@ -7,9 +7,11 @@
   <title>TRACE Engine // Causal Inference Terminal</title>
   <!-- debt-09：CSS 拆分为 theme.css（主题变量）+ main.css（样式） -->
   <!-- 共享特摄防卫队基地主题 -->
-  <link rel="stylesheet" href="shared/themes/tokusatsu.css?v=20260728a">
-  <link rel="stylesheet" href="/css/theme.css?v=20260728a">
-  <link rel="stylesheet" href="/css/main.css?v=20260728a">
+  <link rel="stylesheet" href="shared/themes/tokusatsu.css?v=20260729h">
+  <link rel="stylesheet" href="/css/theme.css?v=20260729h">
+  <link rel="stylesheet" href="/css/main.css?v=20260729j">
+  <!-- P0 修复 (2026-07-29): 阻止浏览器默认请求 favicon.ico 产生 404 -->
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'/%3E">
 </head>
 <body data-self-port="3000">
   <div class="crt-overlay" aria-hidden="true"></div>
@@ -263,9 +265,12 @@
           <tbody id="conceptFreqBody"></tbody>
         </table>
 
-        <h3 class="section-title" style="display:flex;justify-content:space-between;align-items:center;">
-          // CONCEPT TOPOLOGY
-          <button id="mainTopoToggle" class="btn-mini secondary">3D 拓扑</button>
+        <h3 class="section-title" style="display:flex;justify-content:space-between;align-items:center;gap:0.5rem;flex-wrap:wrap;">
+          <span>// CONCEPT TOPOLOGY</span>
+          <span style="display:flex;gap:6px;">
+            <button id="mainTopoToggle" class="btn-mini secondary" title="切换到 3D 拓扑">3D 拓扑</button>
+            <button id="mainTopo2DToggle" class="btn-mini secondary hidden" title="切换到 2D 网络图谱">2D 网络</button>
+          </span>
         </h3>
         <div id="mainMatrixView">
           <h3 class="section-title">// ADJACENCY MATRIX HEATMAP</h3>
@@ -277,9 +282,19 @@
             <canvas id="topologyCanvas" style="width:100%;height:100%;display:block;"></canvas>
             <div style="position:absolute;top:6px;right:8px;display:flex;gap:6px;">
               <button id="topoPauseBtn" class="btn-mini secondary topo-pause-btn" title="暂停/继续旋转">⏸</button>
-              <button id="topoResetBtn" class="btn-mini secondary topo-reset-btn" title="重置视角">⟲</button>
+              <button id="topoResetBtn" class="btn-mini secondary topo-pause-btn" title="重置视角">⟲</button>
             </div>
-            <div style="position:absolute;bottom:6px;left:8px;font-size:0.6rem;color:var(--muted);">拖拽旋转 · 滚轮缩放 · 节点大小=出现频次 · 边粗细=因果强度</div>
+            <div style="position:absolute;bottom:6px;left:8px;font-size:0.6rem;color:var(--muted);">拖拽旋转 · 滚轮缩放 · 点击节点坍缩为 2D 网络 · 节点大小=出现频次 · 边粗细=因果强度</div>
+          </div>
+        </div>
+        <div id="mainTopology2DView" class="hidden">
+          <h3 class="section-title">// 2D CAUSAL NETWORK (坍缩网络图谱)</h3>
+          <div id="topology2DWrap" style="position:relative;width:100%;height:min(50vh,420px);border:1px solid var(--border);border-radius:6px;overflow:hidden;background:#05070a;">
+            <canvas id="topology2DCanvas" style="width:100%;height:100%;display:block;"></canvas>
+            <div style="position:absolute;top:6px;right:8px;display:flex;gap:6px;">
+              <button id="topo2DResetBtn" class="btn-mini secondary topo-2d-reset-btn" title="重置布局">⟲</button>
+            </div>
+            <div style="position:absolute;bottom:6px;left:8px;font-size:0.6rem;color:var(--muted);">拖拽节点 · 滚轮缩放 · 点击高亮邻居 · 2D 力导向网络 · 边=因果链接</div>
           </div>
         </div>
 
@@ -320,11 +335,11 @@
        jobs.js 处理任务历史；app.js 最后加载，声明 DOM 引用、附加监听器、执行初始化。 -->
   </div>
 
-  <script src="/js/schema.js?v=20260728a"></script>
-  <script src="/js/sse.js?v=20260728a"></script>
-  <script src="/js/render.js?v=20260728a"></script>
-  <script src="/js/jobs.js?v=20260728a"></script>
-  <script src="/js/app.js?v=20260728a"></script>
+  <script src="/js/schema.js?v=20260729k"></script>
+  <script src="/js/sse.js?v=20260729h"></script>
+  <script src="/js/render.js?v=20260729i"></script>
+  <script src="/js/jobs.js?v=20260729h"></script>
+  <script src="/js/app.js?v=20260729h"></script>
   <!-- P1-2 (§20.12): BASE 导航隧道模式自适应, 替代 9 处硬编码 127.0.0.1:PORT -->
   <script>
   (function () {

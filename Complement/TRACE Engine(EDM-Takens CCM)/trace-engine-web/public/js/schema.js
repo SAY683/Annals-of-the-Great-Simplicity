@@ -76,12 +76,22 @@ function renderParams(schema) {
     div.className = 'param';
     const label = formatParamLabel(key);
     const step = meta.type === 'integer' ? 1 : (meta.step || 0.1);
-    if (meta.type === 'string') {
+    if (meta.type === 'boolean') {
+      // P0 硬修复 (2026-07-29): boolean 参数之前被错渲染成 <input type="number">，
+      // 导致 value="false" 触发浏览器 warning，且提交时变成数字 0 被服务端拒绝。
+      const checked = meta.default === true ? 'checked' : '';
+      div.innerHTML = `<span class="k" title="${escapeHtml(meta.description || '')}">${label}</span>
+        <input type="checkbox" id="param-${key}" ${checked} style="accent-color:var(--accent);width:18px;height:18px;cursor:pointer;">`;
+    } else if (meta.type === 'string') {
       div.innerHTML = `<span class="k" title="${escapeHtml(meta.description || '')}">${label}</span>
         <input type="text" id="param-${key}" value="${escapeHtml(String(meta.default ?? ''))}" style="width:110px;background:var(--bg-elevated);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:0.25rem;">`;
     } else {
+      // P0 硬修复 (2026-07-29): 后端可能把 number 类型默认值写成 false/null/字符串，
+      // 直接塞进 <input type="number"> 会触发浏览器 warning 甚至解析异常。
+      const rawDefault = meta.default ?? 0;
+      const numericDefault = (typeof rawDefault === 'number' && !isNaN(rawDefault)) ? rawDefault : 0;
       div.innerHTML = `<span class="k" title="${escapeHtml(meta.description || '')}">${label}</span>
-        <input type="number" id="param-${key}" value="${meta.default ?? 0}" step="${step}" min="${meta.min ?? ''}" max="${meta.max ?? ''}" style="width:80px;background:var(--bg-elevated);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:0.25rem;">`;
+        <input type="number" id="param-${key}" value="${numericDefault}" step="${step}" min="${meta.min ?? ''}" max="${meta.max ?? ''}" style="width:80px;background:var(--bg-elevated);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:0.25rem;">`;
     }
     dynamicParams.appendChild(div);
   });
@@ -102,16 +112,18 @@ function getConfig() {
     const meta = schema[key];
     const el = document.getElementById(`param-${key}`);
     if (!el) return;
-    let raw = el.value.trim();
-    if (meta.type === 'string') {
-      cfg[key] = raw;
+    if (meta.type === 'boolean') {
+      // P0 硬修复 (2026-07-29): checkbox 读取 checked 状态。
+      cfg[key] = Boolean(el.checked);
+    } else if (meta.type === 'string') {
+      cfg[key] = el.value.trim();
     } else if (meta.type === 'integer') {
       // P2-3：parseInt 可能返回 NaN（空串/非法输入），NaN 时回退到 schema 默认值
-      const parsed = parseInt(raw, 10);
+      const parsed = parseInt(el.value.trim(), 10);
       cfg[key] = Number.isNaN(parsed) ? (meta.default ?? 0) : parsed;
     } else {
       // P2-3：parseFloat 同样需要 NaN 检查并回退默认值
-      const parsed = parseFloat(raw);
+      const parsed = parseFloat(el.value.trim());
       cfg[key] = Number.isNaN(parsed) ? (meta.default ?? 0) : parsed;
     }
   });

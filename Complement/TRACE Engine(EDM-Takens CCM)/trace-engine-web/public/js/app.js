@@ -524,3 +524,24 @@ clearLogBtn.addEventListener('click', () => {
 // 页面加载时拉取参数 Schema 与任务历史
 loadBridgeSchema();
 loadJobHistory();
+
+// P0 修复 (2026-07-29): 页面刷新后自动渲染最近一次已完成的任务结果，
+// 否则拓扑切换按钮/2D 网络视图因 setupTopologyToggle 未被调用而保持 hidden。
+(async function loadLatestCompletedResult() {
+  try {
+    const res = await fetch('/api/jobs?limit=20');
+    const data = await res.json();
+    if (!data.success || !Array.isArray(data.jobs)) return;
+    const latest = data.jobs.find(j => j.status === 'completed' || j.status === 'done');
+    if (!latest) return;
+    const r2 = await fetch(`/api/result/${latest.id}`);
+    if (!r2.ok) return;
+    const result = await r2.json();
+    if (result && (result.concepts || result.edges)) {
+      renderResult(result);
+      log('info', `已自动加载最近完成结果: ${latest.id.slice(0, 8)}…`);
+    }
+  } catch (err) {
+    console.warn('[loadLatestCompletedResult]', err);
+  }
+})();

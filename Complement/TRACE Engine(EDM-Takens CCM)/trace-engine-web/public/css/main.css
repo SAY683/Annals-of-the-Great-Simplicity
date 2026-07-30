@@ -565,8 +565,8 @@ button.danger:hover:not(:disabled) { background: rgba(255, 77, 77, 0.08); }
 }
 /* 复用共享主题的 log-cockpit 行样式，但保留本项目的弹性布局 */
 .terminal.log-cockpit {
-  height: auto;
-  max-height: none;
+  max-height: clamp(360px, 48vh, 620px);
+  overflow-y: auto;
 }
 /* Round 19 修缮：jobHistoryTerminal 用响应式高度替代原内联硬编码 160/260px */
 #jobHistoryTerminal {
@@ -658,6 +658,51 @@ button.danger:hover:not(:disabled) { background: rgba(255, 77, 77, 0.08); }
 }
 .terminal-line:hover { background: rgba(102,252,241,0.035); }
 .terminal-line .log-icon { flex-shrink: 0; width: 1.1rem; text-align: center; }
+/* P0 硬修复 (2026-07-29): job-card 必须完全避免 inline 混用, 用独立行块隔离 */
+.terminal-line.job-card {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 0;
+  padding: 0.15rem 0.35rem 0.15rem 0.35rem !important;
+}
+.terminal-line.job-card .job-card-row {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  width: 100%;
+  gap: 0.35rem;
+  min-width: 0;
+}
+.terminal-line.job-card .job-cb {
+  flex-shrink: 0;
+  margin: 0;
+}
+.terminal-line.job-card .job-meta {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.terminal-line.job-card .job-actions {
+  flex-shrink: 0;
+  display: flex;
+  gap: 0.25rem;
+  align-items: center;
+}
+.terminal-line.job-card .job-actions a {
+  white-space: nowrap;
+}
+/* Fix: job-card 预览文字堆叠 — 桌面端也需 flex:1 1 100% 强制换行 (P3 修缮 2026-07-29) */
+.terminal-line.job-card .job-preview {
+  flex: 1 1 100%;
+  order: 4;
+  margin-top: 0.15rem;
+  margin-left: 1.5rem;
+  line-height: 1.3;
+  word-break: break-word;
+}
 .terminal-line .log-meta { flex-shrink: 0; display: flex; gap: 0.35rem; align-items: center; }
 .terminal-line .log-ts { color: var(--muted); font-size: 0.65rem; }
 .terminal-line .log-level {
@@ -902,12 +947,56 @@ details > div { padding: 0.75rem; }
   margin-bottom: 0.75rem;
 }
 
+.adj-matrix-wrap {
+  margin-top: 0.5rem;
+  overflow-x: auto;
+  padding-bottom: 0.25rem;
+}
 .adj-matrix {
   display: grid;
   gap: 2px;
   font-family: var(--font-mono);
-  font-size: clamp(0.62rem, 0.9vw, 0.76rem);
-  margin-top: 0.5rem;
+  font-size: clamp(0.58rem, 0.82vw, 0.68rem);
+  align-items: stretch;
+}
+.adj-corner {
+  min-width: 84px;
+  max-width: 120px;
+  height: 52px;
+}
+.adj-col-header {
+  position: relative;
+  height: 52px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding-bottom: 2px;
+}
+.adj-col-header span {
+  display: inline-block;
+  transform: rotate(-45deg);
+  transform-origin: center bottom;
+  white-space: nowrap;
+  color: var(--muted);
+  font-size: clamp(0.6rem, 0.82vw, 0.7rem);
+  max-width: 100px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1;
+}
+.adj-row-header {
+  min-width: 84px;
+  max-width: 120px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-right: 0.45rem;
+  color: var(--muted);
+  font-size: clamp(0.62rem, 0.85vw, 0.72rem);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .adj-cell {
   aspect-ratio: 1;
@@ -915,16 +1004,11 @@ details > div { padding: 0.75rem; }
   place-items: center;
   border-radius: 2px;
   color: var(--text);
-  min-width: 26px;
+  min-width: 28px;
+  min-height: 28px;
   transition: transform 0.1s;
 }
 .adj-cell:hover { transform: scale(1.15); z-index: 2; border-radius: 4px; }
-.adj-label {
-  color: var(--muted);
-  font-size: clamp(0.58rem, 0.85vw, 0.7rem);
-  transform: rotate(-45deg);
-  white-space: nowrap;
-}
 .adj-legend {
   display: flex;
   align-items: center;
@@ -1095,6 +1179,10 @@ details > div { padding: 0.75rem; }
     gap: 0.3rem;
     padding: 0.4rem 0.5rem;
     align-items: flex-start;
+  }
+  .terminal-line.job-card .job-card-row {
+    flex-wrap: wrap;
+    gap: 0.3rem;
   }
   .terminal-line.job-card .job-meta {
     flex: 1 1 100%;
@@ -1321,27 +1409,62 @@ details > div { padding: 0.75rem; }
   border-left-color: var(--accent);
   transform: translateX(2px);
 }
+/* P0 硬修复 (2026-07-29): job-card 必须完全避免 inline 混用, 用独立行块隔离 */
+.terminal-line.job-card {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 0;
+  padding: 0.15rem 0.35rem 0.15rem 0.35rem !important;
+}
+.terminal-line.job-card .job-card-row {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  width: 100%;
+  gap: 0.35rem;
+  min-width: 0;
+}
+.terminal-line.job-card .job-cb {
+  flex: 0 0 auto;
+  accent-color: var(--accent, #00ff88);
+  margin: 0;
+  transform: translateY(1px);
+}
 /* job-meta：保证时间戳/ID/状态/耗时横排显示不被挤兑成竖向 */
 .terminal-line.job-card .job-meta {
   flex: 1 1 auto;
-  min-width: 180px;
+  min-width: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  font-size: clamp(0.68rem, 0.9vw, 0.76rem);
+  font-size: clamp(0.65rem, 0.85vw, 0.74rem);
+  line-height: 1.3;
+}
+.terminal-line.job-card .job-actions {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 0.15rem;
+  align-items: center;
+}
+.terminal-line.job-card .job-actions a {
+  padding: 0.05rem 0.15rem;
+  font-size: clamp(0.56rem, 0.75vw, 0.66rem);
+  white-space: nowrap;
 }
 .terminal-line.job-card .job-preview {
-  flex-basis: 100%;
+  display: block !important;
+  flex: 1 1 100%;
+  width: 100%;
+  order: 99;
   border-top: 1px dashed var(--border);
   padding-top: 0.15rem;
   margin-top: 0.15rem;
   line-height: 1.35;
-  font-size: clamp(0.62rem, 0.85vw, 0.72rem);
-}
-/* 动作链接更紧凑 */
-.terminal-line.job-card .job-actions a {
-  padding: 0.05rem 0.2rem;
-  font-size: clamp(0.58rem, 0.78vw, 0.68rem);
+  font-size: clamp(0.6rem, 0.82vw, 0.7rem);
+  color: var(--muted);
+  opacity: 0.75;
+  word-break: break-word;
 }
 
 /* ── 任务历史面板进一步紧凑化 (Round 27) ───────────────────────────── */
@@ -1351,7 +1474,7 @@ details > div { padding: 0.75rem; }
   line-height: 1.25;
 }
 #jobHistoryTerminal .terminal-line.job-card {
-  padding: 0.1rem 0.25rem !important;
+  padding: 0.15rem 0.35rem 0.15rem 0.35rem !important;
   margin-bottom: 0.04rem !important;
   line-height: 1.2;
   min-height: 20px;
@@ -1363,11 +1486,16 @@ details > div { padding: 0.75rem; }
   gap: 6px !important;
 }
 #jobHistoryTerminal .terminal-line.job-card .job-meta {
-  font-size: clamp(0.64rem, 0.85vw, 0.74rem);
+  font-size: clamp(0.65rem, 0.85vw, 0.74rem);
 }
 #jobHistoryTerminal .terminal-line.job-card .job-preview {
-  margin-top: 0.05rem;
-  padding-top: 0.1rem;
-  line-height: 1.25;
+  display: block;
+  flex: 0 0 100%;
+  order: 4;
+  width: 100%;
+  max-width: 100%;
+  margin-top: 0.12rem;
+  padding-top: 0.12rem;
+  line-height: 1.3;
   font-size: clamp(0.6rem, 0.82vw, 0.7rem);
 }
