@@ -184,11 +184,47 @@ function pyScript(script, timeout = 15000) {
 const activeJobs = new Map();   // jobId → { process, mode, startTime, logs[] }
 const jobHistory = [];          // 最近 50 条已完成任务
 
+// ROUND28 P1-02: 错误响应辅助函数 — 生产模式不泄露内部细节
+// 统一所有 catch 块的错误返回, 避免 e.message 直接暴露给客户端
+const IS_PROD = process.env.NODE_ENV === 'production';
+function errorResponse(e, defaultMessage = 'Internal Server Error') {
+  console.error('[Server] 路由错误:', e);
+  return { error: IS_PROD ? defaultMessage : (e.message || defaultMessage) };
+}
+
 // ── Express 初始化 ────────────────────────────────────────
 const app = express();
-app.use(express.json({ limit: '20mb' }));
-app.use(express.urlencoded({ extended: true, limit: '20mb' }));
+// ROUND28 P1-06: body limit 收窄 20mb → 2mb, 防止 DoS 攻击面
+// (如需大批量 CSV 上传, 应走分端点或分片上传)
+app.use(express.json({ limit: '2mb' }));
+app.use(express.urlencoded({ extended: true, limit: '2mb' }));
 app.use(express.static(PUBLIC_DIR));
+
+// ROUND28 P1-01: 安全 HTTP 头 (手动设置, 避免 helmet 依赖)
+// 对齐 trace-engine-web / edm-takens-web 的 CSP 修缮标准
+app.use((req, res, next) => {
+  // CSP: script-src 'self' (移除 unsafe-inline, 与 base_nav.js 抽取对齐)
+  res.header('Content-Security-Policy',
+    "default-src 'self'; " +
+    "script-src 'self'; " +
+    "style-src 'self' 'unsafe-inline'; " +
+    "img-src 'self' data: blob:; " +
+    "connect-src 'self' http://127.0.0.1:* http://localhost:*; " +
+    "font-src 'self' data:; " +
+    "object-src 'none'; " +
+    "base-uri 'self'; " +
+    "frame-ancestors 'none'"
+  );
+  res.header('X-Content-Type-Options', 'nosniff');
+  res.header('X-Frame-Options', 'DENY');
+  res.header('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.header('X-XSS-Protection', '1; mode=block');
+  // HSTS: 仅 HTTPS 时生效
+  if (req.secure || req.headers['x-forwarded-proto'] === 'https') {
+    res.header('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  }
+  next();
+});
 
 // 全局错误处理: 捕获 body-parser PayloadTooLargeError 等
 app.use((err, _req, res, _next) => {
@@ -196,7 +232,12 @@ app.use((err, _req, res, _next) => {
     return res.status(413).json({ error: 'payload too large' });
   }
   if (err) {
-    return res.status(500).json({ error: err.message || 'internal error' });
+    // ROUND28 P1-02: 生产模式不泄露内部错误细节
+    console.error('[Server] 全局错误:', err);
+    const isDev = process.env.NODE_ENV !== 'production';
+    return res.status(500).json({
+      error: isDev ? (err.message || 'internal error') : 'Internal Server Error'
+    });
   }
   _next();
 });
@@ -1064,37 +1105,79 @@ app.get('/api/version', (_req, res) => {
 
 // ── API: 状态查询 ─────────────────────────────────────────
 
+// ROUND28 P0-04/P1-04: EDM 分级 confidence_level (与 edm_trigger.py 阈值对齐)
+// 15-30 行 = exploratory (探索性), ≥30 行 = formal (正式), <15 = insufficient
+// 阈值常量与 edm_trigger.EDM_FORMAL_THRESHOLD / config.EDM_MIN_ROWS_FOR_ANALYSIS 保持同步
+const EDM_MIN_ROWS = 15;
+const EDM_FORMAL_THRESHOLD = 30;
+function computeEDMConfidence(nRows) {
+  if (nRows < EDM_MIN_ROWS) {
+    return {
+      confidence_level: 'insufficient',
+      confidence_disclaimer: `数据不足 (${nRows} < ${EDM_MIN_ROWS}), 无法触发 EDM 分析。`,
+    };
+  }
+  if (nRows < EDM_FORMAL_THRESHOLD) {
+    return {
+      confidence_level: 'exploratory',
+      confidence_disclaimer:
+        `探索性分析 (${nRows} 行, < ${EDM_FORMAL_THRESHOLD}): ` +
+        'EDM 动力学预测在小样本下不稳定, 可能产生伪相变信号。' +
+        '结果仅供探索, 不得用于投资决策。建议积累 ≥30 行后再做正式分析。',
+    };
+  }
+  return {
+    confidence_level: 'formal',
+    confidence_disclaimer:
+      `正式分析 (${nRows} 行 ≥ ${EDM_FORMAL_THRESHOLD}): ` +
+      '结果可用于报告, 但仍需注意 EDM-TAKENS 的 IAAFT/BH 统计保证边界。',
+  };
+}
+
 app.get('/api/status', (_req, res) => {
   const traj = readTrajectoryCSV();
   const active = Array.from(activeJobs.keys());
 
-  // EDM 就绪度
-  const edmReady = traj.total >= 15;
+  // EDM 就绪度 + 分级置信度 (ROUND28 P0-04)
+  const edmReady = traj.total >= EDM_MIN_ROWS;
+  const { confidence_level, confidence_disclaimer } = computeEDMConfidence(traj.total);
+
+  // ROUND28 P1-04/05: L3 目标标注 interpretive + methodology_tag
+  // 与 layer3_sacred.METHODOLOGY_TAG / METHODOLOGY_DISCLAIMER 对齐
+  const L3_TAG = 'interpretive_zero_shot';
+  const L3_DISCLAIMER =
+    'Layer 3 是诠释性框架 (Interpretive Framework), 非统计推断。' +
+    'z_* 值由八本私域经书的零样本余弦相似度确定, 不具备 Layer 1 那样的 ' +
+    'refutation/p-value 统计保证。投资决策需与 L1 统计量交叉验证。';
+  const mkL1 = (col, desc) => ({ col, desc, layer: 'L1', interpretive: false, methodology_tag: 'statistical' });
+  const mkL2 = (col, desc) => ({ col, desc, layer: 'L2', interpretive: false, methodology_tag: 'statistical_pca' });
+  const mkL3 = (col, desc) => ({ col, desc, layer: 'L3', interpretive: true, methodology_tag: L3_TAG, methodology_disclaimer: L3_DISCLAIMER });
+
   const edmTargets = edmReady ? [
-    // Layer 1: 元SCM
-    { col: 'ate', desc: '因果效应强度', layer: 'L1' },
-    { col: 'adj_density', desc: '因果图密度 — 系统纠缠度', layer: 'L1' },
-    { col: 'max_delta_nll', desc: '最强因果信号', layer: 'L1' },
-    { col: 'ci_width', desc: '因果不确定性 — 时代噪音', layer: 'L1' },
-    { col: 'edge_count', desc: '显著因果边数', layer: 'L1' },
-    { col: 'ccm_coverage_pct', desc: 'CCM非线性验证覆盖率', layer: 'L1' },
-    // Layer 2: 世俗语义 PCA
-    { col: 'z_pca_1', desc: '世俗PCA第1主轴', layer: 'L2' },
-    { col: 'z_pca_2', desc: '世俗PCA第2主轴', layer: 'L2' },
-    { col: 'z_pca_3', desc: '世俗PCA第3主轴', layer: 'L2' },
-    { col: 'secular_entropy', desc: '世俗熵', layer: 'L2' },
-    // Layer 3: 八正道全轴
-    { col: 'z_福音', desc: '福音(祂志书) 投影', layer: 'L3' },
-    { col: 'z_吉祥', desc: '吉祥(赐福书) 投影', layer: 'L3' },
-    { col: 'z_奥美', desc: '奥美(圣源书) 投影', layer: 'L3' },
-    { col: 'z_存在', desc: '存在(真实书) 投影 — 本体论距离', layer: 'L3' },
-    { col: 'z_自孕', desc: '自孕(胜育书) 投影', layer: 'L3' },
-    { col: 'z_弥赛亚', desc: '弥赛亚(至意书) 投影', layer: 'L3' },
-    { col: 'z_Alice', desc: 'Alice(慧辩书) 投影', layer: 'L3' },
-    { col: 'z_觉爱', desc: '觉爱(智识书) 投影 — 智慧维度', layer: 'L3' },
-    // Layer 3: 一阶差分 (关键动力学信号)
-    { col: 'dz_存在', desc: '存在轴一阶差分 Δz/Δt', layer: 'L3' },
-    { col: 'dz_觉爱', desc: '觉爱轴一阶差分 Δz/Δt', layer: 'L3' },
+    // Layer 1: 元SCM (科学层)
+    mkL1('ate', '因果效应强度'),
+    mkL1('adj_density', '因果图密度 — 系统纠缠度'),
+    mkL1('max_delta_nll', '最强因果信号'),
+    mkL1('ci_width', '因果不确定性 — 时代噪音'),
+    mkL1('edge_count', '显著因果边数'),
+    mkL1('ccm_coverage_pct', 'CCM非线性验证覆盖率'),
+    // Layer 2: 世俗语义 PCA (科学层)
+    mkL2('z_pca_1', '世俗PCA第1主轴'),
+    mkL2('z_pca_2', '世俗PCA第2主轴'),
+    mkL2('z_pca_3', '世俗PCA第3主轴'),
+    mkL2('secular_entropy', '世俗熵'),
+    // Layer 3: 八正道全轴 (诠释层 · 非统计推断)
+    mkL3('z_福音', '福音(祂志书) 投影'),
+    mkL3('z_吉祥', '吉祥(赐福书) 投影'),
+    mkL3('z_奥美', '奥美(圣源书) 投影'),
+    mkL3('z_存在', '存在(真实书) 投影 — 本体论距离'),
+    mkL3('z_自孕', '自孕(胜育书) 投影'),
+    mkL3('z_弥赛亚', '弥赛亚(至意书) 投影'),
+    mkL3('z_Alice', 'Alice(慧辩书) 投影'),
+    mkL3('z_觉爱', '觉爱(智识书) 投影 — 智慧维度'),
+    // Layer 3: 一阶差分 (诠释层 · 关键动力学信号)
+    mkL3('dz_存在', '存在轴一阶差分 Δz/Δt'),
+    mkL3('dz_觉爱', '觉爱轴一阶差分 Δz/Δt'),
   ] : [];
 
   res.json({
@@ -1105,6 +1188,11 @@ app.get('/api/status', (_req, res) => {
       columns: traj.columns.length,
       edm_ready: edmReady,
       edm_targets: edmTargets,
+      // ROUND28 P0-04: 分级置信度披露
+      confidence_level,
+      confidence_disclaimer,
+      formal_threshold: EDM_FORMAL_THRESHOLD,
+      min_required: EDM_MIN_ROWS,
     },
     jobs: { active: active.length, active_ids: active },
     layers: {
@@ -1134,7 +1222,7 @@ else:
     const { out } = await pyScript(script, 30000);
     try { res.json(JSON.parse(out)); }
     catch { res.status(500).json({ error: 'invalid response', raw: out.slice(0, 500) }); }
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { res.status(500).json(errorResponse(e)); }
 });
 
 // ── API: 轨迹数据 ─────────────────────────────────────────
@@ -1160,7 +1248,7 @@ print('{"success":true,"rows":0}')
     `.trim();
     const { out } = await pyScript(script, 10000);
     try { res.json(JSON.parse(out)); } catch { res.json({ success: true }); }
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { res.status(500).json(errorResponse(e)); }
 });
 
 // ── P2 (§20.12): 一键导出人话版 Markdown 报告 ─────────────────────
@@ -1178,7 +1266,7 @@ app.get('/api/trajectory/export/md', async (_req, res) => {
       html_url: `/api/trajectory/report?format=html`,
     });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    res.status(500).json(errorResponse(e));
   }
 });
 
@@ -1197,7 +1285,7 @@ app.get('/api/trajectory/report', (req, res) => {
       res.send(report.mdContent);
     }
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    res.status(500).json(errorResponse(e));
   }
 });
 
@@ -1206,7 +1294,8 @@ app.get('/api/trajectory/report', (req, res) => {
 app.post('/api/run', (req, res) => {
   const { mode, text, source, ts } = req.body;
   const jobId = createJobId();
-  const traceMode = mode || 'light';
+  // P1 修复: 白名单校验 mode 参数，防止注入 SUPER 等未授权模式
+  const traceMode = ['light', 'deep'].includes(mode) ? mode : 'light';
 
   // P1 修复：/api/run 原先忽略 text 参数，总是跑示例 CSV；现在支持单条文本。
   const args = [BRIDGE_SCRIPT];
@@ -1243,12 +1332,22 @@ app.post('/api/run', (req, res) => {
     'Connection': 'keep-alive',
   });
 
+  // P0 修复: 客户端断连时清理子进程，防止孤儿进程泄漏
+  let clientDisconnected = false;
+  req.on('close', () => {
+    if (clientDisconnected) return;
+    clientDisconnected = true;
+    try { proc.kill('SIGTERM'); } catch (_) {}
+    activeJobs.delete(jobId);
+  });
+
   emitSSE(res, 'start', { job_id: jobId, mode: traceMode });
 
   proc.stdout.on('data', (data) => {
-    const text = data.toString();
-    job.logs.push({ time: new Date().toISOString(), text: text.trim() });
-    const lines = text.trim().split('\n');
+    if (clientDisconnected) return;
+    const chunk = data.toString();
+    job.logs.push({ time: new Date().toISOString(), text: chunk.trim() });
+    const lines = chunk.trim().split('\n');
     for (const line of lines) {
       if (line.includes('✓ 完成') || line.includes('批量处理完成')) {
         // 提取进度
@@ -1262,14 +1361,16 @@ app.post('/api/run', (req, res) => {
   });
 
   proc.stderr.on('data', (data) => {
-    const text = data.toString().trim();
-    if (text) {
-      job.logs.push({ time: new Date().toISOString(), text });
-      emitSSE(res, 'log', { message: text });
+    if (clientDisconnected) return;
+    const stderrText = data.toString().trim();
+    if (stderrText) {
+      job.logs.push({ time: new Date().toISOString(), text: stderrText });
+      emitSSE(res, 'log', { message: stderrText });
     }
   });
 
   proc.on('close', (code) => {
+    if (clientDisconnected) return;
     job.status = code === 0 ? 'completed' : 'failed';
     job.endTime = new Date().toISOString();
     activeJobs.delete(jobId);
@@ -1287,6 +1388,7 @@ app.post('/api/run', (req, res) => {
   });
 
   proc.on('error', (err) => {
+    if (clientDisconnected) return;
     job.status = 'error';
     activeJobs.delete(jobId);
     emitSSE(res, 'error', { message: err.message });
@@ -1581,7 +1683,7 @@ print(json.dumps({"files": files}, ensure_ascii=False))
     const { out } = await pyScript(script, 5000);
     try { res.json(JSON.parse(out)); }
     catch { res.json({ files: [] }); }
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { res.status(500).json(errorResponse(e)); }
 });
 
 app.get('/api/dataset', async (_req, res) => {
@@ -1590,7 +1692,7 @@ app.get('/api/dataset', async (_req, res) => {
     const proc = spawn(PYTHON_CMD, ['-c', script], { cwd: ROOT, env: { ...process.env, PYTHONIOENCODING: 'utf-8' }, timeout: 10000 });
     let out = ''; proc.stdout.on('data', d => out += d.toString());
     proc.on('close', () => { try { res.json(JSON.parse(out)); } catch { res.json({ error: out }); } });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { res.status(500).json(errorResponse(e)); }
 });
 
 app.post('/api/dataset/add', async (req, res) => {
@@ -1600,7 +1702,7 @@ app.post('/api/dataset/add', async (req, res) => {
     const entries = uuids.map(u => ({ uuid: u, mtime: '', text_preview: '' }));
     const result = await pyDS('add_replay_uuids', [entries]);
     res.json(result);
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { res.status(500).json(errorResponse(e)); }
 });
 
 app.post('/api/dataset/add-text', async (req, res) => {
@@ -1620,22 +1722,22 @@ app.post('/api/dataset/add-text', async (req, res) => {
     if (!rows.length) return res.status(400).json({ error: 'no text rows' });
     const result = await pyDS('add_text_entries', [rows]);
     res.json(result);
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { res.status(500).json(errorResponse(e)); }
 });
 
 app.post('/api/dataset/remove', async (req, res) => {
   try { await pyDS('remove_entry', [req.body.id]); res.json({ success: true }); }
-  catch (e) { res.status(500).json({ error: e.message }); }
+  catch (e) { res.status(500).json(errorResponse(e)); }
 });
 
 app.post('/api/dataset/clear-processed', async (_req, res) => {
   try { await pyDS('clear_processed'); res.json({ success: true }); }
-  catch (e) { res.status(500).json({ error: e.message }); }
+  catch (e) { res.status(500).json(errorResponse(e)); }
 });
 
 app.post('/api/dataset/reset', async (_req, res) => {
   try { await pyDS('reset_all_pending'); res.json({ success: true }); }
-  catch (e) { res.status(500).json({ error: e.message }); }
+  catch (e) { res.status(500).json(errorResponse(e)); }
 });
 
 app.post('/api/dataset/update-ts', async (req, res) => {
@@ -1664,7 +1766,7 @@ else:
     `.trim();
     const { out } = await pyScript(script, 5000);
     try { res.json(JSON.parse(out)); } catch { res.json({ success: true }); }
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { res.status(500).json(errorResponse(e)); }
 });
 
 // ── API: 统一管线执行 ─────────────────────────────────────
@@ -1715,9 +1817,10 @@ pm = get_project_manager()
 dm = DatasetManager(pm.current_dir)
 with open('${tmpFile.replace(/\\/g, '\\\\')}', 'r', encoding='utf-8') as f:
     ids = json.load(f)
+errors = []
 for eid in ids:
     try: dm.mark_processed(eid)
-    except: pass
+    except Exception as e: errors.append(str(e))
 pm.update_row_count()
 rows = 0
 if os.path.exists(pm.current_csv):
@@ -1887,7 +1990,7 @@ app.get('/api/models', async (_req, res) => {
     try { payload = JSON.parse(result.out); } catch { payload = { error: result.out }; }
     setCached('models', payload);
     res.json(payload);
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { res.status(500).json(errorResponse(e)); }
 });
 
 app.post('/api/models/activate', async (req, res) => {
@@ -1923,7 +2026,7 @@ app.post('/api/models/activate', async (req, res) => {
     // P1-b：模型切换后失效缓存，确保下次 GET /api/models 返回最新状态
     invalidateCache('models');
     res.json(payload);
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { res.status(500).json(errorResponse(e)); }
 });
 
 
@@ -1938,7 +2041,7 @@ app.get('/api/projects', async (_req, res) => {
     setCached('projects', result);
     res.json(result);
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    res.status(500).json(errorResponse(e));
   }
 });
 
@@ -1960,7 +2063,7 @@ app.post('/api/projects', async (req, res) => {
     invalidateCache('projects');  // P1-b：项目列表变更后失效缓存
     res.json(result);
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    res.status(500).json(errorResponse(e));
   }
 });
 
@@ -1975,7 +2078,7 @@ app.put('/api/projects/activate', async (req, res) => {
     invalidateCache();
     res.json(result);
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    res.status(500).json(errorResponse(e));
   }
 });
 
@@ -1989,7 +2092,7 @@ app.delete('/api/projects/:name', async (req, res) => {
     invalidateCache('projects');  // P1-b：项目删除后失效缓存
     res.json(result);
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    res.status(500).json(errorResponse(e));
   }
 });
 
@@ -2000,7 +2103,7 @@ app.get('/api/work-scan', async (_req, res) => {
     const result = await pyCall(['--scan-work']);
     res.json(result);
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    res.status(500).json(errorResponse(e));
   }
 });
 
@@ -2024,7 +2127,7 @@ print(json.dumps(result, ensure_ascii=False))
     let out = '';
     proc.stdout.on('data', d => out += d.toString());
     proc.on('close', () => { try { res.json(JSON.parse(out)); } catch { res.json({ raw: out }); } });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { res.status(500).json(errorResponse(e)); }
 });
 
 app.post('/api/work-clean', async (req, res) => {
@@ -2049,7 +2152,7 @@ print(json.dumps(result, ensure_ascii=False))
     }
     try { res.json(JSON.parse(out)); } catch { res.json({ raw: out.trim(), error: err.trim() || undefined }); }
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    res.status(500).json(errorResponse(e));
   }
 });
 
@@ -2121,7 +2224,7 @@ print(json.dumps({"count": count}))
     });
 
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    res.status(500).json(errorResponse(e));
     try { fs.unlinkSync(uuidsFile); } catch {}
   }
 });
@@ -2156,7 +2259,7 @@ print(json.dumps({"text": text or ""}, ensure_ascii=False))
       res.status(404).json({ error: 'TEXT_NOT_FOUND', raw: out.trim() });
     }
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    res.status(500).json(errorResponse(e));
   }
 });
 

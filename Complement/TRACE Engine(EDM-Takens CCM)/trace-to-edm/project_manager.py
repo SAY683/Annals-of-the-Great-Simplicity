@@ -257,13 +257,22 @@ class ProjectManager:
                 import os as _os
                 for root, dirs, files in _os.walk(str(project_dir), topdown=False):
                     for f in files:
-                        try: _os.unlink(_os.path.join(root, f))
-                        except: pass
+                        try:
+                            _os.unlink(_os.path.join(root, f))
+                        except Exception as e:
+                            if VERBOSE:
+                                print(f"[PM] unlink 失败 {f}: {e}")
                     for d in dirs:
-                        try: _os.rmdir(_os.path.join(root, d))
-                        except: pass
-                try: project_dir.rmdir()
-                except: pass
+                        try:
+                            _os.rmdir(_os.path.join(root, d))
+                        except Exception as e:
+                            if VERBOSE:
+                                print(f"[PM] rmdir 失败 {d}: {e}")
+                try:
+                    project_dir.rmdir()
+                except Exception as e:
+                    if VERBOSE:
+                        print(f"[PM] rmdir 顶层失败 {name}: {e}")
 
         if VERBOSE:
             print(f"[PM] 删除项目: {name}")

@@ -92,8 +92,13 @@ class EDMTrigger:
         """
         检查当前数据是否满足 EDM 分析条件。
 
+        ROUND28 P0-04: 引入分级 confidence_level, 对齐 EDM-TAKENS 自己声明
+        "32 样本不足"的边界。15-30 行为"探索性", ≥30 行为"正式"。
+
         Returns:
-            {"ready": bool, "n_rows": int, "min_required": int, "reason": str}
+            {"ready": bool, "n_rows": int, "min_required": int, "reason": str,
+             "confidence_level": "exploratory"|"formal"|"insufficient",
+             "confidence_disclaimer": str}
         """
         if not self.csv_path.exists():
             return {
@@ -101,6 +106,8 @@ class EDMTrigger:
                 "n_rows": 0,
                 "min_required": EDM_MIN_ROWS_FOR_ANALYSIS,
                 "reason": f"CSV 文件不存在: {self.csv_path}",
+                "confidence_level": "insufficient",
+                "confidence_disclaimer": "无数据, 无法分析。",
             }
 
         import csv
@@ -111,8 +118,33 @@ class EDMTrigger:
         n_rows = len(rows)
         ready = n_rows >= EDM_MIN_ROWS_FOR_ANALYSIS
 
+        # ROUND28 P0-04: 分级 confidence_level
+        # EDM-TAKENS 自己的测试明示 32 样本仍不足以可靠估计 Lyapunov 时间
+        # 15-30 行: 探索性 (exploratory) — 可触发但结果不稳定
+        # ≥30 行: 正式 (formal) — 可用于报告
+        # <15 行: 不足 (insufficient)
+        EDM_FORMAL_THRESHOLD = 30  # 与 EDM-TAKENS 边界声明对齐
+        if n_rows < EDM_MIN_ROWS_FOR_ANALYSIS:
+            confidence_level = "insufficient"
+            confidence_disclaimer = (
+                f"数据不足 ({n_rows} < {EDM_MIN_ROWS_FOR_ANALYSIS}), 无法触发 EDM 分析。"
+            )
+        elif n_rows < EDM_FORMAL_THRESHOLD:
+            confidence_level = "exploratory"
+            confidence_disclaimer = (
+                f"探索性分析 ({n_rows} 行, < {EDM_FORMAL_THRESHOLD}): "
+                "EDM 动力学预测在小样本下不稳定, 可能产生伪相变信号。"
+                "结果仅供探索, 不得用于投资决策。建议积累 ≥30 行后再做正式分析。"
+            )
+        else:
+            confidence_level = "formal"
+            confidence_disclaimer = (
+                f"正式分析 ({n_rows} 行 ≥ {EDM_FORMAL_THRESHOLD}): "
+                "结果可用于报告, 但仍需注意 EDM-TAKENS 的 IAAFT/BH 统计保证边界。"
+            )
+
         reason = (
-            f"数据充足 ({n_rows} ≥ {EDM_MIN_ROWS_FOR_ANALYSIS})"
+            f"数据充足 ({n_rows} ≥ {EDM_MIN_ROWS_FOR_ANALYSIS}, {confidence_level})"
             if ready
             else f"数据不足 ({n_rows} < {EDM_MIN_ROWS_FOR_ANALYSIS})"
         )
@@ -121,7 +153,10 @@ class EDMTrigger:
             "ready": ready,
             "n_rows": n_rows,
             "min_required": EDM_MIN_ROWS_FOR_ANALYSIS,
+            "formal_threshold": EDM_FORMAL_THRESHOLD,
             "reason": reason,
+            "confidence_level": confidence_level,
+            "confidence_disclaimer": confidence_disclaimer,
         }
 
     def copy_to_edm_data(self, time_start: str = None, time_end: str = None) -> Path:
@@ -378,20 +413,57 @@ class EDMTrigger:
             "z_pca_2": "世俗PCA第2主轴",
             "z_pca_3": "世俗PCA第3主轴",
             "secular_entropy": "世俗熵 — 话语多样性",
-            # Layer 3: 八正道全轴
-            "z_福音": "福音(祂志书)投影",
-            "z_吉祥": "吉祥(赐福书)投影",
-            "z_奥美": "奥美(圣源书)投影",
-            "z_存在": "存在(真实书)投影 — 本体论距离",
-            "z_自孕": "自孕(胜育书)投影",
-            "z_弥赛亚": "弥赛亚(至意书)投影",
-            "z_Alice": "Alice(慧辩书)投影",
-            "z_觉爱": "觉爱(智识书)投影 — 智慧维度",
-            # Layer 3: 一阶差分
-            "dz_存在": "存在轴一阶差分",
-            "dz_觉爱": "觉爱轴一阶差分",
         }
+        # ROUND28 P0-01: Layer 3 作为诠释层单独分组, 附 disclaimer
+        # 避免与 L1/L2 科学层并列误导投资者
+        l3_recommendations = {
+            # Layer 3: 八正道全轴 (诠释层 · 非统计推断)
+            "z_福音": "(诠释) 福音(祂志书)投影",
+            "z_吉祥": "(诠释) 吉祥(赐福书)投影",
+            "z_奥美": "(诠释) 奥美(圣源书)投影",
+            "z_存在": "(诠释) 存在(真实书)投影 — 本体论距离",
+            "z_自孕": "(诠释) 自孕(胜育书)投影",
+            "z_弥赛亚": "(诠释) 弥赛亚(至意书)投影",
+            "z_Alice": "(诠释) Alice(慧辩书)投影",
+            "z_觉爱": "(诠释) 觉爱(智识书)投影 — 智慧维度",
+            # Layer 3: 一阶差分 (诠释层)
+            "dz_存在": "(诠释) 存在轴一阶差分",
+            "dz_觉爱": "(诠释) 觉爱轴一阶差分",
+        }
+        # 合并返回, 但保留分组结构供前端识别
+        recommendations.update(l3_recommendations)
         return recommendations
+
+    def get_target_methodology_groups(self) -> dict:
+        """ROUND28 P0-01: 返回目标列的方法学分组, 供前端区分科学层与诠释层。
+
+        Returns:
+            {
+                "scientific": {"ate": "因果效应强度", ...},  # L1+L2, 有统计保证
+                "interpretive": {"z_福音": "(诠释)...", ...},  # L3, 诠释框架
+                "disclaimer": "Layer 3 是诠释性框架..."
+            }
+        """
+        try:
+            from layer3_sacred import METHODOLOGY_TAG, METHODOLOGY_DISCLAIMER
+        except Exception:
+            METHODOLOGY_TAG = "interpretive_zero_shot"
+            METHODOLOGY_DISCLAIMER = (
+                "Layer 3 是诠释性框架, 非统计推断。"
+                "投资决策需与 L1 统计量交叉验证。"
+            )
+        all_targets = self.list_recommended_targets()
+        interpretive_keys = {
+            "z_福音", "z_吉祥", "z_奥美", "z_存在", "z_自孕",
+            "z_弥赛亚", "z_Alice", "z_觉爱",
+            "dz_存在", "dz_觉爱",
+        }
+        return {
+            "scientific": {k: v for k, v in all_targets.items() if k not in interpretive_keys},
+            "interpretive": {k: v for k, v in all_targets.items() if k in interpretive_keys},
+            "methodology_tag": METHODOLOGY_TAG,
+            "disclaimer": METHODOLOGY_DISCLAIMER,
+        }
 
 
 # ── 自检 (需要后端运行) ─────────────────────────────────────

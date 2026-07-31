@@ -2,3 +2,45 @@
   --dept-color: #f2c94c;
   --dept-color-dim: #c7a53d;
 }
+
+/* R17 修复 (P4 修缮): 从 index.html head 抽取的内联样式, 消除 !important 内联覆盖.
+ * 原 index.html 行 11-21 的 9 行 <style> 内联 !important 已移至此文件,
+ * 保持 header 紧凑化优先级的同时, 遵循样式表分离原则. */
+.base-header { padding: 8px 14px; margin-bottom: 12px; gap: 12px; }
+.base-header .header-left h1 { font-size: clamp(1rem, 2.2vw, 1.55rem); white-space: nowrap; }
+.base-header .header-left p { font-size: clamp(0.68rem, 1vw, 0.82rem); margin-top: 0.15rem; }
+.base-header .header-right { gap: 6px; flex-wrap: nowrap; align-items: center; }
+.base-header .base-nav { padding: 3px; gap: 3px; }
+.base-header .base-nav a { padding: 4px 7px; font-size: 0.58rem; }
+.base-header .mission-clock { padding: 0.15rem 0.4rem; min-width: auto; }
+.base-header .mission-clock .clock-value { font-size: clamp(0.72rem, 1.2vw, 0.95rem); }
+.base-header .status-dot { font-size: clamp(0.55rem, 0.78vw, 0.65rem); padding: 0.15rem 0.4rem; }
+
+/* ROUND28 P0-04/P1-04: EDM 分级置信度警告条幅
+ * 探索性(橙) / 正式(绿) / 不足(隐藏). 紧凑、无突兀白底, 对齐特摄主题。
+ * 文本相对条幅组件居中 (用户 UI 偏好: 文本与组件居中对齐)。 */
+.edm-confidence-banner {
+  margin: 6px 0 8px;
+  padding: 6px 10px;
+  border-radius: 4px;
+  font-size: clamp(0.62rem, 0.85vw, 0.72rem);
+  line-height: 1.45;
+  text-align: center;
+  border: 1px solid;
+  display: block;
+}
+.edm-confidence-banner[data-level="exploratory"] {
+  background: rgba(255, 167, 38, 0.10);
+  border-color: var(--warn);
+  color: var(--warn);
+}
+.edm-confidence-banner[data-level="formal"] {
+  background: rgba(77, 166, 255, 0.08);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+/* L3 诠释目标在下拉中的视觉区分 (色块标注, P1-04 契约) */
+#edmTarget option[data-interpretive="1"] {
+  color: var(--accent2);
+  font-style: italic;
+}

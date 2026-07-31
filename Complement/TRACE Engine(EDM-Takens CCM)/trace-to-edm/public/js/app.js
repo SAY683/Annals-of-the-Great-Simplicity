@@ -177,8 +177,39 @@ async function refreshStatus() {
     if (edmPipeStage) edmPipeStage.classList.toggle('active', !!d.trajectory.edm_ready);
     const edmBtn = document.getElementById('btnEDM');
     edmBtn.disabled = !d.trajectory.edm_ready;
-    document.getElementById('edmStatus').textContent = d.trajectory.edm_ready ? '✓ 就绪' : `需≥15行 (当前${d.trajectory.rows})`;
-    document.getElementById('edmStatus').style.color = d.trajectory.edm_ready ? 'var(--accent)' : 'var(--warn)';
+
+    // ROUND28 P0-04: 分级 confidence_level 披露 (与 edm_trigger.py 对齐)
+    // insufficient=红/exploratory=橙/formal=绿
+    const confLevel = d.trajectory.confidence_level || (d.trajectory.edm_ready ? 'formal' : 'insufficient');
+    const confDisclaimer = d.trajectory.confidence_disclaimer || '';
+    const edmStatusEl = document.getElementById('edmStatus');
+    const edmBannerEl = document.getElementById('edmConfidenceBanner');
+    const rowN = d.trajectory.rows;
+    if (confLevel === 'formal') {
+      edmStatusEl.textContent = `✓ 正式 (${rowN}行)`;
+      edmStatusEl.style.color = 'var(--accent)';
+    } else if (confLevel === 'exploratory') {
+      edmStatusEl.textContent = `⚠ 探索性 (${rowN}行, <30)`;
+      edmStatusEl.style.color = 'var(--warn)';
+    } else {
+      edmStatusEl.textContent = `需≥15行 (当前${rowN})`;
+      edmStatusEl.style.color = 'var(--warn)';
+    }
+    // 探索性时显示警告条幅, formal/insufficient 时隐藏 (insufficient 由按钮 disabled 表达)
+    if (edmBannerEl) {
+      if (confLevel === 'exploratory' && confDisclaimer) {
+        edmBannerEl.hidden = false;
+        edmBannerEl.textContent = '⚠ ' + confDisclaimer;
+        edmBannerEl.dataset.level = 'exploratory';
+      } else if (confLevel === 'formal' && confDisclaimer) {
+        edmBannerEl.hidden = false;
+        edmBannerEl.textContent = '✓ ' + confDisclaimer;
+        edmBannerEl.dataset.level = 'formal';
+      } else {
+        edmBannerEl.hidden = true;
+        edmBannerEl.textContent = '';
+      }
+    }
 
     if (d.trajectory.rows === 0) {
       document.getElementById('edmDataRange').textContent = '无数据 (需≥15行)';
@@ -191,7 +222,14 @@ async function refreshStatus() {
       d.trajectory.edm_targets.forEach(t => {
         const o = document.createElement('option');
         o.value = t.col;
-        o.textContent = `[${t.layer}] ${t.col} — ${t.desc}`;
+        // ROUND28 P1-04: L3 诠释层目标标注 "(诠释)" 前缀, 与科学层区分
+        // 避免投资者将 z_福音 等诠释投影与 ate 等统计量并列解读
+        const interpretiveTag = t.interpretive ? '(诠释) ' : '';
+        o.textContent = `[${t.layer}] ${interpretiveTag}${t.col} — ${t.desc}`;
+        if (t.interpretive && t.methodology_disclaimer) {
+          o.title = t.methodology_disclaimer;
+          o.dataset.interpretive = '1';
+        }
         edmTargetSel.appendChild(o);
       });
       if ([...edmTargetSel.options].some(o => o.value === cv)) edmTargetSel.value = cv;

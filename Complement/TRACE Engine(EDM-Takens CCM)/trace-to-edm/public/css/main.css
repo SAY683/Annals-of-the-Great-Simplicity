@@ -753,11 +753,12 @@ td.tstat-skipped { color: var(--muted); font-style: italic; }
 /* trace_error 单元格：等宽字体便于排错，截断省略号 */
 td[title] { font-family: 'JetBrains Mono', 'Consolas', monospace; font-size: 0.62rem; }
 
-/* ── Responsive ─────────────────────────── */
+/* ── Responsive ───────────────────────────
+   R18 修复 (P3-P5 全级别修缮): 统一三方项目移动端断点为 900px + 520px 两级,
+   与共享主题 tokusatsu.css 及 trace-engine-web/edm-takens-web 对齐.
+   原 720px 改为 900px (合并到主断点), 消除响应式布局差异. */
 @media (max-width: 900px) {
   .command-grid { grid-template-columns: 1fr; }
-}
-@media (max-width: 720px) {
   .ctrl-grid { grid-template-columns: 1fr; }
 }
 @media (max-width: 520px) {

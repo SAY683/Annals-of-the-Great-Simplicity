@@ -262,6 +262,12 @@ def _run_semantic_layers(
         print(f"[Bridge] ⚠ L2/L3 处理失败: {e}")
         import traceback
         traceback.print_exc()
+        # ROUND28 P2-06: L2/L3 失败时标记 PARTIAL, 避免下游误读为完全成功
+        # trace_status 已由上层设置, 此处仅补充 l3_status 字段
+        existing_status = row.get("trace_status", "OK")
+        if existing_status == "OK":
+            row["trace_status"] = "PARTIAL"
+            row["trace_error"] = (row.get("trace_error", "") + f" | L2/L3 failed: {str(e)[:200]}")[:300]
 
     return row
 

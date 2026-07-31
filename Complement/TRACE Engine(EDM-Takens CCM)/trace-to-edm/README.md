@@ -10,15 +10,19 @@
 ## 架构
 
 ```
-                              ┌─ Layer 1: 元SCM参数 (23列)
+                              ┌─ Layer 1: 元SCM参数 (30列 · 科学层)
   TRACE引擎 ──→ result.json ──┤
-           ──→ Qwen编码 ──────├─ Layer 2: 世俗PCA投影 (4列)
-                              └─ Layer 3: 八正道审计 (24列)
+           ──→ Qwen编码 ──────├─ Layer 2: 世俗PCA投影 (4列 · 科学层)
+                              └─ Layer 3: 八正道审计 (48列 · 诠释层)
                                        ↓
-                              narrative_meta_trajectories.csv (54列)
+                              narrative_meta_trajectories.csv (88列)
                                        ↓
                               EDM-Takens 动力学预测 → 相变预警
 ```
+
+> **方法学分层**（详见 `ALGORITHM_AUDIT.md`）：L1/L2 为科学层（有 refutation/
+> p-value / explained_variance 统计保证），L3 为诠释层（零样本余弦探针，
+> 无统计显著性保证，投资决策需与 L1 交叉验证）。
 
 ## 项目结构
 
@@ -32,12 +36,13 @@ trace-to-edm/
 ├── project_manager.py     # 项目CRUD (每个项目自包含)
 ├── dataset_manager.py     # 数据集注册表 (dataset.json)
 ├── work_scanner.py        # TRACE工作目录扫描 + 清理
-├── csv_builder.py         # 轨迹CSV构建器 (54列对齐)
-├── edm_trigger.py         # EDM-Takens API 触发器
+├── csv_builder.py         # 轨迹CSV构建器 (88列对齐 · 列总数断言守卫)
+├── edm_trigger.py         # EDM-Takens API 触发器 (分级 confidence_level)
 │
-├── layer1_meta_scm.py     # L1: 元SCM参数提取 (23列)
-├── layer2_semantic.py     # L2: 世俗PCA投影 (4列)
-├── layer3_sacred.py       # L3: 八正道零样本探针 (24列)
+├── layer1_meta_scm.py     # L1: 元SCM参数提取 (30列 · 科学层)
+├── layer2_semantic.py     # L2: 世俗PCA投影 (4列 · 科学层)
+├── layer3_sacred.py       # L3: 八正道零样本探针 (48列 · 诠释层)
+├── ALGORITHM_AUDIT.md     # 方法学审计 (三层边界/EDM阈值/程序化契约)
 │
 ├── public/                # Web 前端 (双栏仪表盘)
 │   ├── index.html
@@ -147,24 +152,32 @@ python bridge.py --status                  # 轨迹状态
 
 ## EDM 预测目标 (20列)
 
-| 层 | 列 | 说明 |
-|----|-----|------|
-| L1 | `ate`, `adj_density`, `max_delta_nll`, `ci_width`, `edge_count`, `ccm_coverage_pct` | 因果系统诊断 |
-| L2 | `z_pca_1`, `z_pca_2`, `z_pca_3`, `secular_entropy` | 世俗话语流形 |
-| L3 | `z_福音`~`z_觉爱` (8轴) + `dz_存在`, `dz_觉爱` (2差分) | 八正道审计 |
+| 层 | 属性 | 列 | 说明 |
+|----|------|-----|------|
+| L1 | 科学 | `ate`, `adj_density`, `max_delta_nll`, `ci_width`, `edge_count`, `ccm_coverage_pct` | 因果系统诊断 |
+| L2 | 科学 | `z_pca_1`, `z_pca_2`, `z_pca_3`, `secular_entropy` | 世俗话语流形 |
+| L3 | **诠释** | `z_福音`~`z_觉爱` (8轴) + `dz_存在`, `dz_觉爱` (2差分) | 八正道审计（非统计保证） |
 
-## 数据列全表 (54列)
+> L3 目标在 EDM 触发面板标注"(诠释)"，结果不得与 L1/L2 并列用于投资决策。
+
+## 数据列全表 (88列)
+
+> 列总数由 `csv_builder.COLUMN_COUNT` 断言守卫保护（= Meta 6 + L1 30 + L2 4 + L3 48）。
+> 变更 `config.LAYER1_COLUMNS` / `config.SACRED_BOOKS` 后须同步更新本表与 `ALGORITHM_AUDIT.md §5.1`。
 
 | 分组 | 列数 | 内容 |
 |------|------|------|
-| Meta | 3 | `time_step`, `text_hash`, `source_label` |
-| L1 因果 | 6 | `ate`, `ate_ci_lower/upper`, `ci_width`, `refuted_count`, `identifiable` |
-| L1 图结构 | 4 | `concept_count`, `edge_count`, `adj_density`, `max_delta_nll` |
-| L1 诊断 | 6 | `concept_coverage`, `condition_number`, `unk_rate`, `ccm_coverage_pct`, `ccm_verdict`, `edm_rho_high/mid` |
-| L1 其他 | 5 | `havok_status`, `havok_linear_pct`, `causallearn_consensus`, `edge_stability_mean`, `permutation_p_value`, `total_ms` |
-| L2 | 4 | `z_pca_1`, `z_pca_2`, `z_pca_3`, `secular_entropy` |
-| L3 投影 | 8 | `z_福音`, `z_吉祥`, `z_奥美`, `z_存在`, `z_自孕`, `z_弥赛亚`, `z_Alice`, `z_觉爱` |
-| L3 差分 | 16 | `dz_*` (8), `d2z_*` (8) |
+| Meta | 6 | `time_step`, `text_hash`, `source_label`, `trace_status`, `trace_error`, `trace_mode` |
+| L1 因果效应 | 6 | `ate`, `ate_ci_lower/upper`, `ci_width`, `refuted_count`, `identifiable` |
+| L1 图结构 | 7 | `concept_count`, `edge_count`, `adj_density`, `max_delta_nll`, `signal_type`, `max_delta_nll_concept_level`, `concept_level_edge_count` |
+| L1 数据诊断 | 3 | `concept_coverage`, `condition_number`, `unk_rate` |
+| L1 CCM | 4 | `ccm_coverage_pct`, `ccm_verdict`, `refutations_attempted`, `ccm_algorithm_run` |
+| L1 EDM/HAVOK | 4 | `edm_rho_high`, `edm_rho_mid`, `havok_status`, `havok_linear_pct` |
+| L1 稳定性/共识/剖面 | 6 | `causallearn_consensus`, `edge_stability_mean`, `permutation_p_value`, `consensus_score`, `consensus_direction`, `total_ms` |
+| L2 · 科学层 | 4 | `z_pca_1`, `z_pca_2`, `z_pca_3`, `secular_entropy` |
+| L3 绝对投影 · 诠释层 | 8 | `z_福音`, `z_吉祥`, `z_奥美`, `z_存在`, `z_自孕`, `z_弥赛亚`, `z_Alice`, `z_觉爱` |
+| L3 一阶/二阶差分 · 诠释层 | 16 | `dz_*` (8), `d2z_*` (8) |
+| L3 z-score 归一化 · 诠释层 | 24 | `z_*_zscore` (8), `dz_*_zscore` (8), `d2z_*_zscore` (8) — Phase 2 per-project 滚动窗口 |
 
 ## 技术依赖
 

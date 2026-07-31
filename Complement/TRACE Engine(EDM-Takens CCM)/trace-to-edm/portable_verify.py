@@ -86,7 +86,7 @@ R = Result()
 # ── 验证步骤 ────────────────────────────────────────────────
 def verify_directory_structure():
     """1. 目录结构完整性。"""
-    print("\n[1/7] 验证目录结构完整性")
+    print("\n[1/8] 验证目录结构完整性")
 
     # 顶层 Python 模块
     for name in EXPECTED_PY_MODULES:
@@ -138,7 +138,7 @@ def verify_directory_structure():
 
 def verify_sacred_texts():
     """2. sacred_texts/ 8 本经书存在。"""
-    print("\n[2/7] 验证 sacred_texts/ 8 本经书")
+    print("\n[2/8] 验证 sacred_texts/ 8 本经书")
     sacred_dir = HERE / "sacred_texts"
     if not sacred_dir.exists():
         R.fail(f"sacred_texts/ 目录不存在")
@@ -158,7 +158,7 @@ def verify_sacred_texts():
 
 def verify_config_portable_detection():
     """3. config.py 便携式布局探测正确。"""
-    print("\n[3/7] 验证 config.py 便携式布局探测")
+    print("\n[3/8] 验证 config.py 便携式布局探测")
     try:
         # 切换 CWD 到 HERE 以模拟便携式运行
         original_cwd = os.getcwd()
@@ -224,7 +224,7 @@ def verify_config_portable_detection():
 
 def verify_python_imports():
     """4. Python 模块导入正常。"""
-    print("\n[4/7] 验证 Python 模块导入")
+    print("\n[4/8] 验证 Python 模块导入")
     original_cwd = os.getcwd()
     os.chdir(HERE)
     sys.path.insert(0, str(HERE))
@@ -254,7 +254,7 @@ def verify_python_imports():
 
 def verify_server_js_syntax():
     """5. server.js 语法正确。"""
-    print("\n[5/7] 验证 server.js 语法")
+    print("\n[5/8] 验证 server.js 语法")
     server_js = HERE / "server.js"
     if not server_js.exists():
         R.fail("server.js 不存在")
@@ -283,7 +283,7 @@ def verify_default_project_cleanliness():
     default 项目是便携式模板项目，不应残留 text-* 测试条目。
     若存在 text-* 条目，说明开发期的测试数据未清理，会污染便携式分发。
     """
-    print("\n[7/7] 验证 default 项目数据清洁度")
+    print("\n[8/8] 验证 default 项目数据清洁度")
     default_dir = HERE / "projects" / "default"
     dataset_path = default_dir / "dataset.json"
     if not dataset_path.exists():
@@ -320,7 +320,7 @@ def verify_default_project_cleanliness():
 
 def verify_trace_engine_web_bridge():
     """6. 与 trace-engine-web 的路径对接正确。"""
-    print("\n[6/7] 验证与 trace-engine-web 路径对接")
+    print("\n[6/8] 验证与 trace-engine-web 路径对接")
     trace_web = HERE.parent / "trace-engine-web"
     if not trace_web.exists():
         R.fail(f"trace-engine-web 不存在: {trace_web}")
@@ -350,6 +350,62 @@ def verify_trace_engine_web_bridge():
         R.warn(f"edm-takens-web 不存在（可选）: {edm_web}")
 
 
+def verify_methodology_audit():
+    """7. 方法学审计契约 (ROUND28 P0-02/P0-04/P2-03).
+
+    验证三项:
+      a. ALGORITHM_AUDIT.md 存在 (layer3_sacred.py 引用 "详见 ALGORITHM_AUDIT.md §3");
+      b. layer3_sacred.METHODOLOGY_TAG / METHODOLOGY_DISCLAIMER 可导入且非空;
+      c. csv_builder.COLUMN_COUNT == 88 (列总数契约, 防止 LAYER1_COLUMNS/SACRED_BOOKS
+         变更后列数漂移不被发现).
+    """
+    print("\n[7/8] 验证方法学审计契约")
+
+    # a. ALGORITHM_AUDIT.md 存在性
+    audit_md = HERE / "ALGORITHM_AUDIT.md"
+    if audit_md.exists() and audit_md.is_file():
+        size = audit_md.stat().st_size
+        if size > 500:
+            R.ok(f"ALGORITHM_AUDIT.md 存在 ({size} bytes)")
+        else:
+            R.fail(f"ALGORITHM_AUDIT.md 过小 ({size} bytes), 疑似占位文件")
+    else:
+        R.fail("缺失 ALGORITHM_AUDIT.md (layer3_sacred.py 引用此文件 §3)")
+
+    # b. layer3_sacred 方法学常量
+    original_cwd = os.getcwd()
+    os.chdir(HERE)
+    sys.path.insert(0, str(HERE))
+    # 清理已导入的本地模块以避免缓存
+    for mod_name in list(sys.modules.keys()):
+        if mod_name == "layer3_sacred" or mod_name == "csv_builder" or mod_name == "config":
+            del sys.modules[mod_name]
+    try:
+        import layer3_sacred
+        tag = getattr(layer3_sacred, "METHODOLOGY_TAG", None)
+        disclaimer = getattr(layer3_sacred, "METHODOLOGY_DISCLAIMER", None)
+        if tag == "interpretive_zero_shot":
+            R.ok(f"layer3_sacred.METHODOLOGY_TAG = {tag!r}")
+        else:
+            R.fail(f"layer3_sacred.METHODOLOGY_TAG 非预期: {tag!r} (期望 'interpretive_zero_shot')")
+        if disclaimer and len(disclaimer) > 20 and "诠释" in disclaimer:
+            R.ok(f"layer3_sacred.METHODOLOGY_DISCLAIMER 存在 ({len(disclaimer)} 字符)")
+        else:
+            R.fail(f"layer3_sacred.METHODOLOGY_DISCLAIMER 缺失或不含'诠释': {disclaimer!r}")
+
+        # c. csv_builder 列总数契约
+        import csv_builder
+        col_count = getattr(csv_builder, "COLUMN_COUNT", None)
+        if col_count == 88:
+            R.ok(f"csv_builder.COLUMN_COUNT = {col_count} (契约一致)")
+        else:
+            R.fail(f"csv_builder.COLUMN_COUNT = {col_count} (期望 88, 列数契约漂移)")
+    except Exception as e:
+        R.fail(f"方法学常量导入异常: {e}")
+    finally:
+        os.chdir(original_cwd)
+
+
 # ── 主入口 ─────────────────────────────────────────────────
 def main():
     print("=" * 60)
@@ -363,6 +419,7 @@ def main():
     verify_python_imports()
     verify_server_js_syntax()
     verify_trace_engine_web_bridge()
+    verify_methodology_audit()
     verify_default_project_cleanliness()
 
     print("\n" + "=" * 60)

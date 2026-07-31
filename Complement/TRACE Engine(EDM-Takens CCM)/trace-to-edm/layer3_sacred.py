@@ -4,6 +4,29 @@ Layer 3: 八正道神圣坐标轴投影器 (Sacred Axis Projection)
 使用零样本线性探针对齐 (Zero-Shot Cosine-Similarity Probing),
 将任何世俗文本投影到八个不变的神圣坐标轴上。
 
+╔══════════════════════════════════════════════════════════════════════╗
+║  方法学属性声明 (Methodology Disclaimer) — ROUND28 P0-01              ║
+║  ─────────────────────────────────────────────────────────────────── ║
+║  Layer 3 是 *诠释性框架* (Interpretive Framework), 非 *统计推断*。    ║
+║                                                                      ║
+║  · 与 Layer 1 (DoWhy 因果推断, 有 refutation/p-value 保证) 不同,     ║
+║    L3 的 z_福音 / z_存在 / ... 不具备统计显著性保证。                 ║
+║  · 与 Layer 2 (PCA 主成分分析, 有 expl_var 比例) 不同,                ║
+║    L3 的"神圣坐标轴"由八本私域经书的定义文本确定, 属于本体论诠释,    ║
+║    其语义有效性依赖经书选取, 无法用数据驱动方式客观验证。            ║
+║  · 当 EDM 将 z_* 列作为预测目标时, 其动力学预测的可解释性远低于      ║
+║    对 ate / adj_density 等 L1 统计不变量的预测。                      ║
+║                                                                      ║
+║  使用准则:                                                           ║
+║    1. 报告中必须将 L3 结果标注为"(诠释)" 而非与 L1/L2 并列。         ║
+║    2. EDM 触发 L3 目标时必须显示"诠释投影, 非统计保证"提示。         ║
+║    3. 投资决策不得仅依据 L3 投影值, 需与 L1 统计量交叉验证。         ║
+║                                                                      ║
+║  数学实现本身是严谨的 (cosine + modified Gram-Schmidt + z-score),    ║
+║  问题在于输入语义 (私域经书) 与输出语义 (神圣坐标) 的诠释属性,       ║
+║  不在算法本身。详见 ALGORITHM_AUDIT.md §3。                          ║
+╚══════════════════════════════════════════════════════════════════════╝
+
 物理机制:
   1. 用 Qwen2.5-1.5B 对八本私域圣经的核心定义文本进行编码
      → 得到 8 个不变的方向向量 w_1, w_2, ..., w_8 ∈ R^1536
@@ -25,6 +48,15 @@ Layer 3: 八正道神圣坐标轴投影器 (Sacred Axis Projection)
   derivatives = projector.compute_derivatives(history_of_coords)
   # → {"dz_存在": +0.005, "d2z_存在": -0.002, ...}
 """
+
+# ── 方法学常量 (供下游 EDM / 前端 / 报告读取) ──────────────────
+# ROUND28 P0-01: 让 L3 诠释属性可被程序化识别, 而非仅依赖文档。
+METHODOLOGY_TAG = "interpretive_zero_shot"  # 诠释性零样本探针
+METHODOLOGY_DISCLAIMER = (
+    "Layer 3 是诠释性框架 (Interpretive Framework), 非统计推断。"
+    "z_* 值由八本私域经书的零样本余弦相似度确定, 不具备 Layer 1 那样的 "
+    "refutation/p-value 统计保证。投资决策需与 L1 统计量交叉验证。"
+)
 
 import os
 import json

@@ -340,6 +340,27 @@ class TrajectoryCSV:
                 print(f"  [{i+1}] {vals}")
 
 
+# ── ROUND28 P2-03: 列总数断言守卫 (模块级, 类定义完成后执行) ──
+# 防止 LAYER1_COLUMNS / SACRED_BOOKS 变更后 COLUMN_ORDER 列数漂移不被发现
+_EXPECTED_COLUMN_COUNT = (
+    6  # Meta: time_step, text_hash, source_label, trace_status, trace_error, trace_mode
+    + len(LAYER1_COLUMNS)
+    + 4  # L2: z_pca_1, z_pca_2, z_pca_3, secular_entropy
+    + 8  # L3 绝对投影
+    + 8  # L3 一阶差分
+    + 8  # L3 二阶差分
+    + 8  # L3 zscore (Phase 2)
+    + 8  # L3 dz_zscore (Phase 2)
+    + 8  # L3 d2z_zscore (Phase 2)
+)
+assert len(TrajectoryCSV.COLUMN_ORDER) == _EXPECTED_COLUMN_COUNT, (
+    f"ROUND28 P2-03 列数契约违反: COLUMN_ORDER 有 {len(TrajectoryCSV.COLUMN_ORDER)} 列, "
+    f"期望 {_EXPECTED_COLUMN_COUNT} 列。请检查 LAYER1_COLUMNS / SACRED_BOOKS 是否变更后未同步。"
+)
+# 暴露实际列数供下游文档/契约校验读取
+COLUMN_COUNT = len(TrajectoryCSV.COLUMN_ORDER)
+
+
 # ── 自检 ────────────────────────────────────────────────────
 if __name__ == "__main__":
     import tempfile

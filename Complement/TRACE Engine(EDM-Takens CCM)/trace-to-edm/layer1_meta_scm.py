@@ -330,8 +330,13 @@ def _compute_consensus_score(params: Dict[str, Any]) -> float:
             return 1.0
         consensus = max(0.0, min(1.0, 1.0 - std_v / max_std))
         return float(consensus)
-    except Exception:
-        return 0.0
+    except Exception as e:
+        # ROUND28 P2-05: 返回哨兵值 -1.0 而非 0.0
+        # 0.0 在下游 EDM 中会被误读为"完全无共识", 但实际是计算异常
+        # -1.0 表示"不可用", CSV 中应被识别为缺失值
+        if os.environ.get("TRACE_TO_EDM_VERBOSE", "0") == "1":
+            print(f"[L1] consensus_score 计算异常: {e}")
+        return -1.0  # 哨兵值: 不可用
 
 
 def _compute_consensus_direction(params: Dict[str, Any]) -> str:

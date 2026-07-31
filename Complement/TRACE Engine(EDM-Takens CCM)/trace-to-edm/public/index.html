@@ -4,21 +4,10 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>trace-to-edm 操纵台</title>
-  <link rel="stylesheet" href="shared/themes/tokusatsu.css?v=20260728a" />
-  <link rel="stylesheet" href="/css/override.css?v=20260728a" />
-  <link rel="stylesheet" href="/css/main.css?v=20260728a" />
-  <!-- 内联兜底：确保 header 紧凑化优先于任何缓存或主题覆盖 -->
-  <style>
-    .base-header { padding: 8px 14px !important; margin-bottom: 12px !important; gap: 12px !important; }
-    .base-header .header-left h1 { font-size: clamp(1rem, 2.2vw, 1.55rem) !important; white-space: nowrap !important; }
-    .base-header .header-left p { font-size: clamp(0.68rem, 1vw, 0.82rem) !important; margin-top: 0.15rem !important; }
-    .base-header .header-right { gap: 6px !important; flex-wrap: nowrap !important; align-items: center !important; }
-    .base-header .base-nav { padding: 3px !important; gap: 3px !important; }
-    .base-header .base-nav a { padding: 4px 7px !important; font-size: 0.58rem !important; }
-    .base-header .mission-clock { padding: 0.15rem 0.4rem !important; min-width: auto !important; }
-    .base-header .mission-clock .clock-value { font-size: clamp(0.72rem, 1.2vw, 0.95rem) !important; }
-    .base-header .status-dot { font-size: clamp(0.55rem, 0.78vw, 0.65rem) !important; padding: 0.15rem 0.4rem !important; }
-  </style>
+  <link rel="stylesheet" href="shared/themes/tokusatsu.css?v=20260731r17" />
+  <link rel="stylesheet" href="/css/override.css?v=20260731r17" />
+  <link rel="stylesheet" href="/css/main.css?v=20260729h" />
+  <!-- R17 修复 (P4 修缮): 内联样式已抽取到 override.css, 消除 !important 内联覆盖 -->
 </head>
 <body data-self-port="3100">
   <div id="app">
@@ -231,9 +220,10 @@
             <span class="hud-corner br"></span>
             <span class="sector-label">SECTOR-B2</span>
             <h2><span class="panel-icon">◉</span> EDM 触发 <span id="edmStatus" style="font-size:0.65rem;color:var(--warn)">需≥15行</span></h2>
+            <div id="edmConfidenceBanner" class="edm-confidence-banner" hidden></div>
             <div class="form-row">
               <label>预测目标:</label>
-              <select id="edmTarget">
+              <select id="edmTarget" title="L3 标注(诠释)的目标为诠释性投影, 非统计推断">
                 <option value="ate">[L1] ate — 因果效应强度</option>
               </select>
             </div>
@@ -291,8 +281,8 @@
     </main>
   </div>
 
-  <script src="/js/logCockpit.js?v=20260728e"></script>
-  <script src="/js/app.js?v=20260728e"></script>
+  <script src="/js/logCockpit.js?v=20260729i"></script>
+  <script src="/js/app.js?v=20260729i"></script>
   <!-- P1-2 (§20.12): BASE 导航隧道模式自适应, 替代 9 处硬编码 127.0.0.1:PORT -->
   <script>
   (function () {
