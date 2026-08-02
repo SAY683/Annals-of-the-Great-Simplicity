@@ -1366,7 +1366,12 @@ async function refreshTable() {
       h += `<tr data-text-hash="${escapeHtml(row.text_hash||'')}" data-time-step="${escapeHtml(row.time_step||'')}">`;
       cols.forEach(c => {
         const v = row[c]||'';
-        const isNum = !isNaN(parseFloat(v)) && v !== '';
+        // ROUND28 P1-fix: time_step/source_label 是字符串, 不能走 parseFloat 分支
+        // 否则 "2026-07-25 21:48" 被 parseFloat 解析为 2026, 显示为 "2026.0000"
+        const isStringCol = c === 'time_step' || c === 'source_label' ||
+                            c === 'trace_status' || c === 'trace_mode' ||
+                            c === 'trace_error' || c === 'text_hash';
+        const isNum = !isStringCol && !isNaN(parseFloat(v)) && v !== '' && isFinite(parseFloat(v));
         // dz_/d2z_ 列: 第一行为空是正常的 (差分需两个点)
         const isDiffCol = c.startsWith('dz_') || c.startsWith('d2z_');
         const diffEmpty = isDiffCol && v === '';
@@ -1386,8 +1391,18 @@ async function refreshTable() {
           const statusColors = {
             OK: 'tstat-ok', FAILED: 'tstat-failed', PARTIAL: 'tstat-partial',
             EXTRACT_FAILED: 'tstat-extract', SKIPPED: 'tstat-skipped',
+            LEGACY: 'tstat-skipped',
           };
           statusClass = statusColors[v] || '';
+        }
+        // ROUND28 P1-fix: trace_mode 列加模式色 (light=青/deep=蓝/replay=紫/unknown=灰)
+        // 让投资者一眼区分行来源: 实时文本 vs 回填
+        if (c === 'trace_mode') {
+          const modeColors = {
+            light: 'tmode-light', deep: 'tmode-deep',
+            replay: 'tmode-replay', unknown: 'tstat-skipped',
+          };
+          statusClass = modeColors[v] || '';
         }
         h += `<td class="${isNum?'num':''} ${diffEmpty?'dim':''} ${statusClass}"${titleAttr}>${display}</td>`;
       });

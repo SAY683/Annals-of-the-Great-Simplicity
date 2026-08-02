@@ -108,13 +108,14 @@ if (!pythonEnv.ok) {
 
 // ── 安全与生产中间件（debt-15） ─────────────────────────────────────
 // helmet：设置安全 HTTP 头（CSP/X-Frame-Options/X-Content-Type-Options 等）。
-// 注意：前端内联脚本与样式需要 unsafe-inline，CSP 适当放宽。
+// OPT-7 修复 (2026-07-30 审计): scriptSrc 移除 unsafe-inline，所有脚本已外部化。
+// styleSrc 保留 unsafe-inline（前端有 27 处内联 style 属性，风险低，重构成本高）。
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'"],
-      styleSrc: ["'self'", "'unsafe-inline'"],
+      scriptSrc: ["'self'"],  // OPT-7: 移除 'unsafe-inline'，防 XSS
+      styleSrc: ["'self'", "'unsafe-inline'"],  // 保留：内联样式无代码执行风险
       imgSrc: ["'self'", 'data:'],
       connectSrc: ["'self'"],
     },
@@ -190,10 +191,9 @@ const startupCleanupTimer = setTimeout(adminCleanup.cleanupOldOutputs, 5000);
 const cacheTtlInterval = startCacheTtlSweeper();
 
 // ── 启动监听 ────────────────────────────────────────────────────────
-// P1 修缮 (2026-07-25 元审计 Round 12.10): host 收窄到 127.0.0.1
-// 原实现 app.listen(PORT) 未指定 host，等价于隐式 0.0.0.0（暴露至 LAN/公网）
-// 默认仅本机访问；如需外部访问，显式设置 TRACE_HOST=0.0.0.0
-const HOST = process.env.TRACE_HOST || '127.0.0.1';
+// P1-5 修复 (Round 27 审计): host 从 CONFIG 读取，与 /api/health、/api/config 单一来源。
+// 原实现 server.js 直接读 env，绕过 CONFIG，导致 /api/config 不暴露 host 字段。
+const HOST = CONFIG.host;
 const server = app.listen(PORT, HOST, () => {
   console.log(`TRACE Engine Web MVP 运行在 http://${HOST}:${PORT}`);
   console.log(`工作目录: ${WORK_DIR}`);
@@ -209,21 +209,42 @@ const server = app.listen(PORT, HOST, () => {
 });
 
 // ── 优雅关闭 ────────────────────────────────────────────────────────
+// P0-1/P0-2 修复 (Round 27 审计):
+// 1. 增加 isShuttingDown 守卫，防止 SIGTERM/SIGINT/uncaughtException 并发触发重复清理
+// 2. uncaughtException 改为同步清理子进程后再走 gracefulShutdown，移除 5s 兜底
+//    （原 5s < 10s forceExit，会先 fire 并跳过 server.close() 回调内的全部清理）
+// 3. 新增 unhandledRejection 处理器，避免 async 路由裸崩进程
+let isShuttingDown = false;
+function _cleanupActiveJobsSync() {
+  // 同步遍历活跃任务，区分真实子进程与 SUPER 占位对象分别处理
+  for (const [id, proc] of activeJobs.entries()) {
+    try {
+      if (proc && typeof proc.kill === 'function') {
+        utils.killProcessWithFallback(proc);
+      } else if (proc && typeof proc.cancel === 'function') {
+        proc.cancel();
+      }
+      utils.recordJob(id, null, 'terminated_by_shutdown');
+    } catch (_) {}
+  }
+  activeJobs.clear();
+}
 function gracefulShutdown(signal) {
+  if (isShuttingDown) {
+    console.log(`[${signal}] 已在关闭流程中，忽略重复触发`);
+    return;
+  }
+  isShuttingDown = true;
   console.log(`[${signal}] 正在优雅关闭服务...`);
   logToFile('info', `收到 ${signal}，开始优雅关闭`);
+  // P0 修复: 兜底强制退出，避免 server.close() 因 SSE 长连接永久挂起
+  const forceExit = setTimeout(() => {
+    console.error('[shutdown] 强制退出（等待连接超时）');
+    process.exit(1);
+  }, 10000).unref();
   server.close(() => {
-    // 遍历活跃任务，区分真实子进程与 SUPER 占位对象分别处理
-    for (const [id, proc] of activeJobs.entries()) {
-      try {
-        if (proc && typeof proc.kill === 'function') {
-          utils.killProcessWithFallback(proc);
-        } else if (proc && typeof proc.cancel === 'function') {
-          proc.cancel();
-        }
-        utils.recordJob(id, null, 'terminated_by_shutdown');
-      } catch (_) {}
-    }
+    clearTimeout(forceExit);
+    _cleanupActiveJobsSync();
     // 显式终止常驻 LLaMA Worker
     llamaWorkerSvc.terminateLlamaWorker();
     // 清理全局定时器
@@ -240,7 +261,27 @@ process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 process.on('uncaughtException', (err) => {
   logToFile('fatal', `未捕获异常: ${err.stack || err.message}`);
   console.error('未捕获异常:', err);
-  process.exit(1);
+  // P0-1 修复: 先同步清理子进程与持久化状态，再走 gracefulShutdown。
+  // 原实现仅调用 gracefulShutdown 后挂 5s 兜底定时器，但 5s < 10s forceExit，
+  // 5s 先 fire 直接 process.exit(1)，跳过 server.close() 回调内的子进程清理、
+  // LLaMA Worker 终止、jobHistory 持久化，导致 Python/LLaMA Worker 僵尸化。
+  try { _cleanupActiveJobsSync(); } catch (_) {}
+  try { llamaWorkerSvc.terminateLlamaWorker(); } catch (_) {}
+  try { utils.persistJobHistory(); } catch (_) {}
+  gracefulShutdown('uncaughtException');
+  // 不再挂 5s 兜底：gracefulShutdown 内部已有 10s forceExit
+});
+// P0-2 修复: 新增 unhandledRejection 处理器。
+// P1-2 修复 (ROUND27 12维度核对): 原 unhandledRejection 直接 gracefulShutdown,
+// 导致单个 async 路由 reject (如 /api/jobs/:id/detail 读文件失败) 整服下线.
+// 现改为: 记录日志 + 继续运行, 不杀进程. async 路由的 reject 已由 asyncHandler
+// (routes/jobs.js) 转交 Express errorHandler, 不会到达此处; 到此处的 rejection
+// 是非路由 Promise (如 setTimeout 内异步操作), 不应因局部故障下线全服.
+// uncaughtException 仍保持 gracefulShutdown (真正的不可恢复错误).
+process.on('unhandledRejection', (reason) => {
+  const msg = reason && reason.stack ? reason.stack : String(reason);
+  logToFile('error', `未处理的 Promise rejection (已记录, 继续运行): ${msg}`);
+  console.error('未处理的 Promise rejection (已记录, 继续运行):', reason);
 });
 
 // 暴露内部对象给路由模块（仅在 gracefulShutdown 中需要）

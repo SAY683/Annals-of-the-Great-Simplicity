@@ -75,6 +75,16 @@ _singleton_project = None  # 当前单例绑定的项目名
 _zscore_normalizer = None
 
 
+def _to_float_safe(v, default=0.0) -> float:
+    """安全转 float, 失败返回 default. 用于 L1 全零检测等场景。"""
+    try:
+        if v is None or v == "":
+            return default
+        return float(v)
+    except (ValueError, TypeError):
+        return default
+
+
 def _check_and_reset_singletons():
     """检查当前活动项目是否与单例绑定的项目一致，不一致则重置单例。
 
@@ -630,17 +640,44 @@ def process_replay_row(
         "time_step": timestamp,
         "text_hash": f"replay:{uuid_str[:8]}",
         "source_label": source,
+        # ROUND28 P1-fix: 回填路径补全 trace_status/trace_mode/trace_error
+        # 原实现完全未设置这三列, 导致前端表格"TRACE 诊断列"全空,
+        # 投资者无法判断回填行的 TRACE 状态与模式。
+        # trace_mode 固定为 "replay" (回填不重新运行 TRACE, 而是读取已有 result.json);
+        # trace_status 按 L1/L2/L3 成功情况分级标记。
+        "trace_mode": "replay",
+        "trace_status": "OK",  # 初始值, 后续按失败情况降级
+        "trace_error": "",
     }
 
     # ── Layer 1: 直接从 result.json 提取 ──────────────
+    l1_ok = False
     try:
         l1_params = extract_meta_scm_params(result_json)
         row.update(l1_params)
+        l1_ok = True
         if VERBOSE:
             print(f"[Replay] L1 ✓: ate={l1_params.get('ate', 'N/A')}, "
                   f"edges={l1_params.get('edge_count', 'N/A')}")
+
+        # ROUND28 P1-fix: 检测 L1 全零行 (result.json 存在但 TRACE 实际失败)
+        # 表现: ate=0, edge_count=0, adj_density=0, max_delta_nll=0
+        # 说明 result.json 是空壳 (TRACE 运行失败但写了默认值), 不是有效因果推断
+        _l1_zero_keys = ("ate", "edge_count", "adj_density", "max_delta_nll")
+        _l1_all_zero = all(
+            _to_float_safe(row.get(k, 0)) == 0.0 for k in _l1_zero_keys
+        )
+        if _l1_all_zero:
+            row["trace_status"] = "PARTIAL"
+            row["trace_error"] = "L1 all-zero: result.json is empty shell (TRACE failed silently)"
+            if VERBOSE:
+                print(f"[Replay] ⚠ L1 全零, 疑似 TRACE 失败空壳 result.json")
+            l1_ok = False  # 视为 L1 不可用
     except Exception as e:
         print(f"[Replay] ⚠ L1 提取失败: {e}")
+        # L1 失败标记为 PARTIAL, 记录错误
+        row["trace_status"] = "PARTIAL"
+        row["trace_error"] = ("L1 failed: " + str(e))[:300]
         # 即使 L1 失败也继续尝试 L2+L3
 
     # ── Layer 2+3: 找回原始文本 ──────────────────────
@@ -649,6 +686,12 @@ def process_replay_row(
     if original_text:
         _run_semantic_layers(original_text, row, l3_history, timestamp=timestamp, l3_timestamps=l3_timestamps)
     else:
+        # 原始文本未找到: L2+L3 跳过, 但 L1 仍有数据 → PARTIAL
+        if l1_ok:
+            row["trace_status"] = "PARTIAL"
+            existing_err = row.get("trace_error", "")
+            l3_skip_msg = "L2/L3 skipped: original text not found"
+            row["trace_error"] = (existing_err + (" | " if existing_err else "") + l3_skip_msg)[:300]
         if VERBOSE:
             print(f"[Replay] ⚠ 原始文本未找到, 跳过 L2+L3 (仅 L1)")
 

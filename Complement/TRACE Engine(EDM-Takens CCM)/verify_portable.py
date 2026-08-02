@@ -370,12 +370,15 @@ def check_portable_code_fixes(root: Path) -> dict:
     result = {'name': '便携式代码修缮落地', 'ok': True, 'messages': []}
 
     # 1. 主机绑定检查
+    # Round 27 更新: 接受两种实现——直接 env 读取或通过 CONFIG.host（P1-5 修缮后）
     web_server = root / 'trace-engine-web' / 'server.js'
     if web_server.exists():
         text = web_server.read_text(encoding='utf-8')
-        if "TRACE_HOST || '127.0.0.1'" not in text and 'TRACE_HOST || "127.0.0.1"' not in text:
+        _old_pattern = "TRACE_HOST || '127.0.0.1'" in text or 'TRACE_HOST || "127.0.0.1"' in text
+        _new_pattern = 'CONFIG.host' in text
+        if not _old_pattern and not _new_pattern:
             result['ok'] = False
-            result['messages'].append('trace-engine-web/server.js 未绑定 TRACE_HOST || 127.0.0.1')
+            result['messages'].append('trace-engine-web/server.js 未绑定 TRACE_HOST || 127.0.0.1 或 CONFIG.host')
 
     t2e_server = root / 'trace-to-edm' / 'server.js'
     if t2e_server.exists():
@@ -445,30 +448,199 @@ def check_docs_sync(root: Path) -> dict:
 
 
 def check_skill_projects(root: Path) -> dict:
-    """Round 17 新增：校验 Skill/ 目录下三大项目已同步。"""
-    result = {'name': 'Skill 同步', 'ok': True, 'messages': []}
-    # root 是 TRACE Engine(EDM-Takens CCM)/，Skill/ 在其上一级
-    skill_dir = root.parent / 'Skill'
-    if not skill_dir.exists():
-        result['messages'].append('未找到 Skill/ 目录，跳过（可能是仅 TRACE 布局）')
-        return result
+    """Round 17 新增：校验 Skill/ 目录下三大项目已同步。
+    ROUND28 更新: 改为检查便携目录内的 edm-takens/ 和 edm-takens-web/,
+    而非依赖外部 Skill/ 目录, 实现真正的开箱即用.
+    """
+    result = {'name': 'EDM-TAKENS 项目同步', 'ok': True, 'messages': []}
 
-    required_projects = ['edm-takens', 'edm-takens-web', 'shared']
-    for proj in required_projects:
-        if not (skill_dir / proj).exists():
+    # ROUND28: 检查便携目录内的 EDM-TAKENS 项目, 而非外部 Skill/
+    required_projects = {
+        'edm-takens': root / 'edm-takens',
+        'edm-takens-web': root / 'edm-takens-web',
+    }
+    for proj_name, proj_path in required_projects.items():
+        if not proj_path.exists():
             result['ok'] = False
-            result['messages'].append(f'Skill/ 缺失: {proj}/')
+            result['messages'].append(f'便携目录缺失: {proj_name}/')
+        else:
+            result['messages'].append(f'存在: {proj_name}/')
 
-    # edm-takens-web 后端关键文件
-    web_backend = skill_dir / 'edm-takens-web' / 'backend'
-    if web_backend.exists():
-        for f in ['api.py', 'sync_check.py']:
-            if not (web_backend / f).exists():
-                result['ok'] = False
-                result['messages'].append(f'edm-takens-web/backend/ 缺失: {f}')
+    # edm-takens 核心库关键文件检查
+    edm_takens = root / 'edm-takens'
+    if edm_takens.exists():
+        critical_files = [
+            edm_takens / 'src' / 'pipeline.py',
+            edm_takens / 'src' / 'ccm_causality.py',
+            edm_takens / 'src' / 'sovereign_havok.py',
+            edm_takens / 'src' / '_numpy_edm.py',
+            edm_takens / 'src' / '_numeric_constants.py',
+            edm_takens / 'src' / 'surrogate_test.py',
+            edm_takens / 'run_pipeline.py',
+            edm_takens / 'run_tests.py',
+            edm_takens / 'docs' / 'ALGORITHM_AUDIT.md',
+        ]
+        missing = [str(f.relative_to(root)) for f in critical_files if not f.exists()]
+        if missing:
+            result['ok'] = False
+            result['messages'].append(f'edm-takens 缺失关键文件: {missing}')
+        else:
+            result['messages'].append(f'edm-takens 关键文件齐全 ({len(critical_files)} 项)')
+
+    # edm-takens-web 后端关键文件检查
+    edm_takens_web = root / 'edm-takens-web'
+    if edm_takens_web.exists():
+        critical_files = [
+            edm_takens_web / 'backend' / 'api.py',
+            edm_takens_web / 'backend' / 'sync_check.py',
+            edm_takens_web / 'backend' / 'services' / 'summary_builder.py',
+            edm_takens_web / 'backend' / 'edmtakens' / 'pipeline.py',
+            edm_takens_web / 'backend' / 'edmtakens' / 'ccm_causality.py',
+            edm_takens_web / 'frontend' / 'src' / 'main.js',
+            edm_takens_web / 'frontend' / 'src' / 'style.css',
+            edm_takens_web / 'frontend' / 'index.html',
+            edm_takens_web / 'docs' / 'ALGORITHM_AUDIT.md',
+        ]
+        missing = [str(f.relative_to(root)) for f in critical_files if not f.exists()]
+        if missing:
+            result['ok'] = False
+            result['messages'].append(f'edm-takens-web 缺失关键文件: {missing}')
+        else:
+            result['messages'].append(f'edm-takens-web 关键文件齐全 ({len(critical_files)} 项)')
 
     if result['ok']:
-        result['messages'].append('Skill/ 三大项目齐全')
+        result['messages'].append('EDM-TAKENS 项目在便携目录内完整')
+    return result
+
+
+def check_edm_takens_cli(root: Path) -> dict:
+    """ROUND28 新增: 校验 edm-takens CLI 核心模块可导入.
+
+    科研级产品的开箱即用要求: 用户进入便携目录后, 无需配置 PYTHONPATH,
+    即可运行 edm-takens 的 CLI (run_pipeline.py) 和测试套件 (run_tests.py).
+    本检查验证 src/ 下的核心算法模块能被 Python 解释器成功导入.
+    """
+    result = {'name': 'EDM-TAKENS CLI 模块导入', 'ok': True, 'messages': []}
+    edm_takens = root / 'edm-takens'
+    if not edm_takens.exists():
+        result['ok'] = False
+        result['messages'].append('缺失 edm-takens/ 目录')
+        return result
+
+    src_dir = edm_takens / 'src'
+    if not src_dir.exists():
+        result['ok'] = False
+        result['messages'].append('缺失 edm-takens/src/ 目录')
+        return result
+
+    # 导入核心模块的冒烟测试脚本
+    script = """
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent / 'src'))
+try:
+    from pipeline import run_pipeline, run_full_analysis, PipelineConfig
+    from ccm_causality import ccm_causality_test, ccm_batch_test
+    from sovereign_havok import SovereignHAVOK
+    from _numpy_edm import CCM, EmbedDimension, Simplex
+    from _numeric_constants import EPS_DISTANCE, EPS_VARIANCE, EPS_PROB, EPS_ENERGY, EPS_LYAPUNOV
+    from surrogate_test import iaaft_surrogates, surrogate_significance_test
+    from final_interpretation import ccm_with_convergence
+    print('EDM_TAKENS_IMPORT_OK')
+except Exception as e:
+    print(f'IMPORT_ERROR: {e}', file=sys.stderr)
+    sys.exit(1)
+"""
+    test_file = edm_takens / '_verify_imports.py'
+    try:
+        test_file.write_text(script, encoding='utf-8')
+        proc = subprocess.run([sys.executable, str(test_file)],
+                              capture_output=True, text=True, timeout=60)
+        if proc.returncode != 0 or 'EDM_TAKENS_IMPORT_OK' not in proc.stdout:
+            result['ok'] = False
+            result['messages'].append(proc.stderr or proc.stdout)
+        else:
+            result['messages'].append('edm-takens 核心模块导入成功 (7 模块)')
+    finally:
+        if test_file.exists():
+            test_file.unlink()
+    return result
+
+
+def check_edm_takens_disclosure_fields(root: Path) -> dict:
+    """ROUND28 新增: 校验科研披露字段在便携目录的 edm-takens 副本中存在.
+
+    这 4 个字段是科研级产品的核心披露, 必须在便携目录中存在:
+      - is_strict_confirmatory (ccm_causality.py): BH uniform-null 假设披露
+      - methodology_disclaimer (ccm_causality.py): 方法学免责声明
+      - effective_lib_sizes (_numpy_edm.py): out-of-sample 实际建树库大小
+      - out_of_sample_used (_numpy_edm.py): 评估模式标志
+    """
+    result = {'name': 'EDM-TAKENS 科研披露字段', 'ok': True, 'messages': []}
+    edm_takens = root / 'edm-takens'
+    if not edm_takens.exists():
+        result['ok'] = False
+        result['messages'].append('缺失 edm-takens/ 目录')
+        return result
+
+    disclosure_fields = {
+        'src/ccm_causality.py': ['is_strict_confirmatory', 'methodology_disclaimer'],
+        'src/_numpy_edm.py': ['effective_lib_sizes', 'out_of_sample_used'],
+    }
+    missing = []
+    for rel_path, fields in disclosure_fields.items():
+        fpath = edm_takens / rel_path
+        if not fpath.exists():
+            missing.append(f'{rel_path} (文件缺失)')
+            continue
+        content = fpath.read_text(encoding='utf-8')
+        for field in fields:
+            if f'"{field}"' not in content and f"'{field}'" not in content:
+                missing.append(f'{rel_path}: 字段 {field}')
+
+    if missing:
+        result['ok'] = False
+        result['messages'].append(f'科研披露字段缺失: {missing}')
+    else:
+        result['messages'].append('4 个科研披露字段全部存在 (confirmatory/disclaimer/lib_sizes/oos)')
+    return result
+
+
+def check_edm_takens_sync_check(root: Path) -> dict:
+    """ROUND28 新增: 在便携目录内运行 sync_check.py, 验证核心库与 Web 副本一致.
+
+    sync_check.py 比对 edm-takens/src/ 和 edm-takens-web/backend/edmtakens/ 的
+    SHA256 一致性, 确保便携目录内的两个项目没有失同步.
+    """
+    result = {'name': 'EDM-TAKENS 跨项目 sync_check', 'ok': True, 'messages': []}
+    sync_check = root / 'edm-takens-web' / 'backend' / 'sync_check.py'
+    if not sync_check.exists():
+        result['ok'] = False
+        result['messages'].append('缺失 edm-takens-web/backend/sync_check.py')
+        return result
+
+    # sync_check.py 依赖相对路径 ../edm-takens/src, 需在 backend/ 目录下运行
+    backend_dir = root / 'edm-takens-web' / 'backend'
+    proc = subprocess.run(
+        [sys.executable, str(sync_check), '--quiet'],
+        capture_output=True, text=True, timeout=60,
+        cwd=str(backend_dir)
+    )
+    if proc.returncode != 0:
+        result['ok'] = False
+        result['messages'].append(f'sync_check 失败 (exit={proc.returncode})')
+        result['messages'].append(proc.stdout[-500:] if proc.stdout else proc.stderr[-500:])
+    else:
+        # 解析输出中的汇总行
+        output = proc.stdout
+        if '源码汇总' in output:
+            # 提取汇总行
+            for line in output.split('\n'):
+                if '源码汇总' in line:
+                    result['messages'].append(f'sync_check: {line.strip()}')
+                    break
+        else:
+            result['messages'].append('sync_check 通过 (核心库与 Web 副本一致)')
     return result
 
 
@@ -497,6 +669,7 @@ def main():
     print('=' * 60)
 
     # Round 17：从 7 项扩充到 11 项，覆盖 trace-to-edm 契约、代码修缮落地、Docs/Skill 同步
+    # ROUND28: 从 11 项扩充到 14 项, 新增 EDM-TAKENS CLI 导入、科研披露字段、sync_check
     checks = [
         check_structure(root),
         check_no_runtime_artifacts(root),
@@ -509,6 +682,10 @@ def main():
         check_portable_code_fixes(root),
         check_docs_sync(root),
         check_skill_projects(root),
+        # ROUND28 新增: EDM-TAKENS 专用检查
+        check_edm_takens_cli(root),
+        check_edm_takens_disclosure_fields(root),
+        check_edm_takens_sync_check(root),
     ]
 
     all_ok = True
@@ -527,7 +704,7 @@ def main():
             all_ok = False
 
     print('\n' + '=' * 60)
-    print(f'汇总: {n_pass} PASS / {n_fail} FAIL / {len(checks)} 项 (Round 17 11项契约)')
+    print(f'汇总: {n_pass} PASS / {n_fail} FAIL / {len(checks)} 项 (ROUND28 14项契约)')
     if all_ok:
         print('审计结果: 全部通过，便携目录可独立运行。')
         return 0

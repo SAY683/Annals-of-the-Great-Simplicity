@@ -54,9 +54,38 @@ except Exception:
     _STATSMODELS_AVAILABLE = False
 
 
+def _sanitize_json(obj):
+    """递归将 NaN/Inf 替换为 None，确保 JSON 合法（RFC 8259）。
+
+    P0-3 修复 (2026-07-30): float('nan') 经 json.dumps 输出 "NaN"，
+    前端严格 JSON 解析器会失败。此函数在 _emit 入口拦截。
+    """
+    if isinstance(obj, float):
+        if obj != obj or obj in (float('inf'), float('-inf')):
+            return None
+        return obj
+    if isinstance(obj, dict):
+        return {k: _sanitize_json(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [_sanitize_json(v) for v in obj]
+    try:
+        import numpy as _np
+        if isinstance(obj, _np.floating):
+            v = float(obj)
+            return v if _np.isfinite(v) else None
+        if isinstance(obj, _np.integer):
+            return int(obj)
+        if isinstance(obj, _np.ndarray):
+            return [_sanitize_json(v) for v in obj.tolist()]
+    except ImportError:
+        pass
+    return obj
+
+
 def _emit(obj: dict):
     """输出一行 JSON Lines 到 stdout 并立即刷新。"""
-    print(json.dumps(obj, ensure_ascii=False), flush=True)
+    # P0-3 修复: 过滤 NaN/Inf，确保 JSON 合法
+    print(json.dumps(_sanitize_json(obj), ensure_ascii=False, allow_nan=False), flush=True)
 
 
 def _log(level: str, message: str):
@@ -575,18 +604,26 @@ def main():
     six_warriors = {}
     if mode == "deep":
         timer.start("six_warriors")
-        _stage("six_warriors", "正在执行六战士深度诊断 (CCM/EDM/HAVOK/causallearn)...", 0.94)
+        _stage("six_warriors", "正在执行六战士深度诊断 (CCM/EDM/HAVOK/causallearn)...", 0.92)
         try:
             from six_warriors import assemble_all_six
             # 使用 bridge 中的概念级邻接矩阵和 token_list
             # 注意：必须传入原始 token 序列（而非 bridge.token_list 概念名列表），
             # 否则 CCM/EDM 等依赖频率的战士会误判为每个概念只出现 1 次。
+            # 方案A: 用 progress_cb 细粒度汇报六战士进度 (0.92~0.96 区间)
+            def _sw_progress_cb(step, total, name):
+                if name:
+                    _log("info", f"六战士进度: {step}/{total} — {name}")
+                    # 0.92 + (step/total) * 0.04, 逐步推进
+                    _sw_pct = 0.92 + (step / total) * 0.04
+                    _stage("six_warriors", f"六战士 {step}/{total}: {name}", _sw_pct)
             cards = assemble_all_six(
                 bridge.concept_adj if bridge.concept_adj is not None else adj,
                 tokens,
                 bridge=bridge,
                 text=text[:500],
                 concept_names=bridge.concept_names,
+                progress_cb=_sw_progress_cb,
             )
             # Web 桥接未加载 LLaMA TRACE 模型，TRACE 战士实际基于共现近似
             if "trace" in cards:
@@ -601,7 +638,7 @@ def main():
         timer.end("six_warriors")
 
     timer.start("report")
-    _stage("report", "正在生成 Markdown 报告与 JSON 结果...", 0.98)
+    _stage("report", "正在生成 Markdown 报告与 JSON 结果...", 0.96)
     report = bridge.report()
     try:
         (out_dir / "report.md").write_text(report, encoding="utf-8")
@@ -652,12 +689,26 @@ def main():
     stability_analysis = {}
     if mode == "deep":
         timer.start("stability")
-        _stage("stability", "正在执行稳定性与鲁棒性分析 (bootstrap / permutation / CV)...", 0.955)
+        _stage("stability", "正在执行稳定性与鲁棒性分析 (bootstrap / permutation / CV)...", 0.96)
         _log("info", f"稳定性分析启动: n_bootstrap=30, n_permutation=20, n_folds=3")
         try:
+            # 方案A: 稳定性分析细粒度进度回调 (0.96~1.0 区间, 由 4 个子阶段分摊)
+            _stab_phase = {'idx': 0}
+            _stab_phases = ['边稳定性', 'ATE bootstrap', '置换检验', 'K-fold CV']
+            def _stab_progress_cb(step, total, name):
+                # 确定当前阶段索引
+                if name in _stab_phases:
+                    _stab_phase['idx'] = _stab_phases.index(name)
+                phase_idx = _stab_phase['idx']
+                phase_count = len(_stab_phases)
+                # 阶段内进度: step/total, 总区间 0.96~1.0
+                intra = step / max(total, 1)
+                _stab_pct = 0.96 + ((phase_idx + intra) / phase_count) * 0.04
+                _stage("stability", f"稳定性分析: {name} {step}/{total}", _stab_pct)
             stability_analysis = _run_stability_analysis(
                 bridge, tokens, concept_names, window_size, threshold, max_concepts, estimate,
                 valid_filter=_is_valid_concept_web,
+                progress_cb=_stab_progress_cb,
             )
             _log("info", f"稳定性分析完成: edge_stability_mean={stability_analysis.get('edge_stability_mean'):.3f}")
         except Exception as e:
@@ -873,7 +924,7 @@ def _bca_bootstrap_ci(bootstrap_estimates, original_estimate, jackknife_estimate
     return [ci_lo, ci_hi]
 
 
-def _run_stability_analysis(bridge, tokens, concept_names, window_size, threshold, max_concepts, estimate, valid_filter=None):
+def _run_stability_analysis(bridge, tokens, concept_names, window_size, threshold, max_concepts, estimate, valid_filter=None, progress_cb=None):
     """执行轻量稳定性与鲁棒性分析（bootstrap 边稳定性、ATE 置换检验、K-fold CV）。"""
     from _token_filters import is_valid_concept
     from counterfactual_bridge import TRACE2DoWhy
@@ -894,6 +945,9 @@ def _run_stability_analysis(bridge, tokens, concept_names, window_size, threshol
     token_arr = np.asarray(tokens)
     T = len(tokens)
     for b in range(n_bootstrap):
+        # 进度回调：每 100 次汇报一次
+        if progress_cb and b % 100 == 0:
+            progress_cb(b, n_bootstrap, '边稳定性 bootstrap')
         # 对 token 序列做 bootstrap resample（保持顺序）
         idx = rng.integers(0, T, size=T)
         boot_tokens = token_arr[idx].tolist()
@@ -937,7 +991,9 @@ def _run_stability_analysis(bridge, tokens, concept_names, window_size, threshol
         try:
             n_rows = df.shape[0]
             covariates = [c for c in df.columns if c not in (treatment_col, outcome_col)]
-            for _ in range(n_bootstrap):
+            for _ab in range(n_bootstrap):
+                if progress_cb and _ab % 100 == 0:
+                    progress_cb(_ab, n_bootstrap, 'ATE bootstrap')
                 idx = rng.integers(0, n_rows, size=n_rows)
                 boot_df = df.iloc[idx]
                 X = boot_df[[treatment_col] + covariates].values
@@ -954,7 +1010,9 @@ def _run_stability_analysis(bridge, tokens, concept_names, window_size, threshol
     permutation_ates = []
     if df is not None and treatment_col in df.columns and outcome_col in df.columns:
         orig_ate = float(estimate.value)
-        for _ in range(n_permutation):
+        for _pt in range(n_permutation):
+            if progress_cb and _pt % 100 == 0:
+                progress_cb(_pt, n_permutation, '置换检验')
             perm_df = df.copy()
             perm_df[treatment_col] = rng.permutation(perm_df[treatment_col].values)
             try:
@@ -983,7 +1041,9 @@ def _run_stability_analysis(bridge, tokens, concept_names, window_size, threshol
     if df is not None and n_rows >= n_folds * 2:
         all_indices = np.arange(n_rows)
         fold_indices = np.array_split(all_indices, n_folds)  # P0修复: 不漏样本
-        for test_idx in fold_indices:
+        for _fi, test_idx in enumerate(fold_indices):
+            if progress_cb:
+                progress_cb(_fi, n_folds, 'K-fold CV')
             mask = np.ones(n_rows, dtype=bool)
             mask[test_idx] = False
             try:

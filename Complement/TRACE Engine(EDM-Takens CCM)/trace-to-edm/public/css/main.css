@@ -400,20 +400,22 @@
 }
 
 /* ── Terminal / Log View 补充（在 log-cockpit 结构下） ── */
+/* ROUND28 P1-fix: 终端上下扩张 (用户要求"再扩大三分之一")
+   在上一轮基础上 ×4/3, 同时保持紧凑无长条突兀。 */
 .terminal {
   background: var(--term-bg);
   border: 1px solid var(--border);
   border-radius: 4px;
   padding: 14px;
-  height: 260px;
+  height: 427px;
   overflow-y: auto;
-  font-size: clamp(0.7rem, 0.95vw, 0.8rem);
-  line-height: 1.6;
+  font-size: clamp(0.74rem, 1.0vw, 0.84rem);
+  line-height: 1.7;
 }
 .log-view.terminal {
-  height: 240px;
-  min-height: 180px;
-  max-height: 320px;
+  height: 400px;
+  min-height: 293px;
+  max-height: 613px;
   border: none;
   border-radius: 0;
   resize: vertical;
@@ -437,19 +439,20 @@
   min-height: 0;
 }
 /* 终端面板填满左栏剩余高度，但避免自身被拉成“长条”
-   Round 26 §2: 面板整体加 max-height 上限; 内部 terminal 继承上限并内部滚动. */
+   Round 26 §2: 面板整体加 max-height 上限; 内部 terminal 继承上限并内部滚动.
+   ROUND28 P1-fix: 上限扩张 ×4/3 (640→853, 540→720), 配合终端内容扩张. */
 .command-grid > .col-left .panel.log-cockpit {
   flex: 1 1 auto;
   display: flex;
   flex-direction: column;
   min-height: 0;
-  max-height: min(56vh, 520px);
+  max-height: min(85vh, 853px);
 }
 .command-grid > .col-left .panel.log-cockpit .log-view.terminal {
   flex: 1 1 auto;
   height: auto;
   min-height: 0;
-  max-height: min(48vh, 420px);
+  max-height: min(75vh, 720px);
   overflow-y: auto;
   resize: none;
 }
@@ -749,6 +752,11 @@ td.tstat-failed { color: #ef4444; font-weight: 700; }
 td.tstat-partial { color: #f59e0b; font-weight: 600; }
 td.tstat-extract { color: #f97316; font-weight: 600; }
 td.tstat-skipped { color: var(--muted); font-style: italic; }
+/* ROUND28 P1-fix: trace_mode 单元格按模式着色 (light/deep/replay)
+   让投资者一眼区分行来源: 实时文本 vs 回填 */
+td.tmode-light { color: #22d3ee; font-weight: 600; }
+td.tmode-deep { color: #60a5fa; font-weight: 600; }
+td.tmode-replay { color: #c084fc; font-weight: 600; }
 
 /* trace_error 单元格：等宽字体便于排错，截断省略号 */
 td[title] { font-family: 'JetBrains Mono', 'Consolas', monospace; font-size: 0.62rem; }
@@ -772,7 +780,7 @@ td[title] { font-family: 'JetBrains Mono', 'Consolas', monospace; font-size: 0.6
   .base-header .header-right { align-items: flex-start; flex-wrap: wrap; }
   .base-header .base-nav { width: 100%; order: -1; }
   .btn { width: 100%; }
-  .terminal { height: 200px; }
+  .terminal { height: 347px; }
   .chart-wrap { height: min(34vh, 220px); min-height: 160px; }
 }
 

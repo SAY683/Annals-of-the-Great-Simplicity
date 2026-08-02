@@ -287,7 +287,15 @@ class TrajectoryCSV:
         return self._rows[-1] if self._rows else None
 
     def get_columns_by_layer(self) -> Dict[str, List[str]]:
-        """按层分组返回列名"""
+        """按层分组返回列名
+
+        ROUND28 P1-fix: 修正列分组漏匹配。
+        原 layer1_prefixes 漏了 signal_type/condition_number/unk_rate/
+        refutations_attempted/consensus_score/consensus_direction (6列),
+        Meta 漏了 trace_status/trace_error/trace_mode (3列),
+        导致 print_summary 显示 "Meta:3 / L1:24 / 其他:9" 而非
+        正确的 "Meta:6 / L1:30 / 其他:0"。
+        """
         groups = {
             "meta": [],
             "layer1": [],
@@ -296,15 +304,25 @@ class TrajectoryCSV:
             "other": [],
         }
 
+        # Meta 列完整集合 (6列)
+        meta_cols = {
+            "time_step", "text_hash", "source_label",
+            "trace_status", "trace_error", "trace_mode",
+        }
+
+        # L1 前缀匹配 + 显式列名 (覆盖 config.LAYER1_COLUMNS 全部 30 列)
         layer1_prefixes = (
-            "ate", "ci_", "refuted", "identifiable", "concept_", "edge_",
+            "ate", "ci_", "refuted", "refutations_",
+            "identifiable", "concept_", "edge_",
             "adj_", "max_", "ccm_", "edm_", "havok_", "causallearn_",
             "edge_stability", "permutation", "total_ms",
+            "signal_type", "condition_number", "unk_rate",
+            "consensus_score", "consensus_direction",
         )
         layer3_prefixes = ("z_", "dz_", "d2z_")
 
         for col in self._known_columns:
-            if col in ("time_step", "text_hash", "source_label"):
+            if col in meta_cols:
                 groups["meta"].append(col)
             elif col.startswith("z_pca") or col == "secular_entropy":
                 groups["layer2"].append(col)
