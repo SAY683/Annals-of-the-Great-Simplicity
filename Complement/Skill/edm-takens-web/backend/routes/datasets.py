@@ -47,7 +47,79 @@ def _safe_data_path(filename: str) -> str:
 
 @router.get("/api/health", dependencies=[Depends(require_auth_optional)])
 def health():
-    return {"status": "ok", "time": datetime.utcnow().isoformat()}
+    """健康检查 — 真实检查核心依赖项就绪情况.
+
+    盲审 P1-4 修缮 (2026-08-02):
+        原版仅返回固定字符串 {status:'ok', time}, 未检查任何依赖项就绪情况,
+        违反"健康检查应反映真实状态"的工程惯例. 本版真实检查:
+          1. data/ 目录可读写
+          2. results/ 目录可写
+          3. pyEDM / numpy 核心依赖可导入
+          4. 数据集数量 (便于监控)
+        返回三态: healthy / degraded / unhealthy
+    """
+    import os
+    import sys
+    checks = {}
+    overall = "healthy"
+
+    # 1. 数据目录可读写
+    try:
+        from core.locks import DATA_DIR
+        if os.path.isdir(DATA_DIR) and os.access(DATA_DIR, os.W_OK | os.R_OK):
+            checks["data_dir"] = "ok"
+        else:
+            checks["data_dir"] = "fail"
+            overall = "degraded"
+    except Exception as e:
+        checks["data_dir"] = f"error: {type(e).__name__}"
+        overall = "degraded"
+
+    # 2. 结果目录可写
+    try:
+        from core.locks import RESULTS_DIR
+        if os.path.isdir(RESULTS_DIR) and os.access(RESULTS_DIR, os.W_OK):
+            checks["results_dir"] = "ok"
+        else:
+            checks["results_dir"] = "fail"
+            overall = "degraded"
+    except Exception as e:
+        checks["results_dir"] = f"error: {type(e).__name__}"
+        overall = "degraded"
+
+    # 3. 核心依赖可导入 (numpy 是 EDM 必备)
+    try:
+        import numpy  # noqa: F401
+        checks["numpy"] = f"ok ({numpy.__version__})"
+    except Exception as e:
+        checks["numpy"] = f"fail: {e}"
+        overall = "unhealthy"
+
+    # 4. pyEDM 可选依赖 (缺失时降级到 numpy fallback, 不算 unhealthy)
+    try:
+        import pyEDM  # noqa: F401
+        checks["pyEDM"] = "ok"
+    except ImportError:
+        checks["pyEDM"] = "not_installed (using numpy fallback)"
+        if overall == "healthy":
+            overall = "degraded"
+    except Exception as e:
+        checks["pyEDM"] = f"error: {type(e).__name__}"
+        if overall == "healthy":
+            overall = "degraded"
+
+    # 5. 数据集数量 (便于监控)
+    try:
+        ds_count = len(_list_uploaded_csvs())
+        checks["datasets"] = ds_count
+    except Exception:
+        checks["datasets"] = "unknown"
+
+    return {
+        "status": overall,
+        "time": datetime.utcnow().isoformat(),
+        "checks": checks,
+    }
 
 
 @router.get("/api/datasets", dependencies=[Depends(require_auth_optional)])

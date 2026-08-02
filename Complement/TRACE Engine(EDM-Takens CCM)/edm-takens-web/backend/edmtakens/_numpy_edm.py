@@ -256,7 +256,14 @@ def EmbedDimension(series, maxE=10, Tp=1, tau=1,
                 if rho > best_rho:
                     best_rho = rho
                     best_E = E
-        except Exception:
+        except Exception as e:
+            # 盲审 P1-5 修缮 (2026-08-02): ROUND27 P2 漏网之鱼.
+            # 原版 `except: rho_curve[E] = 0.0` 静默吞错, 失败原因不可观测.
+            # 现按 ROUND27 P2 模式记录失败原因到 stderr, 便于审计回溯.
+            # rho_curve[E] 仍保持 0.0 (不会覆盖 best_rho), 但失败可观测.
+            import sys
+            print(f"[EmbedDimension] WARN: E={E} simplex_predict failed: "
+                  f"{type(e).__name__}: {e}", file=sys.stderr)
             rho_curve[E] = 0.0
 
     if best_rho < 0:
@@ -704,17 +711,26 @@ def CCM(series_cause, series_effect, E, Tp=0, tau=1,
 
 
 # ═══════════════════════════════════════════════════════════════
-# Multiview — CCA-based spatial embedding (pure numpy fallback)
+# Multiview — PCA+SVD-based spatial embedding (pure numpy fallback)
 # ═══════════════════════════════════════════════════════════════
+# 盲审 P2-7 修缮 (2026-08-02):
+#   原注释自称 "CCA-based" (Canonical Correlation Analysis), 但实际实现
+#   使用 SVD 分解 + top-E 主成分投影, 是 PCA (Principal Component Analysis)
+#   而非 CCA. 功能上仍是合理的 spatial embedding, 但方法名有偏差.
+#   现修正注释为 PCA+SVD, 与实际实现对齐.
 
 def Multiview(data_matrix, target_col=0, E=3, lib=None, pred=None, Tp=1):
-    """Multiview embedding using CCA-based spatial reconstruction.
+    """Multiview embedding using PCA+SVD-based spatial reconstruction.
 
-    Uses Canonical Correlation Analysis to find linear combinations of
-    variables that maximize correlation with the target's delay embedding.
-    This is the spatial analogue of temporal delay embedding — instead of
-    using x(t), x(t-τ), x(t-2τ) as coordinates, we use linear combinations
-    of x(t), y(t), z(t) that are maximally informative about the dynamics.
+    Uses SVD to decompose the library data matrix and select the top-E
+    principal components as spatial coordinates. This is the spatial
+    analogue of temporal delay embedding — instead of using x(t), x(t-τ),
+    x(t-2τ) as coordinates, we use the top-E principal components of
+    x(t), y(t), z(t) that capture the most variance in the dynamics.
+
+    Note: This is PCA (variance-maximizing), not CCA (correlation-maximizing).
+    CCA would require paired target delay vectors and is computationally
+    more expensive; PCA+SVD is the pragmatic fallback here.
 
     Based on: Ashby (1956) "An Introduction to Cybernetics" (Law of Requisite
     Variety) and Sugihara et al. (2016) multiview embedding concept.

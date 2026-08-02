@@ -24,6 +24,9 @@ from scipy.spatial import KDTree
 from scipy.stats import pearsonr
 import warnings
 
+# P2-1 修复: 统一硬编码 eps 为单一真相源常量
+from _numeric_constants import EPS_DISTANCE, EPS_VARIANCE
+
 
 # ═══════════════════════════════════════════════════════════════
 # Internal helpers
@@ -115,7 +118,7 @@ def simplex_predict(series, E, lib, pred, tau=1, Tp=1):
         idxs = np.atleast_1d(idxs)
 
         # Remove zero-distance (self-match)
-        good = dists > 1e-15
+        good = dists > EPS_DISTANCE
         if not good.any():
             good = np.ones(len(dists), dtype=bool)
         dists = dists[good][:E + 1]
@@ -130,7 +133,7 @@ def simplex_predict(series, E, lib, pred, tau=1, Tp=1):
         # 丧失 simplex 投影的加权平均平滑效果。Sugihara & May 1990 要求 E+1
         # 邻居形成单纯形; 退化场景下均匀权重 (算术平均) 更符合数学语义。
         d_min = dists[0]
-        if d_min < 1e-15:
+        if d_min < EPS_DISTANCE:
             w = np.ones(len(dists)) / len(dists)
         else:
             w = np.exp(-dists / d_min)
@@ -253,7 +256,14 @@ def EmbedDimension(series, maxE=10, Tp=1, tau=1,
                 if rho > best_rho:
                     best_rho = rho
                     best_E = E
-        except Exception:
+        except Exception as e:
+            # 盲审 P1-5 修缮 (2026-08-02): ROUND27 P2 漏网之鱼.
+            # 原版 `except: rho_curve[E] = 0.0` 静默吞错, 失败原因不可观测.
+            # 现按 ROUND27 P2 模式记录失败原因到 stderr, 便于审计回溯.
+            # rho_curve[E] 仍保持 0.0 (不会覆盖 best_rho), 但失败可观测.
+            import sys
+            print(f"[EmbedDimension] WARN: E={E} simplex_predict failed: "
+                  f"{type(e).__name__}: {e}", file=sys.stderr)
             rho_curve[E] = 0.0
 
     if best_rho < 0:
@@ -359,7 +369,7 @@ def SMapPredictNonlinear(series, E, Tp=1, tau=1, lib=None, pred=None,
             dists = np.atleast_1d(dists)
             idxs = np.atleast_1d(idxs)
 
-            good = dists > 1e-15
+            good = dists > EPS_DISTANCE
             if not good.any():
                 good = np.ones(len(dists), dtype=bool)
             dists = dists[good]
@@ -516,7 +526,9 @@ def CCM(series_cause, series_effect, E, Tp=0, tau=1,
     _rng = np.random.default_rng(rng)
 
     if libSizes is None:
-        lib_min = max(E + 1, 5)
+        # P2-2.2 修复 (科研严谨性审查): 原 E+1 与 ccm_causality.py:140 的 E+2 不一致,
+        # 且 pyEDM 后端要求 libSize >= E+2. 改为 E+2 与 ccm_causality.py 和 pyEDM 对齐.
+        lib_min = max(E + 2, 5)
         lib_max = min(n - 5, n - 1)
         n_steps = min(10, (lib_max - lib_min) // 2)
         if n_steps < 2:
@@ -534,6 +546,9 @@ def CCM(series_cause, series_effect, E, Tp=0, tau=1,
 
     rho_per_size = []
     actual_sizes = []
+    # S1-3 修复 (科研严谨性审查 Round 27): 记录实际建树库大小
+    # out-of-sample 模式下 effective = lib_size // 2; in-sample 模式下 effective = lib_size
+    effective_sizes = []
 
     for lib_size in lib_sizes:
         lib_size = min(lib_size, N - 1)
@@ -590,7 +605,7 @@ def CCM(series_cause, series_effect, E, Tp=0, tau=1,
 
                 # In-sample 路径需排除自身 (距离 ~0); out-of-sample 路径
                 # query 点不在 tree 中, 不会有自身匹配, 但保留过滤无害
-                good = dists > 1e-15
+                good = dists > EPS_DISTANCE
                 if not good.any():
                     good = np.ones(len(dists), dtype=bool)
                 dists = dists[good][:E + 1]
@@ -599,7 +614,7 @@ def CCM(series_cause, series_effect, E, Tp=0, tau=1,
                 if len(dists) < 2:
                     continue
 
-                w = np.exp(-dists / max(dists[0], 1e-15))
+                w = np.exp(-dists / max(dists[0], EPS_DISTANCE))
                 w = w / w.sum()
 
                 # Cross-map: 邻居在 tree_idx 中的索引映射回原时间序列位置
@@ -632,6 +647,17 @@ def CCM(series_cause, series_effect, E, Tp=0, tau=1,
         if rhos:
             rho_per_size.append(np.mean(rhos))
             actual_sizes.append(lib_size)
+            # S1-3 修复 (科研严谨性审查 Round 27): 记录 effective_lib_size.
+            # out-of-sample 模式下, 实际用于建树的库大小 = lib_size // 2,
+            # 而非用户指定的完整 lib_size. Sugihara et al. 2012 的收敛性
+            # 定义是基于完整库大小的, 拆分后曲线右移, 下游消费者需知晓.
+            # in-sample 模式下 effective = lib_size (无拆分).
+            if use_oos:
+                effective_sizes.append(lib_size // 2)
+            else:
+                effective_sizes.append(lib_size)
+
+    # S1-3 修复: effective_sizes 已在循环前显式初始化, 此处无需守卫
 
     if len(rho_per_size) < 2:
         return {
@@ -640,6 +666,9 @@ def CCM(series_cause, series_effect, E, Tp=0, tau=1,
             'final_rho': rho_per_size[-1] if rho_per_size else 0.0,
             'is_converging': False,
             'n_points': len(rho_per_size),
+            # S1-3 修复: 暴露实际建树库大小, 防 out-of-sample 语义误读
+            'effective_lib_sizes': effective_sizes,
+            'out_of_sample_used': bool(out_of_sample),
         }
 
     # Convergence check
@@ -670,21 +699,38 @@ def CCM(series_cause, series_effect, E, Tp=0, tau=1,
         'spearman_p': spear_p,
         'is_converging': is_converging,
         'n_points': len(rho_per_size),
+        # S1-3 修复 (科研严谨性审查 Round 27): 暴露实际建树库大小.
+        # out-of-sample 模式下 effective_lib_sizes = lib_sizes // 2,
+        # 收敛曲线的 x 轴语义已改变. 下游消费者 (ccm_causality_test, 报告
+        # 生成器, Web 前端) 应据此选择措辞:
+        #   out_of_sample_used=True  -> "ρ vs effective library size (train split)"
+        #   out_of_sample_used=False -> "ρ vs library size (in-sample)"
+        'effective_lib_sizes': effective_sizes,
+        'out_of_sample_used': bool(out_of_sample),
     }
 
 
 # ═══════════════════════════════════════════════════════════════
-# Multiview — CCA-based spatial embedding (pure numpy fallback)
+# Multiview — PCA+SVD-based spatial embedding (pure numpy fallback)
 # ═══════════════════════════════════════════════════════════════
+# 盲审 P2-7 修缮 (2026-08-02):
+#   原注释自称 "CCA-based" (Canonical Correlation Analysis), 但实际实现
+#   使用 SVD 分解 + top-E 主成分投影, 是 PCA (Principal Component Analysis)
+#   而非 CCA. 功能上仍是合理的 spatial embedding, 但方法名有偏差.
+#   现修正注释为 PCA+SVD, 与实际实现对齐.
 
 def Multiview(data_matrix, target_col=0, E=3, lib=None, pred=None, Tp=1):
-    """Multiview embedding using CCA-based spatial reconstruction.
+    """Multiview embedding using PCA+SVD-based spatial reconstruction.
 
-    Uses Canonical Correlation Analysis to find linear combinations of
-    variables that maximize correlation with the target's delay embedding.
-    This is the spatial analogue of temporal delay embedding — instead of
-    using x(t), x(t-τ), x(t-2τ) as coordinates, we use linear combinations
-    of x(t), y(t), z(t) that are maximally informative about the dynamics.
+    Uses SVD to decompose the library data matrix and select the top-E
+    principal components as spatial coordinates. This is the spatial
+    analogue of temporal delay embedding — instead of using x(t), x(t-τ),
+    x(t-2τ) as coordinates, we use the top-E principal components of
+    x(t), y(t), z(t) that capture the most variance in the dynamics.
+
+    Note: This is PCA (variance-maximizing), not CCA (correlation-maximizing).
+    CCA would require paired target delay vectors and is computationally
+    more expensive; PCA+SVD is the pragmatic fallback here.
 
     Based on: Ashby (1956) "An Introduction to Cybernetics" (Law of Requisite
     Variety) and Sugihara et al. (2016) multiview embedding concept.
@@ -768,7 +814,7 @@ def Multiview(data_matrix, target_col=0, E=3, lib=None, pred=None, Tp=1):
         dists = np.atleast_1d(dists)
         idxs = np.atleast_1d(idxs)
 
-        good = dists > 1e-15
+        good = dists > EPS_DISTANCE
         if not good.any():
             good = np.ones(len(dists), dtype=bool)
         dists = dists[good][:E_eff + 1]
@@ -777,7 +823,7 @@ def Multiview(data_matrix, target_col=0, E=3, lib=None, pred=None, Tp=1):
         if len(dists) < 2:
             continue
 
-        w = np.exp(-dists / max(dists[0], 1e-15))
+        w = np.exp(-dists / max(dists[0], EPS_DISTANCE))
         w = w / w.sum()
 
         # Predict target value at Tp ahead
@@ -891,7 +937,7 @@ def multiview_full(data_matrix, target_col=0, E=3, lib=None, pred=None,
         sub = data[:, list(cols)]
         # normalize
         mu = sub[lib_s:lib_e].mean(axis=0)
-        sd = sub[lib_s:lib_e].std(axis=0) + 1e-12
+        sd = sub[lib_s:lib_e].std(axis=0) + EPS_VARIANCE
         sub_n = (sub - mu) / sd
         X_lib = sub_n[lib_s:lib_e]
         X_pred = sub_n[pred_s:pred_e]
@@ -904,14 +950,14 @@ def multiview_full(data_matrix, target_col=0, E=3, lib=None, pred=None,
             knn = min(E + 2, len(X_lib))
             dists, idxs = tree.query(X_pred[i], k=knn)
             dists = np.atleast_1d(dists); idxs = np.atleast_1d(idxs)
-            good = dists > 1e-15
+            good = dists > EPS_DISTANCE
             if not good.any():
                 good = np.ones(len(dists), dtype=bool)
             dists = dists[good][:E + 1]
             idxs = idxs[good][:E + 1]
             if len(dists) < 2:
                 continue
-            w = np.exp(-dists / max(dists[0], 1e-15))
+            w = np.exp(-dists / max(dists[0], EPS_DISTANCE))
             w = w / w.sum()
             # Same alignment fix as simplex_predict / SMapPredictNonlinear
             # (Round 10): append the weight alongside the future value,
@@ -1005,7 +1051,7 @@ def false_nearest_neighbors(series, max_E=10, tau=1, rtol=15.0, atol=2.0):
     from scipy.spatial import KDTree
     series = np.asarray(series, dtype=float).ravel()
     n = len(series)
-    sigma = np.std(series) + 1e-12
+    sigma = np.std(series) + EPS_VARIANCE
 
     fnn_frac = []
     E_values = list(range(1, min(max_E + 1, max(2, n // 5))))
@@ -1035,7 +1081,7 @@ def false_nearest_neighbors(series, max_E=10, tau=1, rtol=15.0, atol=2.0):
             dists = np.atleast_1d(dists); idxs = np.atleast_1d(idxs)
             # take nearest non-self
             for j_idx, idx in enumerate(idxs):
-                if idx != i and dists[j_idx] > 1e-15:
+                if idx != i and dists[j_idx] > EPS_DISTANCE:
                     d_E = dists[j_idx]
                     nn = idx
                     break

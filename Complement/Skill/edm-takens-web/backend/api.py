@@ -13,13 +13,27 @@ api.py 现在只负责:
   - workers/    : 后台分析 worker
   - routes/     : APIRouter 路由模块（datasets / analyze / history）
 """
+import logging
 import os
 import sys
+import uuid
+from datetime import datetime, timezone
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
+
+# ── P3 修复 (Round 29 §11.4): 日志可追踪 (维度5) ────────
+# edm-takens-web 原全仓零日志, 故障排查几乎不可能.
+# 本模块配置结构化 logger, trace_id 通过 BaseHTTPMiddleware 注入.
+_LOG_FORMAT = "%(asctime)s [%(levelname)s] [%(name)s] %(message)s"
+logging.basicConfig(
+    level=os.environ.get("EDM_LOG_LEVEL", "INFO"),
+    format=_LOG_FORMAT,
+    handlers=[logging.StreamHandler(sys.stdout)],
+)
+logger = logging.getLogger("edm_takens_web")
 
 # ── sys.path 设置 ─────────────────────────────────────────
 # debt-17: 推荐通过 `pip install -e .`（edm-takens/pyproject.toml）
@@ -170,6 +184,88 @@ app.add_middleware(
     allow_headers=_EDM_ALLOWED_HEADERS,
 )
 
+
+# ── P3 修复 (Round 29 §11.4): trace_id + 缓存控制 (维度5 + 维度6) ──
+# 维度5 (日志可追踪): trace_id 贯穿请求全生命周期, 通过 X-Trace-Id 头传入或生成.
+# 维度6 (缓存策略): /api/ GET 端点 no-cache, 静态资源短 TTL.
+# 两项债务在同一中间件内修复, 避免多重中间件开销.
+from starlette.middleware.base import BaseHTTPMiddleware
+
+
+class TraceIdAndCacheMiddleware(BaseHTTPMiddleware):
+    """注入 trace_id 到 request.state 并设置 Cache-Control 响应头.
+
+    - trace_id 来源: 客户端 X-Trace-Id 头 > X-Request-Id 头 > 服务端生成 UUID4
+    - Cache-Control:
+        * /api/ 路径 GET 请求: no-store (防止敏感数据/实时数据被缓存)
+        * /api/analyze/jobs/{id}/stream: no-store (SSE 流不可缓存)
+        * 静态资源 (?v=xxx): public, max-age=300 (5分钟, 配合缓存戳失效)
+        * 其他: no-cache (默认保守)
+    """
+
+    async def dispatch(self, request: Request, call_next):
+        # --- trace_id 注入 ---
+        trace_id = (
+            request.headers.get("x-trace-id")
+            or request.headers.get("x-request-id")
+            or f"edm-{uuid.uuid4().hex[:16]}"
+        )
+        request.state.trace_id = trace_id
+
+        # --- 请求日志 ---
+        start_ts = datetime.now(timezone.utc)
+        client_ip = request.client.host if request.client else "unknown"
+        logger.info(
+            f"[{trace_id}] -> {request.method} {request.url.path} "
+            f"from={client_ip} ua={request.headers.get('user-agent', '-')[:60]}"
+        )
+
+        # --- 调用下游 ---
+        try:
+            response = await call_next(request)
+        except Exception as e:
+            duration_ms = (datetime.now(timezone.utc) - start_ts).total_seconds() * 1000
+            logger.error(
+                f"[{trace_id}] !! {request.method} {request.url.path} "
+                f"duration={duration_ms:.1f}ms error={type(e).__name__}: {e}"
+            )
+            raise
+
+        # --- 响应日志 ---
+        duration_ms = (datetime.now(timezone.utc) - start_ts).total_seconds() * 1000
+        logger.info(
+            f"[{trace_id}] <- {response.status_code} "
+            f"duration={duration_ms:.1f}ms"
+        )
+
+        # --- Cache-Control 设置 ---
+        path = request.url.path
+        method = request.method
+
+        if method == "GET" and path.startswith("/api/"):
+            # API GET 端点: 严格不缓存 (数据实时性 + 鉴权敏感)
+            response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+            response.headers["Pragma"] = "no-cache"
+            response.headers["Expires"] = "0"
+        elif "/stream" in path:
+            # SSE 流: 不可缓存
+            response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
+            response.headers["X-Accel-Buffering"] = "no"
+        elif "v=" in request.url.query:
+            # 静态资源带缓存戳: 允许中间缓存 5 分钟
+            response.headers["Cache-Control"] = "public, max-age=300"
+        else:
+            # 其他: 默认保守
+            response.headers["Cache-Control"] = "no-cache"
+
+        # --- 透传 trace_id 到响应头 (便于客户端排查) ---
+        response.headers["X-Trace-Id"] = trace_id
+
+        return response
+
+
+app.add_middleware(TraceIdAndCacheMiddleware)
+
 # ── Mount routers (debt-19) ──────────────────────────────
 from routes.datasets import router as _datasets_router
 from routes.analyze import router as _analyze_router
@@ -178,6 +274,10 @@ from routes.history import router as _history_router
 app.include_router(_datasets_router)
 app.include_router(_analyze_router)
 app.include_router(_history_router)
+
+# ROUND29 MCP: 补齐 MCP 协议端点 (JSON-RPC 2.0 over HTTP)
+from mcp import create_mcp_router
+app.include_router(create_mcp_router(8000))
 
 # ── Re-export route handlers for backward compatibility ──
 from routes.datasets import (

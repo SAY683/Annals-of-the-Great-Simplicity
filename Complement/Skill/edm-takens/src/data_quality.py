@@ -14,6 +14,9 @@ from scipy.stats import spearmanr
 # 避免两套阈值漂移。data_quality 在基础检查之上叠加趋势/平稳性/异常值等综合条件。
 from _usability import is_usable_for_edm
 
+# P2-1 修复: 统一硬编码 eps 为单一真相源常量
+from _numeric_constants import EPS_VARIANCE
+
 
 def _safe_lag1_autocorr(values: np.ndarray) -> float:
     """Lag-1 Pearson autocorrelation, ignoring NaNs."""
@@ -25,7 +28,7 @@ def _safe_lag1_autocorr(values: np.ndarray) -> float:
     xm = x[mask] - np.mean(x[mask])
     ym = y[mask] - np.mean(y[mask])
     denom = np.sqrt(np.sum(xm ** 2) * np.sum(ym ** 2))
-    if denom < 1e-12:
+    if denom < EPS_VARIANCE:
         return 0.0
     return float(np.sum(xm * ym) / denom)
 
@@ -39,9 +42,18 @@ def _safe_trend_score(values: np.ndarray) -> float:
         return float("nan")
     try:
         rho, _ = spearmanr(idx[mask], values[mask])
-        return float(rho) if np.isfinite(rho) else 0.0
-    except Exception:
-        return 0.0
+        if not np.isfinite(rho):
+            # 盲审 P1-6 修缮 (2026-08-02):
+            # 原版 `return 0.0` 让"统计失败"与"零相关"不可区分, 可能掩盖真实问题.
+            # 现返回 NaN 表示"无法判定", 与 spearmanr 本身对常量输入返回 NaN 的语义一致.
+            return float("nan")
+        return float(rho)
+    except Exception as e:
+        # 同理: 异常时返回 NaN 而非 0.0, 避免掩盖错误.
+        import sys
+        print(f"[data_quality] WARN: _safe_trend_score spearmanr failed: "
+              f"{type(e).__name__}: {e}", file=sys.stderr)
+        return float("nan")
 
 
 def _adf_test(values: np.ndarray) -> Optional[Dict[str, Any]]:
@@ -54,6 +66,34 @@ def _adf_test(values: np.ndarray) -> Optional[Dict[str, Any]]:
         stat, pvalue, _, _, crit, _ = adfuller(clean, regression="ct", autolag="AIC")
         return {
             "test": "ADF",
+            "statistic": float(stat),
+            "pvalue": float(pvalue),
+            "critical_values": {str(k): float(v) for k, v in crit.items()},
+        }
+    except Exception:
+        return None
+
+
+def _kpss_test(values: np.ndarray) -> Optional[Dict[str, Any]]:
+    """Run KPSS test (Kwiatkowski-Phillips-Schmidt-Shin) via statsmodels.
+
+    S1 修复 (科研严谨性审查): 文档 forbidden_rules_reference.md 承诺 ADF+KPSS 联合
+    决策矩阵, 但原代码只有 ADF. KPSS 的 null 是"平稳", ADF 的 null 是"非平稳",
+    二者联合可区分四种情况:
+      ADF reject + KPSS not reject → 强证据平稳
+      ADF not reject + KPSS reject → 强证据非平稳
+      ADF reject + KPSS reject     → 趋势平稳 (去趋势后平稳)
+      ADF not reject + KPSS not reject → 数据不足, 无法判定
+    """
+    try:
+        from statsmodels.tsa.stattools import kpss
+        clean = values[np.isfinite(values)]
+        if len(clean) < 10:
+            return None
+        # regression='c' for level stationarity, 'ct' for trend stationarity
+        stat, pvalue, _, crit = kpss(clean, regression='c', nlags='auto')
+        return {
+            "test": "KPSS",
             "statistic": float(stat),
             "pvalue": float(pvalue),
             "critical_values": {str(k): float(v) for k, v in crit.items()},
@@ -79,7 +119,7 @@ def _robust_stationarity_check(values: np.ndarray) -> Dict[str, Any]:
     half = n // 2
     var_first = float(np.var(clean[:half], ddof=1)) if half > 1 else 0.0
     var_second = float(np.var(clean[half:], ddof=1)) if (n - half) > 1 else 0.0
-    pooled_var = max((var_first + var_second) / 2.0, 1e-12)
+    pooled_var = max((var_first + var_second) / 2.0, EPS_VARIANCE)
     var_shift = abs(var_second - var_first) / pooled_var
 
     # Heuristic thresholds tuned to flag obvious non-stationarity without
@@ -113,9 +153,43 @@ def _robust_stationarity_check(values: np.ndarray) -> Dict[str, Any]:
 
 
 def _stationarity_check(values: np.ndarray) -> Dict[str, Any]:
-    """Best-effort stationarity check: ADF when available, robust fallback otherwise."""
+    """Best-effort stationarity check: ADF+KPSS joint decision matrix when available.
+
+    S1 修复 (科研严谨性审查): 原代码仅 ADF 单检验, 无法区分"趋势平稳"与"差分平稳".
+    现 ADF+KPSS 联合:
+      ADF p<0.05 + KPSS p>=0.05 → 强证据平稳
+      ADF p>=0.05 + KPSS p<0.05 → 强证据非平稳
+      ADF p<0.05 + KPSS p<0.05  → 趋势平稳 (去趋势后平稳, regression='ct' 已部分处理)
+      ADF p>=0.05 + KPSS p>=0.05 → 数据不足, 无法判定
+    """
     adf = _adf_test(values)
-    if adf is not None:
+    kpss = _kpss_test(values)  # S1 修复: 新增 KPSS 联合检验
+    if adf is not None and kpss is not None:
+        adf_stationary = adf["pvalue"] < 0.05  # ADF null: 非平稳, reject → 平稳
+        kpss_stationary = kpss["pvalue"] >= 0.05  # KPSS null: 平稳, not reject → 平稳
+        if adf_stationary and kpss_stationary:
+            is_stationary = True
+            note = "Stationary (ADF p<0.05, KPSS p>=0.05 — joint confirm)"
+        elif not adf_stationary and not kpss_stationary:
+            is_stationary = False
+            note = "Non-stationary (ADF p>=0.05, KPSS p<0.05 — joint confirm)"
+        elif adf_stationary and not kpss_stationary:
+            is_stationary = True
+            note = "Trend-stationary (ADF rejects but KPSS rejects — detrended series is stationary)"
+        else:
+            is_stationary = None
+            note = "Inconclusive (ADF p>=0.05 but KPSS p>=0.05 — insufficient evidence)"
+        return {
+            "test": "ADF+KPSS",
+            "is_stationary": is_stationary,
+            "adf_pvalue": round(adf["pvalue"], 6),
+            "kpss_pvalue": round(kpss["pvalue"], 6),
+            "adf_statistic": round(adf["statistic"], 4),
+            "kpss_statistic": round(kpss["statistic"], 4),
+            "note": note,
+        }
+    elif adf is not None:
+        # KPSS 不可用, 回退到仅 ADF
         is_stationary = bool(adf["pvalue"] < 0.05)
         return {
             "test": "ADF",
@@ -123,7 +197,7 @@ def _stationarity_check(values: np.ndarray) -> Dict[str, Any]:
             "pvalue": round(adf["pvalue"], 6),
             "statistic": round(adf["statistic"], 4),
             "note": (
-                "Stationary (ADF p<0.05)" if is_stationary
+                "Stationary (ADF p<0.05, KPSS unavailable)" if is_stationary
                 else "Possibly non-stationary (ADF p>=0.05); consider differencing/detrending"
             ),
         }
@@ -145,7 +219,7 @@ def _outlier_summary(values: np.ndarray) -> Dict[str, Any]:
 
     med = float(np.median(clean))
     mad = float(np.median(np.abs(clean - med)))
-    threshold = 3.5 * max(mad, 1e-12)
+    threshold = 3.5 * max(mad, EPS_VARIANCE)
     mad_outliers = int(np.sum(np.abs(clean - med) > threshold))
 
     # Union of the two methods
@@ -219,7 +293,7 @@ def _build_suggested_action(
 ) -> str:
     """Return a concise recommended action for this column."""
     actions: List[str] = []
-    if is_constant or std < 1e-12:
+    if is_constant or std < EPS_VARIANCE:
         return "剔除：常数/近常数列，无可分析动力学信息"
     if unique_ratio > 0.95:
         return "剔除：疑似 ID/索引列，不应参与嵌入"
@@ -282,7 +356,7 @@ def series_quality(series: pd.Series) -> Dict[str, Any]:
         warnings.append(f"缺失比例 {missing_ratio:.1%}，建议插值或清洗")
     if is_constant:
         warnings.append("常数列，无可分析动力学信息")
-    elif std < 1e-12:
+    elif std < EPS_VARIANCE:
         warnings.append("方差极低，近似常数")
     if unique_ratio > 0.95:
         warnings.append("近似唯一值，疑似 ID/索引列")
@@ -299,7 +373,7 @@ def series_quality(series: pd.Series) -> Dict[str, Any]:
 
     usable = (
         not is_constant
-        and std >= 1e-12
+        and std >= EPS_VARIANCE
         and unique_ratio <= 0.95
         and (sparsity is None or sparsity >= 0.15)
     )
