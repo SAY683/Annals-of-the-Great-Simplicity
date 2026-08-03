@@ -502,8 +502,11 @@ def check_docs_sync(root: Path) -> dict:
     if not docs_dir.exists():
         result['messages'].append('未找到 Docs/ 目录，跳过')
     else:
+        # R45-D 修复 (ROUND45 P0): 移除 META_AUDIT_CHANGELOG.md 检查 (废话文档已删除).
+        # 成品目录只呈现最好的状态和可解释性, 不记录"我们改了什么".
+        # 改为检查可解释性文档 (DEPENDENCY_MATRIX.md / MICROSERVICE_API_DESIGN.md / 00-README.md).
         required_docs = [
-            'META_AUDIT_CHANGELOG.md',
+            'DEPENDENCY_MATRIX.md',
             'MICROSERVICE_API_DESIGN.md',
             '00-README.md',
         ]
@@ -514,6 +517,16 @@ def check_docs_sync(root: Path) -> dict:
 
         if result['ok']:
             result['messages'].append(f'Docs/ 关键文档齐全 ({len(required_docs)} 项)')
+
+        # R45-D 新增: 确认废话文档不存在 (防御性检查)
+        pollution_docs = [
+            'META_AUDIT_CHANGELOG.md',
+            'DOC_SYNC_REPORT.md',
+        ]
+        for doc in pollution_docs:
+            if (docs_dir / doc).exists():
+                result['ok'] = False
+                result['messages'].append(f'Docs/ 仍含废话文档: {doc} (应已删除)')
 
     # P1 修缮: 校验便携目录根的关键文档
     portable_root_docs = [

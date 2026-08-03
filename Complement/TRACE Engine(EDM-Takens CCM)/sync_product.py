@@ -87,9 +87,13 @@ dst_edm_takens = product / 'edm-takens'
 dst_edm_takens_web = product / 'edm-takens-web'
 
 # 运行时产物排除模式
+# R45-D 修复 (ROUND45 P0): 新增废话文档排除, 防止"修改记录/变更日志"类文档
+# 污染成品目录. 成品目录只呈现最好的状态和可解释性, 不记录"我们改了什么".
 engine_ignore = shutil.ignore_patterns(
     '__pycache__', '*.pyc', '*.pyo', '.git', '.gitignore',
-    'outputs', 'work', 'node_modules', 'package-lock.json'
+    'outputs', 'work', 'node_modules', 'package-lock.json',
+    # R45-D: 内部审计报告 (废话文档, 非可解释性)
+    'secret_adoption_audit.md',
 )
 web_ignore = shutil.ignore_patterns(
     '__pycache__', '*.pyc', '*.pyo', '.git', '.gitignore',
@@ -104,9 +108,16 @@ web_ignore = shutil.ignore_patterns(
 )
 # ROUND28 新增: EDM-TAKENS 核心库排除模式
 # 排除 __pycache__、.git、生成的图片、运行时输出
+# R45-D 修复 (ROUND45 P0): 新增废话文档排除 (CHANGELOG/VERSIONS/diff_report/
+# optimization_potentials/secret_adoption_audit), 防止"修改记录/变更日志"类
+# 文档污染成品目录. 成品目录只呈现最好的状态和可解释性, 不记录"我们改了什么".
 edm_takens_ignore = shutil.ignore_patterns(
     '__pycache__', '*.pyc', '*.pyo', '.git', '.gitignore',
-    '*.png', 'outputs', 'work', '.pytest_cache'
+    '*.png', 'outputs', 'work', '.pytest_cache',
+    # R45-D: 废话文档排除 (修改记录/变更日志/版本记录/内部审计)
+    'CHANGELOG.md', 'VERSIONS.md',
+    '*_diff_report.md', '*_optimization_potentials.md',
+    'secret_adoption_audit.md',
 )
 # ROUND28 新增: EDM-TAKENS Web 排除模式
 # 排除 node_modules、__pycache__、运行时输出
@@ -134,6 +145,8 @@ edm_takens_web_ignore = shutil.ignore_patterns(
     # sync_edm_takens_projects() 会将其复制到便携目录, 反向污染.
     'round33_e_*', 'round33_*_results.json', 'round33_*_result.json',
     'round33_e2e_test.*', 'sample_input.txt',
+    # R45-D 修复 (ROUND45 P0): 废话文档排除 (变更日志/版本记录)
+    'CHANGELOG.md', 'VERSIONS.md',
 )
 
 
@@ -430,18 +443,27 @@ def cleanup_product_pollution():
       但未清理成品目录已存在的污染残留 (Docs/META_THINKING/、__pycache__/).
       且缺少主动清理机制, 导致每次同步后污染仍残留.
 
-    修复策略 (R44 主动清理, 而非被动响应):
+    R45-D 扩展 (ROUND45 P0): 新增废话文档清理.
+    病灶 (用户反馈 "成品目录有必要说我们修改了什么之类的吗？完全是废话"):
+      成品目录只呈现最好的状态和可解释性, 不记录"我们改了什么".
+      CHANGELOG/VERSIONS/AUDIT_CHANGELOG/SYNC_REPORT/diff_report/
+      optimization_potentials/secret_adoption_audit 等都是废话文档.
+
+    修复策略 (主动清理, 而非被动响应):
       在 main() 开头 (所有同步操作之前) 主动扫描并清理:
       1. Docs/META_THINKING/ 目录 (内部进度归档, 违反"开箱即用"语义)
       2. 所有 ROUND*_META_THINKING.md 文件 (散落的进度归档)
       3. 所有 ROUND*_AUDIT.md 文件 (内部审计报告)
       4. 所有 __pycache__/ 目录 (运行时产物, 违反便携打包约束)
       5. 所有 *.pyc 文件 (运行时产物)
+      6. 废话文档: CHANGELOG.md / VERSIONS.md / META_AUDIT_CHANGELOG.md /
+         DOC_SYNC_REPORT.md / *_diff_report.md / *_optimization_potentials.md /
+         secret_adoption_audit.md (修改记录/变更日志, 非可解释性)
 
     设计原则: "应清尽清" — 成品目录只包含用户需要的最终产物,
     内部迭代进度保留在工作目录 Docs/META_THINKING/ 即可.
     """
-    print('\n[R44] 主动清理成品目录污染文件 (开箱即用语义保障)')
+    print('\n[R45] 主动清理成品目录污染文件 (开箱即用语义保障)')
     removed_count = 0
 
     # 1. 清理 Docs/META_THINKING/ 目录
@@ -488,6 +510,26 @@ def cleanup_product_pollution():
             removed_count += 1
         except Exception as e:
             print(f'  [FAIL] 无法删除 {pyc}: {e}')
+
+    # 5. R45-D 新增: 清理废话文档 (修改记录/变更日志/版本记录/内部审计)
+    # 成品目录只呈现最好的状态和可解释性, 不记录"我们改了什么"
+    pollution_doc_patterns = [
+        'CHANGELOG.md',           # 变更日志
+        'VERSIONS.md',            # 版本记录
+        'META_AUDIT_CHANGELOG.md',  # 元审计变更日志
+        'DOC_SYNC_REPORT.md',     # 文档同步报告
+        '*_diff_report.md',       # diff报告 (DEPRECATED演进报告)
+        '*_optimization_potentials.md',  # 优化潜力 (DEPRECATED)
+        'secret_adoption_audit.md',  # 内部审计报告
+    ]
+    for pattern in pollution_doc_patterns:
+        for f in product.rglob(pattern):
+            try:
+                f.unlink()
+                print(f'  [OK] 删除废话文档: {f.name}')
+                removed_count += 1
+            except Exception as e:
+                print(f'  [FAIL] 无法删除 {f}: {e}')
 
     if removed_count == 0:
         print('  无污染文件需清理')
