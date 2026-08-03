@@ -272,6 +272,7 @@ csv_builder.py 组装narrative_meta_trajectories.csv
   └── Layer 3: 八正道审计(z_福音等 + zscore列)
   ↓
 EDM-TAKENS Web消费
+```
 
 ---
 
