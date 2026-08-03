@@ -20,7 +20,14 @@ _FRONTEND_CMD = [_NPM, "run", "dev"]
 
 
 def _ensure_frontend_deps():
-    """重启后 node_modules 可能缺失，启动前自动安装。"""
+    """重启后 node_modules 可能缺失，启动前自动安装。
+
+    R47-A fix (ROUND47 P0): Add --allow-scripts to npm install.
+    Root cause: npm 10+ "allow-scripts" security feature blocks esbuild
+    postinstall (node install.js) by default, causing "npm warn allow-scripts"
+    and potentially missing platform binary (@esbuild/win32-x64/esbuild.exe).
+    Fix: Explicitly allow scripts during install so esbuild postinstall runs.
+    """
     node_modules = os.path.join(_FRONTEND_DIR, "node_modules")
     if os.path.isdir(node_modules):
         return
@@ -28,7 +35,8 @@ def _ensure_frontend_deps():
         print("[!] 未找到 npm，无法自动安装前端依赖，前端可能无法启动。")
         return
     print("[INFO] frontend/node_modules 缺失，自动执行 npm install...")
-    subprocess.run([_NPM, "install", "--no-audit", "--no-fund"], cwd=_FRONTEND_DIR, check=False)
+    subprocess.run([_NPM, "install", "--no-audit", "--no-fund", "--allow-scripts"],
+                   cwd=_FRONTEND_DIR, check=False)
     print("[OK] 前端依赖安装完成。")
 
 

@@ -1,22 +1,23 @@
 @echo off
 chcp 65001 >nul
+REM R46-D fix (ROUND46 P0): Pure English bat to avoid GBK mis-decode.
 pushd "%~dp0"
 
-:: 检查 Python 可用性
+REM -- Python availability check --
 where python >nul 2>nul
 if %errorlevel% neq 0 (
-    echo [ERROR] 未找到 python，请确保 Python 已加入系统 PATH。
+    echo [ERROR] python not found, ensure Python is in system PATH.
     pause
     popd
     exit /b 1
 )
 
-echo [*] 启动 EDM-Takens Web MVP ...
-echo [*] 工作目录: %cd%
+echo [*] Starting EDM-Takens Web MVP ...
+echo [*] Working directory: %cd%
 python start_mvp.py
 
 if %errorlevel% neq 0 (
-    echo [ERROR] 启动脚本异常退出。
+    echo [ERROR] Startup script exited abnormally.
     pause
 )
 

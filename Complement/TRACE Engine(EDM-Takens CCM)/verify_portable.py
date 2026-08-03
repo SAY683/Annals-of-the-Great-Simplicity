@@ -762,6 +762,59 @@ def find_product_root(start: Path) -> Path:
     return start
 
 
+def check_bat_encoding(root: Path) -> dict:
+    """R47-B 新增 (ROUND47 P0): 检查所有 .bat 文件编码合规性.
+
+    病灶 (用户反馈): trace-to-edm/start.bat 因 UTF-8 中文被 GBK 误解码,
+    导致命令被截断成无效片段 ("neq", "xit", "CE_PYTHON_CMD" ...).
+
+    检查项:
+      1. 所有 .bat 文件无中文内容 (CJK Unified Ideographs U+4E00-U+9FFF)
+      2. 所有 .bat 文件开头有 chcp 65001 (处理中文路径)
+    """
+    result = {'name': 'BAT 编码合规', 'ok': True, 'messages': []}
+    bat_files = list(root.rglob('*.bat'))
+    if not bat_files:
+        result['messages'].append('未找到 .bat 文件，跳过')
+        return result
+
+    chinese_count = 0
+    no_chcp_count = 0
+    for bat in bat_files:
+        try:
+            content = bat.read_text(encoding='utf-8', errors='replace')
+        except Exception as e:
+            result['ok'] = False
+            result['messages'].append(f'无法读取 {bat.name}: {e}')
+            continue
+
+        # 检查中文内容
+        has_chinese = False
+        for i, line in enumerate(content.split('\n'), 1):
+            for ch in line:
+                if '\u4e00' <= ch <= '\u9fff':
+                    rel = bat.relative_to(root)
+                    result['messages'].append(f'{rel}:{i} 含中文: {line.strip()[:60]}')
+                    has_chinese = True
+                    chinese_count += 1
+                    break
+            if has_chinese:
+                break
+
+        # 检查 chcp 65001
+        if 'chcp 65001' not in content:
+            rel = bat.relative_to(root)
+            result['messages'].append(f'{rel} 缺少 chcp 65001')
+            no_chcp_count += 1
+
+    if chinese_count > 0 or no_chcp_count > 0:
+        result['ok'] = False
+        result['messages'].insert(0, f'{chinese_count} 处中文, {no_chcp_count} 个缺少 chcp 65001')
+    else:
+        result['messages'].append(f'{len(bat_files)} 个 .bat 文件全部合规 (无中文 + chcp 65001)')
+    return result
+
+
 def main():
     root = find_product_root(Path(__file__).resolve().parent)
     print('=' * 60)
@@ -771,6 +824,7 @@ def main():
 
     # Round 17：从 7 项扩充到 11 项，覆盖 trace-to-edm 契约、代码修缮落地、Docs/Skill 同步
     # ROUND28: 从 11 项扩充到 14 项, 新增 EDM-TAKENS CLI 导入、科研披露字段、sync_check
+    # ROUND47: 从 14 项扩充到 15 项, 新增 .bat 文件编码合规检查
     checks = [
         check_structure(root),
         check_no_runtime_artifacts(root),
@@ -787,6 +841,8 @@ def main():
         check_edm_takens_cli(root),
         check_edm_takens_disclosure_fields(root),
         check_edm_takens_sync_check(root),
+        # ROUND47 新增: .bat 文件编码合规检查 (防止 GBK 乱码导致命令截断)
+        check_bat_encoding(root),
     ]
 
     all_ok = True
@@ -805,7 +861,7 @@ def main():
             all_ok = False
 
     print('\n' + '=' * 60)
-    print(f'汇总: {n_pass} PASS / {n_fail} FAIL / {len(checks)} 项 (ROUND28 14项契约)')
+    print(f'汇总: {n_pass} PASS / {n_fail} FAIL / {len(checks)} 项 (ROUND47 15项契约)')
     if all_ok:
         print('审计结果: 全部通过，便携目录可独立运行。')
         return 0
