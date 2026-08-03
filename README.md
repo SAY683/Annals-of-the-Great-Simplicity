@@ -189,14 +189,15 @@ Annals-of-the-Great-Simplicity/
 ├── Core-Magician/          ← 核心文献（PDF 经卷）
 ├── Base/                   ← Web 前端（DaoPan / VTS / PDF Viewer）
 ├── Complement/             ← 技术补充
-│   ├── Skill/              ←    AI 技能定义 & EDM-Takens 计算模块
+│   ├── Docs/               ←    文档中心（架构/部署/调试/数据管道）
 │   └── TRACE Engine(EDM-Takens CCM)/
-│       ├── trace-engine/   ←    TRACE 引擎核心
-│       │   ├── models/     ←      模型配置（权重 → 魔搭托管）
-│       │   ├── examples/   ←      分析示例
-│       │   ├── references/ ←      参考文档
-│       │   └── trace-to-edm/←      TRACE → EDM 桥接（文本 → 相空间映射）
-│       └── trace-engine-web/ ←  TRACE Web 接口
+│       ├── Models/         ←    模型仓库（权重 → 魔搭托管）
+│       ├── edm-takens/     ←    EDM-Takens CCM 因果推断核心
+│       ├── edm-takens-web/ ←    EDM 引擎 Web 后端与前端
+│       ├── trace-engine/   ←    TRACE 引擎核心（LLaMA 推理 + 反事实分析）
+│       ├── trace-engine-web/ ←  TRACE Web 接口与服务
+│       ├── trace-to-edm/   ←    TRACE → EDM 桥接（文本 → 相空间映射）
+│       └── shared/         ←    共享模块
 ├── Miscellanies/           ← 杂集 · 经文附录
 ├── Remarks/                ← 札记 · 比修斯书
 └── Obsolete/               ← 旧档（保留参考）
@@ -208,14 +209,15 @@ Annals-of-the-Great-Simplicity/
 
 | 项目 | 路径 | 说明 |
 | :--- | :--- | :--- |
-| **EDM-Takens 引擎** | `Skill/edm-takens/` | 收敛交叉映射（CCM）因果推断核心计算模块 |
-| **EDM-Takens Web** | `Skill/edm-takens-web/` | EDM 引擎的 Web 后端与前端 |
+| **EDM-Takens 引擎** | `TRACE Engine/edm-takens/` | 收敛交叉映射（CCM）因果推断核心计算模块 |
+| **EDM-Takens Web** | `TRACE Engine/edm-takens-web/` | EDM 引擎的 Web 后端与前端 |
 | **TRACE 引擎** | `TRACE Engine/trace-engine/` | LLaMA 微调推理 + 反事实因果分析管道 |
 | **TRACE Web** | `TRACE Engine/trace-engine-web/` | TRACE 引擎的 Web 接口与服务 |
 | **trace-to-edm** | `TRACE Engine/trace-to-edm/` | 文本 → 相空间映射桥接（连接 TRACE 与 EDM）|
 | **模型仓库** | `TRACE Engine/Models/` | 模型配置与权重（权重 → 魔搭托管）|
+| **文档中心** | `Complement/Docs/` | 架构 · 部署 · 调试 · 数据管道（00-README 为入口）|
 
-> **Skill/** 下的两个项目独立于 TRACE Engine，可直接复用；其余项目位于 `TRACE Engine(EDM-Takens CCM)/` 目录下，构成完整的因果分析与语言模型推理管线。
+> 六大项目统一位于 `TRACE Engine(EDM-Takens CCM)/` 目录下，构成完整的因果分析与语言模型推理管线；`Complement/Docs/` 提供系统级文档（架构、部署、调试、数据管道），`start_all.bat` / `start_all.ps1` 为全量启动脚本。
 
 ---
 
