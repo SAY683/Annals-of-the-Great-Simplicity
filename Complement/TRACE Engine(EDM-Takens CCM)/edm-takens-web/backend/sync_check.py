@@ -164,6 +164,10 @@ def _check_portable_sync(quiet: bool) -> int:
     所有 4 个副本中保持一致, 防止 ROUND33-G3 同步遗漏再现.
 
     所有路径相对于 _PROJECT_ROOT (研发测试/).
+
+    R39-C 修复 (ROUND39 P0): 当 Skill/ 目录不存在时 (如 Complement 外部成品目录),
+    降级为 SKIP 而非 FAIL. _PROJECT_ROOT 在 Complement 目录下是 Complement/,
+    不含 Skill/ 子目录, 这是环境差异而非同步缺陷.
     """
     if not quiet:
         print("\n── 便携目录算法层同步检查 (R34-A) ──────────────")
@@ -171,11 +175,24 @@ def _check_portable_sync(quiet: bool) -> int:
         print(f"[ERROR] 项目根目录不存在: {_PROJECT_ROOT}", file=sys.stderr)
         return 2
 
+    # R39-C 修复: 检测 Skill/ 目录是否存在 (Complement 外部成品目录无此子目录)
+    _skill_dir = os.path.join(_PROJECT_ROOT, "Skill")
+    _has_skill = os.path.isdir(_skill_dir)
+    if not _has_skill and not quiet:
+        print(f"  [SKIP] Skill/ 目录不存在于 {_PROJECT_ROOT}")
+        print(f"  (Complement 外部成品目录无需 Skill/ 子目录, 降级为 SKIP)")
+        print(f"  仅检查 TRACE Engine(EDM-Takens CCM)/ 内的副本一致性")
+
     issues = []
     n_checked = 0
+    n_expected = 0
     for fname, rel_paths in PORTABLE_ALGORITHM_FILES.items():
         hashes = {}
         for rel in rel_paths:
+            # R39-C 修复: Skill/ 不存在时跳过 Skill/ 路径
+            if not _has_skill and rel.startswith("Skill/"):
+                continue
+            n_expected += 1
             full = os.path.join(_PROJECT_ROOT, rel, fname)
             if not os.path.exists(full):
                 issues.append(f"文件缺失: {rel}/{fname}")
@@ -205,7 +222,7 @@ def _check_portable_sync(quiet: bool) -> int:
         return 1
     elif not quiet:
         print(f"  便携目录算法层检查通过 ({n_checked} 副本, "
-              f"{sum(len(v) for v in PORTABLE_ALGORITHM_FILES.values())} 预期)")
+              f"{n_expected} 预期)")
     return 0
 
 
