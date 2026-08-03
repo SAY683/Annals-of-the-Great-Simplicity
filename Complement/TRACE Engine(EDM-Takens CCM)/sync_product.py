@@ -422,18 +422,92 @@ def copy_audit_scripts_to_root():
             print(f'  无法复制 {name}: {e}')
 
 
+def cleanup_product_pollution():
+    """R44-C 修复 (ROUND44 P0): 同步前清理成品目录所有污染文件.
+
+    病灶 (用户反馈 "你删除了，这个无效文件了吗？为什么我总是说一句你才干一件？"):
+      R43 仅修正了 sync_research_reports() 不再同步 META_THINKING,
+      但未清理成品目录已存在的污染残留 (Docs/META_THINKING/、__pycache__/).
+      且缺少主动清理机制, 导致每次同步后污染仍残留.
+
+    修复策略 (R44 主动清理, 而非被动响应):
+      在 main() 开头 (所有同步操作之前) 主动扫描并清理:
+      1. Docs/META_THINKING/ 目录 (内部进度归档, 违反"开箱即用"语义)
+      2. 所有 ROUND*_META_THINKING.md 文件 (散落的进度归档)
+      3. 所有 ROUND*_AUDIT.md 文件 (内部审计报告)
+      4. 所有 __pycache__/ 目录 (运行时产物, 违反便携打包约束)
+      5. 所有 *.pyc 文件 (运行时产物)
+
+    设计原则: "应清尽清" — 成品目录只包含用户需要的最终产物,
+    内部迭代进度保留在工作目录 Docs/META_THINKING/ 即可.
+    """
+    print('\n[R44] 主动清理成品目录污染文件 (开箱即用语义保障)')
+    removed_count = 0
+
+    # 1. 清理 Docs/META_THINKING/ 目录
+    docs_meta = product.parent / 'Docs' / 'META_THINKING'
+    # 也清理成品目录内部的 Docs/META_THINKING/ (如果存在)
+    docs_meta_internal = product / 'Docs' / 'META_THINKING'
+    for target in [docs_meta, docs_meta_internal]:
+        if target.exists() and target.is_dir():
+            try:
+                file_count = sum(1 for _ in target.rglob('*') if _.is_file())
+                safe_rmtree(target)
+                print(f'  [OK] 删除内部进度归档: {target} ({file_count} 个文件)')
+                removed_count += file_count
+            except Exception as e:
+                print(f'  [FAIL] 无法删除 {target}: {e}')
+
+    # 2. 清理所有 ROUND*_META_THINKING.md 和 ROUND*_AUDIT.md 文件
+    round_patterns = ['ROUND*_META_THINKING.md', 'ROUND*_AUDIT.md']
+    for pattern in round_patterns:
+        for f in product.rglob(pattern):
+            try:
+                f.unlink()
+                print(f'  [OK] 删除进度文件: {f.name}')
+                removed_count += 1
+            except Exception as e:
+                print(f'  [FAIL] 无法删除 {f}: {e}')
+
+    # 3. 清理所有 __pycache__/ 目录
+    for pycache in product.rglob('__pycache__'):
+        if pycache.is_dir():
+            try:
+                file_count = sum(1 for _ in pycache.iterdir() if _.is_file())
+                safe_rmtree(pycache)
+                print(f'  [OK] 删除运行时缓存: {pycache} ({file_count} 个文件)')
+                removed_count += file_count
+            except Exception as e:
+                print(f'  [FAIL] 无法删除 {pycache}: {e}')
+
+    # 4. 清理所有 .pyc 文件 (散落的, 不在 __pycache__ 目录中的)
+    for pyc in product.rglob('*.pyc'):
+        try:
+            pyc.unlink()
+            print(f'  [OK] 删除运行时文件: {pyc.name}')
+            removed_count += 1
+        except Exception as e:
+            print(f'  [FAIL] 无法删除 {pyc}: {e}')
+
+    if removed_count == 0:
+        print('  无污染文件需清理')
+    else:
+        print(f'  清理完成: 共删除 {removed_count} 项污染文件')
+
+
 def sync_research_reports():
     """R36-B 修复 (ROUND36 P1): 同步研究汇报到便携目录.
 
-    将最新论文和元反思归档同步到 Skill/研究汇报/ 目录,
-    确保便携目录包含完整的研究成果汇报.
+    R43 修正 (ROUND43 P0): 成品目录只保留最终研究成果 (论文),
+    不再同步内部进度文件 (ROUND*_META_THINKING.md / ROUND*_AUDIT.md).
+    病灶: 原版将开发进度归档 (META_THINKING) 同步到成品目录, 污染了
+    成品目录的"开箱即用"语义 — 成品目录应只包含用户需要的最终产物,
+    内部迭代进度保留在工作目录 Docs/META_THINKING/ 即可.
 
-    同步内容:
-      - 五大项目算法模型论文.md (最新版本)
-      - 最近2轮 META_THINKING 归档
-      - ROUND33_F_AUDIT.md (反向传播侦察审计报告)
+    同步内容 (R43 修正后):
+      - 五大项目算法模型论文.md (最新版本, 唯一同步项)
     """
-    print('\n[R36-B] 同步研究汇报到便携目录')
+    print('\n[R43] 同步研究汇报到便携目录 (仅论文, 不含进度文件)')
     # Docs/ 在开发目录的父级 (研发测试/Docs/)
     src_docs = _SCRIPT_DIR.parent / 'Docs'
     # 研究汇报复制到便携目录根级
@@ -445,26 +519,15 @@ def sync_research_reports():
 
     dst_reports.mkdir(parents=True, exist_ok=True)
 
-    # 论文
+    # 论文 (唯一同步项)
     paper_src = src_docs / '五大项目算法模型论文' / '五大项目算法模型论文.md'
     if paper_src.exists():
         shutil.copy2(paper_src, dst_reports / paper_src.name)
         print(f'  ✓ {paper_src.name}')
 
-    # 最近2轮 META_THINKING
-    meta_dir = src_docs / 'META_THINKING'
-    if meta_dir.exists():
-        # 找出最近的2个 ROUND*_META_THINKING.md (按名称排序)
-        meta_files = sorted(meta_dir.glob('ROUND*_META_THINKING.md'))
-        for mf in meta_files[-2:]:
-            shutil.copy2(mf, dst_reports / mf.name)
-            print(f'  ✓ {mf.name}')
-
-    # ROUND33_F_AUDIT.md
-    audit_src = src_edm_takens_web / 'ROUND33_F_AUDIT.md'
-    if audit_src.exists():
-        shutil.copy2(audit_src, dst_reports / audit_src.name)
-        print(f'  ✓ {audit_src.name}')
+    # R43 修正: 不再同步 ROUND*_META_THINKING.md 和 ROUND33_F_AUDIT.md
+    # 这些是内部进度归档, 保留在工作目录 Docs/META_THINKING/ 即可,
+    # 不应污染成品目录的"开箱即用"语义.
 
     print(f'  研究汇报同步完成: {dst_reports}')
 
@@ -650,6 +713,12 @@ def _verify_self_contained_integrity():
 def main():
     print('=== 同步到成品目录 ===')
     print(f'成品目录: {product}')
+
+    # R44-C 修复 (ROUND44 P0): 同步前主动清理成品目录所有污染文件.
+    # 病灶: R43 仅修正了不再同步 META_THINKING, 但未清理已存在的污染残留.
+    # 修复: 每次同步前主动扫描并清理 __pycache__、ROUND*_META_THINKING.md、
+    #       ROUND*_AUDIT.md、Docs/META_THINKING/ 等污染, 保障"开箱即用"语义.
+    cleanup_product_pollution()
 
     # P1 修复 (2026-07-30 审计): 自包含布局下 src == dst，自我覆盖会导致数据丢失。
     # 自包含布局下仅执行保守清理和验证，跳过所有复制操作。

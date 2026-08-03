@@ -13,15 +13,27 @@ TRACE Engine 便携目录独立运行审计脚本
     4. trace-engine-web 服务端可启动并接受健康检查
     5. 关键文件存在且无运行时产物污染
 """
+# R44-D 修复 (ROUND44 P0): 禁止 Python 写入 __pycache__,
+# 避免 verify_portable.py 运行时在成品目录生成 .pyc 运行时产物.
+# 病灶: verify_portable.py 导入 trace-engine/edm-takens 模块时,
+# Python 自动生成 __pycache__/ 目录, 违反便携打包"无运行时产物"约束.
+# 修复: 在导入任何项目模块之前设置 sys.dont_write_bytecode = True,
+# 并通过环境变量 PYTHONDONTWRITEBYTECODE=1 让子进程 (health_check.py、
+# test_skill.py、sync_check.py 等) 也继承此设置, 根治 __pycache__ 污染.
+import sys
+sys.dont_write_bytecode = True
+
 import json
 import os
 import shutil
 import socket
 import subprocess
-import sys
 import time
 import urllib.request
 from pathlib import Path
+
+# 设置环境变量, 让 subprocess 启动的子进程也禁止写入 __pycache__
+os.environ['PYTHONDONTWRITEBYTECODE'] = '1'
 
 
 def find_free_port(start=3030, end=3050):
