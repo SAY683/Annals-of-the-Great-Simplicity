@@ -24,7 +24,22 @@ const PUBLIC_PATHS = new Set([
 const ADMIN_PATHS = new Set([
   '/api/admin/cleanup',
   '/api/jobs/clear',
+  // P0-3 修复 (Round 27 审计): 批量删除属破坏性操作，原未纳入 ADMIN_PATHS，
+  // 普通用户持 apiKey 即可清空他人任务历史。
+  '/api/jobs/batch-delete',
 ]);
+
+// 动态管理员路径（需正则匹配，配合 req.method 判定）
+// DELETE /api/jobs/:id —— 单条删除同样属破坏性操作，需管理员密钥
+const ADMIN_PATH_RE = /^\/api\/jobs\/[a-f0-9-]{8,}(\.json)?$/i;
+
+function _isAdminRequest(req) {
+  const reqPath = req.path;
+  if (ADMIN_PATHS.has(reqPath)) return true;
+  // DELETE /api/jobs/:id 动态路径：UUID 校验 + 方法限定
+  if (req.method === 'DELETE' && ADMIN_PATH_RE.test(reqPath)) return true;
+  return false;
+}
 
 function _extractApiKey(req) {
   // 优先 Authorization: Bearer <key>
@@ -35,16 +50,27 @@ function _extractApiKey(req) {
   // 兼容 X-Api-Key 头
   const xKey = req.headers['x-api-key'];
   if (xKey) return String(xKey).trim();
-  // 兼容 query 参数 ?api_key=（便于浏览器直接访问）
-  if (req.query && req.query.api_key) return String(req.query.api_key).trim();
+
+  // P0-6 修复 (ROUND27 12维度核对): query 参数 ?api_key= 仅对 GET 请求放行,
+  // 禁止 POST/DELETE 的 query 鉴权 —— 攻击者可通过 <img src="...?api_key=LEAKED">
+  // 发起 CSRF 执行破坏性操作 (清空历史/删除任务). GET 请求无副作用, 保留 query
+  // 鉴权便于浏览器直接访问只读 API.
+  const isDestructiveMethod = ['POST', 'DELETE', 'PUT', 'PATCH'].includes(req.method);
+  const isAdminPath = _isAdminRequest(req);
+  if (!isDestructiveMethod && !isAdminPath && req.query && req.query.api_key) {
+    return String(req.query.api_key).trim();
+  }
   return null;
 }
 
 function _constantTimeEqual(a, b) {
   if (typeof a !== 'string' || typeof b !== 'string') return false;
-  if (a.length !== b.length) return false;
-  let diff = 0;
-  for (let i = 0; i < a.length; i++) {
+  // P2-12 修复 (ROUND27 12维度核对): 原 `if (a.length !== b.length) return false`
+  // 在长度不等时早返回, 攻击者可通过响应时间侧信道推断密钥长度.
+  // 现将长度差异合并到 diff, 遍历较短长度, 最后统一返回.
+  const minLen = Math.min(a.length, b.length);
+  let diff = a.length ^ b.length;
+  for (let i = 0; i < minLen; i++) {
     diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
   }
   return diff === 0;
@@ -68,8 +94,11 @@ function createAuthMiddleware() {
     if (!authEnabled) return next();
 
     const reqPath = req.path;
-    // 静态资源与非 /api 路径放行
-    if (!reqPath || !reqPath.startsWith('/api/')) return next();
+    // 静态资源与非 /api/ 且非 /mcp 路径放行
+    // P0 修缮（2026-08-03）: 原版仅保护 /api/, 导致 /mcp (MCP JSON-RPC 端点) 完全
+    // 绕过鉴权 —— 攻击者可直接 POST /mcp 调用 analyze_text 等工具耗尽 GPU 资源。
+    // 现将 /mcp 纳入鉴权范围, 与 /api/ 同等保护。
+    if (!reqPath || (!reqPath.startsWith('/api/') && !reqPath.startsWith('/mcp'))) return next();
 
     // 公开只读路径放行
     if (PUBLIC_PATHS.has(reqPath)) return next();
@@ -82,7 +111,7 @@ function createAuthMiddleware() {
     // 现改为：管理员路径优先校验 adminKey，普通路径校验 apiKey。
 
     // 管理员路径：优先校验 TRACE_ADMIN_KEY
-    if (ADMIN_PATHS.has(reqPath)) {
+    if (_isAdminRequest(req)) {
       if (!adminKey) {
         logToFile('warn', `管理员操作被拒：TRACE_ADMIN_KEY 未设置 path=${reqPath}`);
         return res.status(403).json({

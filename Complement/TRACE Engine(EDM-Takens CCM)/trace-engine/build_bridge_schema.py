@@ -51,13 +51,19 @@ def load_presets_yaml(skill_dir: Path) -> dict:
         try:
             from presets import load_yaml_presets
             return load_yaml_presets()
-        except Exception:
-            pass
+        except Exception as e:
+            # P2-F 修复 (ROUND27 12维度核对): 原 except: pass 完全静默吞错,
+            # presets.yaml 解析失败时 schema 退化为空 dict, Web 端无法感知根因.
+            print(f"[build_bridge_schema] presets.load_yaml_presets() 失败: "
+                  f"{type(e).__name__}: {e}", file=sys.stderr)
     try:
         import yaml
         yaml_path = skill_dir / 'presets.yaml'
         return yaml.safe_load(yaml_path.read_text(encoding='utf-8'))
-    except Exception:
+    except Exception as e:
+        # P2-F 修复: 同上, 记录失败原因而非静默返回空 dict
+        print(f"[build_bridge_schema] yaml.safe_load() 失败: "
+              f"{type(e).__name__}: {e}", file=sys.stderr)
         return {}
 
 

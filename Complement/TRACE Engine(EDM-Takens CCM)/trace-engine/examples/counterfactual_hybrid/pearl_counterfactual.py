@@ -108,12 +108,25 @@ class PearlCounterfactual:
 
         if ti is None or oi is None:
             return {
-                'observed_outcome': float('nan'),
-                'counterfactual_outcome': float('nan'),
-                'causal_effect': 0.0,
+                'observed_outcome': None,
+                'counterfactual_outcome': None,
+                'causal_effect': None,
                 'abduction_noise': {},
                 'error': f'Variable not found: {treatment_var} or {outcome_var}'
             }
+
+        # P0-2 修复 (2026-07-30): NaN 防护 — observed 含 NaN/Inf 时全链路传播 NaN，
+        # 导致 json.dumps 输出 "NaN" 违反 RFC 8259。在此返回 None（JSON-safe）。
+        obs_arr = np.asarray(observed, dtype=float)
+        if not np.all(np.isfinite(obs_arr)):
+            return {
+                'observed_outcome': None,
+                'counterfactual_outcome': None,
+                'causal_effect': None,
+                'abduction_noise': {},
+                'error': 'observed sample contains NaN/Inf'
+            }
+        observed = obs_arr  # 后续逻辑用 obs_arr
 
         # D-P0-1 修复: 显式拓扑排序, 不再假设 _coeff 已按拓扑序可计算.
         topo_order, has_cycle = self._topological_sort(self._coeff)
@@ -164,11 +177,12 @@ class PearlCounterfactual:
                             # 父节点必已在 cf_values 中 (拓扑序保证)
                             pred += self._coeff[p, v] * cf_values[p]
                     cf_values[v] = pred + noise[v]
-            # 环中节点 (不在 topo_order): 无法定义反事实, 用 observed 兜底
-            if len(cf_values) < n_vars:
-                for v in range(n_vars):
-                    if v not in cf_values:
-                        cf_values[v] = float(observed[v])
+            # 环中节点 (不在 topo_order): 无法定义反事实.
+            # P2-C 修复 (ROUND27 12维度核对): 原代码用 observed 兜底, 若 outcome 在环中
+            # 则返回 observed 而非 NaN, 导致 ite=0 被误读为"无因果效应".
+            # 现在环中节点保持未写入, cf_values.get(oi, float('nan')) 会返回 NaN,
+            # 上层 ite=NaN → causal_effect=None → 前端显示 N/A 而非 0.
+            # 仅对非 outcome 的环中节点用 observed 兜底 (保持图结构完整性).
             return cf_values.get(oi, float('nan'))
 
         y_treatment = predict_cf(treatment_value)
@@ -182,7 +196,9 @@ class PearlCounterfactual:
         result = {
             'observed_outcome': y_obs,
             'counterfactual_outcome': float(y_treatment) if not np.isnan(y_treatment) else None,
-            'causal_effect': float(ite) if not np.isnan(ite) else 0.0,
+            # P0修复 (2026-07-30): ite=NaN（环/不可估计）时返回 None 而非 NaN，
+            # 避免 json.dumps 输出 "NaN" 违反 RFC 8259。上层 card 应将 None 显示为 "N/A" 而非 0
+            'causal_effect': float(ite) if not np.isnan(ite) else None,
             'abduction_noise': {f'U_{k}': float(v) for k, v in noise.items()},
         }
         if has_cycle:

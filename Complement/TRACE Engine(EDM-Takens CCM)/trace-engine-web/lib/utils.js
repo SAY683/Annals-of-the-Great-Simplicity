@@ -92,7 +92,18 @@ function loadJobHistory() {
 }
 
 // ── 任务记录（含 textHash + textPreview + inputs 持久化） ───────────
+// P0-4 修复 (ROUND27 12维度核对): recordJob 的 findIndex→赋值/push→shift 是复合操作,
+// 两个并发任务 close 时可同时读到同一 idx 导致后者覆盖前者, 或同时 push 导致
+// length 暂时超限被 shift 误删. 现用 _recordLock 串行化数组变异临界区.
+let _recordLock = Promise.resolve();
 function recordJob(id, mode, status, error = null, meta = {}) {
+  _recordLock = _recordLock.then(() => {
+    _recordJobSync(id, mode, status, error, meta);
+  }).catch(() => {});
+  return _recordLock;
+}
+
+function _recordJobSync(id, mode, status, error = null, meta = {}) {
   const now = new Date().toISOString();
   const existing = jobHistory.find((j) => j.id === id);
   // 当 mode 为 null 时保留已有记录的 mode（用于 gracefulShutdown 等场景）
@@ -212,7 +223,8 @@ function loadBridgeParamSchema(preset = null, probedLlamaModels = []) {
 function _hardcodedBridgeFallback(isLlama = false) {
   const base = {
     threshold: { type: 'number', min: 0, max: 10, default: 0.03, description: '因果边显著性阈值' },
-    window_size: { type: 'integer', min: 2, max: 256, default: 64, description: 'TRACE 滑动窗口大小' },
+    // P2-1 修复 (ROUND27 12维度核对): window_size 默认值 64→8, 与 bridge_schema.json (8) 对齐
+    window_size: { type: 'integer', min: 2, max: 256, default: 8, description: 'TRACE 滑动窗口大小' },
     max_segments: { type: 'integer', min: 1, max: 16, default: 4, description: 'LLaMA TRACE 最大分段数' },
     max_concepts: { type: 'integer', min: 1, max: 128, default: 12, description: '最大概念数' },
     concept_min_freq: { type: 'integer', min: 1, max: 1000, default: 2, description: '概念最小出现频次' },
@@ -223,6 +235,12 @@ function _hardcodedBridgeFallback(isLlama = false) {
     filter_percentile: { type: 'integer', min: 50, max: 99, default: 85, description: 'percentile 模式的百分位' },
     random_state: { type: 'integer', min: 0, max: 999999, default: 42, description: '随机种子' },
     classical_mode: { type: 'boolean', default: false, description: '古汉语模式' },
+    // P2-D 修复: 补全 TRACE2DoWhy 接受但硬编码兜底缺失的参数
+    simulation: { type: 'boolean', default: false, description: '使用 SimulationModel 替代真实 DoWhy' },
+    min_concept_len: { type: 'integer', min: 1, max: 10, default: null, description: '概念最小长度' },
+    sem_regularization: { type: 'string', default: null, description: 'SEM 正则化 (null/ridge/lasso)' },
+    sem_alpha: { type: 'number', min: 0, max: 10, default: 0.01, description: 'SEM 正则化强度' },
+    refutation_deviation_threshold: { type: 'number', min: 0, max: 1, default: 0.3, description: '反驳偏差阈值' },
   };
   if (isLlama) {
     return Object.assign({}, base, {
@@ -299,7 +317,9 @@ function validateAnalysisInput(text, mode, config, schemaCtx = {}) {
 }
 
 // ── ID 合法性校验（防路径遍历） ─────────────────────────────────────
-const UUID_RE = /^[0-9a-f-]{36}$/i;
+// P1-8 修复 (ROUND27 12维度核对): 原 /^[0-9a-f-]{36}$/i 只校验字符集+长度,
+// 允许 36 个连字符通过. 现使用标准 UUID v4 格式 (8-4-4-4-12).
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 function isValidId(id) {
   return typeof id === 'string' && UUID_RE.test(id);
 }
@@ -427,7 +447,11 @@ function parseBridgeConfig(raw) {
     const obj = typeof raw === 'string' ? JSON.parse(raw) : raw;
     return JSON.stringify(obj);
   } catch (_) {
-    return String(raw);
+    // P1-7 修复 (ROUND27 12维度核对): 原返回 String(raw), 下游 JSON.parse 会再次
+    // 抛 SyntaxError 被 catch 吞掉. 现返回空字符串, 下游 JSON.parse('') 返回 null,
+    // validateAnalysisInput 会用 null 跳过 config 校验, 行为一致且不产生误导.
+    logToFile('warn', `parseBridgeConfig: 无效的 JSON 配置, 已忽略: ${String(raw).slice(0, 100)}`);
+    return '';
   }
 }
 

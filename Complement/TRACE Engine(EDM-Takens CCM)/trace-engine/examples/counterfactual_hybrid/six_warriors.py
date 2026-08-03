@@ -158,7 +158,8 @@ def _deploy_trace(adj_matrix, token_list, bridge=None) -> WarriorCard:
         card.metrics = {"tokens": T, "edges": 0, "max_ΔNLL": "N/A", "UNK_rate": "N/A"}
         return card
     n_edges = int((adj_matrix > 0).sum())
-    max_dnl = float(adj_matrix.max())
+    # P0 fix: 防护 adj_matrix 全负异常，max() 会返回最大负值导致 verdict 恒为 SIGNAL_WEAK
+    max_dnl = float(np.maximum(adj_matrix, 0).max())
     unk_count = sum(1 for t in token_list if is_unk_token(t))
     unk_rate = unk_count / max(T, 1)
 
@@ -213,9 +214,14 @@ def _build_ccm_timeseries(adj_matrix, token_list, concept_names=None, window=20)
             return None, None, None
 
     # 找最强因果边 (上三角, 避免自环)
+    # P0 fix: 只在有效概念对中选取最强边，避免选中标点/BPE碎片（如 " → 嫌）
     max_val, max_i, max_j = 0.0, -1, -1
     for i in range(len(names)):
+        if not is_valid_concept(names[i]):
+            continue
         for j in range(i + 1, len(names)):
+            if not is_valid_concept(names[j]):
+                continue
             v = float(adj[i, j])
             if v > max_val:
                 max_val, max_i, max_j = v, i, j
@@ -297,8 +303,19 @@ def _deploy_ccm(adj_matrix, token_list, concept_names=None) -> WarriorCard:
                 )
                 if df_ccm is not None and len(df_ccm) >= 30 and cause_name and effect_name:
                     E = min(5, max(2, len(df_ccm) // 10))
+                    # P0数学修复: 原 _step=max(8, n//25) 在 n=30 时生成 [5,28,8] → 仅 3 点，
+                    # Spearman p<0.1 数学不可达（n=3 最小 p≈0.333）。
+                    # 新策略: 保证至少 7 个库大小点（Spearman n=7 时 p<0.05 可达），
+                    # 同时控制总点数 ≤30 避免性能回退。
+                    _n = len(df_ccm)
+                    _min_lib = E + 2
+                    _max_lib = max(_n - 2, _min_lib)
+                    _target_points = 12  # 目标点数，平衡显著性与性能
+                    _step = max(2, (_max_lib - _min_lib) // _target_points)
+                    _coarse_lib_sizes = f'{_min_lib} {_max_lib} {_step}'
                     ccm_result = ccm_with_convergence(
-                        df_ccm, cause_name, effect_name, E
+                        df_ccm, cause_name, effect_name, E,
+                        lib_sizes=_coarse_lib_sizes,
                     )
                     # ALG-02 修复 (审视报告修正): 返回 dict 顶层无 'converging',
                     # 收敛判定在 forward/reverse 子字典的 'is_converging' 字段
@@ -328,12 +345,30 @@ def _deploy_ccm(adj_matrix, token_list, concept_names=None) -> WarriorCard:
                         card.metrics["ccm_direction"] = _dir
                     else:
                         card.verdict = "ELIGIBLE_BUT_NOT_RUN"
+                        card.status = "fallback"
+                        # P0 fix: 不再将完整 ccm_result dict 倾倒到 findings 中，
+                        # 仅提取关键指标（final_rho / spearman_rho / verdict）。
+                        # 完整结果存入 card.raw 供 details 折叠区查看。
+                        card.raw = ccm_result if isinstance(ccm_result, dict) else {"raw": str(ccm_result)[:500]}
+                        _fwd = ccm_result.get('forward', {}) if isinstance(ccm_result, dict) else {}
+                        _rev = ccm_result.get('reverse', {}) if isinstance(ccm_result, dict) else {}
+                        _fwd_rho = _fwd.get('final_rho', 'N/A')
+                        _rev_rho = _rev.get('final_rho', 'N/A')
+                        _fwd_sp = _fwd.get('spearman_rho', 'N/A')
+                        _rev_sp = _rev.get('spearman_rho', 'N/A')
+                        _ccm_verdict = ccm_result.get('verdict', 'N/A') if isinstance(ccm_result, dict) else 'N/A'
                         card.findings.append(
                             f"ℹ ccm_with_convergence 已运行但未收敛: "
-                            f"{cause_name}→{effect_name} (结果: {ccm_result})"
+                            f"{cause_name}→{effect_name}"
                         )
+                        card.findings.append(
+                            f"  forward: ρ={_fwd_rho}, spearman={_fwd_sp} | "
+                            f"reverse: ρ={_rev_rho}, spearman={_rev_sp}"
+                        )
+                        card.findings.append(f"  verdict: {_ccm_verdict}")
                 else:
                     card.verdict = "ELIGIBLE_BUT_NOT_RUN"
+                    card.status = "fallback"
                     _reason = "无有效时间序列" if df_ccm is None else f"窗口数不足({len(df_ccm) if df_ccm is not None else 0}<30)"
                     if cause_name and effect_name:
                         card.findings.append(
@@ -346,6 +381,7 @@ def _deploy_ccm(adj_matrix, token_list, concept_names=None) -> WarriorCard:
                         )
             except Exception as ccm_err:
                 card.verdict = "ELIGIBLE_BUT_NOT_RUN"
+                card.status = "fallback"
                 card.findings.append(
                     f"ℹ ccm_with_convergence 调用异常: {str(ccm_err)[:120]}"
                 )
@@ -423,34 +459,42 @@ def _deploy_edm(token_list) -> WarriorCard:
         return card
 
     # 简单可预测性: 检查 token 出现间隔的规律性
-    rho_scores = {}
+    # OPT-6 修复 (2026-07-30 审计): 重命名 rho → rho_proxy，明确这是间隔变异系数倒数，
+    # 非 Sugihara EDM 的交叉映射相关性 ρ。两者数学定义完全不同。
+    rho_proxy_scores = {}
     for tok in target_tokens:
         positions = [i for i, t in enumerate(token_list) if t == tok]
         if len(positions) >= 3:
             intervals = np.diff(positions)
-            cv = float(np.std(intervals) / (np.mean(intervals) + 1e-8))
-            rho = 1.0 / (1.0 + cv)  # 低 CV → 高规律性 → 高 ρ
-            rho_scores[tok] = rho
+            _mean = float(np.mean(intervals))
+            # P1 fix: 防除零——mean 极小时 1e-8 不够，用 max(mean, 1.0) 保证 CV 稳定
+            cv = float(np.std(intervals) / max(_mean, 1.0))
+            rho_proxy = 1.0 / (1.0 + cv)  # 低 CV → 高规律性 → 高 rho_proxy
+            rho_proxy_scores[tok] = rho_proxy
 
-    high_rho = {t: r for t, r in rho_scores.items() if r > 0.8}
-    mid_rho = {t: r for t, r in rho_scores.items() if 0.4 <= r <= 0.8}
+    high_rho = {t: r for t, r in rho_proxy_scores.items() if r > 0.8}
+    mid_rho = {t: r for t, r in rho_proxy_scores.items() if 0.4 <= r <= 0.8}
 
-    card.metrics = {"rho_high": len(high_rho), "rho_mid": len(mid_rho),
-                    "analyzed": len(rho_scores)}
+    # metrics 同时保留旧 key (rho_high/rho_mid) 和新 key (rho_proxy_high/rho_proxy_mid) 以保向后兼容
+    card.metrics = {
+        "rho_high": len(high_rho), "rho_mid": len(mid_rho),  # 向后兼容
+        "rho_proxy_high": len(high_rho), "rho_proxy_mid": len(mid_rho),  # OPT-6 新 key
+        "analyzed": len(rho_proxy_scores),
+    }
     # EDM 始终使用自包含启发式（无真算法导入路径），明确标注
     card.status = "fallback"
     if high_rho:
         top = sorted(high_rho.items(), key=lambda x: x[1], reverse=True)[:3]
         card.findings = [
-            f"高可预测性概念: {', '.join(f'{t}(ρ={r:.2f})' for t,r in top)}",
+            f"高可预测性概念: {', '.join(f'{t}(ρ_proxy={r:.2f})' for t,r in top)}",
             "→ 文本具有强叙事结构（非论证文）",
-            "⚠ 启发式回退: 使用间隔变异系数近似 ρ，非 Sugihara EDM 算法",
+            "⚠ 启发式回退: rho_proxy = 1/(1+CV)，是间隔变异系数倒数，非 Sugihara EDM ρ",
         ]
         card.verdict = "HEURISTIC_STRONG_NARRATIVE_STRUCTURE"
     else:
         card.findings = [
             "无明显高可预测性概念 → 非套路化叙事",
-            "⚠ 启发式回退: 使用间隔变异系数近似 ρ，非 Sugihara EDM 算法",
+            "⚠ 启发式回退: rho_proxy = 1/(1+CV)，是间隔变异系数倒数，非 Sugihara EDM ρ",
         ]
         card.verdict = "HEURISTIC_WEAK_STRUCTURE"
     return card
@@ -464,19 +508,27 @@ def _deploy_havok(adj_matrix, token_list=None) -> WarriorCard:
     adj_matrix = np.asarray(adj_matrix)
     card = WarriorCard("HAVOK", "混沌暗杀者", "X光机", color="⚫", tier="A")
 
+    if adj_matrix.ndim < 2:
+        card.status = "unavailable"
+        card.findings = ["adj_matrix 维度不足，无法做 HAVOK 分析"]
+        return card
+
     T = adj_matrix.shape[0]
     token_len = len(token_list) if token_list else T
-    if T < 20:
+    # SYNC-2 修复 (2026-07-30 审计): 统一阈值为 T<22，与 ALGORITHM_AUDIT.md §3.1
+    # "N<22 触发 HAVOK 不可靠" 文档对齐。原 T<20 是更严格但未文档化的实现阈值。
+    _HAVOK_MIN_T = 22
+    if T < _HAVOK_MIN_T:
         card.status = "unavailable"
         # 概念级矩阵（Web 快速分析）常见场景，给出明确诊断
         if token_len > T * 2:
             card.findings = [
-                f"概念级矩阵尺寸 T={T} < 20，不满足 HAVOK 分解要求",
+                f"概念级矩阵尺寸 T={T} < {_HAVOK_MIN_T}，不满足 HAVOK 分解要求",
                 "→ Web 快速分析使用概念级共现矩阵，HAVOK 不可用是设计权衡",
                 "→ 如需完整 HAVOK，请使用 trace-engine CLI 处理原始 token 级 TRACE 输出",
             ]
         else:
-            card.findings = [f"因果矩阵太小 (T={T} < 20) 无法做 HAVOK 分解"]
+            card.findings = [f"因果矩阵太小 (T={T} < {_HAVOK_MIN_T}) 无法做 HAVOK 分解"]
         return card
 
     try:
@@ -488,12 +540,14 @@ def _deploy_havok(adj_matrix, token_list=None) -> WarriorCard:
 
         # 用原始 token 顺序（不排序！保留时间结构）
         # 取因果活跃度最高的连续区域
+        best_start = 0  # P2-6 修复: 显式初始化，避免条件分支外的引用触发 NameError
         if len(col_mean) > 100:
             # 取滑动窗口方差最大的区域（因果动力学最丰富）
             window = min(80, len(col_mean) // 2)
-            best_start = 0
+            window = max(window, 2)  # P1-6 修复: 强制下界，避免 window=1 时 step=0
             best_var = 0
-            for start in range(0, len(col_mean) - window, window // 2):
+            step = max(1, window // 2)  # 步长至少 1，避免 range(0, n, 0) ValueError
+            for start in range(0, len(col_mean) - window, step):
                 seg = col_mean[start:start + window]
                 if np.var(seg) > best_var:
                     best_var = np.var(seg)
@@ -504,7 +558,13 @@ def _deploy_havok(adj_matrix, token_list=None) -> WarriorCard:
 
         # 去趋势 + 归一化 (保留波动)
         signal = signal - np.mean(signal)
-        signal = signal / (np.std(signal) + 1e-10)
+        # P1 fix: 常数信号 std=0 时 1e-10 太小会产生 inf，用 max(std, 1e-6) 防护
+        _std = np.std(signal)
+        if _std < 1e-8:
+            card.status = "unavailable"
+            card.findings = ["信号方差为零（常数列），无法做 HAVOK 分析"]
+            return card
+        signal = signal / _std
 
         # Hankel 嵌入
         q = min(12, len(signal) // 4)
@@ -590,6 +650,15 @@ def _deploy_havok(adj_matrix, token_list=None) -> WarriorCard:
             ]
             card.verdict = "LINEAR_DOMINANT — 时间线叙事"
 
+        # OPT-5 修复 (2026-07-30 审计): HAVOK 方法学 disclaimer
+        # HAVOK 数学上要求时间序列输入（Hankel 矩阵捕捉时间延迟相关性）。
+        # 此处信号源自因果流入强度的空间序列（按 token 位置排序），
+        # 非真正的时间动力学。verdict 的因果解释力限于位置相关结构。
+        card.findings.append(
+            "⚠ 方法学说明: 信号源自因果流入的空间序列（按 token 位置），"
+            "HAVOK 解释力限于位置相关结构，非真正时间动力学。"
+        )
+
     except Exception as e:
         card.status = "fallback"
         card.findings = [f"HAVOK 分解失败: {e}"]
@@ -614,11 +683,14 @@ def _deploy_dowhy_cf(bridge) -> WarriorCard:
         return card
     ci = DoWhy14Adapter.get_confidence_interval(est)
 
+    _ci_arr = np.asarray(ci, dtype=float).flatten()
+    ci_str = f"[{_ci_arr[0]:.4f}, {_ci_arr[1]:.4f}]" if len(_ci_arr) >= 2 else "N/A"
+
     card.metrics = {
         "treatment": bridge.treatment,
         "outcome": bridge.outcome,
         "ATE": f"{est.value:.4f}",
-        "95%CI": f"[{ci[0]:.4f}, {ci[1]:.4f}]",
+        "95%CI": ci_str,
         "mode": bridge.mode_name,
         "n_edges": len(bridge.significant_edges),
     }
@@ -633,15 +705,18 @@ def _deploy_dowhy_cf(bridge) -> WarriorCard:
 
     # _check 是 dict 而非对象，需用键访问而非 getattr
     n_refuted = 0
+    n_total_refuters = len(bridge.refutation_results)
     for r in bridge.refutation_results.values():
         check = getattr(r, '_check', None)
         refuted = check['refuted'] if isinstance(check, dict) else getattr(r, 'refuted', False)
         if refuted:
             n_refuted += 1
+    # P1-2 修复 (2026-07-30): 分母用实际反驳测试数，避免异常路径下硬编码 "3" 误导
+    n_total = n_total_refuters if n_total_refuters > 0 else 3
     if n_refuted == 0:
-        card.verdict = "ROBUST — 0/3 反驳"
+        card.verdict = f"ROBUST — 0/{n_total} 反驳"
     else:
-        card.verdict = f"CAUTION — {n_refuted}/3 反驳"
+        card.verdict = f"CAUTION — {n_refuted}/{n_total} 反驳"
 
     card.status = "deployed" if not bridge.simulation else "fallback"
     # 避免存储不可序列化的 bridge 对象（to_dict 时会被过滤为 None）
@@ -721,9 +796,10 @@ def _deploy_causallearn(bridge) -> WarriorCard:
             sub_data = sub_data + np.random.default_rng(42).normal(0, jitter_std, size=sub_data.shape)
             card.findings.append(f"数据注入 {jitter_std:.2e} 抖动以修复奇异矩阵")
 
-        # PC (fast: alpha=0.01)
+        # P1-E 修复 (ROUND27 12维度核对): PC alpha 统一为 0.05, 与 counterfactual_bridge.py:1038
+        # 对齐. 原 0.01 导致六战士与 bridge.causallearn_validate() 结果不可复现对比.
         from causallearn.search.ConstraintBased.PC import pc as _pc_alg
-        pc_result = _pc_alg(sub_data, alpha=0.01)
+        pc_result = _pc_alg(sub_data, alpha=0.05)
         pc_edges = set()
         # P0-2 修复 (Round 21 §P0-B): causallearn 节点名 'X1','X2',... 是 1-based,
         # 必须做 -1 转换才能正确索引 sub_names (与 causallearn_validator.py:184-185 一致).
@@ -793,7 +869,7 @@ def _deploy_causallearn(bridge) -> WarriorCard:
 # 六战士合体 — 统一编排
 # ══════════════════════════════════════════════════════════════════════
 
-def assemble_all_six(adj_matrix, token_list, bridge=None, text="", concept_names=None):
+def assemble_all_six(adj_matrix, token_list, bridge=None, text="", concept_names=None, progress_cb=None):
     """
     六战士统一编排 — 生成完整六合一诊断。
 
@@ -819,6 +895,9 @@ def assemble_all_six(adj_matrix, token_list, bridge=None, text="", concept_names
     concept_names : list[str] or None
         concept-level 矩阵对应的概念名列表；当 adj_matrix 为 concept-level 时
         用于 CCM 边级资格检查等需要名称映射的场景。
+    progress_cb : callable or None
+        进度回调函数，签名 progress_cb(step:int, total:int, name:str)。
+        每完成一个战士后调用，用于细粒度进度汇报。
 
     Returns
     -------
@@ -826,19 +905,65 @@ def assemble_all_six(adj_matrix, token_list, bridge=None, text="", concept_names
     """
     cards = {}
 
+    # 六战士部署顺序及中文名，用于进度回调
+    _warrior_steps = [
+        ('trace', 'TRACE 因果提取'),
+        ('ccm', 'CCM 收敛映射'),
+        ('edm', 'EDM 嵌入分析'),
+        ('havok', 'HAVOK 强迫分解'),
+        ('dowhy_cf', 'DoWhy 反事实'),
+        ('causallearn', 'causallearn PC/GES'),
+    ]
+    _step_idx = 0
+    _total_steps = len(_warrior_steps)
+
+    def _report():
+        nonlocal _step_idx
+        if progress_cb:
+            progress_cb(_step_idx, _total_steps, _warrior_steps[_step_idx - 1][1] if _step_idx > 0 else '')
+
     # 🔴 TRACE (Tier-A)
-    cards['trace'] = _deploy_trace(adj_matrix, token_list, bridge=bridge)
+    _step_idx = 1; _report()
+    try:
+        cards['trace'] = _deploy_trace(adj_matrix, token_list, bridge=bridge)
+    except Exception as e:
+        cards['trace'] = WarriorCard("TRACE", "拓扑先锋", "探照灯",
+                                      status="unavailable", color="🔴")
+        cards['trace'].findings = [f"TRACE 战士诊断异常: {e}"]
+        cards['trace'].verdict = f"ERROR — {str(e)[:80]}"
 
     # 🔵 CCM (Tier-B — 启发式诊断层，依赖 edm-takens 真算法，不可用时降级)
-    cards['ccm'] = _deploy_ccm(adj_matrix, token_list, concept_names=concept_names)
+    _step_idx = 2; _report()
+    try:
+        cards['ccm'] = _deploy_ccm(adj_matrix, token_list, concept_names=concept_names)
+    except Exception as e:
+        cards['ccm'] = WarriorCard("CCM", "流形力场", "测谎仪",
+                                    status="unavailable", color="🔵", tier="B")
+        cards['ccm'].findings = [f"CCM 战士诊断异常: {e}"]
+        cards['ccm'].verdict = f"ERROR — {str(e)[:80]}"
 
     # 🟡 EDM (Tier-B — 启发式诊断层，间隔变异系数近似 ρ)
-    cards['edm'] = _deploy_edm(token_list)
+    _step_idx = 3; _report()
+    try:
+        cards['edm'] = _deploy_edm(token_list)
+    except Exception as e:
+        cards['edm'] = WarriorCard("EDM", "时序节拍器", "套路探测器",
+                                    status="unavailable", color="🟡", tier="B")
+        cards['edm'].findings = [f"EDM 战士诊断异常: {e}"]
+        cards['edm'].verdict = f"ERROR — {str(e)[:80]}"
 
     # ⚫ HAVOK (Tier-A)
-    cards['havok'] = _deploy_havok(adj_matrix, token_list)
+    _step_idx = 4; _report()
+    try:
+        cards['havok'] = _deploy_havok(adj_matrix, token_list)
+    except Exception as e:
+        cards['havok'] = WarriorCard("HAVOK", "混沌暗杀者", "X光机",
+                                      status="unavailable", color="⚫", tier="A")
+        cards['havok'].findings = [f"HAVOK 战士诊断异常: {e}"]
+        cards['havok'].verdict = f"ERROR — {str(e)[:80]}"
 
     # 🟡 DoWhy+CF
+    _step_idx = 5; _report()
     if bridge is not None:
         try:
             cards['dowhy_cf'] = _deploy_dowhy_cf(bridge)
@@ -848,6 +973,7 @@ def assemble_all_six(adj_matrix, token_list, bridge=None, text="", concept_names
                                             verdict=f"ERROR — {str(e)[:80]}")
 
     # ⬜ causallearn
+    _step_idx = 6; _report()
     if bridge is not None:
         try:
             cards['causallearn'] = _deploy_causallearn(bridge)

@@ -7,9 +7,9 @@
   <title>TRACE Engine // Causal Inference Terminal</title>
   <!-- debt-09：CSS 拆分为 theme.css（主题变量）+ main.css（样式） -->
   <!-- 共享特摄防卫队基地主题 -->
-  <link rel="stylesheet" href="shared/themes/tokusatsu.css?v=20260729h">
-  <link rel="stylesheet" href="/css/theme.css?v=20260729h">
-  <link rel="stylesheet" href="/css/main.css?v=20260729j">
+  <link rel="stylesheet" href="shared/themes/tokusatsu.css?v=20260803a">
+  <link rel="stylesheet" href="/css/theme.css?v=20260803a">
+  <link rel="stylesheet" href="/css/main.css?v=20260803a">
   <!-- P0 修复 (2026-07-29): 阻止浏览器默认请求 favicon.ico 产生 404 -->
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'/%3E">
 </head>
@@ -26,8 +26,8 @@
       <nav class="base-nav" id="baseNav">
         <span class="nav-label">BASE</span>
         <a class="active" data-port="3000" href="/"><span class="nav-dot"></span>CMD</a>
-        <a data-port="3100" href="http://127.0.0.1:3100"><span class="nav-dot" style="color:#f2c94c"></span>RELAY</a>
-        <a data-port="8000" href="http://127.0.0.1:8000"><span class="nav-dot" style="color:#00ff9d"></span>OBS</a>
+        <a data-port="3100" href="#"><span class="nav-dot" style="color:#f2c94c"></span>RELAY</a>
+        <a data-port="8000" href="#"><span class="nav-dot" style="color:#00ff9d"></span>OBS</a>
       </nav>
       <div class="status-board" id="statusBoard" title="当前运行模式与驱动核心">
         <span class="sb-label">MODE</span>
@@ -284,7 +284,6 @@
               <button id="topoPauseBtn" class="btn-mini secondary topo-pause-btn" title="暂停/继续旋转">⏸</button>
               <button id="topoResetBtn" class="btn-mini secondary topo-pause-btn" title="重置视角">⟲</button>
             </div>
-            <div style="position:absolute;bottom:6px;left:8px;font-size:0.6rem;color:var(--muted);">拖拽旋转 · 滚轮缩放 · 点击节点坍缩为 2D 网络 · 节点大小=出现频次 · 边粗细=因果强度</div>
           </div>
         </div>
         <div id="mainTopology2DView" class="hidden">
@@ -294,7 +293,6 @@
             <div style="position:absolute;top:6px;right:8px;display:flex;gap:6px;">
               <button id="topo2DResetBtn" class="btn-mini secondary topo-2d-reset-btn" title="重置布局">⟲</button>
             </div>
-            <div style="position:absolute;bottom:6px;left:8px;font-size:0.6rem;color:var(--muted);">拖拽节点 · 滚轮缩放 · 点击高亮邻居 · 2D 力导向网络 · 边=因果链接</div>
           </div>
         </div>
 
@@ -335,59 +333,13 @@
        jobs.js 处理任务历史；app.js 最后加载，声明 DOM 引用、附加监听器、执行初始化。 -->
   </div>
 
-  <script src="/js/schema.js?v=20260729k"></script>
-  <script src="/js/sse.js?v=20260729h"></script>
-  <script src="/js/render.js?v=20260729i"></script>
-  <script src="/js/jobs.js?v=20260729h"></script>
-  <script src="/js/app.js?v=20260729h"></script>
+  <script src="/js/schema.js?v=20260803a"></script>
+  <script src="/js/sse.js?v=20260803a"></script>
+  <script src="/js/render.js?v=20260803a"></script>
+  <script src="/js/jobs.js?v=20260803a"></script>
+  <script src="/js/app.js?v=20260803a"></script>
   <!-- P1-2 (§20.12): BASE 导航隧道模式自适应, 替代 9 处硬编码 127.0.0.1:PORT -->
-  <script>
-  (function () {
-    var nav = document.getElementById('baseNav');
-    if (!nav) return;
-    var selfPort = document.body.getAttribute('data-self-port') || '';
-    var host = window.location.hostname;
-    var isTunnel = /trycloudflare\.com$|\.cfargotunnel\.com$/.test(host);
-    var links = nav.querySelectorAll('a[data-port]');
-    links.forEach(function (a) {
-      var port = a.getAttribute('data-port');
-      if (port === selfPort) {
-        // 当前项目: 用相对路径, 隧道/本地均可
-        a.href = '/';
-      } else if (isTunnel) {
-        // 隧道模式跨项目: 从 localStorage 读取已配置的隧道 URL
-        var saved = localStorage.getItem('tunnel_url_' + port);
-        if (saved) {
-          a.href = saved;
-          a.target = '_blank';
-          a.rel = 'noopener';
-        } else {
-          a.href = '#';
-          a.classList.add('tunnel-unconfigured');
-          a.title = '隧道模式下未配置此项目的 URL, 点击配置';
-          a.addEventListener('click', function (e) {
-            e.preventDefault();
-            var label = a.textContent.trim();
-            var input = prompt('请输入 ' + label + ' (端口 ' + port + ') 的隧道 URL (如 https://xxx.trycloudflare.com):');
-            if (input) {
-              try { new URL(input); } catch (err) { alert('URL 格式无效'); return; }
-              localStorage.setItem('tunnel_url_' + port, input);
-              a.href = input;
-              a.target = '_blank';
-              a.rel = 'noopener';
-              a.classList.remove('tunnel-unconfigured');
-            }
-          });
-        }
-      } else {
-        // 本地模式: 保持 127.0.0.1:PORT
-        a.href = 'http://127.0.0.1:' + port;
-        // P1 fix (Round 22 §4): 跨项目跳转在新标签页打开, 避免中断当前页 SSE 实时汇报.
-        a.target = '_blank';
-        a.rel = 'noopener';
-      }
-    });
-  })();
-  </script>
+  <!-- OPT-7 (2026-07-30 审计): 抽取为外部文件, 配合 CSP 移除 unsafe-inline -->
+  <script src="/js/base_nav.js?v=20260803a"></script>
 </body>
 </html>

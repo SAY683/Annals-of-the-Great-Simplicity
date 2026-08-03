@@ -59,7 +59,8 @@ async function loadJobHistory() {
 
     if (data.active && data.active.length > 0) {
       addLine(`ACTIVE: ${data.active.length} job(s)`);
-      data.active.forEach(id => addLine(`  ${id.slice(0, 8)}... running`));
+      // P1-3 修复：id 来自服务端，转义后输出避免 XSS
+      data.active.forEach(id => addLine(`  ${escapeHtml(id.slice(0, 8))}... running`));
     }
 
     if (data.history && data.history.length > 0) {
@@ -73,12 +74,13 @@ async function loadJobHistory() {
         const dur = j.durationMs != null ? ` ${(j.durationMs / 1000).toFixed(1)}s` : '';
         const errMark = j.error ? ' ⚠' : '';
         const retryable = ['error', 'timeout', 'cancelled'].includes(j.status) && j.mode !== 'super';
+        // P1-3 修复：j.id 进入 data-id 属性，需 escapeHtml 防止属性注入 / XSS
         const retryBtn = retryable
-          ? ` <a href="#" class="retry-link" data-id="${j.id}" style="color:var(--accent);text-decoration:none;">[RETRY]</a>`
+          ? ` <a href="#" class="retry-link" data-id="${escapeHtml(j.id)}" style="color:var(--accent);text-decoration:none;">[RETRY]</a>`
           : '';
-        const deleteBtn = ` <a href="#" class="delete-link" data-id="${j.id}" style="color:var(--danger,#ff4444);text-decoration:none;margin-left:3px;">[DEL]</a>`;
+        const deleteBtn = ` <a href="#" class="delete-link" data-id="${escapeHtml(j.id)}" style="color:var(--danger,#ff4444);text-decoration:none;margin-left:3px;">[DEL]</a>`;
         // 显式"详情"链接：提供独立可点击目标，避免与 checkbox/链接的点击区域冲突
-        const detailBtn = ` <a href="#" class="detail-link" data-id="${j.id}" style="color:var(--accent-tokusatsu,#ff9f43);text-decoration:none;margin-left:3px;font-weight:600;">[详情]</a>`;
+        const detailBtn = ` <a href="#" class="detail-link" data-id="${escapeHtml(j.id)}" style="color:var(--accent-tokusatsu,#ff9f43);text-decoration:none;margin-left:3px;font-weight:600;">[详情]</a>`;
         // 截断 textPreview 至 200 字符作为摘要（任务详情模态框入口提示）
         const previewRaw = j.textPreview || '';
         const preview = previewRaw.length > 200 ? previewRaw.slice(0, 200) + '…' : previewRaw;
@@ -90,8 +92,8 @@ async function loadJobHistory() {
 
         const row = addLine(
           `<div class="job-card-row">` +
-          `<input type="checkbox" class="job-cb" data-id="${j.id}">` +
-          `<span class="job-meta">[${ts}] ${j.id.slice(0, 8)}… ${mode} ${j.status}${dur}${errMark}</span>` +
+          `<input type="checkbox" class="job-cb" data-id="${escapeHtml(j.id)}">` +
+          `<span class="job-meta">[${ts}] ${escapeHtml(j.id.slice(0, 8))}… ${escapeHtml(mode)} ${escapeHtml(j.status)}${dur}${errMark}</span>` +
           `<span class="job-actions">${retryBtn}${deleteBtn}${detailBtn}</span>` +
           `</div>` +
           previewHtml
@@ -133,11 +135,36 @@ async function loadJobHistory() {
         cbs.forEach(cb => { cb.checked = selectAllCb.checked; });
         updateBatchUI();
       });
-      jobHistoryTerminal.addEventListener('change', (e) => {
-        if (e.target.classList.contains('job-cb')) {
-          updateBatchUI();
-        }
-      });
+      // P1 修复 (2026-07-30 审计): jobHistoryTerminal 是持久 DOM 元素，
+      // loadJobHistory() 每次调用都会重复绑定 change 监听器导致累积内存泄漏。
+      // 使用 _batchChangeBound 标志确保只绑定一次（事件委托模式）。
+      if (!jobHistoryTerminal._batchChangeBound) {
+        jobHistoryTerminal._batchChangeBound = true;
+        jobHistoryTerminal.addEventListener('change', (e) => {
+          if (e.target.classList.contains('job-cb')) {
+            // 动态查找当前的 updateBatchUI（闭包可能已变更）
+            const cbs = Array.from(jobHistoryTerminal.querySelectorAll('.job-cb'));
+            const checked = cbs.filter(cb => cb.checked);
+            const selAll = document.getElementById('selectAllJobs');
+            if (selAll && cbs.length > 0) {
+              selAll.indeterminate = checked.length > 0 && checked.length < cbs.length;
+              selAll.checked = checked.length === cbs.length;
+            }
+            const batchBtn = document.getElementById('batchDeleteBtn');
+            const selCount = document.getElementById('selectedCount');
+            if (batchBtn && selCount) {
+              if (checked.length > 0) {
+                batchBtn.style.display = 'inline-block';
+                selCount.style.display = 'inline';
+                selCount.textContent = `已选 ${checked.length} 项`;
+              } else {
+                batchBtn.style.display = 'none';
+                selCount.style.display = 'none';
+              }
+            }
+          }
+        });
+      }
 
       function updateBatchUI() {
         const cbs = Array.from(jobCheckboxes());
@@ -365,19 +392,29 @@ async function viewJobDetail(id) {
       const ttlHint = diag.outputTtlMs
         ? `TTL=${Math.round(diag.outputTtlMs / 3600000)}h`
         : 'TTL=?';
+      // P0修复: XSS 防护 — outputDir/resultReason/jobCreatedAt/jobEndedAt
+      // 可能含用户输入或异常堆栈信息，插入 innerHTML 前必须 escapeHtml 转义
+      const _dir = escapeHtml(diag.outputDir || '?');
+      const _ca = escapeHtml(diag.jobCreatedAt || '?');
+      const _en = escapeHtml(diag.jobEndedAt || '?');
       resultData.innerHTML =
-        `<p class="detail-empty">(result.json 未落盘或已被清理 [${ttlHint}])<br>` +
-        `  路径: ${diag.outputDir || '?'}\\result.json<br>` +
-        `  任务创建: ${diag.jobCreatedAt || '?'}  结束: ${diag.jobEndedAt || '?'}</p>`;
+        `<p class="detail-empty">(result.json 未落盘或已被清理 [${escapeHtml(ttlHint)}])<br>` +
+        `  路径: ${_dir}\\result.json<br>` +
+        `  任务创建: ${_ca}  结束: ${_en}</p>`;
     } else if (diag.resultReason && diag.resultReason.startsWith('json_parse_failed')) {
+      // P0修复: resultReason 可能含异常堆栈（含用户输入路径），必须转义
+      const _reason = escapeHtml(diag.resultReason);
+      const _dir = escapeHtml(diag.outputDir || '?');
       resultData.innerHTML =
-        `<p class="detail-empty" style="color:var(--warn,#ffb000);">(result.json 存在但解析失败: ${diag.resultReason})<br>` +
-        `  路径: ${diag.outputDir || '?'}\\result.json<br>` +
+        `<p class="detail-empty" style="color:var(--warn,#ffb000);">(result.json 存在但解析失败: ${_reason})<br>` +
+        `  路径: ${_dir}\\result.json<br>` +
         `  建议: 检查 Python 写盘是否被中途截断</p>`;
     } else {
+      const _reason = escapeHtml(diag.resultReason || 'unknown');
+      const _dir = escapeHtml(diag.outputDir || '?');
       resultData.innerHTML =
-        `<p class="detail-empty">(result.json 读取失败: ${diag.resultReason || 'unknown'})<br>` +
-        `  路径: ${diag.outputDir || '?'}\\result.json</p>`;
+        `<p class="detail-empty">(result.json 读取失败: ${_reason})<br>` +
+        `  路径: ${_dir}\\result.json</p>`;
     }
 
     // 报告
@@ -531,7 +568,6 @@ function renderResultMetrics(r) {
           <button id="detailTopoPauseBtn" class="btn-mini secondary topo-pause-btn" title="暂停/继续旋转">⏸</button>
           <button id="detailTopoResetBtn" class="btn-mini secondary topo-reset-btn" title="重置视角">⟲</button>
         </div>
-        <div style="position:absolute;bottom:6px;left:8px;font-size:0.6rem;color:var(--muted);">拖拽旋转 · 滚轮缩放 · 点击节点坍缩为 2D 网络 · 节点大小=出现频次 · 边粗细=因果强度</div>
       </div>
     </div>`;
     html += `<div id="detailTopology2DView" class="hidden">
@@ -541,7 +577,6 @@ function renderResultMetrics(r) {
         <div style="position:absolute;top:6px;right:8px;display:flex;gap:6px;">
           <button id="detailTopo2DResetBtn" class="btn-mini secondary topo-2d-reset-btn" title="重置布局">⟲</button>
         </div>
-        <div style="position:absolute;bottom:6px;left:8px;font-size:0.6rem;color:var(--muted);">拖拽节点 · 滚轮缩放 · 点击高亮邻居 · 2D 力导向网络 · 边=因果链接</div>
       </div>
     </div>`;
   }

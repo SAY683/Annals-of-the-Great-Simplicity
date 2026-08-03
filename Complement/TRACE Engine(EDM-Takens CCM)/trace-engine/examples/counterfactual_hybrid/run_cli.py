@@ -52,14 +52,16 @@ from pipeline_helpers import run_full_pipeline
 
 
 # 简洁的 ASCII 战队标识
+# P1-H 修复 (ROUND27 12维度核对): 使用 raw string 避免 \| \_ \ 等无效转义序列
+# 触发 SyntaxWarning (Python 3.12+ 升级为 DeprecationWarning, 未来版本变为 SyntaxError)
 ASCII_LOGO = [
-    "    ____  _____  ___   ___   ___  _   _ ",
-    "   / __ \|  __ \|__ \ / _ \ / _ \| \ | |",
-    "  | |  | | |__) |  ) | | | | | | |  \| |",
-    "  | |  | |  _  /  / /| | | | | | | . ` |",
-    "  | |__| | | \ \ / /_| |_| | |_| | |\  |",
-    "   \____/|_|  \_\____|\___/ \___/|_| \_|",
-    "        COUNTERFACTUAL SENTAI v1.0      ",
+    r"    ____  _____  ___   ___   ___  _   _ ",
+    r"   / __ \|  __ \|__ \ / _ \ / _ \| \ | |",
+    r"  | |  | | |__) |  ) | | | | | | |  \| |",
+    r"  | |  | | _  /  / /| | | | | | | . ` |",
+    r"  | |__| | | \ \ / /_| |_| | |_| | |\  |",
+    r"   \____/|_|  \_\____|\___/ \___/|_| \_|",
+    r"        COUNTERFACTUAL SENTAI v1.0      ",
 ]
 
 
@@ -312,6 +314,17 @@ def cmd_real(preset="llama"):
                     log_warn(f"TRACE 缓存已失效（文本内容变更: {cached_hash} → {current_hash}）")
                     log_info("请重新运行: python run_real_pipeline.py")
                     return
+                # P1-6 修复 (Round 27 审计): 比对 model_dir，模型切换后缓存失效。
+                # 原实现仅比对 text_hash，切换模型（如 shehui→shenji）后仍复用旧 adj.npy，
+                # 导致错误的因果边集。当前模型来自 TRACE_MODEL_DIR 环境变量（若设置）。
+                cached_model = meta.get('model_dir', '')
+                _cur_model_env = __import__('os').environ.get('TRACE_MODEL_DIR', '')
+                if _cur_model_env and cached_model:
+                    _cur_model_name = __import__('pathlib').Path(_cur_model_env).name
+                    if cached_model != _cur_model_name:
+                        log_warn(f"TRACE 缓存已失效（模型变更: {cached_model} → {_cur_model_name}）")
+                        log_info("请重新运行: python run_real_pipeline.py")
+                        return
                 log_info(f"TRACE 缓存有效 (hash={cached_hash})")
         except Exception as e:
             log_warn(f"缓存元数据读取失败 ({e})，继续使用缓存")
@@ -344,6 +357,11 @@ def cmd_real(preset="llama"):
         filter_percentile=p.trace2dowhy.filter_percentile,
         random_state=p.trace2dowhy.random_state,
         classical_mode=getattr(p.trace2dowhy, 'classical_mode', False),
+        # P1-1/P1-2 修复 (Round 27 审计): 传入 dowhy/counterfactual section 参数，
+        # 否则 presets.yaml 中的 refutation_deviation_threshold / sem_regularization / sem_alpha 永不生效。
+        refutation_deviation_threshold=getattr(p.get('dowhy') or {}, 'refutation_deviation_threshold', 0.3),
+        sem_regularization=getattr(p.get('counterfactual') or {}, 'sem_regularization', None),
+        sem_alpha=getattr(p.get('counterfactual') or {}, 'sem_alpha', 0.01),
     )
     # debt-05: 管线核心序列抽取到 pipeline_helpers.run_full_pipeline（双轨入口合并）
     run_full_pipeline(bridge, preset=p)

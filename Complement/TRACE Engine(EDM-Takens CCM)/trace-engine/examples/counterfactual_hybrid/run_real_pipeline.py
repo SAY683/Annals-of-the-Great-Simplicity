@@ -141,6 +141,11 @@ def main():
         text = f.read().strip()
     log(f"Text: {len(text):,} chars")
 
+    # P0 修复 (2026-07-30 审计): TEXT_HASH 用于缓存元数据，必须在使用前定义。
+    # 原代码在 line 271 引用 TEXT_HASH 但从未定义，导致 NameError → result.json 永不生成。
+    import hashlib
+    TEXT_HASH = hashlib.md5(text.encode('utf-8')).hexdigest()[:12]
+
     # ═══════════════════════════════════════════════════════════════
     # Step 1: TRACE — compute real ΔNLL adjacency matrix
     # ═══════════════════════════════════════════════════════════════
@@ -286,12 +291,26 @@ def main():
     # classical_mode 由 trace2dowhy 预设控制；显式取出后，其余参数用 ** 展开
     trace_kwargs = dict(p.trace2dowhy)
     classical_mode = trace_kwargs.pop('classical_mode', False)
+    # P1-1/P1-2 修复 (Round 27 审计): 显式传入 dowhy 与 counterfactual section 参数。
+    # 原实现仅展开 trace2dowhy section，导致 presets.yaml 中的
+    # refutation_deviation_threshold / sem_regularization / sem_alpha 永不生效，
+    # SYNC-4 与 ALGORITHM_AUDIT.md §5.3 的"已同步"声明不实。
+    extra_kwargs = {}
+    _dowhy = p.get('dowhy') or {}
+    if 'refutation_deviation_threshold' in _dowhy:
+        extra_kwargs['refutation_deviation_threshold'] = _dowhy['refutation_deviation_threshold']
+    _cf = p.get('counterfactual') or {}
+    if 'sem_regularization' in _cf:
+        extra_kwargs['sem_regularization'] = _cf['sem_regularization']
+    if 'sem_alpha' in _cf:
+        extra_kwargs['sem_alpha'] = _cf['sem_alpha']
     bridge = TRACE2DoWhy(
         adj_matrix=adj_matrix,
         token_list=all_tokens,
         random_state=42,
         classical_mode=classical_mode,
         **trace_kwargs,
+        **extra_kwargs,
     )
     # debt-05: 管线核心序列抽取到 pipeline_helpers.run_full_pipeline（双轨入口合并）
     run_full_pipeline(bridge, preset=p)

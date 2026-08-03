@@ -42,9 +42,18 @@ def _safe_trend_score(values: np.ndarray) -> float:
         return float("nan")
     try:
         rho, _ = spearmanr(idx[mask], values[mask])
-        return float(rho) if np.isfinite(rho) else 0.0
-    except Exception:
-        return 0.0
+        if not np.isfinite(rho):
+            # 盲审 P1-6 修缮 (2026-08-02):
+            # 原版 `return 0.0` 让"统计失败"与"零相关"不可区分, 可能掩盖真实问题.
+            # 现返回 NaN 表示"无法判定", 与 spearmanr 本身对常量输入返回 NaN 的语义一致.
+            return float("nan")
+        return float(rho)
+    except Exception as e:
+        # 同理: 异常时返回 NaN 而非 0.0, 避免掩盖错误.
+        import sys
+        print(f"[data_quality] WARN: _safe_trend_score spearmanr failed: "
+              f"{type(e).__name__}: {e}", file=sys.stderr)
+        return float("nan")
 
 
 def _adf_test(values: np.ndarray) -> Optional[Dict[str, Any]]:

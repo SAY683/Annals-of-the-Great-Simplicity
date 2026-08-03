@@ -5,17 +5,22 @@
   "description": "统一 bridgeParamSchema 的 fallback 定义（debt-16）。server.js 与 public/js/schema.js 都从此加载，避免双端硬编码漂移。当 trace-engine/build_bridge_schema.py 可用时，运行时优先采用其输出（与 presets.yaml 一致）；本文件仅作为缺失时的兜底。同时包含 /api/presets 端点的预设参数定义，复用 llama_worker.py 的 _merge_llama_presets 逻辑。",
   "default": {
     "threshold": { "type": "number", "min": 0, "max": 10, "default": 0.03, "description": "因果边显著性阈值（过拟合 LLaMA 模型建议 0.01-0.05）" },
-    "window_size": { "type": "integer", "min": 2, "max": 256, "default": 64, "description": "TRACE 滑动窗口大小" },
+    "window_size": { "type": "integer", "min": 2, "max": 256, "default": 8, "description": "TRACE 滑动窗口大小（P1-6 修复: 与 presets.default 对齐，原 64 与 preset 8 冲突）" },
     "max_segments": { "type": "integer", "min": 1, "max": 16, "default": 4, "description": "LLaMA TRACE 最大分段数" },
     "max_concepts": { "type": "integer", "min": 1, "max": 128, "default": 12, "description": "最大概念数" },
     "concept_min_freq": { "type": "integer", "min": 1, "max": 1000, "default": 2, "description": "概念最小出现频次" },
     "min_valid_tokens": { "type": "integer", "min": 1, "max": 10000, "default": 10, "description": "最小有效 token 数" },
-    "min_concepts": { "type": "integer", "min": 2, "max": 128, "default": 3, "description": "最小概念数" },
+    "min_concepts": { "type": "integer", "min": 2, "max": 128, "default": 3, "description": "最小概念数（Web 层校验，不转发至 TRACE2DoWhy）" },
     "max_edges_for_dowhy": { "type": "integer", "min": 1, "max": 100, "default": 8, "description": "传入 DoWhy 的最大边数" },
     "filter_mode": { "type": "string", "default": "topn", "description": "边过滤模式 (topn / percentile / adaptive)" },
     "filter_percentile": { "type": "integer", "min": 50, "max": 99, "default": 85, "description": "percentile 模式的百分位" },
     "random_state": { "type": "integer", "min": 0, "max": 999999, "default": 42, "description": "随机种子" },
-    "classical_mode": { "type": "boolean", "default": false, "description": "古汉语模式（Shenji 古文保留之/乎/者/也等虚词）" }
+    "classical_mode": { "type": "boolean", "default": false, "description": "古汉语模式（Shenji 古文保留之/乎/者/也等虚词）" },
+    "sem_regularization": { "type": "string", "default": null, "description": "SEM 正则化 (null/ridge/lasso)。P1-3 修复: 补全 TRACE2DoWhy 接受但 schema 缺失的参数" },
+    "sem_alpha": { "type": "number", "min": 0, "max": 10, "default": 0.01, "description": "SEM 正则化强度" },
+    "refutation_deviation_threshold": { "type": "number", "min": 0, "max": 1, "default": 0.3, "description": "反驳偏差阈值 (30%)" },
+    "simulation": { "type": "boolean", "default": false, "description": "P2-D 修复: 是否使用 SimulationModel 替代真实 DoWhy（无 DoWhy 依赖时可用）" },
+    "min_concept_len": { "type": "integer", "min": 1, "max": 10, "default": null, "description": "P2-D 修复: 概念最小长度（None=不限制，2=仅保留≥2字词）" }
   },
   "llama": {
     "threshold": { "type": "number", "min": 0, "max": 10, "default": 0.01, "description": "因果边显著性阈值（LLaMA V4 过拟合模型专属，建议 0.01-0.03）" },
@@ -29,7 +34,10 @@
     "filter_mode": { "type": "string", "default": "topn", "description": "边过滤模式 (topn / percentile / adaptive)" },
     "filter_percentile": { "type": "integer", "min": 50, "max": 99, "default": 85, "description": "percentile 模式的百分位" },
     "random_state": { "type": "integer", "min": 0, "max": 999999, "default": 42, "description": "随机种子" },
-    "classical_mode": { "type": "boolean", "default": false, "description": "古汉语模式（Shenji 古文保留之/乎/者/也等虚词）" }
+    "classical_mode": { "type": "boolean", "default": false, "description": "古汉语模式（Shenji 古文保留之/乎/者/也等虚词）" },
+    "sem_regularization": { "type": "string", "default": "ridge", "description": "SEM 正则化（llama 预设默认 ridge 稳定小样本）" },
+    "sem_alpha": { "type": "number", "min": 0, "max": 10, "default": 0.01, "description": "SEM 正则化强度" },
+    "refutation_deviation_threshold": { "type": "number", "min": 0, "max": 1, "default": 0.3, "description": "反驳偏差阈值 (30%)" }
   },
   "presets": {
     "default": {

@@ -24,6 +24,14 @@ function cleanupOldOutputs() {
     for (const dir of dirs) {
       const full = require('path').join(OUTPUT_DIR, dir);
       try {
+        // P1-1 修复 (ROUND27 12维度核对): 用 lstatSync 不跟随符号链接,
+        // 防止植入的 symlink 指向系统目录被 rmSync(recursive) 递归删除.
+        // statSync 会跟随 symlink, lstatSync 返回符号链接本身的信息.
+        const lstat = require('fs').lstatSync(full);
+        if (lstat.isSymbolicLink()) {
+          console.warn(`[cleanup] 跳过符号链接: ${dir} (潜在安全风险)`);
+          continue;
+        }
         const stat = require('fs').statSync(full);
         if (now - stat.mtimeMs > CONFIG.outputTtlMs) {
           require('fs').rmSync(full, { recursive: true, force: true });

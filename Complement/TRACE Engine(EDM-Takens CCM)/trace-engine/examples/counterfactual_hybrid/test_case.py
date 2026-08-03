@@ -210,8 +210,9 @@ def test_4_counterfactual(bridge):
     )
     print(f"    观测: {cf_c['observed_outcome']:.4f}")
     print(f"    反事实: {cf_c['counterfactual_outcome']:.4f}")
-    print(f"    ITE: {cf_c['causal_effect']:+.4f}")
-    if cf_c['causal_effect'] > 0.1:
+    print(f"    ITE: {cf_c['causal_effect']:+.4f}" if cf_c['causal_effect'] is not None else "    ITE: N/A")
+    # P1 修复 (2026-07-30 审计): causal_effect 可能为 None（环检测），None > 0.1 抛 TypeError。
+    if cf_c['causal_effect'] is not None and cf_c['causal_effect'] > 0.1:
         print("    → ⚠️ 确认反馈回路!")
     else:
         print("    → 反馈回路效应不显著")

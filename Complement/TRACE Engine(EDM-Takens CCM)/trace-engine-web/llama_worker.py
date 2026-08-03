@@ -95,8 +95,38 @@ from six_warriors import assemble_all_six
 # ══════════════════════════════════════════════════════════════════════
 # 日志/输出辅助
 # ══════════════════════════════════════════════════════════════════════
+def _sanitize_json(obj):
+    """递归将 NaN/Inf 替换为 None，确保 JSON 合法（RFC 8259）。
+
+    P0-3 修复 (2026-07-30): float('nan') 经 json.dumps 输出 "NaN"，
+    前端用严格 JSON 解析器（如 ajv）会失败。此函数在 emit 入口拦截。
+    """
+    if isinstance(obj, float):
+        if obj != obj:  # NaN
+            return None
+        if obj == float('inf'):
+            return None
+        if obj == float('-inf'):
+            return None
+        return obj
+    if isinstance(obj, dict):
+        return {k: _sanitize_json(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [_sanitize_json(v) for v in obj]
+    # numpy 标量兼容
+    if isinstance(obj, (np.floating, np.integer)):
+        v = obj.item()
+        if isinstance(v, float):
+            return v if np.isfinite(v) else None
+        return v
+    if isinstance(obj, np.ndarray):
+        return [_sanitize_json(v) for v in obj.tolist()]
+    return obj
+
+
 def emit(obj: dict):
-    print(json.dumps(obj, ensure_ascii=False), flush=True)
+    # P0-3 修复: 过滤 NaN/Inf，确保 JSON 合法
+    print(json.dumps(_sanitize_json(obj), ensure_ascii=False, allow_nan=False), flush=True)
 
 
 def log(level: str, message: str):
@@ -401,7 +431,7 @@ def _algorithm_sufficiency(diagnostics: Dict[str, Any], concepts: List[str], edg
     }
 
 
-def _run_super_stability(bridge, tokens, config, estimate, n_bootstrap=200, n_permutation=200):
+def _run_super_stability(bridge, tokens, config, estimate, n_bootstrap=200, n_permutation=200, progress_cb=None):
     """SUPER 模式轻量稳定性分析：ATE bootstrap / permutation / K-fold CV + 边稳定性。
 
     与 py_bridge.py 的 _run_stability_analysis 对齐，但：
@@ -428,6 +458,8 @@ def _run_super_stability(bridge, tokens, config, estimate, n_bootstrap=200, n_pe
     token_arr = np.asarray(tokens)
     T = len(tokens)
     for b in range(n_bootstrap):
+        if progress_cb and b % 20 == 0:
+            progress_cb(b, n_bootstrap, '边稳定性')
         idx = rng.integers(0, T, size=T)
         boot_tokens = token_arr[idx].tolist()
         valid_boot = [t for t in boot_tokens if is_valid_concept(t)]
@@ -446,13 +478,17 @@ def _run_super_stability(bridge, tokens, config, estimate, n_bootstrap=200, n_pe
                 if a is None or bb is None or a == bb:
                     continue
                 boot_adj[a, bb] += 1.0
+        # P0 fix: 原实现归一化到 [0,8] 后与 threshold(默认0.03)比较，
+        # 阈值行为随最大共现数漂移，无统计意义。改为用原始计数的百分位阈值。
         if boot_adj.max() > 0:
-            boot_adj = boot_adj / boot_adj.max() * 8.0
+            _edge_threshold = max(1.0, np.percentile(boot_adj[boot_adj > 0], 50))
+        else:
+            _edge_threshold = 1.0
         for s, t in original_edges:
             if s in ci and t in ci:
                 key = f"{s} → {t}"
                 edge_stability.setdefault(key, []).append(
-                    float(boot_adj[ci[s], ci[t]] > threshold)
+                    float(boot_adj[ci[s], ci[t]] >= _edge_threshold)
                 )
 
     # ── ATE 稳定性：数据行级 bootstrap / permutation / CV ──
@@ -468,14 +504,16 @@ def _run_super_stability(bridge, tokens, config, estimate, n_bootstrap=200, n_pe
         try:
             n_rows = df.shape[0]
             covariates = [c for c in df.columns if c not in (treatment_col, outcome_col)]
-            for _ in range(n_bootstrap):
+            for _ab in range(n_bootstrap):
+                if progress_cb and _ab % 20 == 0:
+                    progress_cb(_ab, n_bootstrap, 'ATE bootstrap')
                 idx = rng.integers(0, n_rows, size=n_rows)
                 boot_df = df.iloc[idx]
                 X = boot_df[[treatment_col] + covariates].values
                 y = boot_df[outcome_col].values
                 # ALG-06修复: 添加 intercept 列 (全1)，treatment 系数索引变为 1，避免估计偏差
                 X_intercept = np.hstack([np.ones((X.shape[0], 1)), X])
-                coef = np.linalg.lstsq(X_intercept, y, rcond=None)[0][1]
+                coef = np.linalg.lstsq(X_intercept, y, rcond=1e-10)[0][1]
                 ate_bootstrap.append(float(coef))
         except Exception:
             pass
@@ -485,14 +523,16 @@ def _run_super_stability(bridge, tokens, config, estimate, n_bootstrap=200, n_pe
     if df is not None and treatment_col in df.columns and outcome_col in df.columns:
         try:
             orig_ate = float(estimate.value) if estimate else 0.0
-            for _ in range(n_permutation):
+            for _pt in range(n_permutation):
+                if progress_cb and _pt % 20 == 0:
+                    progress_cb(_pt, n_permutation, '置换检验')
                 perm_df = df.copy()
                 perm_df[treatment_col] = rng.permutation(perm_df[treatment_col].values)
                 X = perm_df[[treatment_col] + [c for c in df.columns if c not in (treatment_col, outcome_col)]].values
                 y = perm_df[outcome_col].values
                 # ALG-06修复: 添加 intercept 列，treatment 系数索引变为 1
                 X_intercept = np.hstack([np.ones((X.shape[0], 1)), X])
-                coef = np.linalg.lstsq(X_intercept, y, rcond=None)[0][1]
+                coef = np.linalg.lstsq(X_intercept, y, rcond=1e-10)[0][1]
                 permutation_ates.append(float(coef))
             # ALG-04修复: p值 +1 修正 (count+1)/(n+1)，避免 p=0 且确保零假设下 p 均匀分布 (Phipson & Smyth 2010)
             if permutation_ates:
@@ -510,7 +550,9 @@ def _run_super_stability(bridge, tokens, config, estimate, n_bootstrap=200, n_pe
         # ALG-05修复: 用 array_split 划分折，避免漏样本，与 DEEP 模式一致
         all_indices = np.arange(n_rows)
         fold_indices = np.array_split(all_indices, n_folds)
-        for test_idx in fold_indices:
+        for _fi, test_idx in enumerate(fold_indices):
+            if progress_cb:
+                progress_cb(_fi, n_folds, 'K-fold CV')
             mask = np.ones(n_rows, dtype=bool)
             mask[test_idx] = False
             try:
@@ -520,7 +562,10 @@ def _run_super_stability(bridge, tokens, config, estimate, n_bootstrap=200, n_pe
                 y_train = train_df[outcome_col].values
                 # ALG-06修复: 添加 intercept 列
                 X_train_int = np.hstack([np.ones((X_train.shape[0], 1)), X_train])
-                coef = np.linalg.lstsq(X_train_int, y_train, rcond=None)[0]
+                coef = np.linalg.lstsq(X_train_int, y_train, rcond=1e-10)[0]
+                # P1 fix: NaN 防护——奇异矩阵上 lstsq 可能返回 NaN 系数
+                if not np.all(np.isfinite(coef)):
+                    continue
                 # ALG-05修复: 改为反事实评估 (treatment=1 vs treatment=0 的预测差均值)
                 # 原代码 np.mean(y_pred) 计算的是 Y 预测均值，非真正的 ATE
                 X_test = test_df[[treatment_col] + [c for c in df.columns if c not in (treatment_col, outcome_col)]].values
@@ -532,7 +577,9 @@ def _run_super_stability(bridge, tokens, config, estimate, n_bootstrap=200, n_pe
                 X_test_t0_int = np.hstack([np.ones((X_test_t0.shape[0], 1)), X_test_t0])
                 y1_pred = X_test_t1_int @ coef
                 y0_pred = X_test_t0_int @ coef
-                cv_ates.append(float(np.mean(y1_pred - y0_pred)))
+                _cv_ate = float(np.mean(y1_pred - y0_pred))
+                if np.isfinite(_cv_ate):
+                    cv_ates.append(_cv_ate)
             except Exception:
                 pass
 
@@ -917,7 +964,7 @@ def run_super_job(job: dict):
     job_id = job.get('id', '')  # 用于取消检查
 
     if not text or not text.strip():
-        error("输入文本为空")
+        fatal_error("输入文本为空")
         return
 
     stage("init", f"SUPER 任务启动 [模型={model_name}]", 0.0)
@@ -927,7 +974,7 @@ def run_super_job(job: dict):
     env_diag = _check_environment(model_name)
     log("info", f"环境研判: torch={env_diag['torch_version']}, cuda={env_diag['cuda_available']}, model_dir_exists={env_diag.get('model_dir_exists')}")
     if not env_diag.get('model_dir_exists'):
-        error(f"模型目录不存在: {env_diag.get('model_dir')}。请确认 trace-engine 与 trace-engine-web 处于同一层级目录，且模型已同步。")
+        fatal_error(f"模型目录不存在: {env_diag.get('model_dir')}。请确认 trace-engine 与 trace-engine-web 处于同一层级目录，且模型已同步。")
         return
     timer.end()
 
@@ -936,7 +983,7 @@ def run_super_job(job: dict):
     try:
         model, sp = MODEL_CACHE.load(model_name)
     except Exception as e:
-        error(f"模型加载失败: {e}")
+        fatal_error(f"模型加载失败: {e}")
         return
     timer.end()
 
@@ -967,7 +1014,7 @@ def run_super_job(job: dict):
 
     min_tokens = max(16, config.get('min_valid_tokens', 10))
     if token_diagnostics['n_tokens'] < min_tokens:
-        error(f"输入文本过短，无法执行 token-level TRACE。当前 {token_diagnostics['n_tokens']} tokens，至少需要 {min_tokens} tokens。")
+        fatal_error(f"输入文本过短，无法执行 token-level TRACE。当前 {token_diagnostics['n_tokens']} tokens，至少需要 {min_tokens} tokens。")
         return
 
     # 1.6 耗时预检：在真正计算前告诉用户大致需要多久，避免长时间黑盒等待
@@ -1088,9 +1135,54 @@ def run_super_job(job: dict):
     # 5. 六战士诊断
     _check_cancel(job_id, "six_warriors")
     timer.begin("six_warriors")
-    stage("six_warriors", "六战士合体诊断...", 0.8)
+    stage("six_warriors", "六战士合体诊断...", 0.80)
     try:
-        cards = assemble_all_six(adj_matrix, tokens, bridge=bridge, text=text[:500])
+        # 方案A: 用 progress_cb 细粒度汇报六战士进度 (0.80~0.88 区间)
+        # P1 fix (Round 26): 增加心跳线程，在单个战士内部长时间运行时平滑推进进度条，
+        # 避免卡在 83% 等固定百分比造成"假死"观感。
+        _sw_state = {
+            'running': True,
+            'current_pct': 0.80,
+            'current_step': 0,
+            'total': 6,
+            'current_name': '初始化',
+            'base_pct': 0.80,
+            'range_pct': 0.08,
+        }
+
+        def _sw_progress_cb(step, total, name):
+            if name:
+                log("info", f"六战士进度: {step}/{total} — {name}")
+                _sw_state['current_step'] = step
+                _sw_state['total'] = total
+                _sw_state['current_name'] = name
+                pct = _sw_state['base_pct'] + (step / total) * _sw_state['range_pct']
+                _sw_state['current_pct'] = max(_sw_state['current_pct'], pct)
+                stage("six_warriors", f"六战士 {step}/{total}: {name}", _sw_state['current_pct'])
+
+        def _sw_heartbeat():
+            while _sw_state['running']:
+                time.sleep(1.0)
+                if not _sw_state['running']:
+                    break
+                step = _sw_state['current_step']
+                total = _sw_state['total']
+                step_size = _sw_state['range_pct'] / max(total, 1)
+                next_step_pct = _sw_state['base_pct'] + ((step + 1) / max(total, 1)) * _sw_state['range_pct']
+                # P1 fix (Round 26 §2): 每 1s 在当前步骤区间内推进 12%，
+                # 让长时间运行的 CCM/HAVOK 等步骤的进度条平滑移动，避免卡在 83%。
+                new_pct = min(_sw_state['current_pct'] + step_size * 0.12, next_step_pct - 0.001)
+                if new_pct > _sw_state['current_pct']:
+                    _sw_state['current_pct'] = new_pct
+                    stage("six_warriors", f"六战士 {step}/{total}: {_sw_state['current_name']} (处理中...)", new_pct)
+
+        _hb_thread = threading.Thread(target=_sw_heartbeat, daemon=True)
+        _hb_thread.start()
+        try:
+            cards = assemble_all_six(adj_matrix, tokens, bridge=bridge, text=text[:500], progress_cb=_sw_progress_cb)
+        finally:
+            _sw_state['running'] = False
+            _hb_thread.join(timeout=2)
     except Exception as e:
         recoverable_error(f"六战士诊断部分失败: {e}")
         cards = {}
@@ -1109,14 +1201,67 @@ def run_super_job(job: dict):
 
     # 6.5 稳定性分析（与 DEEP 模式对齐）
     timer.begin("stability")
-    stage("stability", f"稳定性与鲁棒性分析 (bootstrap n={sim_count} / permutation n={sim_count} / CV)...", 0.95)
+    stage("stability", f"稳定性与鲁棒性分析 (bootstrap n={sim_count} / permutation n={sim_count} / CV)...", 0.91)
     stability_analysis = {}
     try:
         log("info", f"SUPER 稳定性分析启动: n_bootstrap={sim_count}, n_permutation={sim_count}, n_folds=3")
-        stability_analysis = _heartbeat_log(f"稳定性分析 (bootstrap/permutation n={sim_count})")(lambda: _run_super_stability(
-            bridge, tokens, config, bridge.estimate_result,
-            n_bootstrap=sim_count, n_permutation=sim_count,
-        ))
+        # 方案A: 稳定性分析细粒度进度回调 (0.91~0.95 区间)
+        # P1 fix (Round 26 §4): 增加心跳线程，bootstrap / permutation 等阶段内部也能平滑推进，
+        # 避免长时间停留在 91% 等固定百分比。
+        _stab_phases = ['边稳定性', 'ATE bootstrap', '置换检验', 'K-fold CV']
+        _stab_state = {
+            'running': True,
+            'base_pct': 0.91,
+            'range_pct': 0.04,
+            'phase_idx': 0,
+            'phase_total': len(_stab_phases),
+            'current_name': '初始化',
+            'current_pct': 0.91,
+            'step': 0,
+            'total': 1,
+        }
+
+        def _stab_progress_cb(step, total, name):
+            if name in _stab_phases:
+                _stab_state['phase_idx'] = _stab_phases.index(name)
+            _stab_state['current_name'] = name
+            _stab_state['step'] = step
+            _stab_state['total'] = max(total, 1)
+            phase_idx = _stab_state['phase_idx']
+            phase_count = _stab_state['phase_total']
+            intra = step / max(total, 1)
+            _stab_pct = _stab_state['base_pct'] + ((phase_idx + intra) / phase_count) * _stab_state['range_pct']
+            _stab_state['current_pct'] = max(_stab_state['current_pct'], _stab_pct)
+            stage("stability", f"稳定性分析: {name} {step}/{total}", _stab_state['current_pct'])
+
+        def _stab_heartbeat():
+            while _stab_state['running']:
+                time.sleep(1.0)
+                if not _stab_state['running']:
+                    break
+                phase_idx = _stab_state['phase_idx']
+                phase_count = _stab_state['phase_total']
+                step = _stab_state['step']
+                total = _stab_state['total']
+                phase_size = _stab_state['range_pct'] / max(phase_count, 1)
+                step_size = phase_size / max(total, 1)
+                next_step_pct = _stab_state['base_pct'] + ((phase_idx + ((step + 1) / max(total, 1))) / phase_count) * _stab_state['range_pct']
+                new_pct = min(_stab_state['current_pct'] + step_size * 0.12, next_step_pct - 0.001)
+                if new_pct > _stab_state['current_pct']:
+                    _stab_state['current_pct'] = new_pct
+                    stage("stability", f"稳定性分析: {_stab_state['current_name']} {step}/{total} (处理中...)", new_pct)
+
+        _stab_hb_thread = threading.Thread(target=_stab_heartbeat, daemon=True)
+        _stab_hb_thread.start()
+        try:
+            stability_analysis = _run_super_stability(
+                bridge, tokens, config, bridge.estimate_result,
+                n_bootstrap=sim_count, n_permutation=sim_count,
+                progress_cb=_stab_progress_cb,
+            )
+        finally:
+            _stab_state['running'] = False
+            _stab_hb_thread.join(timeout=2)
         log("info", f"稳定性分析完成: edge_stability_mean={stability_analysis.get('edge_stability_mean', 0):.3f}")
     except Exception as e:
         log("warn", f"稳定性分析部分失败: {e}")
@@ -1159,6 +1304,18 @@ def run_super_job(job: dict):
         "signal_type": "delta_nll",  # SUPER 模式为真实 ΔNLL, 区分于 LIGHT 模式的 co_occurrence
     }
 
+    # P1 fix (Round 26): SUPER 模式返回 concept-level 聚合矩阵，维度与 concepts 一致，
+    # 避免前端因 token 级矩阵（855×855）与 concepts（12）维度不匹配而降级成全 0 矩阵。
+    concept_adj = getattr(bridge, 'concept_adj', None)
+    if concept_adj is not None and len(bridge.concept_names) == concept_adj.shape[0]:
+        other_idx = bridge.concept_names.index("<other>") if "<other>" in bridge.concept_names else -1
+        keep = [i for i in range(len(bridge.concept_names)) if i != other_idx]
+        concept_adj_filtered = concept_adj[np.ix_(keep, keep)] if keep else concept_adj
+        adjacency_matrix_for_frontend = concept_adj_filtered
+    else:
+        # fallback: 返回 concept_adj 本身（含 <other>），避免维度不匹配
+        adjacency_matrix_for_frontend = concept_adj if concept_adj is not None else np.zeros((0, 0))
+
     result = {
         "success": True,
         "analysis_mode": "super",
@@ -1167,18 +1324,20 @@ def run_super_job(job: dict):
         "concepts": [c for c in bridge.concept_names if c != "<other>"],
         "concept_frequencies": {k: v for k, v in concept_frequencies.items() if k != "<other>"},
         # P1 fix (Round 24 §4): 补全 adjacency_matrix, 让前端热力词矩阵在 SUPER 模式也能显示.
-        # SUPER 模式的 adj_matrix 来自 LLaMA counterfactual probing (真实 ΔNLL),
-        # 比 LIGHT/DEEP 的共现计数更有价值, 应当呈现给用户.
-        "adjacency_matrix": adj_matrix.tolist() if adj_matrix is not None else [],
+        # P1 fix (Round 26): 使用 concept-level 聚合矩阵，确保维度与 concepts 匹配.
+        "adjacency_matrix": adjacency_matrix_for_frontend.tolist() if adjacency_matrix_for_frontend is not None else [],
         "n_significant_edges": len(bridge.significant_edges),
         "top_edges": [
-            {"source": e[0], "target": e[1], "strength": e[2], "direction": "→"}
+            # P1修复: e[2] 可能为 numpy.float64, json.dumps 无法序列化, 显式 float()
+            {"source": e[0], "target": e[1], "strength": float(e[2]), "direction": "→"}
             for e in bridge.significant_edges[:20]
         ],
         "treatment": bridge.treatment,
         "outcome": bridge.outcome,
-        "ate": est.value if est else None,
-        "confidence_interval": ci,
+        # P1修复: est.value 可能为 numpy.float64, 显式 float() 转换
+        "ate": float(est.value) if est is not None and est.value is not None else None,
+        # P1修复: ci 可能为 [numpy.float64, numpy.float64] 或含 None, 统一转换
+        "confidence_interval": [float(x) if x is not None else None for x in ci] if ci else [None, None],
         "identifiable": identifiable,
         "refutations": _serialize_refutations(bridge.refutation_results),
         # P1-7：将 scan_results 转换为与 py_bridge.py 一致的统一结构，避免前端字段不匹配

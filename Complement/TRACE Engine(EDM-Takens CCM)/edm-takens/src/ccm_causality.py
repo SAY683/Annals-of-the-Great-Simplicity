@@ -138,8 +138,13 @@ def ccm_causality_test(df, cause_var, effect_var, E, lib_sizes=None,
     n = len(df)
     if lib_sizes is None:
         # 深度复审修复：pyEDM 要求 libSize >= E+2，原默认起始值 5 对 E>=4 无效
+        # P1 修复 (ROUND33 三视角评审-算法工程师): 步长硬编码为 3 会导致
+        # n=300 时生成 ~98 个库大小点, Spearman p 值假性趋近 0.
+        # 改为自适应步长, 目标 ~12 个点 (与 six_warriors.py _ccm_with_convergence 对齐).
         min_lib = E + 2
-        lib_sizes = f'{min_lib} {max(n - 2, min_lib)} 3'
+        max_lib = max(n - 2, min_lib)
+        _step = max(2, (max_lib - min_lib) // 12)
+        lib_sizes = f'{min_lib} {max_lib} {_step}'
     if sample is None:
         sample = min(50, n)
 
@@ -283,7 +288,10 @@ def ccm_causality_test(df, cause_var, effect_var, E, lib_sizes=None,
         # ALG-09 修复: 结构化 disclaimer 为 disclaimer_text + disclaimer_level 字段
         # 下游消费方应优先读取 disclaimer_text (结构化) 而非 disclaimer (遗留字符串)
         'disclaimer_text': common_driver_disclaimer(),
-        'disclaimer_level': 'escalated' if _count_significant_pairs_for_disclaimer(fwd, rev) >= 3 else 'base',
+        # P2 修复 (ROUND33 三视角评审-算法工程师): 阈值 >= 3 永远不触发
+        # (单次 ccm_causality_test 只测试 1 对变量的 2 个方向, count 最大为 2).
+        # 改为 >= 2: forward + reverse 都收敛即视为双向因果, 触发 escalated.
+        'disclaimer_level': 'escalated' if _count_significant_pairs_for_disclaimer(fwd, rev) >= 2 else 'base',
     }
 
 
@@ -596,7 +604,12 @@ def ccm_batch_test(df, pairs, E, analysis_label: str = 'exploratory',
                 # 生成 IAAFT surrogate (保留幅度分布和功率谱, 破坏相位耦合)
                 _surrs = iaaft_surrogates(_real_series,
                                           n_surrogates=n_surrogates,
-                                          seed=surrogate_seed + hash((cause, effect)) % 1000,
+                                          # P1 修复 (ROUND33 三视角评审-算法工程师):
+                                          # Python 3.3+ 默认开启字符串哈希随机化 (PYTHONHASHSEED),
+                                          # hash((cause, effect)) 每次进程启动返回不同值,
+                                          # 导致同一份数据跑出不同 surrogate p 值, 违反可重现性.
+                                          # 改用 hashlib.md5 确定性哈希.
+                                          seed=surrogate_seed + int(__import__('hashlib').md5(f"{cause},{effect}".encode()).hexdigest()[:8], 16) % 1000,
                                           max_iter=20)
                 # 对每个 surrogate 重新计算 CCM ρ, 构建 null 分布
                 _surr_rhos = []

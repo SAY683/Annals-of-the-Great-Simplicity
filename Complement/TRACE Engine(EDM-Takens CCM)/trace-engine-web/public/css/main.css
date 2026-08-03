@@ -214,8 +214,16 @@ input[type="text"], input[type="number"], input[type="file"], select, button {
 }
 .panel-body {
   padding: clamp(0.7rem, 1.3vw, 1.05rem);
-  overflow-y: auto;
-  overscroll-behavior: contain;
+  /* P1 fix (Round 26): 默认不捕获滚轮，避免结果面板等长内容区域拦截页面滚动。
+     需要内部滚动的组件（.terminal / #jobHistoryTerminal）已单独声明 overflow。 */
+  overflow-y: visible;
+  overscroll-behavior: auto;
+  touch-action: pan-y;
+}
+/* 结果面板主体随页面滚动，不建立独立滚动容器 */
+.result-fullwidth .panel-body {
+  overflow-y: visible;
+  overscroll-behavior: auto;
 }
 
 label {
@@ -694,14 +702,20 @@ button.danger:hover:not(:disabled) { background: rgba(255, 77, 77, 0.08); }
 .terminal-line.job-card .job-actions a {
   white-space: nowrap;
 }
-/* Fix: job-card 预览文字堆叠 — 桌面端也需 flex:1 1 100% 强制换行 (P3 修缮 2026-07-29) */
+/* P0+ 硬修复 (2026-07-29): job-preview 必须独占一行、与上下卡片隔离，
+   避免长文本换行后垂直重叠造成"重影"。 */
 .terminal-line.job-card .job-preview {
-  flex: 1 1 100%;
+  flex: 0 0 calc(100% - 1.5rem);
   order: 4;
-  margin-top: 0.15rem;
+  width: calc(100% - 1.5rem);
+  margin-top: 0.2rem;
   margin-left: 1.5rem;
-  line-height: 1.3;
+  padding: 0.2rem 0;
+  line-height: 1.45;
   word-break: break-word;
+  overflow-wrap: anywhere;
+  color: var(--muted);
+  font-size: clamp(0.62rem, 0.82vw, 0.72rem);
 }
 .terminal-line .log-meta { flex-shrink: 0; display: flex; gap: 0.35rem; align-items: center; }
 .terminal-line .log-ts { color: var(--muted); font-size: 0.65rem; }
@@ -951,22 +965,39 @@ details > div { padding: 0.75rem; }
   margin-top: 0.5rem;
   overflow-x: auto;
   padding-bottom: 0.25rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 240px;
+  width: 100%;
+}
+#mainMatrixView {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-height: min(60vh, 520px);
+  width: 100%;
+  padding: 0.5rem 0;
 }
 .adj-matrix {
   display: grid;
-  gap: 2px;
+  gap: 3px;
   font-family: var(--font-mono);
-  font-size: clamp(0.58rem, 0.82vw, 0.68rem);
+  font-size: clamp(0.72rem, 1.15vw, 0.92rem);
   align-items: stretch;
+  justify-content: center;
+  margin: 0 auto;
+  width: fit-content;
 }
 .adj-corner {
   min-width: 84px;
   max-width: 120px;
-  height: 52px;
+  height: 68px;
 }
 .adj-col-header {
   position: relative;
-  height: 52px;
+  height: 68px;
   display: flex;
   align-items: flex-end;
   justify-content: center;
@@ -978,40 +1009,42 @@ details > div { padding: 0.75rem; }
   transform-origin: center bottom;
   white-space: nowrap;
   color: var(--muted);
-  font-size: clamp(0.6rem, 0.82vw, 0.7rem);
-  max-width: 100px;
+  font-size: clamp(0.7rem, 1.1vw, 0.88rem);
+  max-width: 120px;
   overflow: hidden;
   text-overflow: ellipsis;
   line-height: 1;
 }
 .adj-row-header {
-  min-width: 84px;
+  width: 100%;
   max-width: 120px;
-  height: 32px;
+  height: 46px;
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  padding-right: 0.45rem;
+  padding-right: 0.4rem;
   color: var(--muted);
-  font-size: clamp(0.62rem, 0.85vw, 0.72rem);
+  font-size: clamp(0.74rem, 1.15vw, 0.9rem);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  box-sizing: border-box;
 }
 .adj-cell {
   aspect-ratio: 1;
   display: grid;
   place-items: center;
-  border-radius: 2px;
+  border-radius: 3px;
   color: var(--text);
-  min-width: 28px;
-  min-height: 28px;
+  min-width: 40px;
+  min-height: 40px;
   transition: transform 0.1s;
 }
 .adj-cell:hover { transform: scale(1.15); z-index: 2; border-radius: 4px; }
 .adj-legend {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 0.6rem;
   margin-top: 0.6rem;
   font-family: var(--font-mono);
@@ -1081,7 +1114,9 @@ details > div { padding: 0.75rem; }
   transform: scale(1.01);
 }
 
-@media (max-width: 768px) {
+/* R18 修复 (P3-P5 全级别修缮): 原 768px 改为 900px, 与共享主题 tokusatsu.css
+   及 trace-to-edm/edm-takens-web 对齐, 消除三方响应式断点差异. */
+@media (max-width: 900px) {
   #app .base-header {
     grid-template-columns: 1fr;
     gap: 8px;
@@ -1232,8 +1267,11 @@ details > div { padding: 0.75rem; }
   .preset-btn { width: 100%; text-align: center; }
 }
 
-/* ── 超窄屏（手机 ≤480px）专项优化 ── */
-@media (max-width: 480px) {
+/* ── 超窄屏（手机 ≤520px）专项优化 ──
+   R18 修复 (P3-P5 全级别修缮): 统一三方项目移动端断点.
+   原 480px 与共享主题 tokusatsu.css (900/520)、trace-to-edm (900/520)、
+   edm-takens-web (900/520) 不一致. 改为 520px 与三方对齐, 消除响应式布局差异. */
+@media (max-width: 520px) {
   #app { font-size: 14px; }
   #app .base-header { padding: 5px 8px; gap: 6px; }
   #app .base-header .header-left h1 { font-size: 0.95rem; gap: 0.3em; }
@@ -1322,6 +1360,7 @@ details > div { padding: 0.75rem; }
   display: flex;
   flex-direction: column;
   gap: 0.6rem;
+  touch-action: pan-y;
 }
 /* 复用 details 折叠块，但展开内容不嵌套 padding 双层 */
 .modal-body > details > summary {
@@ -1474,10 +1513,11 @@ details > div { padding: 0.75rem; }
   line-height: 1.25;
 }
 #jobHistoryTerminal .terminal-line.job-card {
-  padding: 0.15rem 0.35rem 0.15rem 0.35rem !important;
-  margin-bottom: 0.04rem !important;
-  line-height: 1.2;
-  min-height: 20px;
+  padding: 0.2rem 0.35rem 0.2rem 0.35rem !important;
+  margin-bottom: 0.35rem !important;
+  line-height: 1.35;
+  min-height: unset;
+  height: auto;
 }
 #jobHistoryTerminal .batch-toolbar {
   min-height: 22px;

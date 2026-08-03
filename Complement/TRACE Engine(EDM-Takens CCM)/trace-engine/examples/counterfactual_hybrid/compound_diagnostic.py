@@ -6,12 +6,15 @@ Compound Diagnostic Engine — 复合诊断引擎
 产出文本类型分类与复合诊断结论。
 
 规则矩阵:
-  1. CCM fails + EDM ρ>0.9 + HAVOK linear>80%
+  1. CCM fails + EDM ρ>0.8 + HAVOK linear>80%
      → 叙事文（结构清晰的线性叙事）
   2. CCM converges + EDM ρ moderate + HAVOK nonlinear>30%
      → 论证文（递归逻辑纠缠）
   3. TRACE sparse + CCM fails + EDM ρ intermediate + HAVOK linear>70%
      → 说明文（描述性文本，无深层因果结构）
+
+注: ρ 阈值 0.8 与 six_warriors.py:_deploy_edm 的 high_rho 判定 (r > 0.8) 对齐。
+    本字段为 interval_regularity（间隔变异系数倒数），非 Sugihara EDM ρ。
 
 用法:
     from compound_diagnostic import CompoundDiagnosticEngine
@@ -200,7 +203,7 @@ class CompoundDiagnosticEngine:
         return m
 
     def _rule_narrative(self, m: dict) -> bool:
-        """规则1: CCM fails + EDM ρ>0.9 + HAVOK linear>80% → 叙事文"""
+        """规则1: CCM fails + EDM ρ>0.8 + HAVOK linear>80% → 叙事文"""
         return (
             m["ccm_failed"]
             and m["edm_rho_high"]

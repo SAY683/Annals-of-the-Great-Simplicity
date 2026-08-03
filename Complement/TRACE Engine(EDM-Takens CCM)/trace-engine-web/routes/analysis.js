@@ -102,6 +102,11 @@ function handleAnalyzeStream(req, res) {
     return;
   }
 
+  // P0-5 修复 (ROUND27 12维度核对): 消除 size 检查与 activeJobs.set 之间的 TOCTOU 窗口.
+  // 两个并发请求可同时通过 size 检查, 然后 spawn 后才 set, 突破 maxConcurrentJobs.
+  // 现在检查通过后立即占位, runPythonAnalysisStream/runSuperAnalysisStream 会覆盖它.
+  activeJobs.set(id, { placeholder: true, mode });
+
   if (mode === 'super') {
     runSuperAnalysisStream(text, id, bridgeConfig, res);
   } else {
@@ -219,6 +224,10 @@ router.post('/analyze-file', upload.single('file'), async (req, res) => {
 // ── 主动取消任务 ────────────────────────────────────────────────────
 router.post('/cancel/:id', (req, res) => {
   const id = req.params.id;
+  // P1-1 修复 (2026-07-30): cancel 路由补 UUID 校验，路径遍历返回 400 而非 404
+  if (!utils.isValidId(id)) {
+    return res.status(400).json({ success: false, error: '非法的任务 ID', code: 'INVALID_ID' });
+  }
   const queueIdx = jobQueue.findIndex((j) => j.id === id);
   if (queueIdx >= 0) {
     const removed = jobQueue.splice(queueIdx, 1)[0];
@@ -226,7 +235,7 @@ router.post('/cancel/:id', (req, res) => {
     // 之前仅 res.end() 导致前端看不到终止信号，可能触发自动重连
     try {
       sendSSE(removed.res, 'error', { message: '任务在队列中被取消' });
-      sendSSE(removed.res, 'done', { code: 125 });
+      sendSSE(removed.res, 'done', { code: 125, job_id: id });
       removed.res.end();
     } catch (_) {}
     utils.recordJob(id, removed.mode, 'cancelled', '任务在队列中被取消');
@@ -248,7 +257,7 @@ router.post('/cancel/:id', (req, res) => {
     if (jobRes) {
       try {
         sendSSE(jobRes.res, 'error', { message: '用户主动停止计算' });
-        sendSSE(jobRes.res, 'done', { code: 125 });
+        sendSSE(jobRes.res, 'done', { code: 125, job_id: id });
         jobRes.res.end();
       } catch (_) {}
     }
@@ -275,7 +284,7 @@ router.post('/cancel/:id', (req, res) => {
     if (jobRes) {
       try {
         sendSSE(jobRes.res, 'error', { message: '用户主动停止计算' });
-        sendSSE(jobRes.res, 'done', { code: 125 });
+        sendSSE(jobRes.res, 'done', { code: 125, job_id: id });
         jobRes.res.end();
       } catch (_) {}
     }
@@ -295,7 +304,7 @@ router.post('/cancel/:id', (req, res) => {
   if (jobRes) {
     try {
       sendSSE(jobRes.res, 'error', { message: '用户主动停止计算' });
-      sendSSE(jobRes.res, 'done', { code: 125 });
+      sendSSE(jobRes.res, 'done', { code: 125, job_id: id });
       jobRes.res.end();
     } catch (_) {}
   }
@@ -360,14 +369,16 @@ router.post('/retry/:id', async (req, res) => {
   if (old.config) {
     try { retryCfgObj = JSON.parse(old.config); } catch (_) { retryCfgObj = null; }
   }
-  const retryValidation = validateAnalysisInput(retryText, old.mode || 'light', retryCfgObj, _schemaCtx);
+  // P0 修复: 旧 job_history 可能存有大写 mode，统一转小写兜底
+  const retryMode = String(old.mode || 'light').toLowerCase();
+  const retryValidation = validateAnalysisInput(retryText, retryMode, retryCfgObj, _schemaCtx);
   if (!retryValidation.ok) {
     return res.status(400).json({ success: false, error: retryValidation.error, code: retryValidation.code || 'RETRY_VALIDATION_FAILED', field: retryValidation.field, originalId: id });
   }
   const retryConfig = retryCfgObj && typeof retryCfgObj === 'object' ? JSON.stringify(retryCfgObj) : (old.config || '');
   const newId = uuidv4();
   try {
-    const data = await runPythonAnalysisSync(retryText, newId, old.mode || 'light', retryConfig);
+    const data = await runPythonAnalysisSync(retryText, newId, retryMode, retryConfig);
     res.json({ success: true, message: '重试任务已启动', originalId: id, newId, data });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });

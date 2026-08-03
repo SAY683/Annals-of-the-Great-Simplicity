@@ -662,15 +662,20 @@ def main():
     scan_list = []
     for r in scan:
         def _safe_float(v):
+            # P1 修复 (ROUND31 阶段C): r.get("ite", float('nan')) 在 r["ite"] 显式为 None 时
+            # 不会触发默认值, 而是返回 None, float(None) 会 TypeError 中断整个管线。
+            # 增加 None 短路返回, 与 NaN 同等处理。
+            if v is None:
+                return None
             f = float(v)
             return None if np.isnan(f) else f
         item = {
             "source": r["source"],
             "target": r["target"],
             "trace_dnl": _safe_float(r["trace_dnl"]),
-            "ite": _safe_float(r.get("ite", float('nan'))),
-            "observed": _safe_float(r.get("observed", float('nan'))),
-            "counterfactual": _safe_float(r.get("counterfactual", float('nan'))),
+            "ite": _safe_float(r.get("ite")),
+            "observed": _safe_float(r.get("observed")),
+            "counterfactual": _safe_float(r.get("counterfactual")),
         }
         if "error" in r:
             item["error"] = r["error"]

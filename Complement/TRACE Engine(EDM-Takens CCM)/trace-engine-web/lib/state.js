@@ -57,6 +57,9 @@ initWorkDir();
 // ── 系统配置 ───────────────────────────────────────────────────────────
 const CONFIG = {
   port: parseInt(process.env.PORT || '3000', 10),
+  // P1-5 修复 (Round 27 审计): host 纳入 CONFIG，供 /api/health 与 /api/config 暴露，
+  // 避免 server.js 绕过 CONFIG 直接读 env 导致前端/运维无法通过 API 确认绑定地址。
+  host: process.env.TRACE_HOST || '127.0.0.1',
   skillDir: process.env.TRACE_ENGINE_SKILL_DIR
     ? path.resolve(process.env.TRACE_ENGINE_SKILL_DIR)
     : path.resolve(__dirname, '..', '..', 'trace-engine', 'examples', 'counterfactual_hybrid'),

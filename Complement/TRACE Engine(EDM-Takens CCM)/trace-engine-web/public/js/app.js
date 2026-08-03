@@ -132,9 +132,10 @@ function setRunning(running) {
   else stopElapsedTimer();
 }
 
-function updateProgress(stage, progress) {
+function updateProgress(stage, progress, message) {
   const s = stage.toUpperCase();
-  stageName.textContent = s;
+  // 方案B: 如果有 message，显示 message 作为阶段名（含子任务详情），否则显示 stage
+  stageName.textContent = message || s;
   logStageBadge.textContent = s;
   const pct = progress !== null ? Math.round(progress * 100) : 0;
   // P1 fix (Round 23 §续): 单调递增守卫, 防止SSE事件乱序或阶段切换导致进度回跳
@@ -244,6 +245,9 @@ async function startAnalysis() {
 
   // 使用 POST + fetch + ReadableStream 消费 SSE，避免长文本 URL 超限
   streamAbort = new AbortController();
+  // P1-1 修复：新任务启动时重置 lastSseEventId，避免上一任务的 SSE 事件 ID
+  // 漏到本次 doFetch 的 Last-Event-ID 请求头中（导致服务端误判为重连）
+  resetLastEventId();
   // debt-11：构建请求头，重连时携带 Last-Event-ID（lastSseEventId 由 sse.js 维护）
   // P0 修缮：把 fetch 封装为 doFetch，首次与重连共用；重连时重新构建 headers 以携带最新 lastSseEventId
   const doFetch = async () => {
@@ -311,7 +315,8 @@ async function startAnalysis() {
         throw new Error(data.error || `同步分析失败 HTTP ${resp.status}`);
       }
       const result = data.data && data.data.result ? data.data.result : data.data;
-      renderResult(result);
+      // P1-2 修复：renderResult 期望 { result } 包装结构（与 SSE 'result' 事件 payload 一致）
+      renderResult({ result: result });
       showToast('分析完成（同步模式）', 'success');
     } catch (err) {
       if (err.name !== 'AbortError') {
@@ -531,14 +536,19 @@ loadJobHistory();
   try {
     const res = await fetch('/api/jobs?limit=20');
     const data = await res.json();
-    if (!data.success || !Array.isArray(data.jobs)) return;
-    const latest = data.jobs.find(j => j.status === 'completed' || j.status === 'done');
+    // P2-9 修复 (ROUND27 12维度核对): 后端返回 data.history (非 data.jobs),
+    // 原代码访问错误字段导致 loadLatestCompletedResult 静默失败.
+    const jobs = data.history || data.jobs;
+    if (!data.success || !Array.isArray(jobs)) return;
+    const latest = jobs.find(j => j.status === 'completed' || j.status === 'done');
     if (!latest) return;
     const r2 = await fetch(`/api/result/${latest.id}`);
     if (!r2.ok) return;
     const result = await r2.json();
-    if (result && (result.concepts || result.edges)) {
-      renderResult(result);
+    // P1-2 修复：守卫条件改用 n_significant_edges（result 不存在 edges 字段，原条件恒为 false）
+    if (result && (result.concepts || result.n_significant_edges != null)) {
+      // P1-2 修复：renderResult 期望 { result } 包装结构（与 SSE 'result' 事件 payload 一致）
+      renderResult({ result: result });
       log('info', `已自动加载最近完成结果: ${latest.id.slice(0, 8)}…`);
     }
   } catch (err) {

@@ -234,7 +234,7 @@ function renderResult(data) {
     const total = r.execution_profile.total_ms || 1;
     r.execution_profile.stages.forEach(s => {
       const tr = document.createElement('tr');
-      tr.innerHTML = `<td>${s.stage}</td><td>${s.ms}</td><td>${total > 0 ? safeFmt((s.ms / total) * 100, 1) : 'N/A'}%</td>`;
+      tr.innerHTML = `<td>${escapeHtml(String(s.stage))}</td><td>${escapeHtml(String(s.ms))}</td><td>${total > 0 ? safeFmt((s.ms / total) * 100, 1) : 'N/A'}%</td>`;
       tbody.appendChild(tr);
     });
     table.appendChild(tbody);
@@ -279,9 +279,9 @@ function renderResult(data) {
       const stype = String(v);
       const cls = stype === 'delta_nll' ? 'pass' : (stype === 'co_occurrence' ? 'warn' : '');
       const label = stype === 'delta_nll' ? '真实ΔNLL' : (stype === 'co_occurrence' ? '共现计数' : stype);
-      return `<span class="kpi-pill"><span class="k">${k}:</span><span class="badge ${cls}" title="信号语义类型">${escapeHtml(label)}</span></span>`;
+      return `<span class="kpi-pill"><span class="k">${escapeHtml(k)}:</span><span class="badge ${cls}" title="信号语义类型">${escapeHtml(label)}</span></span>`;
     }
-    return `<span class="kpi-pill"><span class="k">${k}:</span>${escapeHtml(String(display))}</span>`;
+    return `<span class="kpi-pill"><span class="k">${escapeHtml(k)}:</span>${escapeHtml(String(display))}</span>`;
   }).join('');
   // 附加反驳语义徽章
   const refutedBadgeHtml = `<span class="kpi-pill"><span class="k">refutations:</span>${refutedSemantic}</span>`;
@@ -300,9 +300,9 @@ function renderResult(data) {
     <div style="display:flex;align-items:center;gap:0.8rem;margin-bottom:0.5rem;flex-wrap:wrap;">
       <span style="font-family:var(--font-mono);color:var(--muted);">ALGORITHM SUFFICIENCY:</span>
       ${suffBadge}
-      <span class="kpi-pill"><span class="k">tokens:</span>${suff.n_tokens ?? '-'}</span>
-      <span class="kpi-pill"><span class="k">concepts:</span>${suff.n_concepts ?? '-'}</span>
-      <span class="kpi-pill"><span class="k">edges:</span>${suff.n_edges ?? '-'}</span>
+      <span class="kpi-pill"><span class="k">tokens:</span>${escapeHtml(String(suff.n_tokens ?? '-'))}</span>
+      <span class="kpi-pill"><span class="k">concepts:</span>${escapeHtml(String(suff.n_concepts ?? '-'))}</span>
+      <span class="kpi-pill"><span class="k">edges:</span>${escapeHtml(String(suff.n_edges ?? '-'))}</span>
     </div>
     ${suffRecs}
   `;
@@ -424,29 +424,51 @@ function renderResult(data) {
   // Top edges
   const edgesBody = document.getElementById('edgesBody');
   edgesBody.innerHTML = '';
-  (r.top_edges || []).forEach(e => {
-    const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${escapeHtml(e.source)}</td><td>${escapeHtml(e.target)}</td><td>${safeFmt(e.strength, 3)}</td><td>${escapeHtml(e.direction || '→')}</td>`;
-    edgesBody.appendChild(tr);
-  });
+  const edgeList = r.top_edges || [];
+  if (edgeList.length === 0) {
+    const mode = r.analysis_mode || r.mode || 'light';
+    const emptyMsg = mode === 'light'
+      ? 'LIGHT 模式仅输出粗粒度共现边。切换 DEEP / SUPER 模式可获得显著因果边排序。'
+      : `${mode.toUpperCase()} 模式未检出显著因果边（可能因文本过短、概念稀疏或 LLaMA 阈值过滤导致）。可尝试增长文本、降低阈值或切换 DEEP 模式。`;
+    edgesBody.innerHTML = `<tr><td colspan="4" class="empty-state">${emptyMsg}</td></tr>`;
+  } else {
+    edgeList.forEach(e => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${escapeHtml(e.source)}</td><td>${escapeHtml(e.target)}</td><td>${safeFmt(e.strength, 3)}</td><td>${escapeHtml(e.direction || '→')}</td>`;
+      edgesBody.appendChild(tr);
+    });
+  }
 
   // Counterfactual scan
   const scanBody = document.getElementById('scanBody');
   scanBody.innerHTML = '';
-  (r.counterfactual_scan || []).forEach(s => {
-    const tr = document.createElement('tr');
-    const iteNum = typeof s.ite === 'number' ? s.ite : 0;
-    const cls = iteNum > 0 ? 'pass' : (iteNum < 0 ? 'fail' : 'warn');
-    const iteStr = (typeof s.ite === 'number' && s.ite >= 0) ? '+' : '';
-    tr.innerHTML = `<td>${escapeHtml(s.source)} → ${escapeHtml(s.target)}</td><td>${safeFmt(s.trace_dnl, 3)}</td><td><span class="badge ${cls}">${iteStr}${safeFmt(s.ite, 4)}</span></td><td>${safeFmt(s.observed, 4)}</td><td>${safeFmt(s.counterfactual, 4)}</td>`;
-    scanBody.appendChild(tr);
-  });
+  const cfList = r.counterfactual_scan || [];
+  if (cfList.length === 0) {
+    const mode = r.analysis_mode || r.mode || 'light';
+    const emptyMsg = mode === 'light'
+      ? 'LIGHT 模式未执行反事实扫描。切换 DEEP / SUPER 模式可获得 ΔNLL / ITE 反事实估计。'
+      : `${mode.toUpperCase()} 模式未生成反事实扫描结果（通常因为未检出显著因果边）。`;
+    scanBody.innerHTML = `<tr><td colspan="5" class="empty-state">${emptyMsg}</td></tr>`;
+  } else {
+    cfList.forEach(s => {
+      const tr = document.createElement('tr');
+      const iteNum = typeof s.ite === 'number' ? s.ite : 0;
+      const cls = iteNum > 0 ? 'pass' : (iteNum < 0 ? 'fail' : 'warn');
+      const iteStr = (typeof s.ite === 'number' && s.ite >= 0) ? '+' : '';
+      tr.innerHTML = `<td>${escapeHtml(s.source)} → ${escapeHtml(s.target)}</td><td>${safeFmt(s.trace_dnl, 3)}</td><td><span class="badge ${cls}">${iteStr}${safeFmt(s.ite, 4)}</span></td><td>${safeFmt(s.observed, 4)}</td><td>${safeFmt(s.counterfactual, 4)}</td>`;
+      scanBody.appendChild(tr);
+    });
+  }
 
   // Refutations
   const refuteBody = document.getElementById('refuteBody');
   refuteBody.innerHTML = '';
   if (!r.refutations || r.refutations.length === 0) {
-    refuteBody.innerHTML = '<tr><td colspan="5" class="empty-state">LIGHT 模式跳过反驳测试。切换 DEEP 模式可获得随机共因 / 安慰剂处理 / 数据子集三套反驳检验。</td></tr>';
+    const mode = r.analysis_mode || r.mode || 'light';
+    const emptyMsg = mode === 'light'
+      ? 'LIGHT 模式跳过反驳测试。切换 DEEP / SUPER 模式可获得随机共因 / 安慰剂处理 / 数据子集三套反驳检验。'
+      : `${mode.toUpperCase()} 模式未执行反驳测试（通常因为未检出显著因果边，无需/无法反驳）。`;
+    refuteBody.innerHTML = `<tr><td colspan="5" class="empty-state">${emptyMsg}</td></tr>`;
   } else {
   (r.refutations || []).forEach(ref => {
     const tr = document.createElement('tr');
@@ -521,6 +543,24 @@ function renderResult(data) {
   resultPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
+// ── 拓扑边线温度色（按强度从冷到暖，正负方向分色相）────────────────────
+function edgeTempColor(strength, intensity, alpha) {
+  const t = Math.max(0, Math.min(1, intensity));
+  let h, s, l;
+  if (strength > 0) {
+    // 正因果：深蓝青 -> 青 -> 绿青 -> 暖黄
+    if (t < 0.33) { h = 200 - t * 75; s = 65; l = 32 + t * 25; }
+    else if (t < 0.66) { h = 175 - (t - 0.33) * 45; s = 80; l = 52 + (t - 0.33) * 15; }
+    else { h = 160 - (t - 0.66) * 155; s = 90; l = 67 + (t - 0.66) * 18; }
+  } else {
+    // 负因果：深蓝 -> 紫 -> 玫红 -> 红
+    if (t < 0.33) { h = 235 + t * 120; s = 60; l = 32 + t * 25; }
+    else if (t < 0.66) { h = 275 + (t - 0.33) * 120; s = 80; l = 52 + (t - 0.33) * 15; }
+    else { h = 315 + (t - 0.66) * 75; s = 90; l = 67 + (t - 0.66) * 18; }
+  }
+  return `hsla(${h.toFixed(1)}, ${s}%, ${l.toFixed(1)}%, ${alpha})`;
+}
+
 // ── 共享热力词矩阵 HTML 生成器 ─────────────────────────────────────────
 function buildAdjacencyMatrixHTML(r) {
   const concepts = r.concepts || [];
@@ -528,13 +568,39 @@ function buildAdjacencyMatrixHTML(r) {
   if (!matrix || matrix.length === 0 || concepts.length === 0) {
     return '<div class="empty-state">无邻接矩阵数据</div>';
   }
+  // P0 修复: SUPER 模式输出 token 级矩阵(442×442)，与 concepts(12) 维度不匹配
+  // 需要维度守卫：如果矩阵维度 ≠ concepts 数量，降级为概念级聚合或提示
+  if (matrix.length !== concepts.length) {
+    // 尝试从 top_edges 构建概念级矩阵
+    const n = concepts.length;
+    const idx = new Map(concepts.map((c, i) => [c, i]));
+    const agg = Array.from({length: n}, () => new Array(n).fill(0));
+    const edges = r.top_edges || [];
+    edges.forEach(e => {
+      const si = idx.get(e.source);
+      const ti = idx.get(e.target);
+      if (si != null && ti != null) agg[si][ti] = Math.abs(e.strength);
+    });
+    // 用聚合矩阵替代
+    return buildAdjacencyMatrixHTMLFromAgg(concepts, agg);
+  }
   const n = concepts.length;
-  const maxVal = Math.max(...matrix.flat().map(v => Math.abs(v)), 1e-9);
+  // P0 修复: 用 reduce 替代 Math.max(...spread)，防止大矩阵爆栈
+  const maxVal = matrix.reduce((mx, row) => {
+    return row.reduce((rmx, v) => {
+      const a = Math.abs(v);
+      return a > rmx ? a : rmx;
+    }, mx);
+  }, 1e-9);
   // P0 修复 (2026-07-29): 矩阵标签差位问题——改用 "auto + repeat(n, 32px)" 网格,
   // 行标签不旋转, 列标签在独立表头中旋转, 避免单元格内旋转导致的差位.
+  // P0+ 修复 (2026-07-29): 行标签列不能用 auto，否则会在宽屏下被拉得很远。
+  // 改用 minmax(60px, 120px)，让第一列宽度由内容决定但上限 120px，紧贴矩阵单元格。
+  // P1 修缮: 单元格根据容器自适应放大，同时设置上限避免大屏过度拉伸；
+  // 行标签列固定宽度区间，保证短文本时矩阵仍保持视觉重量与居中感。
+  const cellMax = 'min(6vw, 72px)';
   let html = `<div class="adj-matrix-wrap">`;
-  // P0 修复 (2026-07-29): 行标签列必须给一个最小宽度, 避免中文多字概念被压缩成单字.
-  html += `<div class="adj-matrix" style="grid-template-columns:minmax(84px, auto) repeat(${n}, minmax(28px, 32px));">`;
+  html += `<div class="adj-matrix" style="grid-template-columns:minmax(80px, 120px) repeat(${n}, minmax(40px, ${cellMax}));">`;
   // 顶部列标签行
   html += '<div class="adj-corner"></div>';
   concepts.forEach(c => {
@@ -542,6 +608,38 @@ function buildAdjacencyMatrixHTML(r) {
   });
   // 数据行
   matrix.forEach((row, i) => {
+    html += `<div class="adj-row-header" title="${escapeHtml(concepts[i])}">${escapeHtml(concepts[i])}</div>`;
+    row.forEach((v, j) => {
+      const intensity = Math.min(Math.abs(v) / maxVal, 1);
+      const bg = i === j ? 'var(--panel-3)' : `rgba(102,252,241,${0.08 + intensity * 0.72})`;
+      const color = intensity > 0.5 ? '#000' : 'var(--text)';
+      const val = v !== 0 ? safeFmt(Number(v), 1) : '';
+      html += `<div class="adj-cell" style="background:${bg};color:${color};" title="${escapeHtml(concepts[i])} → ${escapeHtml(concepts[j])}: ${safeFmt(Number(v), 2)}">${val}</div>`;
+    });
+  });
+  html += '</div>';
+  html += `<div class="adj-legend"><span>0</span><div class="adj-legend-bar"></div><span>${maxVal.toFixed(1)}</span></div>`;
+  html += '</div>';
+  return html;
+}
+
+// P0 修复: SUPER 模式 token 级矩阵降级为概念级聚合矩阵
+function buildAdjacencyMatrixHTMLFromAgg(concepts, agg) {
+  const n = concepts.length;
+  const maxVal = agg.reduce((mx, row) => {
+    return row.reduce((rmx, v) => {
+      const a = Math.abs(v);
+      return a > rmx ? a : rmx;
+    }, mx);
+  }, 1e-9);
+  const cellMax = 'min(6vw, 72px)';
+  let html = `<div class="adj-matrix-wrap">`;
+  html += `<div class="adj-matrix" style="grid-template-columns:minmax(80px, 120px) repeat(${n}, minmax(40px, ${cellMax}));">`;
+  html += '<div class="adj-corner"></div>';
+  concepts.forEach(c => {
+    html += `<div class="adj-col-header" title="${escapeHtml(c)}"><span>${escapeHtml(c)}</span></div>`;
+  });
+  agg.forEach((row, i) => {
     html += `<div class="adj-row-header" title="${escapeHtml(concepts[i])}">${escapeHtml(concepts[i])}</div>`;
     row.forEach((v, j) => {
       const intensity = Math.min(Math.abs(v) / maxVal, 1);
@@ -720,7 +818,7 @@ function renderTopology3D(r, wrap, canvas, pauseBtn, resetBtn) {
 
     // ── 投影所有节点并排序(远到近) ──────────────────────────
     const projected = s.nodes.map(n => ({ node: n, ...project(n, s.rotX, s.rotY, s.zoom, w, h) })).sort((a, b) => a.z - b.z);
-    const maxStr = Math.max(...s.edges.map(x => Math.abs(x.strength)), 1e-6);
+    const maxStr = s.edges.reduce((mx, x) => { const a = Math.abs(x.strength); return a > mx ? a : mx; }, 1e-6);
 
     // ── 画边: 渐变 + 箭头 + strength 标签 ────────────────────
     s.edges.forEach(e => {
@@ -730,39 +828,59 @@ function renderTopology3D(r, wrap, canvas, pauseBtn, resetBtn) {
       const intensity = Math.min(Math.abs(e.strength) / maxStr, 1);
       const avgAlpha = (Math.max(0.35, Math.min(1, (pa.z + 300) / 500)) + Math.max(0.35, Math.min(1, (pb.z + 300) / 500))) / 2;
 
-      // 渐变线条
-      const lineGrad = ctx.createLinearGradient(pa.x, pa.y, pb.x, pb.y);
-      const colorPos = e.strength > 0 ? '102,252,241' : '255,100,100';
-      lineGrad.addColorStop(0, `rgba(${colorPos},${(0.15 + intensity * 0.5) * avgAlpha})`);
-      lineGrad.addColorStop(1, `rgba(${colorPos},${(0.08 + intensity * 0.35) * avgAlpha})`);
-      ctx.strokeStyle = lineGrad;
-      ctx.lineWidth = 0.8 + intensity * 2.5;
-
-      // 发光效果 (强边)
-      if (intensity > 0.5) {
-        ctx.shadowBlur = 6 + intensity * 8;
-        ctx.shadowColor = `rgba(${colorPos},0.6)`;
+      // 按强度分三级可视化：弱边虚线无箭头、中边实线小箭头、强边粗线发光大箭头
+      // 颜色按温度渐变：正因果从冷青到暖黄，负因果从冷蓝到暖红
+      let lineWidth, arrowSize, arrowThreshold, glowBlur, dashPattern;
+      if (intensity < 0.35) {
+        lineWidth = 0.55 + intensity * 0.55;
+        arrowSize = 0;
+        arrowThreshold = -1;
+        glowBlur = 0;
+        dashPattern = [2, 2];
+      } else if (intensity < 0.7) {
+        lineWidth = 0.85 + intensity * 0.85;
+        arrowSize = 2 + intensity * 2;
+        arrowThreshold = 0.35;
+        glowBlur = 0;
+        dashPattern = [];
       } else {
-        ctx.shadowBlur = 0;
+        lineWidth = 1.25 + intensity * 1.15;
+        arrowSize = 3.5 + intensity * 2.5;
+        arrowThreshold = 0.35;
+        glowBlur = 3 + intensity * 5;
+        dashPattern = [];
+      }
+
+      const lineGrad = ctx.createLinearGradient(pa.x, pa.y, pb.x, pb.y);
+      lineGrad.addColorStop(0, edgeTempColor(e.strength, intensity, (0.25 + intensity * 0.55) * avgAlpha));
+      lineGrad.addColorStop(1, edgeTempColor(e.strength, intensity, (0.12 + intensity * 0.35) * avgAlpha));
+      ctx.strokeStyle = lineGrad;
+      ctx.lineWidth = lineWidth;
+      ctx.lineCap = 'round';
+      ctx.setLineDash(dashPattern);
+
+      if (glowBlur > 0) {
+        ctx.shadowBlur = glowBlur;
+        ctx.shadowColor = edgeTempColor(e.strength, intensity, 0.5);
       }
       ctx.beginPath();
       ctx.moveTo(pa.x, pa.y);
       ctx.lineTo(pb.x, pb.y);
       ctx.stroke();
       ctx.shadowBlur = 0;
+      ctx.setLineDash([]);
 
-      // 方向箭头 (70% 位置, 仅强边)
-      if (intensity > 0.25 && avgAlpha > 0.5) {
+      // 方向箭头 (仅中强边)
+      if (intensity > arrowThreshold && arrowSize > 0 && avgAlpha > 0.5) {
         const arrowPos = 0.62;
         const ax = pa.x + (pb.x - pa.x) * arrowPos;
         const ay = pa.y + (pb.y - pa.y) * arrowPos;
         const angle = Math.atan2(pb.y - pa.y, pb.x - pa.x);
-        const arrowSize = 4 + intensity * 5;
-        ctx.fillStyle = `rgba(${colorPos},${0.6 + intensity * 0.3})`;
+        ctx.fillStyle = edgeTempColor(e.strength, intensity, (0.7 + intensity * 0.25) * avgAlpha);
         ctx.beginPath();
         ctx.moveTo(ax + Math.cos(angle) * arrowSize, ay + Math.sin(angle) * arrowSize);
-        ctx.lineTo(ax + Math.cos(angle + 2.5) * arrowSize * 0.7, ay + Math.sin(angle + 2.5) * arrowSize * 0.7);
-        ctx.lineTo(ax + Math.cos(angle - 2.5) * arrowSize * 0.7, ay + Math.sin(angle - 2.5) * arrowSize * 0.7);
+        ctx.lineTo(ax + Math.cos(angle + 2.5) * arrowSize * 0.75, ay + Math.sin(angle + 2.5) * arrowSize * 0.75);
+        ctx.lineTo(ax + Math.cos(angle - 2.5) * arrowSize * 0.75, ay + Math.sin(angle - 2.5) * arrowSize * 0.75);
         ctx.closePath();
         ctx.fill();
       }
@@ -777,7 +895,7 @@ function renderTopology3D(r, wrap, canvas, pauseBtn, resetBtn) {
         // 背景药丸
         ctx.fillStyle = `rgba(10,16,24,${0.7 * avgAlpha})`;
         ctx.fillRect(mx - tw / 2 - 3, my - 7, tw + 6, 12);
-        ctx.fillStyle = `rgba(${colorPos},${0.85 * avgAlpha})`;
+        ctx.fillStyle = edgeTempColor(e.strength, intensity, 0.85 * avgAlpha);
         ctx.fillText(label, mx - tw / 2, my + 2);
       }
     });
@@ -812,7 +930,8 @@ function renderTopology3D(r, wrap, canvas, pauseBtn, resetBtn) {
       if (alpha > 0.55) {
         const label = p.node.id;
         const fontSize = Math.max(10, Math.min(13, 11 * p.scale * 0.012));
-        ctx.font = `${fontSize}px var(--font-mono, monospace)`;
+        // P2 修复：Canvas ctx.font 不解析 CSS 变量，需用实际字体名（取自 tokusatsu.css --font-mono）
+        ctx.font = `${fontSize}px "JetBrains Mono", "Fira Code", "Consolas", "SF Mono", monospace`;
         const tw = ctx.measureText(label).width;
         const labelX = p.x + radius + 4;
         const labelY = p.y - fontSize / 2;
@@ -829,30 +948,21 @@ function renderTopology3D(r, wrap, canvas, pauseBtn, resetBtn) {
     });
 
     // ── HUD: 信息看板 ────────────────────────────────────────
-    // 半透明背景条
+    // 半透明背景条（两行：操作提示 + 图例状态，避免单行过长重叠）
+    const hudH = 40;
     ctx.fillStyle = 'rgba(5,10,16,0.75)';
-    ctx.fillRect(0, h - 24, w, 24);
-    ctx.fillStyle = 'rgba(148,163,184,0.7)';
+    ctx.fillRect(0, h - hudH, w, hudH);
     ctx.font = '10px monospace';
-    ctx.fillText(`◈ 3D CAUSAL TOPOLOGY · nodes=${s.nodes.length} edges=${s.edges.length} · drag=rotate · wheel=zoom`, 8, h - 8);
+    ctx.fillStyle = 'rgba(148,163,184,0.85)';
+    ctx.fillText(`◈ 3D CAUSAL TOPOLOGY  n=${s.nodes.length} e=${s.edges.length}${s.truncated ? ' (前32)' : ''}  ·  拖拽旋转 · 滚轮缩放 · 点击节点坍缩为 2D`, 8, h - 26);
+    ctx.fillStyle = 'rgba(148,163,184,0.7)';
+    ctx.fillText('─强边  - -弱边  →方向  色温=强度  ▲正因果  ▼负因果', 8, h - 10);
     // 节点截断提示
     if (s.truncated) {
       ctx.fillStyle = 'rgba(251,191,36,0.9)';
       ctx.font = '10px monospace';
-      ctx.fillText(`⚠ 已显示前 32 个节点 (共 ${s.totalConcepts} 个)`, 8, h - 36);
+      ctx.fillText(`⚠ 已显示前 32 个节点 (共 ${s.totalConcepts} 个)`, 8, h - 52);
     }
-    // 图例
-    const legendX = w - 130;
-    const legendY = 12;
-    ctx.fillStyle = 'rgba(5,10,16,0.6)';
-    ctx.fillRect(legendX - 6, legendY - 4, 125, 38);
-    ctx.font = '9px monospace';
-    ctx.fillStyle = 'rgba(102,252,241,0.8)';
-    ctx.fillText('━━ 正因果 (ΔNLL>0)', legendX, legendY + 8);
-    ctx.fillStyle = 'rgba(255,100,100,0.8)';
-    ctx.fillText('━━ 负因果 (ΔNLL<0)', legendX, legendY + 20);
-    ctx.fillStyle = 'rgba(0,217,163,0.8)';
-    ctx.fillText('● 概念节点 (大小=频次)', legendX, legendY + 32);
   }
 
   function animate() {
@@ -1049,6 +1159,20 @@ function renderTopology2D(r, wrap, canvas, focusedNodeId = null) {
     });
   }
 
+  // 为互惠边分配反向弯曲偏移，避免 A→B 与 B→A 完全重叠
+  const pairKey = (i, j) => `${Math.min(i, j)}-${Math.max(i, j)}`;
+  const pairSeen = new Set();
+  edges.forEach(e => {
+    const reciprocal = edges.some(other => other.source.index === e.target.index && other.target.index === e.source.index);
+    if (reciprocal) {
+      const key = pairKey(e.source.index, e.target.index);
+      e.curve = pairSeen.has(key) ? -1 : 1;
+      pairSeen.add(key);
+    } else {
+      e.curve = 0;
+    }
+  });
+
   initPositions2D(nodes, edges, W, H);
 
   const existing = topology2DStates.get(canvas);
@@ -1127,7 +1251,7 @@ function renderTopology2D(r, wrap, canvas, focusedNodeId = null) {
     for (let x = 0; x < w; x += 40) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke(); }
     for (let y = 0; y < h; y += 40) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke(); }
 
-    const maxStr = Math.max(...s.edges.map(x => Math.abs(x.strength)), 1e-6);
+    const maxStr = s.edges.reduce((mx, x) => { const a = Math.abs(x.strength); return a > mx ? a : mx; }, 1e-6);
     const focused = (s.focusedNodeId && s.nodeMap) ? s.nodeMap.get(s.focusedNodeId) : null;
     const neighborSet = new Set();
     if (focused) {
@@ -1138,28 +1262,75 @@ function renderTopology2D(r, wrap, canvas, focusedNodeId = null) {
       });
     }
 
-    // 边
+    // 边：按强度分三级可视化，避免"全是箭头"的杂乱感
     s.edges.forEach(e => {
       const a = toScreen(e.source.x, e.source.y);
       const b = toScreen(e.target.x, e.target.y);
       const intensity = Math.min(Math.abs(e.strength) / maxStr, 1);
       const isDimmed = focused && !(neighborSet.has(e.source.id) && neighborSet.has(e.target.id));
-      const colorPos = e.strength > 0 ? '102,252,241' : '255,100,100';
-      ctx.strokeStyle = `rgba(${colorPos},${isDimmed ? 0.1 : (0.25 + intensity * 0.55)})`;
-      ctx.lineWidth = (0.8 + intensity * 2.5) * s.scale;
-      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
-      // 箭头
-      if (!isDimmed && intensity > 0.15) {
-        const angle = Math.atan2(b.y - a.y, b.x - a.x);
-        const arrowSize = (4 + intensity * 5) * s.scale;
-        const t = 0.55;
-        const ax = a.x + (b.x - a.x) * t;
-        const ay = a.y + (b.y - a.y) * t;
-        ctx.fillStyle = `rgba(${colorPos},${0.6 + intensity * 0.3})`;
+      const baseAlpha = isDimmed ? 0.12 : (0.28 + intensity * 0.52);
+
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+
+      // 弱边：虚线、无箭头；中边：实线+小箭头；强边：实线粗线+大箭头+发光
+      // 粗细差异收束，避免过粗破坏氛围；颜色按温度渐变
+      let lineWidth, arrowSize, arrowThreshold, glowBlur;
+      if (intensity < 0.35) {
+        ctx.setLineDash([3 * s.scale, 3 * s.scale]);
+        lineWidth = (0.65 + intensity * 0.65) * s.scale;
+        arrowSize = 0;
+        arrowThreshold = -1;
+        glowBlur = 0;
+      } else if (intensity < 0.7) {
+        ctx.setLineDash([]);
+        lineWidth = (1.0 + intensity * 0.9) * s.scale;
+        arrowSize = (2 + intensity * 2) * s.scale;
+        arrowThreshold = 0.5;
+        glowBlur = 0;
+      } else {
+        ctx.setLineDash([]);
+        lineWidth = (1.4 + intensity * 1.1) * s.scale;
+        arrowSize = (3 + intensity * 3) * s.scale;
+        arrowThreshold = 0.5;
+        glowBlur = isDimmed ? 0 : (3 + intensity * 5);
+      }
+
+      ctx.strokeStyle = edgeTempColor(e.strength, intensity, baseAlpha);
+      ctx.lineWidth = lineWidth;
+      if (glowBlur > 0) {
+        ctx.shadowBlur = glowBlur;
+        ctx.shadowColor = edgeTempColor(e.strength, intensity, 0.45);
+      }
+
+      // 曲线控制点：互惠边反向弯曲，减少重叠；弯曲度与距离成正比
+      let cx = (a.x + b.x) / 2, cy = (a.y + b.y) / 2;
+      if (e.curve !== 0) {
+        const dx = b.x - a.x, dy = b.y - a.y;
+        const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+        const nx = -dy / dist, ny = dx / dist;
+        const offset = Math.min(dist * 0.22, 60 * s.scale) * e.curve;
+        cx += nx * offset;
+        cy += ny * offset;
+      }
+      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.quadraticCurveTo(cx, cy, b.x, b.y); ctx.stroke();
+      ctx.shadowBlur = 0;
+      ctx.setLineDash([]);
+
+      // 箭头：仅中强边且未被聚焦淡化时绘制；沿曲线切线方向
+      if (!isDimmed && intensity > arrowThreshold && arrowSize > 0) {
+        const t = 0.58;
+        const ax = (1 - t) * (1 - t) * a.x + 2 * (1 - t) * t * cx + t * t * b.x;
+        const ay = (1 - t) * (1 - t) * a.y + 2 * (1 - t) * t * cy + t * t * b.y;
+        // 切线方向：对二次贝塞尔 Q(t) 求导 = 2(1-t)(P1-P0) + 2t(P2-P1)
+        const tx = 2 * (1 - t) * (cx - a.x) + 2 * t * (b.x - cx);
+        const ty = 2 * (1 - t) * (cy - a.y) + 2 * t * (b.y - cy);
+        const angle = Math.atan2(ty, tx);
+        ctx.fillStyle = edgeTempColor(e.strength, intensity, 0.75 + intensity * 0.2);
         ctx.beginPath();
         ctx.moveTo(ax + Math.cos(angle) * arrowSize, ay + Math.sin(angle) * arrowSize);
-        ctx.lineTo(ax + Math.cos(angle + 2.5) * arrowSize * 0.7, ay + Math.sin(angle + 2.5) * arrowSize * 0.7);
-        ctx.lineTo(ax + Math.cos(angle - 2.5) * arrowSize * 0.7, ay + Math.sin(angle - 2.5) * arrowSize * 0.7);
+        ctx.lineTo(ax + Math.cos(angle + 2.5) * arrowSize * 0.75, ay + Math.sin(angle + 2.5) * arrowSize * 0.75);
+        ctx.lineTo(ax + Math.cos(angle - 2.5) * arrowSize * 0.75, ay + Math.sin(angle - 2.5) * arrowSize * 0.75);
         ctx.closePath(); ctx.fill();
       }
     });
@@ -1190,7 +1361,8 @@ function renderTopology2D(r, wrap, canvas, focusedNodeId = null) {
       ctx.shadowBlur = 0;
 
       // 标签
-      ctx.font = `${Math.max(10, 11 * s.scale)}px var(--font-mono, monospace)`;
+      // P2 修复：Canvas ctx.font 不解析 CSS 变量，需用实际字体名（取自 tokusatsu.css --font-mono）
+      ctx.font = `${Math.max(10, 11 * s.scale)}px "JetBrains Mono", "Fira Code", "Consolas", "SF Mono", monospace`;
       const tw = ctx.measureText(node.id).width;
       const labelBg = isFocused ? 'rgba(255,159,67,0.15)' : 'rgba(10,16,24,0.7)';
       ctx.fillStyle = labelBg;
@@ -1200,13 +1372,16 @@ function renderTopology2D(r, wrap, canvas, focusedNodeId = null) {
       ctx.globalAlpha = 1.0;
     });
 
-    // HUD
+    // HUD（两行：操作提示 + 图例状态，避免单行过长重叠）
+    const hudH = 40;
     ctx.fillStyle = 'rgba(5,10,16,0.75)';
-    ctx.fillRect(0, h - 24, w, 24);
-    ctx.fillStyle = 'rgba(148,163,184,0.7)';
+    ctx.fillRect(0, h - hudH, w, hudH);
     ctx.font = '10px monospace';
     const focusText = focused ? ` · 聚焦: ${focused.id}` : '';
-    ctx.fillText(`◈ 2D CAUSAL NETWORK · nodes=${s.nodes.length} edges=${s.edges.length}${focusText} · drag=移动节点 · wheel=缩放`, 8, h - 8);
+    ctx.fillStyle = 'rgba(148,163,184,0.85)';
+    ctx.fillText(`◈ 2D NETWORK  n=${s.nodes.length} e=${s.edges.length}${focusText}  ·  拖拽节点 · 滚轮缩放 · 点击高亮邻居`, 8, h - 26);
+    ctx.fillStyle = 'rgba(148,163,184,0.7)';
+    ctx.fillText('─强边  - -弱边  →方向  色温=强度  ▲正因果  ▼负因果', 8, h - 10);
   }
 
   function animate() {
@@ -1432,14 +1607,17 @@ function setupTopologyToggle(r, opts) {
       const mx = e.clientX - rect.left, my = e.clientY - rect.top;
       const dpr = s.dpr;
       // 找到投影后离鼠标最近的节点
-      let nearest = null, minZ = -Infinity, minD = Infinity;
+      // P2 修复：z 越小表示节点越靠近观察者（project 中 scale = fov*zoom/(fov+z+400)，z 小则 scale 大）。
+      // 原代码 minZ=-Infinity + p.z>minZ 选的是 z 最大（最远）的节点，方向反了。
+      // 改为 minZ=Infinity + p.z<minZ，选 z 最小（最近、最前）的节点。
+      let nearest = null, minZ = Infinity, minD = Infinity;
       const projected = s.nodes.map(n => ({ node: n, ...project(n, s.rotX, s.rotY, s.zoom, s.W, s.H) }));
       projected.forEach(p => {
         const dx = p.x - mx, dy = p.y - my;
         const d = Math.sqrt(dx * dx + dy * dy);
         if (d < Math.max(12, p.node.radius * Math.max(0.4, p.scale * 0.012)) + 6) {
-          // 优先选 z 更近（排序后更前面）的节点
-          if (nearest === null || p.z > minZ || (p.z === minZ && d < minD)) {
+          // 优先选 z 更近（z 更小 = 更靠前）的节点
+          if (nearest === null || p.z < minZ || (p.z === minZ && d < minD)) {
             nearest = p.node; minZ = p.z; minD = d;
           }
         }

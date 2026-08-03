@@ -1,9 +1,0 @@
-{
-  "tests/test_surrogate_test.py::test_iaaft_endpoints_match_original": true,
-  "tests/test_havok_forcing.py::test_lorenz_forcing_heavy_tailed": true,
-  "tests/test_havok_forcing.py::test_forcing_energy_ratio": true,
-  "tests/test_havok_forcing.py::test_augmented_matrix_method": true,
-  "tests/test_havok_forcing.py::test_surrogate_integration": true,
-  "tests/test_havok_forcing.py::test_eigenvalue_stability_discrete": true,
-  "tests/test_havok_forcing.py::test_v_u_basis_consistency": true
-}

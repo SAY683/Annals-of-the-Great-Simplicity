@@ -203,21 +203,27 @@ class DoWhyAuditor:
             if refuted:
                 n_refuted += 1
 
+        # P1-5 修复 (Round 27 审计): 与 counterfactual_bridge.py:1175 对齐，
+        # 使用成比例阈值 max(2, n_total // 2)，避免 n_total=1 时恒不触发 WARN。
+        # 原实现固定 n_refuted >= 2，与 bridge 与 six_warriors 三处判定逻辑不一致。
+        n_total = len(bridge.refutation_results)
+        n_unstable_threshold = max(2, n_total // 2) if n_total > 0 else 2
+
         if not bridge.refutation_results:
             self._add(2, "Refutation Triangulation", Enforcement.WARN,
                       Enforcement.DEFERRED,
                       "无反驳数据 — 未运行 refute()。",
                       data_req="N >= 30")
-        elif n_refuted >= 2:
+        elif n_refuted >= n_unstable_threshold:
             self._add(2, "Refutation Triangulation", Enforcement.WARN,
                       Enforcement.WARN,
-                      f"{n_refuted}/3 反驳 — 因果估计不可靠。",
-                      f"2+ refuters rejected the estimate.",
+                      f"{n_refuted}/{n_total} 反驳 — 因果估计不可靠（阈值 {n_unstable_threshold}）。",
+                      f"{n_unstable_threshold}+ refuters rejected the estimate.",
                       "N >= 30")
         else:
             self._add(2, "Refutation Triangulation", Enforcement.WARN,
                       Enforcement.PASS,
-                      f"{n_refuted}/3 反驳 — 因果估计通过稳健性检查。",
+                      f"{n_refuted}/{n_total} 反驳 — 因果估计通过稳健性检查。",
                       data_req="N >= 30")
 
     # ── R3: SEM Coefficient Stability ──
@@ -243,23 +249,27 @@ class DoWhyAuditor:
         dot_nodes.discard('<other>')
         V_eff = len(dot_nodes)
 
-        if N < 2 * V_eff:
+        # P1 修复 (2026-07-30 审计): 启用 presets.yaml 的 min_n_per_v_ratio 参数，
+        # 替代硬编码 2x/5x 阈值。默认 5.0（向后兼容），下限阈值为其 40%。
+        min_ratio = float(self._min_n_per_v_ratio) if self._min_n_per_v_ratio else 5.0
+        warn_ratio = 0.4 * min_ratio  # 默认 2.0
+        if N < warn_ratio * V_eff:
             self._add(3, "SEM Coefficient Stability", Enforcement.WARN,
                       Enforcement.FAIL,
-                      f"样本量不足: N={N} < 2*V={2*V_eff}，SEM 系数极不稳定。",
+                      f"样本量不足: N={N} < {warn_ratio:.1f}*V={warn_ratio*V_eff:.0f}，SEM 系数极不稳定。",
                       f"增加样本或减少变量。",
-                      f"N >= {5*V_eff}")
-        elif N < 5 * V_eff:
+                      f"N >= {min_ratio*V_eff:.0f}")
+        elif N < min_ratio * V_eff:
             self._add(3, "SEM Coefficient Stability", Enforcement.WARN,
                       Enforcement.WARN,
-                      f"样本量偏低: N={N} < 5*V={5*V_eff}，SEM 系数可能不稳定。",
+                      f"样本量偏低: N={N} < {min_ratio:.1f}*V={min_ratio*V_eff:.0f}，SEM 系数可能不稳定。",
                       f"建议增加样本量。",
-                      f"N >= {5*V_eff}")
+                      f"N >= {min_ratio*V_eff:.0f}")
         else:
             self._add(3, "SEM Coefficient Stability", Enforcement.WARN,
                       Enforcement.PASS,
-                      f"样本量充足: N={N} >= 5*V={5*V_eff}。",
-                      data_req="N >= 50, V < N/5")
+                      f"样本量充足: N={N} >= {min_ratio:.1f}*V={min_ratio*V_eff:.0f}。",
+                      data_req=f"N >= 50, V < N/{min_ratio:.1f}")
 
     # ── R4: Extrapolation Guard ──
 
@@ -383,7 +393,9 @@ class DoWhyAuditor:
         for r in bridge.scan_results[:5]:
             dnl = r['trace_dnl']
             ite = r['ite']
-            if dnl > 0 and ite < -0.1:
+            # P1 修复 (2026-07-30 审计): ite 可能为 None（环检测或异常路径），
+            # None < -0.1 会抛 TypeError 导致整个 audit('full') 中断。
+            if ite is not None and dnl > 0 and ite < -0.1:
                 mismatches += 1
 
         if mismatches > 0:

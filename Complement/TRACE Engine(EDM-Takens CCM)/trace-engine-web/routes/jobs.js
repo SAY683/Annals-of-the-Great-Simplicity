@@ -14,6 +14,12 @@ const utils = require('../lib/utils');
 const { OUTPUT_DIR, INPUTS_DIR, CONFIG, activeJobs, jobHistory, resultCache } = state;
 const { persistJobHistory, isValidId } = utils;
 
+// P0-3 修复 (ROUND27 12维度核对): async 路由无 try/catch, 任一 reject 触发
+// unhandledRejection → gracefulShutdown 整服关闭. asyncHandler 将 reject 转交
+// Express error handler (middleware/index.js errorHandler), 仅返回 500 而不下线.
+const asyncHandler = (fn) => (req, res, next) =>
+  Promise.resolve(fn(req, res, next)).catch(next);
+
 // ── 任务历史列表 ────────────────────────────────────────────────────
 router.get('/', (_req, res) => {
   res.json({
@@ -43,6 +49,16 @@ router.post('/batch-delete', (req, res) => {
   const { ids } = req.body;
   if (!Array.isArray(ids) || ids.length === 0) {
     return res.status(400).json({ success: false, error: 'ids 数组不能为空' });
+  }
+  // P4 修复 (Round 29 §11.4): 范围校验 — 限制单次批量删除上限, 防止 DoS.
+  // 100 条/次已覆盖正常使用场景 (用户清理历史), 超过返回 400 避免服务阻塞.
+  const MAX_BATCH_DELETE = 100;
+  if (ids.length > MAX_BATCH_DELETE) {
+    return res.status(400).json({
+      success: false,
+      error: `单次批量删除上限 ${MAX_BATCH_DELETE} 条, 当前 ${ids.length} 条`,
+      code: 'BATCH_TOO_LARGE',
+    });
   }
   // 安全校验：过滤非法 ID，防止注入
   const validIds = ids.filter(id => isValidId(id));
@@ -110,7 +126,7 @@ router.get('/:id', (req, res) => {
 
 // ── 单任务详情聚合（历史任务详情查看：聚合 job 元数据 + 输入文本 + result.json + report.md） ─
 // 注意：路径必须放在 GET /:id 之后；Express 会按定义顺序匹配，此处 /:id/detail 不会被 /:id 抢先。
-router.get('/:id/detail', async (req, res) => {
+router.get('/:id/detail', asyncHandler(async (req, res) => {
   const id = req.params.id;
   // 校验 UUID，防止 path.join 拼接出路径遍历
   if (!isValidId(id)) {
@@ -166,7 +182,7 @@ router.get('/:id/detail', async (req, res) => {
     inputsDir: INPUTS_DIR,
     outputDir: path.join(OUTPUT_DIR, id),
     jobCreatedAt: job && job.createdAt ? job.createdAt : null,
-    jobEndedAt: job && job.endedAt ? job.endedAt : null,
+    jobEndedAt: job && job.completedAt ? job.completedAt : null,
   };
 
   res.json({
@@ -177,7 +193,7 @@ router.get('/:id/detail', async (req, res) => {
     report: reportRes.data,
     diagnostics,
   });
-});
+}));
 
 // ── P2 (§20.12): 一键导出人话版 Markdown 报告 ─────────────────────
 // 将 result.json 转译为非技术读者可理解的中文报告.
@@ -191,7 +207,7 @@ router.get('/:id/detail', async (req, res) => {
 //   5. 反事实扫描 (ITE + ΔNLL)
 //   6. 概念词汇 (频次 + CCM 资格)
 //   7. 配置与执行附录
-router.get('/:id/export/md', async (req, res) => {
+router.get('/:id/export/md', asyncHandler(async (req, res) => {
   const id = req.params.id;
   if (!isValidId(id)) {
     return res.status(400).json({ success: false, error: '非法的任务 ID' });
@@ -249,7 +265,7 @@ router.get('/:id/export/md', async (req, res) => {
       ``,
       `> **状态**: 原始分析结果已过期或损坏, 无法生成论证报告.`,
       `> **原因**: ${reason}`,
-      `> **任务元数据**: mode=${job.mode || '?'}, status=${job.status || '?'}, 创建=${job.createdAt ? new Date(job.createdAt).toLocaleString('zh-CN', { hour12: false }) : '?'}, 结束=${job.endedAt ? new Date(job.endedAt).toLocaleString('zh-CN', { hour12: false }) : '?'}`,
+      `> **任务元数据**: mode=${job.mode || '?'}, status=${job.status || '?'}, 创建=${job.createdAt ? new Date(job.createdAt).toLocaleString('zh-CN', { hour12: false }) : '?'}, 结束=${job.completedAt ? new Date(job.completedAt).toLocaleString('zh-CN', { hour12: false }) : '?'}`,
       `> **输出 TTL**: ${ttlHint}`,
       ``,
       `## 修复建议`,
@@ -624,7 +640,7 @@ router.get('/:id/export/md', async (req, res) => {
   // P2 fix (Round 24 §10): 改为直接展示 (text/markdown), 不触发浏览器下载.
   res.setHeader('Content-Type', 'text/markdown; charset=utf-8');
   res.send(mdContent);
-});
+}));
 
 
 module.exports = router;

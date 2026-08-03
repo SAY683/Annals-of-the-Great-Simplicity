@@ -630,9 +630,23 @@ def run_pipeline(config: PipelineConfig = None,
     try:
         from ccm_causality import ccm_batch_test
         print(f"\n  [CCM Batch Check (Victim Mirror + Secret 13 correction)]")
-        candidate_pairs = [(cause, config.target_col)
-                           for cause in ['kills', 'damage', 'deaths']
-                           if cause in df.columns and cause != config.target_col]
+        # R34-D 修复 (DEBT-ROUND33-01): CCM candidate_pairs 从硬编码改为动态选择.
+        # 原代码硬编码 ['kills', 'damage', 'deaths'] 作为 cause, 对88列轨迹数据
+        # (ate/ate_ci_lower/consensus_score 等) 完全不适用.
+        # 修改为: 优先使用 config.columns 中除 target_col 外的所有列,
+        # 回退到 game-log schema (kills/damage/deaths) 保持向后兼容.
+        _GAME_LOG_CAUSES = ['kills', 'damage', 'deaths']
+        _dynamic_causes = [c for c in config.columns
+                          if c != config.target_col and c in df.columns]
+        if _dynamic_causes:
+            candidate_pairs = [(cause, config.target_col) for cause in _dynamic_causes]
+            print(f"    [CCM Causes] 动态选择: {_dynamic_causes}")
+        else:
+            # 回退: game-log schema (向后兼容)
+            candidate_pairs = [(cause, config.target_col)
+                              for cause in _GAME_LOG_CAUSES
+                              if cause in df.columns and cause != config.target_col]
+            print(f"    [CCM Causes] 回退 game-log schema: {[c for c in _GAME_LOG_CAUSES if c in df.columns]}")
         ccm_batch = ccm_batch_test(df, candidate_pairs, config.q,
                                    analysis_label=config.analysis_type)
         print(f"    Method: {ccm_batch['method']}")

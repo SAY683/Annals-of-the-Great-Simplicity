@@ -42,10 +42,13 @@ except Exception as e:
   try {
     fs.writeFileSync(tmpFile, script, { encoding: 'utf-8' });
     const probePythonCmd = process.env.TRACE_PYTHON_CMD || process.env.PYTHON_CMD || 'python';
-    const result = require('child_process').execSync(
-      `${probePythonCmd} "${tmpFile}"`,
+    // P0 修复 (2026-07-30 审计): 改用 spawnSync + 参数数组，避免 shell 解释。
+    // 原代码 execSync 的 shell 拼接在环境变量被污染时有命令注入风险。
+    const spawnResult = require('child_process').spawnSync(
+      probePythonCmd, [tmpFile],
       { encoding: 'utf-8', timeout: 15000, env: { ...process.env, PYTHONIOENCODING: 'utf-8' } }
     );
+    const result = spawnResult.stdout || '';
     for (const line of result.trim().split(/\r?\n/)) {
       if (!line.trim()) continue;
       try {
@@ -200,7 +203,10 @@ function ensureLlamaWorker() {
       const waiters = llamaState.startWaiters; llamaState.startWaiters = [];
       waiters.forEach((w) => w.reject(new Error('LLaMA Worker 启动超时')));
       if (llamaState.worker) {
-        try { llamaState.worker.kill(); } catch (_) {}
+        // P1-6 修复 (ROUND27 12维度核对): 原用 worker.kill() (SIGTERM),
+        // Windows 上 SIGTERM 不可靠. 改用 killProcessWithFallback (SIGTERM→5s→SIGKILL),
+        // 与 server.js gracefulShutdown 中的清理逻辑对齐.
+        try { killProcessWithFallback(llamaState.worker); } catch (_) {}
         llamaState.worker = null;
       }
       llamaState.ready = false;

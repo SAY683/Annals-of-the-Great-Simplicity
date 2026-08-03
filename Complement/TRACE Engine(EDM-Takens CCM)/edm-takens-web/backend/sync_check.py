@@ -9,11 +9,18 @@ S1-5 修复 (科研披露落地 Round 28): 扩展校验范围至文档层 (docs/
 out_of_sample_used) 在 ccm_causality.py 和 _numpy_edm.py 中存在定义,
 防止未来重构丢失这些科研级披露字段.
 
+R34-A 修复 (ROUND34 P0): 新增便携目录算法层 SHA256 一致性检查.
+ROUND33-G3 发现便携目录 (Skill/) 的 sovereign_havok.py 和 ccm_causality.py
+完全未同步 ROUND32 修复 (4/√3 极限值 + 自适应步长 + hashlib.md5 种子),
+导致便携目录算法实现与开发目录不一致. 本修复扩展 sync_check.py 检查范围
+到便携目录, 确保开发目录的算法层修复同步到便携目录的所有副本.
+
 用法:
-    python sync_check.py          # 检查所有共享文件 + 文档 + 披露字段
+    python sync_check.py          # 检查所有共享文件 + 文档 + 披露字段 + 便携目录
     python sync_check.py --quiet  # 仅输出差异，无差异时静默
     python sync_check.py --no-docs  # 跳过文档同步检查
     python sync_check.py --no-disclosure  # 跳过披露字段存在性检查
+    python sync_check.py --no-portable  # 跳过便携目录同步检查
 
 注意：_paths.py 在副本中被有意修改（支持 EDMTAKENS_DATA_DIR 环境变量），
 故列入 EXPECTED_DIFFERS 白名单，不视为同步失败。
@@ -76,6 +83,34 @@ DISCLOSURE_FIELDS = {
     ],
 }
 
+# R34-A 修复 (ROUND34 P0): 便携目录算法层关键文件
+# 这些文件是算法实现的核心, 必须在开发目录和便携目录的所有副本中保持一致.
+# ROUND33-G3 发现便携目录的 sovereign_havok.py 和 ccm_causality.py 未同步
+# ROUND32 修复, 导致便携目录算法实现与开发目录不一致.
+# 路径相对于 _PROJECT_ROOT (即 研发测试/, 开发目录 TRACE Engine(EDM-Takens CCM)/
+# 与便携目录 Skill/ 的共同父目录).
+PORTABLE_ALGORITHM_FILES = {
+    "sovereign_havok.py": [   # HAVOK 核心 (Gavish-Donoho 4/√3 修复)
+        "TRACE Engine(EDM-Takens CCM)/edm-takens/src",                          # 开发目录核心库
+        "TRACE Engine(EDM-Takens CCM)/edm-takens-web/backend/edmtakens",        # 开发目录 Web 副本
+        "Skill/edm-takens/src",                                                 # 便携目录核心库
+        "Skill/edm-takens-web/backend/edmtakens",                               # 便携目录 Web 副本
+    ],
+    "ccm_causality.py": [     # CCM 核心 (自适应步长 + hashlib.md5 种子修复)
+        "TRACE Engine(EDM-Takens CCM)/edm-takens/src",
+        "TRACE Engine(EDM-Takens CCM)/edm-takens-web/backend/edmtakens",
+        "Skill/edm-takens/src",
+        "Skill/edm-takens-web/backend/edmtakens",
+    ],
+}
+
+# R34-A: 项目根目录 (研发测试/, 开发目录与便携目录的共同父目录)
+# _BACKEND_DIR = .../TRACE Engine(EDM-Takens CCM)/edm-takens-web/backend
+# 需要 3 个 .. 回到 研发测试/
+_PROJECT_ROOT = os.path.abspath(
+    os.path.join(_BACKEND_DIR, "..", "..", "..")
+)
+
 
 def _sha256(filepath: str) -> str:
     """计算文件的 SHA256 哈希值。"""
@@ -119,6 +154,58 @@ def _check_disclosure_fields(quiet: bool) -> int:
         return 1
     elif not quiet:
         print(f"  披露字段检查通过 ({sum(len(v) for v in DISCLOSURE_FIELDS.values()) * 2} 项)")
+    return 0
+
+
+def _check_portable_sync(quiet: bool) -> int:
+    """R34-A 修复 (ROUND34 P0): 检查便携目录算法层 SHA256 一致性.
+
+    确保 sovereign_havok.py 和 ccm_causality.py 在开发目录和便携目录的
+    所有 4 个副本中保持一致, 防止 ROUND33-G3 同步遗漏再现.
+
+    所有路径相对于 _PROJECT_ROOT (研发测试/).
+    """
+    if not quiet:
+        print("\n── 便携目录算法层同步检查 (R34-A) ──────────────")
+    if not os.path.isdir(_PROJECT_ROOT):
+        print(f"[ERROR] 项目根目录不存在: {_PROJECT_ROOT}", file=sys.stderr)
+        return 2
+
+    issues = []
+    n_checked = 0
+    for fname, rel_paths in PORTABLE_ALGORITHM_FILES.items():
+        hashes = {}
+        for rel in rel_paths:
+            full = os.path.join(_PROJECT_ROOT, rel, fname)
+            if not os.path.exists(full):
+                issues.append(f"文件缺失: {rel}/{fname}")
+                continue
+            hashes[rel] = _sha256(full)
+            n_checked += 1
+
+        # 比较所有副本的哈希
+        unique_hashes = set(hashes.values())
+        if len(unique_hashes) == 0:
+            issues.append(f"{fname}: 所有副本均缺失")
+        elif len(unique_hashes) > 1:
+            # 找出哪个副本不一致
+            issues.append(f"{fname}: 副本不一致 ({len(unique_hashes)} 种哈希)")
+            for rel, h in hashes.items():
+                issues.append(f"  - {rel}: {h[:16]}...")
+        elif not quiet:
+            print(f"  [OK]   {fname}: {len(hashes)} 副本一致")
+
+    if issues:
+        print(f"\n[FAIL] 便携目录算法层同步检查失败 ({len(issues)} 项):")
+        for i in issues:
+            print(f"  - {i}")
+        print("\n请将开发目录的算法层修复同步到便携目录:")
+        print("  开发目录: TRACE Engine(EDM-Takens CCM)/edm-takens/src/")
+        print("  便携目录: Skill/edm-takens/src/ (及对应 web 副本)")
+        return 1
+    elif not quiet:
+        print(f"  便携目录算法层检查通过 ({n_checked} 副本, "
+              f"{sum(len(v) for v in PORTABLE_ALGORITHM_FILES.values())} 预期)")
     return 0
 
 
@@ -183,6 +270,7 @@ def main() -> int:
     quiet = "--quiet" in sys.argv
     skip_docs = "--no-docs" in sys.argv
     skip_disclosure = "--no-disclosure" in sys.argv
+    skip_portable = "--no-portable" in sys.argv
 
     if not os.path.isdir(_CORE_SRC):
         print(f"[ERROR] 核心库目录不存在: {_CORE_SRC}", file=sys.stderr)
@@ -251,6 +339,11 @@ def main() -> int:
     # S1-5 修复: 文档层同步检查
     if not skip_docs:
         if _check_docs_sync(quiet) != 0:
+            exit_code = 1
+
+    # R34-A 修复: 便携目录算法层同步检查
+    if not skip_portable:
+        if _check_portable_sync(quiet) != 0:
             exit_code = 1
 
     return exit_code

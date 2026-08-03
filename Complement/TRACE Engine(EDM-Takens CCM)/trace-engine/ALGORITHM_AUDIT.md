@@ -27,9 +27,14 @@
 | # | 勇士 | 实现位置 | 算法核心 | 完成度 |
 |---|------|---------|---------|--------|
 | 1 | 🔴 TRACE | [run_real_pipeline.py:178-262](examples/counterfactual_hybrid/run_real_pipeline.py) | ΔNLL 掩码干预 + BPE token 对 | ★★★★★ |
-| 2 | ⚫ HAVOK | [six_warriors.py:_deploy_havok](examples/counterfactual_hybrid/six_warriors.py) | Hankel 矩阵 + SVD 90% 能量截断 + 强迫项定位 | ★★★★☆ |
+| 2 | ⚫ HAVOK | [six_warriors.py:_deploy_havok](examples/counterfactual_hybrid/six_warriors.py) | Hankel 矩阵 + SVD 90% 能量截断 + 强迫项定位 | ★★★☆☆（3/5，P0-A 修复后降级 — 使用代理指标） |
 | 3 | 🟡 DoWhy+CF | [counterfactual_bridge.py:166-1138](examples/counterfactual_hybrid/counterfactual_bridge.py) | do-calculus + Pearl 三步反事实 | ★★★★★ |
 | 4 | ⬜ causallearn | [causallearn_validator.py:19-161](examples/counterfactual_hybrid/causallearn_validator.py) | PC + GES 双算法 | ★★★★☆ |
+
+> **HAVOK 评级降级说明**：原评 ★★★★☆（4/5），P0-A 修复后（ROUND27 12维度核对）
+> 发现实际代码使用**代理指标**（`forcing_raw` 残差能量比 + `forcing_col` 峰值列定位）而非
+> 标准 HAVOK 强迫项 v_r（Brunton et al. 2017），故同步降级为 ★★★☆☆（3/5）。
+> 详见 §2.2 完成度评分与 P0-A 修复说明。
 
 ### 1.2 Tier-B 启发式诊断层（2 名）— 文本特征启发式
 
@@ -79,20 +84,37 @@
 1. 构造 Hankel 矩阵 H (embedding_dim × n_snapshots)
 2. SVD: H = U Σ V^T
 3. 截断至 90% 能量: U_r, Σ_r, V_r
-4. 线性算子 A = U_r^T H_shift V_r Σ_r^{-1}
-5. 强迫项 v_r = (I - U_r U_r^T) × (H_shift V_r)
-6. 定位 |v_r| 峰值 → 非线性事件时间点
+4. 强迫项代理: forcing_raw = s[r:].max() / s[0]  (残差能量比)
+5. 强迫项定位: forcing_col = argmax(|U[:, r]|)  (左奇异向量峰值)
 ```
+
+> **P0-A 修复 (ROUND27 12维度核对)**: 原文档描述了标准 HAVOK 的线性算子 A 和强迫向量 v_r
+> (Brunton et al. 2017), 但实际代码使用**代理指标**而非标准强迫项:
+> - `forcing_raw` = 残差奇异值最大值 / 首奇异值 (标量能量比, 非时变向量)
+> - `forcing_col` = 第 r+1 左奇异向量的最大投影位置 (定位, 非完整 v_r)
+>
+> 这是**有意简化**: token 频率时序的离散性使标准 HAVOK 的连续时间假设失真,
+> 代理指标在文本因果发现场景下更具鲁棒性. verdict 的 NOISE_DOMINANT /
+> NONLINEAR_PRESENT 判定基于代理指标, 因果解释力弱于标准 HAVOK, 但足以
+> 区分"线性主导"与"非线性显著"两类动力学画像.
+>
+> 如需标准 HAVOK 强迫项 v_r, 需实现:
+>   A = U_r^T · H_shift · V_r · Σ_r^{-1}
+>   v_r = (I - U_r · U_r^T) · (H_shift · V_r)
 
 **边界局限**：
 - 输入是 token 频率时序，非连续动力系统——HAVOK 的连续时间假设在离散 token 上有失真
 - Hankel 比例约束 p/q ≥ 10（[edm-takens forbidden_rules](../edm-takens/references/forbidden_rules_reference.md)）在 N<22 时无法满足
 - 强迫项峰值定位的统计显著性未做 surrogate 检验
+- **代理指标 vs 标准 v_r**: forcing_raw 是标量比率, 无法定位具体非线性事件时刻;
+  forcing_col 仅定位峰值列, 非完整时变强迫信号
 
-**完成度评分**：★★★★☆（4/5）
+**完成度评分**：★★★☆☆（3/5，P0-A 修复后降级）
 - 完整自实现（不依赖 edm-takens）
-- 自适应 embedding_dim = min(concepts, √N × 3)
+- 自适应 embedding_dim = min(12, len(signal) // 4)
+- **使用代理指标而非标准 HAVOK 强迫项 v_r** (P0-A 修复后如实标注)
 - 缺少 surrogate 显著性检验（建议后续集成）
+- 完整实现标准 v_r 可提升至 4/5
 
 ### 2.3 🟡 DoWhy+CF — do-calculus + Pearl 三步
 
@@ -177,7 +199,7 @@
 
 | 数据画像 | 触发边界 | 影响勇士 | 设计响应 |
 |---------|---------|---------|---------|
-| N < 22 | Hankel 比例 p/q≥10 不可满足 | HAVOK | 标记 `UNRELIABLE`，仍输出但降权 |
+| N < 22 | Hankel 比例 p/q≥10 不可满足 | HAVOK | 标记 `unavailable`，不输出结果（P2-J 修复: 原文档误称"仍输出但降权"，实际代码返回 status="unavailable" 不输出） |
 | N < 200 | PC/GES 统计功效不足 | causallearn | 输出 `TRACE_ONLY`，证明 TRACE 价值 |
 | 概念数 > 50 | DoWhy DOT 图爆炸 | DoWhy+CF | 自动降级为 SimulationModel |
 | UNK 率 > 30% | ΔNLL 信号失真 | TRACE | 警告但不拒绝（test_10e 覆盖） |
@@ -267,6 +289,63 @@
 - `run_tests.py` — 标注为 ❌ DEFERRED
 
 **修复方案**：保留原文件作为"设计规则采纳审计"，但补充说明这些文件位于 TRACE 主项目而非 Skill 目录。详见 [secret_adoption_audit.md](secret_adoption_audit.md) §6 引用范围说明。
+
+### 5.3 2026-07-30 全量审计修缮（侦探级嗅探）
+
+本次审计对 16 个核心 Python 文件 + 20 个 Web 服务文件进行了全量逐行审查，发现并修复以下问题：
+
+#### P0 级修复（阻断/功能失效）
+
+| # | 文件:行号 | 问题 | 修复 |
+|---|----------|------|------|
+| P0-1 | run_real_pipeline.py:271 | `TEXT_HASH` 未定义导致 `NameError` → `result.json` 永不生成（CLI 模式） | 在 text 读取后定义 `TEXT_HASH = hashlib.md5(text.encode('utf-8')).hexdigest()[:12]` |
+| P0-2 | services/llamaWorker.js:45 | `execSync` shell 拼接命令注入风险（环境变量污染时） | 改用 `spawnSync` + 参数数组，避免 shell 解释 |
+| P0-3 | server.js:116 | CSP `unsafe-inline` 放宽了 XSS 纵深防御 | **保留**（前端确有内联脚本，需后续重构为 nonce 模式） |
+
+#### P1 级修复（崩溃风险/数学错误）
+
+| # | 文件:行号 | 问题 | 修复 |
+|---|----------|------|------|
+| P1-1 | dowhy_auditor.py:386 | `ite=None` 时 `None < -0.1` 抛 `TypeError` → audit('full') 中断 | 添加 `if ite is not None and ...` 守卫 |
+| P1-2 | test_case.py:237,214 | `np.isnan(None)` / `None > 0.1` 抛 `TypeError` | 添加 `r['ite'] is not None` / `cf_c['causal_effect'] is not None` 守卫 |
+| P1-3 | counterfactual_bridge.py:1160 | 反驳阈值硬编码 `n_refuted >= 2` 在 n_total<2 时误导 | 改为 `n_refuted >= max(2, n_total_refuters // 2)` |
+| P1-4 | counterfactual_bridge.py:807 | `method` 大小写敏感导致 `linear_regression` 匹配失败 | 统一 `method.lower()` |
+| P1-5 | dowhy_auditor.py:246-262 | `min_n_per_v_ratio` 参数读取但未使用，硬编码 2x/5x | 启用 `self._min_n_per_v_ratio`，默认 5.0（向后兼容） |
+| P1-6 | public/js/jobs.js:138 | `jobHistoryTerminal.addEventListener('change')` 在 `loadJobHistory()` 内重复绑定 → 内存泄漏 | 使用 `_batchChangeBound` 标志确保只绑定一次（事件委托） |
+| P1-7 | sync_product.py:main() | 自包含布局下 `src == dst` 自我覆盖导致数据丢失 | 检测自包含布局，仅执行保守清理和验证 |
+
+#### 跨文件失同步问题
+
+| 编号 | 问题 | 涉及文件 | 状态 |
+|------|------|---------|------|
+| SYNC-1 | EDM ρ 阈值：six_warriors.py:473 用 0.8，compound_diagnostic.py:9 注释写 0.9 | six_warriors.py, compound_diagnostic.py | ✅ 已同步 (注释改为 0.8) |
+| SYNC-2 | HAVOK 最小样本：six_warriors.py:512 用 T<20，文档记录 N<22 | six_warriors.py, 本文 §3.1 | ✅ 已同步 (阈值改为 22) |
+| SYNC-3 | UNK 警告阈值：counterfactual_bridge.py:439 用 0.2，文档记录 0.3 | counterfactual_bridge.py, 本文 §3.1 | ✅ 已同步 (增加 0.3 级别) |
+| SYNC-4 | 反驳阈值：dowhy_adapter.py:69 默认 0.3，simulation_model.py 各自硬编码 0.3/0.2/0.3，presets.yaml:36 定义 0.3 但未被代码读取 | dowhy_adapter.py, simulation_model.py, presets.yaml | ✅ 已同步 (参数化到 preset) |
+| SYNC-5 | min_n_per_v_ratio：presets.yaml:54 定义，dowhy_auditor.py:116 读取但未使用 | presets.yaml, dowhy_auditor.py | ✅ 已修 (P1-5) |
+
+#### SUPER 模式 n_edges=0 的算法解释
+
+历史 SUPER 模式结果中部分任务 `n_significant_edges=0`，经核查确认这是**合理算法结果**而非 bug：
+- TRACE ΔNLL 计算的值（如 0.0022）低于阈值（0.03）→ 无因果边被检出
+- 这是 LLaMA 模型对某些文本类型的因果发现能力限制
+- 使用 `llama` 预设（`threshold=0.01`）可检出更多非零边
+- 建议在论文/报告中明确披露此边界
+
+#### HAVOK 应用于非时序数据的方法学局限
+
+`six_warriors.py:530` 将因果邻接矩阵的列和（空间聚合）作为"时序信号"输入 HAVOK：
+- HAVOK 数学上要求**时间序列**输入（Hankel 矩阵捕捉时间延迟相关性）
+- 列和是静态聚合，不是时间动力学
+- verdict（LINEAR_DOMINANT / NONLINEAR_PRESENT）在此场景下因果解释力弱
+- **建议**：在 verdict 中增加 disclaimer，或将 HAVOK 降为 Tier-B（后续优化）
+
+#### EDM ρ 命名误导
+
+`six_warriors.py:470` 的 `rho = 1.0 / (1.0 + cv)` 是间隔变异系数的倒数：
+- **不是** Sugihara EDM 的交叉映射相关性 ρ
+- 两者数学定义完全不同，但同名 "ρ" 会误导用户
+- **建议**：重命名为 `interval_regularity` 或 `rho_proxy`（后续优化）
 
 ---
 

@@ -1,2 +1,0 @@
-# Optional dependencies for the yinshen (音神) example
-pypinyin

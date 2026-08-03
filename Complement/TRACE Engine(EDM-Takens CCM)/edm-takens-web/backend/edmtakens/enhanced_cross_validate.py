@@ -52,6 +52,10 @@ from sovereign_havok import SovereignHAVOK, classify_havok_stability
 from _numeric_constants import EPS_LYAPUNOV
 from _paths import data_path
 from edm_auditor import classify_hankel_ratio
+# B-02 修复 (Round 29 §11.4): 三份 Lyapunov 实现统一为单一真相源.
+# estimate_lyapunov_robust (final_interpretation.py) 是带 R² 质量检查的主实现,
+# 本文件原 estimate_lyapunov_exponent 委托到主实现, 消除"修改一处他处不跟"风险.
+from final_interpretation import estimate_lyapunov_robust as _estimate_lyapunov_robust
 from ccm_causality import ccm_causality_test
 
 
@@ -63,14 +67,12 @@ def estimate_lyapunov_exponent(data, E, dt=1.0, n_expand=20):
     """
     Estimate the maximal Lyapunov exponent using Rosenstein's algorithm.
 
+    B-02 修复 (Round 29 §11.4): 委托到 final_interpretation.estimate_lyapunov_robust.
+    主实现带 R² 质量检查 + cKDTree 加速 + log(0) 防护, 与本函数语义等价但更严谨.
+    n_expand 参数保留用于向后兼容 (主实现内部已计算 n_expand = min(20, N // 3)).
+
     Based on: Rosenstein, Collins & De Luca (1993), "A practical method
     for calculating largest Lyapunov exponents from small data sets."
-
-    Algorithm:
-    1. Reconstruct phase space with embedding dimension E
-    2. For each point, find nearest neighbor with temporal separation > mean period
-    3. Track divergence rate d(t) ~ exp(lambda_max * t)
-    4. lambda_max = slope of <ln(d)> vs t
 
     Parameters
     ----------
@@ -85,104 +87,26 @@ def estimate_lyapunov_exponent(data, E, dt=1.0, n_expand=20):
     -------
     dict with keys: lambda_max, lyapunov_time, prediction_horizon_3x, n_points
     """
-    data = np.asarray(data, dtype=float).ravel()
-    n = len(data)
-
-    # Reconstruct phase space: each row is a delay vector of length E
-    N = n - E + 1
-    if N < 20:
+    # 委托到主实现, 适配返回字段以保持向后兼容
+    result = _estimate_lyapunov_robust(data, E, dt=dt)
+    # 主实现返回 'reliable' 而非 'warning', 适配为旧格式
+    if result.get('lambda_max') is None:
         return {
             'lambda_max': None,
             'lyapunov_time': None,
             'prediction_horizon_3x': None,
-            'warning': f'Too few state-space points (N={N}) for reliable estimation'
+            'warning': result.get('reason', 'Estimation failed'),
         }
-
-    # Build delay-embedded state vectors
-    X = np.zeros((N, E))
-    for i in range(E):
-        X[:, i] = data[i:i+N]
-
-    # Estimate mean period from first zero-crossing of autocorrelation
-    x_centered = data - np.mean(data)
-    autocorr = np.correlate(x_centered, x_centered, mode='full')
-    autocorr = autocorr[len(autocorr)//2:]
-    # P1-5 修复 (Round 21 §P0-B): autocorr[0] 可能为 0 (常量序列或 std=0),
-    # 导致除以 0 产生 NaN 传播到下游. 用 safe division + fallback.
-    ac0 = autocorr[0] if len(autocorr) > 0 else 0.0
-    if abs(ac0) < EPS_LYAPUNOV:
-        # 常量序列: 无法定义 mean period, 用 E+1 作为保守值
-        mean_period = max(5, E + 1)
-    else:
-        autocorr = autocorr / ac0
-        zero_cross = np.where(np.diff(np.sign(autocorr - 1/np.exp(1))))[0]
-        mean_period = zero_cross[0] + 1 if len(zero_cross) > 0 else max(5, E)
-
-    # Find nearest neighbors for each point (with temporal separation)
-    div_curves = []
-    for i in range(N - n_expand):
-        # Find nearest neighbor with temporal separation > mean_period
-        dists = np.sum((X[:N - n_expand] - X[i])**2, axis=1)
-        dists[i] = np.inf  # exclude self
-        # Exclude points too close in time
-        for j in range(max(0, i - mean_period), min(N - n_expand, i + mean_period + 1)):
-            if 0 <= j < len(dists):
-                dists[j] = np.inf
-
-        j = np.argmin(dists)
-        if np.isinf(dists[j]):
-            continue
-
-        # Track divergence for n_expand steps
-        div = np.zeros(n_expand)
-        for k in range(min(n_expand, N - max(i, j) - 1)):
-            div[k] = np.sqrt(np.sum((X[i+k+1] - X[j+k+1])**2))
-        if div[0] > EPS_LYAPUNOV:
-            # ROUND26 算法审视 P0 修复: 同步 final_interpretation.py:127 的 log(0) 防护
-            # 原 np.log(div + 1e-12) 当 div→0 时引入 -27.6 偏差, 拉低 div_mean 使 λ_max 低估
-            log_div = np.log(div, where=div > EPS_LYAPUNOV, out=np.full_like(div, np.nan))
-            div_curves.append(log_div)
-
-    if len(div_curves) < 10:
-        return {
-            'lambda_max': None,
-            'lyapunov_time': None,
-            'prediction_horizon_3x': None,
-            'warning': f'Too few valid divergence curves ({len(div_curves)})'
-        }
-
-    # Average divergence over all pairs
-    # ROUND26 算法审视 P0 修复 (续): div_curves 现含 NaN (div→0 处), 用 nanmean 忽略
-    div_arr = np.array(div_curves)
-    div_mean = np.nanmean(div_arr, axis=0) if np.any(~np.isnan(div_arr)) else np.zeros(n_expand)
-    t_div = np.arange(len(div_mean)) * dt
-
-    # Fit line to the linear growth region (first half of divergence)
-    fit_end = min(n_expand // 2, len(div_mean) - 5)
-    if fit_end < 5:
-        fit_end = len(div_mean) - 2
-    coeffs = np.polyfit(t_div[:fit_end], div_mean[:fit_end], 1)
-    # Q9 P1-17 修复: 允许负 Lyapunov 指数以正确表示稳定系统
-    # 之前 max(0.001, coeffs[0]) 强制为正，导致稳定系统也被报告为混沌
-    lambda_max = coeffs[0]
-
-    # Lyapunov time: 使用绝对值，稳定系统 lambda_max<=0 时 tau_L 为 inf
-    tau_L = 1.0 / abs(lambda_max) if abs(lambda_max) > 1e-10 else float('inf')
-
-    # Prediction horizons (in original time units, i.e. games)
-    horizon_1x = tau_L
-    horizon_3x = 3 * tau_L
-    horizon_5x = 5 * tau_L
-
+    tau_L = result.get('lyapunov_time')
     return {
-        'lambda_max': lambda_max,
+        'lambda_max': result['lambda_max'],
         'lyapunov_time': tau_L,
-        'prediction_horizon_1x': horizon_1x,
-        'prediction_horizon_3x': horizon_3x,
-        'prediction_horizon_5x': horizon_5x,
-        'n_divergence_curves': len(div_curves),
-        'fit_r2': float(np.corrcoef(t_div[:fit_end], div_mean[:fit_end])[0, 1])**2,
-        'warning': None
+        'prediction_horizon_1x': tau_L,
+        'prediction_horizon_3x': 3 * tau_L if tau_L != float('inf') else float('inf'),
+        'prediction_horizon_5x': 5 * tau_L if tau_L != float('inf') else float('inf'),
+        'n_divergence_curves': result.get('n_curves', 0),
+        'fit_r2': result.get('fit_r2', 0.0),
+        'warning': None if result.get('reliable', False) else f"Low fit R²={result.get('fit_r2', 0):.3f}",
     }
 
 

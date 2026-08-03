@@ -170,6 +170,13 @@ def _prepare_pipeline_data(
     rewriting the entire algorithm, we transparently map the user's columns
     for computation and keep the original names for display.
 
+    R34-D 修复 (DEBT-ROUND33-01): 新增88列轨迹数据智能检测.
+    当检测到 CSV 是 trace-to-edm 的88列轨迹数据时, 跳过 game-log 重映射,
+    保留原始列名 (ate/consensus_score/max_delta_nll 等), 避免 CI 边界与
+    ate 共线导致 HAVOK 退化, 以及真实因果变量被 CCM 忽略.
+    pipeline.py 的 CCM candidate_pairs 已改为动态选择 (R34-D), 支持
+    任意列名, 不再依赖 game-log schema.
+
     Returns:
         (temp_csv_path, pipeline_target, pipeline_vars, original_target,
          display_map)
@@ -177,6 +184,22 @@ def _prepare_pipeline_data(
     original_target = target_col
     df = _read_csv_robust(csv_path)
     column_map: dict[str, str] = {}  # original -> pipeline alias
+
+    # R34-D 修复: 检测88列轨迹数据 (trace-to-edm 输出)
+    # 特征列: ate, consensus_score, max_delta_nll, text_hash, trace_mode 等
+    _TRAJECTORY_SIGNATURES = {
+        "ate", "consensus_score", "text_hash", "trace_mode",
+        "max_delta_nll", "concept_coverage",
+    }
+    _csv_columns = set(df.columns)
+    _is_trajectory = len(_TRAJECTORY_SIGNATURES & _csv_columns) >= 4
+
+    if _is_trajectory:
+        # 88列轨迹数据: 跳过 game-log 重映射, 保留原始列名
+        print(f"[API] 检测到88列轨迹数据 (trace-to-edm 输出), 跳过 game-log 重映射")
+        print(f"[API] 保留原始列名: target={target_col}, vars={selected_vars}")
+        display_map = {}  # 无重映射
+        return csv_path, target_col, selected_vars, original_target, display_map
 
     schema_aliases = ["kills", "damage", "deaths"]
 

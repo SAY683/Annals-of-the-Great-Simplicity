@@ -40,9 +40,16 @@ const {
 // 通过 /api/result/:id 获取已完成任务的结果）。
 function sendSSE(res, event, data) {
   const id = nextSseEventId();
-  res.write(`id: ${id}\n`);
-  res.write(`event: ${event}\n`);
-  res.write(`data: ${JSON.stringify(data)}\n\n`);
+  // P0-1 修复 (ROUND27 12维度核对): 客户端断连后 res 可能已 destroy,
+  // 裸 res.write 会触发 'error' 事件导致 unhandledException → gracefulShutdown.
+  // 与 heartbeat (L178) 和 finish() (L355) 的 try/catch 对齐.
+  try {
+    res.write(`id: ${id}\n`);
+    res.write(`event: ${event}\n`);
+    res.write(`data: ${JSON.stringify(data)}\n\n`);
+  } catch (_) {
+    // 流已关闭, 静默忽略 — res.on('close') 会处理任务取消
+  }
 }
 
 // 在 SSE 响应头之后发送 retry: 30000（30 秒重连间隔，debt-11；跨项目契约对齐 trace-to-edm/server.js）
@@ -59,7 +66,19 @@ function runPythonAnalysisStream(text, outputId, mode, bridgeConfig, res, schema
   const outDir = path.join(OUTPUT_DIR, outputId);
   const cfgObj = bridgeConfig ? (() => { try { return JSON.parse(bridgeConfig); } catch (_) { return null; } })() : null;
 
-  if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true });
+  // P0-2/P0-3 修复 (2026-07-30): resClosed 在 writeFileSync 之前声明，
+  // 避免 TDZ 违规导致错误处理本身崩溃；mkdirSync 异常需捕获并优雅降级。
+  let resClosed = false;
+  try {
+    if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true });
+  } catch (mkdirErr) {
+    logToFile('error', `创建输出目录失败 job=${outputId}: ${mkdirErr.message}`);
+    sendSSE(res, 'error', { message: `创建输出目录失败: ${mkdirErr.message}` });
+    recordJob(outputId, mode, 'error', mkdirErr.message);
+    activeJobs.delete(outputId);  // P0-5: 清理占位符, 释放并发名额
+    processJobQueue();
+    return;
+  }
 
   recordJob(outputId, mode, 'running', null, { text, config: bridgeConfig || CONFIG.bridgeConfig || '' });
   activeJobResponses.set(outputId, { res, mode });
@@ -76,6 +95,8 @@ function runPythonAnalysisStream(text, outputId, mode, bridgeConfig, res, schema
     logToFile('error', `写入输入文件失败 job=${outputId}: ${err.message}`);
     if (!resClosed) sendSSE(res, 'error', { message: `写入输入文件失败: ${err.message}` });
     recordJob(outputId, mode, 'error', err.message);
+    activeJobs.delete(outputId);  // P0-5: 清理占位符, 释放并发名额
+    processJobQueue();
     return;
   }
 
@@ -101,7 +122,7 @@ function runPythonAnalysisStream(text, outputId, mode, bridgeConfig, res, schema
   let stdoutBuffer = '';
   let timeoutId = null;
   let finished = false;
-  let resClosed = false;
+  // resClosed 已在函数开头声明（P0-2 修复），此处不再重复声明
 
   const cleanupTimeout = () => {
     if (timeoutId) {
@@ -158,7 +179,10 @@ function runPythonAnalysisStream(text, outputId, mode, bridgeConfig, res, schema
     }, gracePeriod);
 
     // 若进程在宽限期内完成，清理定时器
-    py.on('exit', () => {
+    // P1-10 修复 (ROUND27 12维度核对): res.on('close') 可被多次触发 (前端 sse.js
+    // 3 次指数退避重连), 每次 close 都给 py 挂 exit 监听器会累积, 超
+    // defaultMaxListeners=10 触发警告. 用 once 替代 on, 确保只挂一次.
+    py.once('exit', () => {
       clearTimeout(graceTimer);
     });
   });
@@ -170,6 +194,14 @@ function runPythonAnalysisStream(text, outputId, mode, bridgeConfig, res, schema
 
   py.stdout.on('data', (chunk) => {
     stdoutBuffer += chunk.toString('utf-8');
+    // P2-7 修复 (ROUND27 12维度核对): stdout 缓冲区无上限, 若 Python 输出
+    // 单行极长 (如 dump 大 JSON 无换行), stdoutBuffer 无限增长导致 OOM.
+    // 限制单行最大 10MB, 超限截断并记录警告.
+    const MAX_STDOUT_LINE = 10 * 1024 * 1024;
+    if (stdoutBuffer.length > MAX_STDOUT_LINE) {
+      logToFile('error', `stdout 缓冲区超限 (${stdoutBuffer.length} bytes), 截断 job=${outputId}`);
+      stdoutBuffer = stdoutBuffer.slice(-MAX_STDOUT_LINE);
+    }
     const lines = stdoutBuffer.split('\n');
     stdoutBuffer = lines.pop();
 
@@ -216,6 +248,7 @@ function runPythonAnalysisStream(text, outputId, mode, bridgeConfig, res, schema
   });
 
   py.stderr.on('data', (chunk) => {
+    if (resClosed) return;  // P0 修复: 防止向已关闭的 SSE 流写入导致进程崩溃
     const lines = chunk.toString('utf-8').split('\n').filter(Boolean);
     for (const line of lines) {
       sendSSE(res, 'log', { level: 'stderr', message: line });
@@ -242,7 +275,7 @@ function runPythonAnalysisStream(text, outputId, mode, bridgeConfig, res, schema
     }
     if (isCurrent) {
       if (!resClosed) {
-        sendSSE(res, 'done', { code });
+        sendSSE(res, 'done', { code, job_id: outputId });
         res.end();
       }
     }
@@ -258,7 +291,7 @@ function runPythonAnalysisStream(text, outputId, mode, bridgeConfig, res, schema
     recordJob(outputId, mode, 'error', err.message);
     logToFile('error', `Python 启动错误 job=${outputId}: ${err.message}`);
     if (!resClosed) {
-      sendSSE(res, 'done', { code: -1 });
+      sendSSE(res, 'done', { code: -1, job_id: outputId });
       res.end();
     }
     processJobQueue();
@@ -272,7 +305,18 @@ async function runSuperAnalysisStream(text, outputId, bridgeConfig, res) {
   const outDir = path.join(OUTPUT_DIR, outputId);
   const cfgObj = bridgeConfig ? (() => { try { return JSON.parse(bridgeConfig); } catch (_) { return null; } })() : null;
 
-  if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true });
+  // P0-3 修复 (2026-07-30): mkdirSync 异常需捕获，避免 async 函数中变成 unhandled rejection
+  try {
+    if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true });
+  } catch (mkdirErr) {
+    logToFile('error', `SUPER 创建输出目录失败 job=${outputId}: ${mkdirErr.message}`);
+    sendSSE(res, 'error', { message: `创建输出目录失败: ${mkdirErr.message}` });
+    sendSSE(res, 'done', { code: -1, job_id: outputId });
+    try { res.end(); } catch (_) {}
+    recordJob(outputId, 'super', 'error', mkdirErr.message);
+    processJobQueue();
+    return;
+  }
   recordJob(outputId, 'super', 'running', null, { text, config: bridgeConfig || '' });
   activeJobResponses.set(outputId, { res, mode: 'super' });
   logToFile('info', `启动 SUPER 分析 job=${outputId} text_len=${text.length} model=${cfgObj?.model || 'shehui-llama'}`);
@@ -309,6 +353,49 @@ async function runSuperAnalysisStream(text, outputId, bridgeConfig, res) {
   // P1-a 修缮：SUPER 模式同样需要 resClosed 守卫，避免向已关闭的 SSE 流写入
   let resClosed = false;
 
+  // P0-2 修复 (ROUND27 12维度核对): res.on('close') 必须在 ensureLlamaWorker 之前注册,
+  // 否则客户端在等待 Worker (最长 120s+ 空闲等待) 期间断连时, resClosed 保持 false,
+  // Worker 就绪后向已关闭的 res 写入 → 触发 unhandledException. 与 runPythonAnalysisStream
+  // (L147 spawn 后立即注册) 对齐.
+  res.on('close', () => {
+    if (finished) return;
+    resClosed = true;
+    activeJobResponses.delete(outputId);
+
+    if (!placeholder.isRunning) {
+      // Worker 尚未就绪: 标记取消, ensureLlamaWorker/waitForLlamaWorkerIdle 返回后
+      // 会检查 placeholder.cancelled 并走取消路径 (L372-383)
+      placeholder.cancelled = true;
+      logToFile('info', `SSE 客户端在 Worker 等待期间断开 job=${outputId} mode=super`);
+      return;
+    }
+
+    // Worker 已就绪: 启动 600s 宽限期
+    const worker = activeJobs.get(outputId);
+    logToFile('info', `SSE 客户端断开，启动 600s 宽限期 job=${outputId} mode=super`);
+    const graceTimer = setTimeout(() => {
+      if (finished) return;
+      logToFile('info', `宽限期超时，清理 super 任务 job=${outputId}`);
+      finished = true;
+      cleanupTimeout();
+      if (keepAlive) clearInterval(keepAlive);
+      try {
+        if (worker && worker.stdin && typeof worker.stdin.write === 'function') {
+          worker.stdin.write(JSON.stringify({ type: 'cancel', id: outputId }) + '\n', 'utf-8');
+        }
+      } catch (_) {}
+      recordJob(outputId, 'super', 'cancelled', '客户端断开连接且 600s 内未重连');
+      llamaState.currentHandler = null;
+      llamaWorkerSvc.releaseLlamaWorker();
+      activeJobs.delete(outputId);
+      processJobQueue();
+    }, 600000);
+
+    if (worker && typeof worker.on === 'function') {
+      worker.on('exit', () => { clearTimeout(graceTimer); });
+    }
+  });
+
   const cleanupTimeout = () => {
     if (timeoutId) {
       clearTimeout(timeoutId);
@@ -330,7 +417,7 @@ async function runSuperAnalysisStream(text, outputId, bridgeConfig, res) {
     activeJobResponses.delete(outputId);
     // P1-a：SSE 已断开时仅记录日志，不再写入 res（结果已通过 resultCache + jobHistory 保留）
     if (!resClosed) {
-      try { sendSSE(res, 'done', { code: doneCode }); res.end(); } catch (_) {}
+      try { sendSSE(res, 'done', { code: doneCode, job_id: outputId }); res.end(); } catch (_) {}
     } else {
       logToFile('info', `SUPER finish(SSE已断开) job=${outputId} code=${doneCode}`);
     }
@@ -347,7 +434,7 @@ async function runSuperAnalysisStream(text, outputId, bridgeConfig, res) {
       recordJob(outputId, 'super', 'cancelled', '等待 Worker 期间被取消');
       logToFile('info', `SUPER 任务在等待 Worker 期间被取消 job=${outputId}`);
       if (!resClosed) {
-        try { sendSSE(res, 'error', { message: '用户主动停止计算' }); sendSSE(res, 'done', { code: 125 }); res.end(); } catch (_) {}
+        try { sendSSE(res, 'error', { message: '用户主动停止计算' }); sendSSE(res, 'done', { code: 125, job_id: outputId }); res.end(); } catch (_) {}
       }
       processJobQueue();
       return;
@@ -425,36 +512,8 @@ async function runSuperAnalysisStream(text, outputId, bridgeConfig, res) {
       }
     };
 
-    // P1-3 + P1-19：SUPER 模式 SSE 客户端断开的宽限期机制（与 LIGHT/DEEP 一致）
-    // 之前 res.on('close') 立即取消任务，现增加 600s 宽限期（SUPER 模式耗时长）：
-    // 客户端断开后不立即清理，若 600s 内重连则恢复流式，600s 后才真正清理
-    res.on('close', () => {
-      if (finished) return;
-      resClosed = true;  // P1-a：标记 SSE 已关闭，后续不再向 res 写入
-      logToFile('info', `SSE 客户端断开，启动 600s 宽限期 job=${outputId} mode=super`);
-      activeJobResponses.delete(outputId);  // 移除 res 引用，避免写已关闭的流
-
-      const graceTimer = setTimeout(() => {
-        if (finished) return;
-        logToFile('info', `宽限期超时，清理 super 任务 job=${outputId}`);
-        finished = true;
-        cleanupTimeout();
-        if (keepAlive) clearInterval(keepAlive);
-        try {
-          worker.stdin.write(JSON.stringify({ type: 'cancel', id: outputId }) + '\n', 'utf-8');
-        } catch (_) {}
-        recordJob(outputId, 'super', 'cancelled', '客户端断开连接且 600s 内未重连');
-        llamaState.currentHandler = null;
-        llamaWorkerSvc.releaseLlamaWorker();
-        activeJobs.delete(outputId);
-        processJobQueue();
-      }, 600000);
-
-      // 若进程在宽限期内完成，清理定时器
-      worker.on('exit', () => {
-        clearTimeout(graceTimer);
-      });
-    });
+    // P0-2 修复: res.on('close') 已在 ensureLlamaWorker 之前注册 (见上方 L345),
+    // 旧的金石 res.on('close') 注册已移除, 避免 Worker 等待期间断连信号丢失.
 
     // P2-8：使用背压感知写入
     await writeWithDrain(worker.stdin, JSON.stringify({
@@ -691,12 +750,27 @@ function runPythonAnalysisSync(text, outputId, mode = 'light', bridgeConfig = ''
     let stderr = '';
     let finished = false;
 
+    // P1-1 修复 (Round 27 审计): sync 路径缺少超时，Python 子进程挂起会永久阻塞 Promise。
+    // 与 runPythonAnalysisStream 对齐：按 mode 选取超时，超时后 killProcessWithFallback。
+    const jobTimeout = mode === 'deep' ? CONFIG.deepJobTimeoutMs : CONFIG.jobTimeoutMs;
+    const timeoutId = setTimeout(() => {
+      if (finished) return;
+      finished = true;
+      try { killProcessWithFallback(py); } catch (_) {}
+      activeJobs.delete(outputId);
+      recordJob(outputId, mode, 'timeout');
+      reject(new Error(`分析超时（>${jobTimeout}ms）`));
+    }, jobTimeout);
+    // 兜底：超时定时器不应阻止进程退出
+    if (typeof timeoutId.unref === 'function') timeoutId.unref();
+
     py.stdout.on('data', (data) => { stdout += data.toString('utf-8'); });
     py.stderr.on('data', (data) => { stderr += data.toString('utf-8'); });
 
     py.on('close', (code) => {
       if (finished) return;
       finished = true;
+      clearTimeout(timeoutId);
       activeJobs.delete(outputId);
       if (code !== 0) {
         recordJob(outputId, mode, 'error', stderr || stdout);
@@ -739,6 +813,7 @@ function runPythonAnalysisSync(text, outputId, mode = 'light', bridgeConfig = ''
     py.on('error', (err) => {
       if (finished) return;
       finished = true;
+      clearTimeout(timeoutId);
       activeJobs.delete(outputId);
       recordJob(outputId, mode, 'error', err.message);
       reject(err);

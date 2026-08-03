@@ -18,15 +18,21 @@ function traceIdMiddleware(req, _res, next) {
 // 当 TRACE_CORS_ORIGIN 未设置时，仅允许 localhost（开发模式兼容）。
 // 生产/多云部署必须通过 TRACE_CORS_ORIGIN 指定精确来源。
 // debt-12.15 隧道支持: 自动读取 tunnel_url.txt，把 trycloudflare 域名加入白名单
+// P1-5 修复 (ROUND27 12维度核对): 原 url.includes('trycloudflare.com') 可被
+// https://attacker.com/?trycloudflare.com 绕过. 现用 new URL() 严格解析 hostname.
 function _loadTunnelOrigins() {
   try {
     const fs = require('fs');
     const path = require('path');
     const tunnelFile = path.join(__dirname, '..', 'tunnel_url.txt');
     if (fs.existsSync(tunnelFile)) {
-      const url = fs.readFileSync(tunnelFile, 'utf-8').trim();
-      if (url && url.includes('trycloudflare.com')) {
-        return [url];
+      const raw = fs.readFileSync(tunnelFile, 'utf-8').trim();
+      if (!raw) return [];
+      const parsed = new URL(raw);  // 严格解析, 非 URL 会抛异常
+      // 仅允许 trycloudflare.com 子域 (hostname 以 .trycloudflare.com 结尾)
+      if (parsed.hostname.endsWith('.trycloudflare.com') &&
+          parsed.protocol === 'https:') {
+        return [parsed.origin];  // origin = protocol + host (无尾斜杠)
       }
     }
   } catch (e) { /* 静默降级 */ }
@@ -46,17 +52,18 @@ function corsMiddleware() {
       res.setHeader('Access-Control-Allow-Origin', reqOrigin);
       res.setHeader('Vary', 'Origin');
     } else if (!origin) {
-      // 开发模式：未配置 TRACE_CORS_ORIGIN 时允许 localhost + trycloudflare
+      // 开发模式：未配置 TRACE_CORS_ORIGIN 时允许 localhost
+      // P1-4 修复 (ROUND27 12维度核对): 移除 trycloudflare 通配符正则分支,
+      // 隧道域名已由 _loadTunnelOrigins() 从 tunnel_url.txt 读取精确域名加入
+      // allowedOrigins, 不再需要通配符放行任意 *.trycloudflare.com (CSRF 风险).
       if (reqOrigin && /https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/.test(reqOrigin)) {
-        res.setHeader('Access-Control-Allow-Origin', reqOrigin);
-        res.setHeader('Vary', 'Origin');
-      } else if (reqOrigin && /https:\/\/[a-z0-9-]+\.trycloudflare\.com/.test(reqOrigin)) {
-        // 隧道模式: 允许任意 trycloudflare 隧道域名（quick tunnel 域名随机）
         res.setHeader('Access-Control-Allow-Origin', reqOrigin);
         res.setHeader('Vary', 'Origin');
       }
     }
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    // P1-2 修复 (Round 27 审计): 补充 DELETE，与 routes/jobs.js 的 router.delete('/:id') 对齐，
+    // 否则跨域（含隧道模式）DELETE 预检会被阻断。
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Trace-Config, X-Trace-Id, Last-Event-ID');
     res.setHeader('Access-Control-Expose-Headers', 'Last-Event-ID');
     next();
@@ -87,8 +94,10 @@ function errorHandler(err, req, res, _next) {
     reqLog(req, 'warn', `请求体过大: ${err.message}`);
     return res.status(413).json({ error: 'PAYLOAD_TOO_LARGE', detail: 'Request body exceeds 20MB limit' });
   }
-  reqLog(req, 'error', `Express 错误: ${err.message}`);
-  res.status(500).json({ success: false, error: err.message, traceId: req.traceId });
+  reqLog(req, 'error', `Express 错误: ${err.message}`);  // 完整错误记录到服务端日志
+  // P1-3 修复 (ROUND27 12维度核对): 5xx 不回显 err.message, 避免泄露 Python stderr/
+  // 文件路径/库版本/堆栈片段. 完整错误已在上方 reqLog 记录, 前端仅显示通用文案.
+  res.status(500).json({ success: false, error: '服务器内部错误，请查看服务端日志获取详细信息', traceId: req.traceId });
 }
 
 module.exports = {

@@ -232,7 +232,14 @@ function applyPreset(presetName) {
     if (!el) return;
     const meta = schema[key];
     let value = overrides[key] !== undefined ? overrides[key] : meta.default;
-    el.value = value;
+    // P2 修复：boolean 参数需设置 checkbox 的 checked 状态，而非 value 属性。
+    // 否则 applyPreset 对 boolean 字段无效（checkbox 没有 value 语义），且会留下
+    // 无效的 value 属性，getConfig 读取 el.checked 仍得到旧状态。
+    if (meta.type === 'boolean') {
+      el.checked = Boolean(value);
+    } else {
+      el.value = value;
+    }
   });
   log('info', `已加载参数预设: ${presetName.toUpperCase()}${resolvedName !== presetName ? ` (→${resolvedName})` : ''}`);
 }

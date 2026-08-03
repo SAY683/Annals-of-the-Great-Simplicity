@@ -20,6 +20,11 @@
 // debt-11：最后接收的 SSE 事件 ID（用于重连续传）
 let lastSseEventId = null;
 
+// P1-1 修复：启动新任务时重置 lastSseEventId，避免上一任务的 ID 漏到新任务的重连请求头中。
+// startAnalysis 启动新分析时必须调用，否则新任务的首个 SSE 事件可能因为携带旧 Last-Event-ID
+// 而被服务端当作"重连"误处理（跳过已发送事件 / 直接返回 204）。
+function resetLastEventId() { lastSseEventId = null; }
+
 /**
  * 读取 SSE 流。debt-11：解析 id: 行并更新 lastSseEventId。
  *
@@ -174,13 +179,18 @@ function dispatchSSEEvent({ event, data }) {
   try {
     const obj = JSON.parse(data);
     if (event === 'stage') {
-      updateProgress(obj.stage, obj.progress ?? null);
+      updateProgress(obj.stage, obj.progress ?? null, obj.message || '');
+      // P1 fix (Round 26 §3): 离开 TRACE 阶段后，旧的 stats 面板（速率/已处理对数/ETA）
+      // 会长时间滞留，造成进度条与 stats 信息不匹配。非 TRACE 阶段立即隐藏 stats。
+      if (obj.stage !== 'trace') hideStats();
     } else if (event === 'log') {
       log(obj.level, obj.message);
     } else if (event === 'stats') {
       updateStats(obj);
     } else if (event === 'result') {
       hideStats();
+      // P0 修复: result 事件到达时强制推进度到 100%，避免任务完成但进度卡在中间值
+      updateProgress('done', 1.0);
       renderResult(obj);
       showToast('分析完成', 'success');
       setRunning(false);

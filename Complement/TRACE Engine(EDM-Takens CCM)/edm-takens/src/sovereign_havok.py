@@ -283,10 +283,19 @@ class SovereignHAVOK:
                         # [0.1, 0.25] 区间线性插值: 1.5494 -> 1.8355
                         _lambda_beta = 1.5494 + (1.8355 - 1.5494) * (_beta - 0.1) / 0.15
                     else:
-                        # β < 0.1 极限值 (Donoho-Gavishi 2014): ~1.5494 -> 4/π * sqrt(2) ≈ 1.8002
-                        _lambda_beta = 1.5494
-                    # S2-2 修复: 用 min(_p, _q) 而非 _q
-                    threshold = _lambda_beta * self.noise_sigma * np.sqrt(_min_dim)
+                        # β < 0.1 极限值 (Gavish-Donoho 2014):
+                        # 论文标题: "The optimal hard threshold for singular values is 4/√3"
+                        # λ(β→0) = ω(β→0)/μ(β→0) = (4/√3)/1 ≈ 2.3094
+                        # P0 修复 (ROUND33 三视角评审-数学家交叉验证):
+                        #   原代码 1.5494 是 β=0.1 表值, 注释误标为 4/π·√2≈1.8002.
+                        #   项目参考文献 fourteen_rules_bibliography.md:85 明确论文标题为 4/√3.
+                        #   数学论证: β→0 时 MP 分布中位数 μ(β→0)→1, 故 λ(β→0)=4/√3.
+                        #   ROUND32 声称已修复但实际未落地 (叙事化修缮), 本轮真实修复.
+                        _lambda_beta = 4.0 / np.sqrt(3.0)  # ≈ 2.309401076...
+                    # P1 修复 (ROUND33 三视角评审-数学家): Gavish-Donoho 原文公式为
+                    # τ = λ(β)·σ·√(max(m,n)), numpy.svd 返回奇异值量级为 σ·√(max).
+                    # 旧代码用 √min 会低估阈值, 保留过多噪声模态.
+                    threshold = _lambda_beta * self.noise_sigma * np.sqrt(_max_dim)
             else:
                 # 未知噪声: 用中位数倍数 (原实现)
                 threshold = 2.858 * np.median(s)

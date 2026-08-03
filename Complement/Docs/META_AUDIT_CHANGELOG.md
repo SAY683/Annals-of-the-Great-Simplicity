@@ -1093,6 +1093,219 @@ _EDM_ALLOWED_HEADERS = [
 
 ---
 
+## Round 32 — 2026-07-29 前端显示修复与 SUPER/DEEP 性能优化
+
+> 触发源：用户反馈 `job_history.log` 文本重叠、`CONCEPT TOPOLOGY` 矩阵差位、3D 拓扑点击后未坍缩为 2D 网络图谱、`realtime_log.stream` 无限增长、DEEP 模式报错、SUPER 模式极慢。
+> 审计目标：修复 P0 级前端显示与后端性能问题，并完成便携目录同步验证闭环。
+
+### 32.1 前端显示 P0 修复
+
+#### 32.1.1 `job_history.log` 文本重叠与错位
+
+**问题**: `.job-card` 内联样式与 flex 布局冲突，导致任务预览文本与元数据行堆叠重叠。
+
+**修缮**:
+- [trace-engine-web/public/css/main.css](trace-engine-web/public/css/main.css) `.job-card` 改为 `display: flex; flex-wrap: wrap;`，引入独立 `.job-card-row` 容器隔离元数据行。
+- `.job-preview` 强制 `flex: 0 0 100%; order: 4;` 独占一行，避免与按钮/时间戳混排。
+
+**验证**: `.tmp_browser_verify.py` 检查 `preview_flexBasis=100%`、宽度占满父容器，截图 `p6_job_history.png` 无重叠。
+
+#### 32.1.2 `CONCEPT TOPOLOGY` 矩阵标签差位
+
+**问题**: 行/列标签与矩阵单元格不在同一网格，旋转后的列标签撑高行高，导致视觉差位。
+
+**修缮**:
+- `.adj-matrix` 改为 `grid-template-columns: auto repeat(n, minmax(28px, 32px))`，首列固定放置行标签，后续每列 32px。
+- `.adj-col-header span` 使用 `transform: rotate(-45deg); transform-origin: center bottom;` 并限制 `max-width: 60px`。
+- `.adj-row-header` 固定高度 32px，与单元格等高，右对齐截断显示。
+
+**验证**: 浏览器计算样式检查列宽一致，矩阵截图 `p2_matrix.png` 标签与单元格对齐。
+
+#### 32.1.3 3D CAUSAL TOPOLOGY 点击节点坍缩为 2D 力导向网络
+
+**问题**: 3D 拓扑仅提供几何漫游式展示，点击节点无响应；用户期望点击几何点后模型坍缩为 2D 网络图谱，但仍保留拓扑链接性。
+
+**修缮**:
+- [trace-engine-web/public/js/render.js](trace-engine-web/public/js/render.js) 新增 `renderTopology2D(r, wrap, canvas, focusedNodeId)`，实现 Canvas 2D 力导向布局：
+  - 节点初始化沿圆周分布，带软边界防止坐标数值爆炸。
+  - 斥力/引力/中心引力/速度阻尼迭代，节点可拖拽、滚轮缩放、平移。
+  - 点击 3D canvas 中心区域时，`setupTopologyToggle` 切换至 2D 视图并聚焦被点击节点，高亮相邻边。
+- 修复 `initPositions2D` 中 `dist` 可能为 0 或 NaN 导致的数值爆炸问题。
+
+**验证**: 浏览器控制台输出 `node0_after_force` 坐标为有限值；截图 `p5_2d_after_click.png` 显示 2D 网络已渲染。
+
+#### 32.1.4 `realtime_log.stream` 无限增长
+
+**问题**: 日志面板 DOM 节点随 SSE 事件无限累积，内存与渲染开销持续增加。
+
+**修缮**:
+- 新增常量 `MAX_LOG_LINES = 300`、`MAX_LOG_MSG_LENGTH = 2000`。
+- 单条消息超过 2000 字符时截断并标注原长；行数超过 300 时移除最早节点。
+
+**验证**: 日志面板截图 `p7_log.png` 行数受控，长时间运行后内存不再线性增长。
+
+#### 32.1.5 `favicon.ico` 404 噪声
+
+**问题**: 浏览器默认请求 `/favicon.ico`，服务端返回 404，污染日志。
+
+**修缮**: [trace-engine-web/public/index.html](trace-engine-web/public/index.html) 添加 data URI 空 SVG favicon。
+
+### 32.2 SUPER/DEEP 性能与稳定性 P0 修复
+
+#### 32.2.1 SUPER 模式 TRACE 阶段批量掩码重构
+
+**问题**: 原实现为每个目标 token、每个候选 token id 跑完整序列前向传播，复杂度约 O(L²·W)，27M 模型亦极慢。
+
+**修缮**:
+- [trace-engine-web/llama_worker.py](trace-engine-web/llama_worker.py) `compute_trace()` 改为"按源位置批量掩码"：
+  - 先一次性计算 base NLL。
+  - 对每个源位置 p 把 `seq[p]` 替换为 `<mask>`，按 `trace_batch_size` 批量前向传播，一次得到该源位置对后续窗口内所有目标位置的 ΔNLL。
+  - 复杂度降至 O(L² / batch_size)；batch_size 按模型规模与设备自适应（CUDA: 4/8/16；CPU: 2/4/8）。
+- 27M 模型 120 tokens 实测 TRACE 阶段约 3.4s（7140 对）。
+
+#### 32.2.2 DoWhy bootstrap/refute 模拟次数自适应
+
+**问题**: DoWhy 默认/1000 次重采样模拟是 SUPER 模式"慢得离奇"的主要瓶颈之一。
+
+**修缮**:
+- `llama_worker.py` 根据模型参数量选择 `sim_count`：
+  - < 50M params: 50 次
+  - < 200M params: 100 次
+  - ≥ 200M params: 200 次
+- 新增 `_heartbeat_log()` 包装器，长耗时阶段每 4 秒发射日志心跳。
+- `py_bridge.py` DEEP 模式同样限制 `num_simulations=100`。
+
+**效果**: 27M 模型 SUPER 总耗时从数十分钟降至约 130 秒。
+
+#### 32.2.3 DEEP 模式 causallearn 奇异矩阵报错
+
+**问题**: `six_warriors.py` 调用 causallearn PC/GES/FCI 时，输入数据存在重复列或协方差矩阵奇异，触发 `singular matrix`/`fisherz` 错误。
+
+**修缮**:
+- 预处理阶段检测并移除重复列。
+- 计算协方差矩阵条件数，奇异时注入极小抖动（jitter）使矩阵可逆。
+- 抑制非关键 warning，保留错误日志。
+
+**效果**: DEEP 测试从 fallback 转为 `CONSENSUS`。
+
+### 32.3 参数与输入 P1 修复
+
+#### 32.3.1 boolean 参数配置 400 错误
+
+**问题**: `classical_mode` 等 boolean 参数被渲染为 `<input type="number" value="false">`，提交时变成数字 0，服务端校验拒绝。
+
+**修缮**:
+- [trace-engine-web/public/js/schema.js](trace-engine-web/public/js/schema.js) `renderParams()` 对 `meta.type === 'boolean'` 渲染为 checkbox。
+- `getConfig()` 读取 `el.checked` 而非 `el.value`。
+- number 类型默认值做 NaN 防护，非法输入回退 schema default。
+
+#### 32.3.2 Windows 中文文本乱码导致有效词数为 0
+
+**问题**: Windows 下 Python 子进程 stdin 默认按 GBK 解码，UTF-8 中文文本传入后乱码，有效词数变为 0。
+
+**修缮**:
+- [trace-engine-web/services/analysis.js](trace-engine-web/services/analysis.js) 将文本写入 UTF-8 临时文件，通过命令行参数传给 `py_bridge.py`，绕过 stdin 编码问题。
+- 复用现有 `INPUTS_DIR` TTL 清理机制。
+
+### 32.4 验证结果
+
+#### 32.4.1 浏览器前端验证
+
+- `p1_home.png` — 首页氛围正常
+- `p2_matrix.png` — CONCEPT TOPOLOGY 矩阵标签对齐
+- `p3_2d_network.png` — 2D 力导向网络正常渲染
+- `p4_3d.png` — 3D 拓扑正常渲染
+- `p5_2d_after_click.png` — 点击 3D 节点后成功坍缩为 2D 并聚焦
+- `p6_job_history.png` — 任务历史无重叠
+- `p7_log.png` — 日志面板受控
+
+#### 32.4.2 便携目录独立运行审计
+
+**时间**: 2026-07-29
+**脚本**: [verify_portable.py](verify_portable.py)
+**目录**: `F:\攻略\研发测试\TRACE Engine(EDM-Takens CCM)`
+
+| 检查项 | 结果 |
+|--------|------|
+| 目录结构 | ✅ PASS |
+| 运行时产物污染 | ✅ PASS（无残留） |
+| trace-engine 独立健康检查 | ✅ PASS |
+| trace-engine 模块导入 | ✅ PASS |
+| trace-engine 自检测试 | ✅ PASS |
+| SUPER 模式导入路径 | ✅ PASS |
+| trace-engine-web 健康检查 | ✅ PASS（/api/config 含 SUPER + max_segments） |
+| trace-to-edm 轨迹表契约 | ✅ PASS |
+| 便携式代码修缮落地 | ✅ PASS |
+| Docs 同步 | ✅ PASS |
+| Skill 同步 | ✅ PASS |
+
+**最终裁决**: 11 PASS / 0 FAIL，便携目录可独立运行。
+
+### 32.5 本次修缮涉及文件清单
+
+| 文件 | 修改类型 | 说明 |
+|------|---------|------|
+| `trace-engine-web/public/css/main.css` | P0 前端修复 | job-card 布局、矩阵标签对齐 |
+| `trace-engine-web/public/js/render.js` | P0 前端修复 | 2D 力导向网络、日志截断、3D→2D 切换 |
+| `trace-engine-web/public/js/schema.js` | P1 修复 | boolean 参数 checkbox 渲染与读取 |
+| `trace-engine-web/public/index.html` | P2 cache戳/favicon | main.css?v=20260729j、data URI favicon |
+| `trace-engine-web/services/analysis.js` | P1 修复 | Windows 中文编码：文件传参替代 stdin |
+| `trace-engine-web/llama_worker.py` | P0 性能重构 | 批量 TRACE、DoWhy 自适应 sim_count、心跳日志 |
+| `trace-engine-web/py_bridge.py` | P1 性能修复 | DEEP 模式 num_simulations=100 |
+| `trace-engine/examples/counterfactual_hybrid/six_warriors.py` | P0 稳定性修复 | causallearn 去重列+协方差 jitter |
+| `.tmp_browser_verify.py` | 验证脚本 | 前端修复自动化截图验证 |
+| `Docs/META_AUDIT_CHANGELOG.md` | 文档更新 | 本节 §32 |
+
+### 32.6 用户回归验证后追加修复（P0+）
+
+> 用户在首轮修复后回归验证，发现：矩阵第一列仍过宽、job_history 文字重影依旧、2D/3D 拓扑箭头杂乱难以区分。本节记录针对性追加修缮。
+
+#### 32.6.1 CONCEPT TOPOLOGY 矩阵第一列过宽
+
+**问题**: `grid-template-columns: minmax(84px, auto)` 在宽屏下把行标签列拉得很远，导致第一列与矩阵单元格之间出现大片空白。
+
+**修缮**:
+- [trace-engine-web/public/js/render.js](trace-engine-web/public/js/render.js) `buildAdjacencyMatrixHTML()` 将第一列从 `minmax(84px, auto)` 改为 `minmax(60px, 120px)`。
+- [trace-engine-web/public/css/main.css](trace-engine-web/public/css/main.css) `.adj-row-header` 增加 `width: 100%; box-sizing: border-box;`，保证行标签在网格轨道内右对齐，同时 `max-width: 120px` 兜底防止超长标签撑开。
+
+**验证**: 截图 `p2_matrix.png` 行标签与矩阵单元格紧密相邻，无过宽空白。
+
+#### 32.6.2 `job_history.log` 文字重影/重叠
+
+**问题**: `#jobHistoryTerminal .terminal-line.job-card` 设置了 `min-height: 20px`，且 `margin-bottom: 0.04rem` 过小，导致 `.job-preview` 长文本换行后垂直空间不足，与相邻卡片产生"重影"。
+
+**修缮**:
+- 移除 `.terminal-line.job-card` 的 `min-height: 20px`，改为 `height: auto; min-height: unset;`。
+- 将 `.terminal-line.job-card` 的 `margin-bottom` 从 `0.04rem` 提升到 `0.35rem`，卡片之间留出足够呼吸空间。
+- `.job-preview` 改为 `flex: 0 0 calc(100% - 1.5rem); width: calc(100% - 1.5rem);`，避免 `flex-basis: 100%` 叠加 `margin-left` 导致横向溢出；增加 `padding: 0.2rem 0` 与 `line-height: 1.45`，让多行文本清晰可读。
+
+**验证**: 截图 `p6_job_history.png` 各卡片 preview 文本独立成行，无重叠、无重影。
+
+#### 32.6.3 2D/3D 拓扑边线/箭头区分度
+
+**问题**: 拓扑图中所有边都是带箭头的实线，12 节点 66 边的稠密网络下，用户无法区分强弱边与方向。
+
+**修缮**:
+- [trace-engine-web/public/js/render.js](trace-engine-web/public/js/render.js) 2D/3D 边渲染统一改为**三级可视化**：
+  - **弱边**（相对强度 < 35%）：细虚线、无箭头。
+  - **中边**（35% ≤ 强度 < 70%）：实线、小箭头。
+  - **强边**（强度 ≥ 70%）：粗实线、大箭头、轻微发光。
+- 2D 网络为互惠边（A→B 且 B→A）分配反向二次贝塞尔曲线，避免两条线完全重叠，方向更清晰。
+- 箭头沿曲线切线方向绘制，并提升阈值至 0.5，减少密集网络中的箭头数量。
+- 2D/3D HUD 底部增加图例说明：`─强边 / - -弱边 / →方向`。
+
+**验证**: 截图 `p3_2d_network.png`、`p5_2d_after_click.png`、`p4_3d.png` 可见虚线弱边、实线强边及曲线分离效果。
+
+### 32.7 残留债务
+
+| # | 债务 | 说明 |
+|---|------|------|
+| D11 | 浏览器截图子代理在复杂滚动页面下不稳定 | 复杂长页面的视觉验证需依赖用户本地 Ctrl+F5 强制刷新 |
+| D12 | SUPER 模式在 470M+ 模型上仍需 GPU 或长时间等待 | 已做 VRAM 预算检查与 FP16 量化，但大模型本性仍慢 |
+| D13 | 3D→2D 切换目前通过点击 canvas 中心区域触发 | 未做精确射线拾取，后续可提升节点命中精度 |
+| D14 | 稠密网络默认展示全部边 | 12 节点 66 边已接近全连接，默认视图仍显拥挤；后续可增加按强度阈值过滤或 topN 边开关 |
+
+
 ## Round 12 续 II — 2026-07-25 用户反馈的 4 个交互缺陷修复
 
 ### 12.24 trace-to-edm 项目下拉为空（P0 回归 bug 修复）

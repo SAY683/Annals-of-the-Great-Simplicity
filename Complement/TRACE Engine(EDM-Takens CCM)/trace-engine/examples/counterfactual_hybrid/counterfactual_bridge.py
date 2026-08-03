@@ -232,12 +232,16 @@ class TRACE2DoWhy:
         random_state: int = 42,
         max_edges_for_dowhy: int = 8,
         filter_mode: str = "top_n",
-        filter_percentile: float = 90,
+        # P1-C 修复 (ROUND27 12维度核对): filter_percentile 默认值与 bridge_schema.json (85) 对齐
+        filter_percentile: float = 85,
         sem_regularization: Optional[str] = None,
         sem_alpha: float = 0.01,
         min_concept_len: Optional[int] = None,
         classical_mode: bool = False,
-        max_concepts: int = 0,
+        # P1-D 修复 (ROUND27 12维度核对): max_concepts 默认值与 bridge_schema.json (12) 对齐
+        max_concepts: int = 12,
+        # SYNC-4 修复 (2026-07-30 审计): 反驳偏差阈值，与 presets.yaml 对齐
+        refutation_deviation_threshold: float = 0.3,
     ):
         self.adj_matrix = np.asarray(adj_matrix)
         if isinstance(token_list, str):
@@ -250,13 +254,26 @@ class TRACE2DoWhy:
             raise ValueError(
                 f"adj_matrix shape ({self.adj_matrix.shape[0]}, {self.adj_matrix.shape[1]}) 与 token_list 长度 ({len(self.token_list)}) 不匹配"
             )
+        # P1-7 修复 (Round 27 审计): 空矩阵语义统一。
+        # 原实现接受 np.zeros((0,0))（形状校验通过），但下游 build_model 会抛 ValueError，
+        # 与 six_warriors._deploy_trace 的 EMPTY_MATRIX 语义冲突。此处显式拒绝。
+        if self.adj_matrix.size == 0:
+            raise ValueError(
+                "adj_matrix 不能为空（size==0）。上游 TRACE 未产生任何 token，"
+                "请检查输入文本或模型 tokenizer 输出。"
+            )
         # NaN/Inf 清理：避免在后续聚合/估计中静默传播
         if not np.all(np.isfinite(self.adj_matrix)):
             warnings.warn("adj_matrix 含 NaN/Inf，已替换为 0.0", RuntimeWarning)
             self.adj_matrix = np.nan_to_num(self.adj_matrix, nan=0.0, posinf=0.0, neginf=0.0)
+        # P0 fix: ΔNLL 数学上必须非负（掩码后 NLL ≥ 原 NLL）。
+        # 上游计算异常可能产生负值，传播到 concept_adj / SEM 系数会导致因果方向反转。
+        self.adj_matrix = np.maximum(self.adj_matrix, 0.0)
         self.tokenizer = tokenizer
         self.threshold = threshold
         self.concept_min_freq = concept_min_freq
+        # SYNC-4: 反驳偏差阈值（与 presets.yaml dowhy.refutation_deviation_threshold 对齐）
+        self.refutation_deviation_threshold = float(refutation_deviation_threshold)
         # P1-A 优化:首次实例化 TRACE2DoWhy 时触发惰性可用性探测。
         # 这确保 _DOWHY_AVAILABLE 等变量在使用前被解析,同时避免模块加载时的 import 开销。
         _resolve_availability_flags()
@@ -413,6 +430,9 @@ class TRACE2DoWhy:
                     continue
                 self.concept_adj[ci, cj] += self.adj_matrix[i, j]
                 concept_counts[ci, cj] += 1
+                # P0-1修复: 同时聚合反向因果边 adj_matrix[j, i] → concept_adj[cj, ci]
+                self.concept_adj[cj, ci] += self.adj_matrix[j, i]
+                concept_counts[cj, ci] += 1
 
         mask = concept_counts > 0
         self.concept_adj[mask] /= concept_counts[mask]
@@ -430,7 +450,13 @@ class TRACE2DoWhy:
                   f"(高频={len(high_freq)}, "
                   f"低频={sum(1 for i, t in enumerate(self.token_list) if t not in high_freq and is_valid_concept(t, classical_mode=self.classical_mode))})")
 
-        if unk_rate > 0.2:
+        if unk_rate > 0.3:
+            # SYNC-3 修复 (2026-07-30 审计): 与 ALGORITHM_AUDIT.md §3.1
+            # "UNK 率 > 30% → ΔNLL 信号失真" 文档对齐。
+            self._log(f"⚠⚠ UNK rate={unk_rate:.1%} (>30%, ΔNLL 信号失真). "
+                      f"TRACE 因果边可能不可靠, 结果需人工复核. "
+                      f"强烈建议: 使用 Instant TRACE 训练专属模型.")
+        elif unk_rate > 0.2:
             self._log(f"⚠ UNK rate={unk_rate:.1%} (严重跨域). "
                       f"强烈建议: 使用 Instant TRACE 训练专属模型. "
                       f"当前 τ={self.threshold} 可能过高, 建议 τ≤0.05.")
@@ -457,13 +483,17 @@ class TRACE2DoWhy:
         """
         # P0 修复 (2026-07-29): 模块级 __getattr__ 不对模块内部代码生效,
         # 必须在方法内部显式 import 才能让 'CausalModel' 名称解析成功.
-        # 重复 import 几乎零开销 (Python 缓存到 sys.modules).
+        # P0 修复 (2026-07-30): 函数内 `from X import Y` 会让 Y 在整个函数作用域内
+        # 成为局部变量。即使 import 在 if 块内，后续 Y() 调用在 if 未进入时也会
+        # 报 UnboundLocalError（如第二次调用时 Y 已缓存到 globals()）。
+        # 解决方案：使用别名 import 避免遮蔽，再通过 globals() 取出绑定到局部别名。
         if "CausalModel" not in globals():
             try:
-                from dowhy import CausalModel
-                globals()["CausalModel"] = CausalModel
+                from dowhy import CausalModel as _CM
+                globals()["CausalModel"] = _CM
             except ImportError:
                 globals()["CausalModel"] = None
+        _CausalModel = globals().get("CausalModel")
         # v2 改进: 同时估计线性 SEM 系数，用于 Pearl 反事实推理。
         if self.concept_adj is None:
             self.aggregate_concepts()
@@ -578,6 +608,7 @@ class TRACE2DoWhy:
                 concept_names=self.concept_names,
                 data=data_df,
                 rng=self.rng,
+                refutation_deviation_threshold=self.refutation_deviation_threshold,
             )
             self._log(f"模型: SimulationMode")
         else:
@@ -600,7 +631,7 @@ class TRACE2DoWhy:
             dot_cols = sorted(dot_nodes)
             reduced_data = data_df[dot_cols] if hasattr(data_df, '__getitem__') else data_df
 
-            self.model = CausalModel(
+            self.model = _CausalModel(
                 data=reduced_data,
                 treatment=default_treatment,
                 outcome=default_outcome,
@@ -663,11 +694,19 @@ class TRACE2DoWhy:
                 for child, eff in adjacency[node]:
                     data[:, child] += eff * data[:, node]
         else:
-            # 有环：使用迭代近似
-            self._log(f"模拟数据: 检测到环 ({len(topo_order)}/{n_concepts} 节点可拓扑排序)，使用迭代近似。")
+            # P0-1 修复 (2026-07-30): 有环使用 Jacobi 风格迭代（非累加），
+            # 限制总能量避免爆炸；原实现是 5 次累加，eff>0.5 时数据爆炸。
+            self._log(f"模拟数据: 检测到环 ({len(topo_order)}/{n_concepts} 节点可拓扑排序)，使用 Jacobi 迭代近似。")
+            # 截断过大效应避免数值爆炸
+            edges_clamped = [(i, j, float(np.clip(eff, -0.5, 0.5))) for i, j, eff in edges]
             for _ in range(5):
-                for i, j, eff in edges:
-                    data[:, j] += eff * data[:, i]
+                delta = np.zeros_like(data)
+                for i, j, eff in edges_clamped:
+                    delta[:, j] += eff * data[:, i]
+                data += delta
+                # 收敛判定：增量能量 < 1e-6 * 数据能量
+                if np.linalg.norm(delta) < 1e-6 * max(np.linalg.norm(data), 1.0):
+                    break
 
         if _PANDAS_AVAILABLE:
             return pd.DataFrame(data, columns=self.concept_names)
@@ -757,6 +796,7 @@ class TRACE2DoWhy:
                 concept_names=self.concept_names,
                 data=self.data_df,
                 rng=self.rng,
+                refutation_deviation_threshold=self.refutation_deviation_threshold,
             )
 
         # 过滤 statsmodels 在条件数计算中产生的无害 divide-by-zero warning
@@ -767,14 +807,33 @@ class TRACE2DoWhy:
                 message="divide by zero encountered in scalar divide",
                 module="statsmodels.regression.linear_model",
             )
-            self.estimate_result = self.model.estimate_effect(
-                self.identified_estimand,
-                method_name=method,
-                confidence_intervals=confidence_intervals,
-                **kwargs,
-            )
+            # P0 修复 (2026-07-30): SimulationModel.estimate_effect 不接受
+            # method_params（DoWhy 0.14 仅 CausalModel 透传到 method 实现）。
+            # 仅对真正的 CausalModel 透传 **kwargs，避免 TypeError。
+            if isinstance(self.model, SimulationModel):
+                self.estimate_result = self.model.estimate_effect(
+                    self.identified_estimand,
+                    method_name=method,
+                    confidence_intervals=confidence_intervals,
+                )
+            else:
+                self.estimate_result = self.model.estimate_effect(
+                    self.identified_estimand,
+                    method_name=method,
+                    confidence_intervals=confidence_intervals,
+                    **kwargs,
+                )
 
         ci = DoWhy14Adapter.get_confidence_interval(self.estimate_result)
+        # P1修复: 设置 confidence_method 字段，标识 CI 计算方式
+        # P1 修复 (2026-07-30 审计): 统一 method.lower()，避免大小写敏感导致匹配失败。
+        method_lower = method.lower() if isinstance(method, str) else ""
+        if "linear_regression" in method_lower:
+            self.confidence_method = "OLS-analytic"
+        elif "sem" in method_lower:
+            self.confidence_method = "SEM-analytic"
+        else:
+            self.confidence_method = "bootstrap"
         self._log(f"估计方法: {method}")
         self._log(f"  效应量: {self.estimate_result.value:.4f}")
         self._log(f"  95% CI: [{ci[0]:.4f}, {ci[1]:.4f}]")
@@ -831,7 +890,8 @@ class TRACE2DoWhy:
                         **kwargs,
                     )
                     check = DoWhy14Adapter.check_refuted(
-                        self.estimate_result, result, method_name=method_name)
+                        self.estimate_result, result, method_name=method_name,
+                        threshold=self.refutation_deviation_threshold)
                     result._check = check  # 附加自定义判断
                     self.refutation_results[label] = result
                     self._log(f"反驳-{label}: 新效应={result.new_effect:.4f}, "
@@ -878,12 +938,23 @@ class TRACE2DoWhy:
         )
 
         self.counterfactual_result = result
-        if 'error' not in result:
+        # P0-3 修复 (Round 27 审计): pearl_counterfactual.py 在 NaN 时返回
+        # observed_outcome=None 且无 'error' 字段，原守卫 'error' not in result 会放行，
+        # 紧接着 None:.4f 抛 TypeError 中断整个 counterfactual_scan。
+        # 新守卫：必须同时满足无 error 且 observed_outcome 非 None 才格式化。
+        if not result.get('error') and result.get('observed_outcome') is not None:
             self._log(f"  观测结果: {result['observed_outcome']:.4f}")
-            self._log(f"  反事实结果: {result['counterfactual_outcome']:.4f}")
-            self._log(f"  个体因果效应 (ITE): {result['causal_effect']:+.4f}")
-        else:
+            # counterfactual_outcome / causal_effect 也可能为 None，单独守护
+            cf_val = result.get('counterfactual_outcome')
+            ite_val = result.get('causal_effect')
+            if cf_val is not None:
+                self._log(f"  反事实结果: {cf_val:.4f}")
+            if ite_val is not None:
+                self._log(f"  个体因果效应 (ITE): {ite_val:+.4f}")
+        elif 'error' in result:
             self._log(f"  错误: {result['error']}")
+        else:
+            self._log("  观测结果: N/A (NaN 或 None) — 跳过格式化输出")
 
         return result
 
@@ -907,20 +978,20 @@ class TRACE2DoWhy:
                     "source": src,
                     "target": dst,
                     "trace_dnl": strength,
-                    "ite": cf.get("causal_effect", float('nan')),
-                    "observed": cf.get("observed_outcome", float('nan')),
-                    "counterfactual": cf.get("counterfactual_outcome", float('nan')),
+                    "ite": cf.get("causal_effect"),
+                    "observed": cf.get("observed_outcome"),
+                    "counterfactual": cf.get("counterfactual_outcome"),
                 })
             except Exception as e:
                 self._log(f"反事实扫描 [{src}→{dst}]: 失败 ({e})")
-                # 异常分支也记录一条带 error 字段的结果，避免静默丢失失败边
+                # P0-3 修复: 异常分支用 None 而非 float('nan')，避免 JSON 输出 "NaN"
                 results.append({
                     "source": src,
                     "target": dst,
                     "trace_dnl": strength,
-                    "ite": float('nan'),
-                    "observed": float('nan'),
-                    "counterfactual": float('nan'),
+                    "ite": None,
+                    "observed": None,
+                    "counterfactual": None,
                     "error": str(e),
                 })
 
@@ -1119,8 +1190,13 @@ class TRACE2DoWhy:
 
         if self.refutation_results:
             lines.append("## 4. 反驳测试")
-            lines.append(f"- 结论: {n_refuted}/3 被反驳 "
-                         f"({'⚠️ 效应不稳定' if n_refuted >= 2 else '✓ 效应稳健'})")
+            # P1-2 修复: 分母用实际反驳测试数，避免异常路径下硬编码 "3" 误导
+            n_total_refuters = len(self.refutation_results)
+            # P1 修复 (2026-07-30 审计): 阈值硬编码 2 在 n_total_refuters<2 时误导。
+            # 改为与总数成比例: 至少 2 票或半数以上才判定不稳定。
+            n_unstable_threshold = max(2, n_total_refuters // 2)
+            lines.append(f"- 结论: {n_refuted}/{n_total_refuters} 被反驳 "
+                         f"({'⚠️ 效应不稳定' if n_refuted >= n_unstable_threshold else '✓ 效应稳健'})")
             lines.append("")
             lines.append("| 反驳方法 | 原始效应 | 新效应 | 指标 | 判定 |")
             lines.append("|---------|---------|--------|------|------|")
@@ -1159,12 +1235,20 @@ class TRACE2DoWhy:
             lines.append("| 原因 → 结果 | TRACE ΔNLL | ITE | 观测 | 反事实 |")
             lines.append("|------------|-----------|-----|------|--------|")
             for r in self.scan_results:
+                # P1 修复 (ROUND31 阶段C): 反事实扫描异常分支会写入 None,
+                # 直接用 :+.4f 格式化 None 会触发 TypeError 中断整个 report()。
+                # 改为辅助函数, None 时显示 "N/A" 保持表格完整。
+                _dnl = r.get('trace_dnl')
+                _ite = r.get('ite')
+                _obs = r.get('observed')
+                _cf  = r.get('counterfactual')
+                _s_dnl = f"{_dnl:.2f}" if _dnl is not None else "N/A"
+                _s_ite = f"{_ite:+.4f}" if _ite is not None else "N/A"
+                _s_obs = f"{_obs:.4f}" if _obs is not None else "N/A"
+                _s_cf  = f"{_cf:.4f}"  if _cf  is not None else "N/A"
                 lines.append(
                     f"| {r['source']} → {r['target']} "
-                    f"| {r['trace_dnl']:.2f} "
-                    f"| {r['ite']:+.4f} "
-                    f"| {r['observed']:.4f} "
-                    f"| {r['counterfactual']:.4f} |"
+                    f"| {_s_dnl} | {_s_ite} | {_s_obs} | {_s_cf} |"
                 )
             lines.append("")
 

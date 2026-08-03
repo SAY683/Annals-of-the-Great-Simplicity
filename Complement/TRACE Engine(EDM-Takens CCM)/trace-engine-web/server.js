@@ -180,6 +180,10 @@ app.use('/api/jobs', jobsRoutes);
 app.use('/api', systemRoutes.router);
 app.use('/api/admin', adminRoutes.router);
 
+// ROUND29 MCP: 补齐 MCP 协议端点 (JSON-RPC 2.0 over HTTP)
+const { createMcpRouter } = require('./mcp');
+app.use('/mcp', createMcpRouter(PORT));
+
 // 全局错误处理
 app.use(middleware.errorHandler);
 

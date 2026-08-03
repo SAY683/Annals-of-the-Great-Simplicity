@@ -196,8 +196,12 @@ function errorResponse(e, defaultMessage = 'Internal Server Error') {
 const app = express();
 // ROUND28 P1-06: body limit 收窄 20mb → 2mb, 防止 DoS 攻击面
 // (如需大批量 CSV 上传, 应走分端点或分片上传)
-app.use(express.json({ limit: '2mb' }));
-app.use(express.urlencoded({ extended: true, limit: '2mb' }));
+// P1 修缮（2026-08-03）: 恢复 20mb 与 trace-engine-web 对齐。
+// 原版 2mb 导致长文本（如完整新闻文章、哲学文本）触发 413/500。
+// 2mb ≈ 100万字符中文，但 sacred_texts/ 中的文本可达 5mb+。
+// DoS 防护通过 auth 中间件 + 限流 + 输入校验实现，不依赖 body limit。
+app.use(express.json({ limit: '20mb' }));
+app.use(express.urlencoded({ extended: true, limit: '20mb' }));
 app.use(express.static(PUBLIC_DIR));
 
 // ROUND28 P1-01: 安全 HTTP 头 (手动设置, 避免 helmet 依赖)
@@ -328,6 +332,12 @@ try {
 
 // 通用输入路径校验（自动处理 body.csv_path）
 app.use(validateInputPathMiddleware);
+
+// ROUND29 MCP: 补齐 MCP 协议端点 (JSON-RPC 2.0 over HTTP)
+// P0 修缮（2026-08-03）: 原版 MCP 挂载在 auth 之前, 导致 /mcp 完全绕过鉴权。
+// 现移至 auth + 输入校验之后, 确保所有 MCP 工具调用都经过 CROSS_PROJECT_API_KEY 鉴权。
+const { createMcpRouter } = require('./mcp');
+app.use('/mcp', createMcpRouter(PORT));
 
 // ── 工具函数 ──────────────────────────────────────────────
 
@@ -1086,9 +1096,86 @@ function buildTrajectoryReportHTML(baseReport) {
 }
 
 // ── API: 健康检查 ─────────────────────────────────────────
+// 盲审 P1-4 修缮 (2026-08-02):
+//   原版仅返回固定字符串 {status:'ok'}, 未检查 Python/bridge.py/磁盘就绪情况,
+//   违反"健康检查应反映真实状态"的工程惯例. 本版真实检查:
+//     1. Python 可用 (bridge.py 依赖)
+//     2. data/inputs 目录存在
+//     3. projects 目录存在
+//     4. bridge.py 脚本可访问
+//   返回三态: healthy / degraded / unhealthy
+app.get('/api/health', async (_req, res) => {
+  const checks = {};
+  let overall = 'healthy';
 
-app.get('/api/health', (_req, res) => {
-  res.json({ status: 'ok', service: 'trace-to-edm', time: new Date().toISOString() });
+  // 1. Python 可用性 (bridge.py 依赖)
+  try {
+    const { execFileSync } = require('child_process');
+    const pyOut = execFileSync(PYTHON_CMD, ['--version'], {
+      encoding: 'utf-8',
+      timeout: 3000,
+      env: { ...process.env, PYTHONIOENCODING: 'utf-8' },
+    }).trim();
+    checks['python'] = pyOut;
+  } catch (e) {
+    checks['python'] = `fail: ${e.message}`;
+    overall = 'unhealthy'; // 无 Python 则 bridge.py 全部失效
+  }
+
+  // 2. data/inputs 目录存在
+  const inputsDir = path.join(ROOT, 'data', 'inputs');
+  try {
+    if (fs.existsSync(inputsDir) && fs.statSync(inputsDir).isDirectory()) {
+      checks['data_inputs_dir'] = 'ok';
+    } else {
+      checks['data_inputs_dir'] = 'missing';
+      overall = 'degraded';
+    }
+  } catch (e) {
+    checks['data_inputs_dir'] = `error: ${e.message}`;
+    overall = 'degraded';
+  }
+
+  // 3. projects 目录存在 (任务产物存储)
+  try {
+    if (fs.existsSync(PROJECTS_DIR) && fs.statSync(PROJECTS_DIR).isDirectory()) {
+      checks['projects_dir'] = 'ok';
+    } else {
+      checks['projects_dir'] = 'missing';
+      overall = 'degraded';
+    }
+  } catch (e) {
+    checks['projects_dir'] = `error: ${e.message}`;
+    overall = 'degraded';
+  }
+
+  // 4. bridge.py 脚本可访问 (核心桥接逻辑)
+  try {
+    if (fs.existsSync(BRIDGE_SCRIPT) && fs.statSync(BRIDGE_SCRIPT).isFile()) {
+      checks['bridge_py'] = 'ok';
+    } else {
+      checks['bridge_py'] = 'missing';
+      overall = 'unhealthy'; // 无 bridge.py 则所有 Python 调用失效
+    }
+  } catch (e) {
+    checks['bridge_py'] = `error: ${e.message}`;
+    overall = 'unhealthy';
+  }
+
+  // 5. 活跃任务数 (便于监控)
+  try {
+    checks['active_jobs'] = activeJobs.size;
+  } catch (e) {
+    checks['active_jobs'] = 'unknown';
+  }
+
+  res.json({
+    status: overall,
+    service: 'trace-to-edm',
+    version: PACKAGE_VERSION,
+    time: new Date().toISOString(),
+    checks,
+  });
 });
 
 // debt-12.13: 暴露 /api/version 端点，版本号从 package.json 读取
@@ -1341,9 +1428,36 @@ app.post('/api/run', (req, res) => {
     activeJobs.delete(jobId);
   });
 
+  // P1 修复 (ROUND32 三视角评审-算法工程师): 启动阶段首字节超时
+  // 病灶: /api/run 仅依赖客户端断连清理, 若 Python 启动卡死 (torch/transformers
+  // 导入失败但未崩溃), SSE 连接会无限挂起, 浏览器侧表现为"loading 永不结束".
+  // 修复: 60s 首字节 timeout — Python 应在 60s 内输出任意 stdout/stderr,
+  // 否则判定为启动卡死, kill 进程并返回 SPAWN_TIMEOUT 错误.
+  let firstByteReceived = false;
+  const SPAWN_TIMEOUT_MS = 60000;
+  const spawnTimer = setTimeout(() => {
+    if (firstByteReceived || clientDisconnected) return;
+    try { proc.kill('SIGKILL'); } catch (_) {}
+    job.status = 'timeout';
+    activeJobs.delete(jobId);
+    emitSSE(res, 'error', {
+      message: `spawn timeout (${SPAWN_TIMEOUT_MS / 1000}s 无首字节输出, Python 启动卡死)`,
+      code: 'SPAWN_TIMEOUT',
+    });
+    res.end();
+  }, SPAWN_TIMEOUT_MS);
+
+  const _markFirstByte = () => {
+    if (!firstByteReceived) {
+      firstByteReceived = true;
+      clearTimeout(spawnTimer);
+    }
+  };
+
   emitSSE(res, 'start', { job_id: jobId, mode: traceMode });
 
   proc.stdout.on('data', (data) => {
+    _markFirstByte();
     if (clientDisconnected) return;
     const chunk = data.toString();
     job.logs.push({ time: new Date().toISOString(), text: chunk.trim() });
@@ -1361,6 +1475,7 @@ app.post('/api/run', (req, res) => {
   });
 
   proc.stderr.on('data', (data) => {
+    _markFirstByte();
     if (clientDisconnected) return;
     const stderrText = data.toString().trim();
     if (stderrText) {
@@ -1370,6 +1485,7 @@ app.post('/api/run', (req, res) => {
   });
 
   proc.on('close', (code) => {
+    clearTimeout(spawnTimer);
     if (clientDisconnected) return;
     job.status = code === 0 ? 'completed' : 'failed';
     job.endTime = new Date().toISOString();
@@ -1388,6 +1504,7 @@ app.post('/api/run', (req, res) => {
   });
 
   proc.on('error', (err) => {
+    clearTimeout(spawnTimer);
     if (clientDisconnected) return;
     job.status = 'error';
     activeJobs.delete(jobId);
@@ -1435,9 +1552,43 @@ app.post('/api/replay', (req, res) => {
     'Connection': 'keep-alive',
   });
 
+  // P0 修复 (ROUND32 三视角评审-算法工程师): /api/replay 缺失客户端断连清理
+  // 与 /api/run 不一致, 长时间回填若客户端断开会留下孤儿进程.
+  let clientDisconnected = false;
+  req.on('close', () => {
+    if (clientDisconnected) return;
+    clientDisconnected = true;
+    try { proc.kill('SIGTERM'); } catch (_) {}
+    activeJobs.delete(jobId);
+  });
+
+  // P1 修复: 启动阶段首字节超时 (与 /api/run 对齐, 60s)
+  let firstByteReceived = false;
+  const SPAWN_TIMEOUT_MS = 60000;
+  const spawnTimer = setTimeout(() => {
+    if (firstByteReceived || clientDisconnected) return;
+    try { proc.kill('SIGKILL'); } catch (_) {}
+    job.status = 'timeout';
+    activeJobs.delete(jobId);
+    emitSSE(res, 'error', {
+      message: `spawn timeout (${SPAWN_TIMEOUT_MS / 1000}s 无首字节输出, Python 启动卡死)`,
+      code: 'SPAWN_TIMEOUT',
+    });
+    res.end();
+  }, SPAWN_TIMEOUT_MS);
+
+  const _markFirstByte = () => {
+    if (!firstByteReceived) {
+      firstByteReceived = true;
+      clearTimeout(spawnTimer);
+    }
+  };
+
   emitSSE(res, 'start', { job_id: jobId, mode: job.mode });
 
   proc.stdout.on('data', (data) => {
+    _markFirstByte();
+    if (clientDisconnected) return;
     const text = data.toString();
     job.logs.push({ time: new Date().toISOString(), text: text.trim() });
     const lines = text.trim().split('\n');
@@ -1453,6 +1604,8 @@ app.post('/api/replay', (req, res) => {
   });
 
   proc.stderr.on('data', (data) => {
+    _markFirstByte();
+    if (clientDisconnected) return;
     const text = data.toString().trim();
     if (text) {
       job.logs.push({ time: new Date().toISOString(), text });
@@ -1461,6 +1614,8 @@ app.post('/api/replay', (req, res) => {
   });
 
   proc.on('close', (code) => {
+    clearTimeout(spawnTimer);
+    if (clientDisconnected) return;
     job.status = code === 0 ? 'completed' : 'failed';
     job.endTime = new Date().toISOString();
     activeJobs.delete(jobId);
@@ -1478,6 +1633,8 @@ app.post('/api/replay', (req, res) => {
   });
 
   proc.on('error', (err) => {
+    clearTimeout(spawnTimer);
+    if (clientDisconnected) return;
     job.status = 'error';
     activeJobs.delete(jobId);
     emitSSE(res, 'error', { message: err.message });

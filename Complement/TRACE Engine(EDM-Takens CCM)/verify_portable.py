@@ -46,6 +46,13 @@ def check_structure(root: Path) -> dict:
 
 
 def check_no_runtime_artifacts(root: Path) -> dict:
+    """检查便携目录是否被运行时产物污染。
+
+    P1 修缮（2026-08-03）: 扩展覆盖 edm-takens-web 的 jobs.sqlite 防护。
+    病灶: backend/job_store.py 默认将 jobs.sqlite 写入 edm-takens-web/ 根目录,
+    若 sync_product.py 的 ignore 未排除（已修复）, 该文件会被反向同步到便携目录,
+    携带旧任务历史与可能的敏感数据。此检查作为契约验证的最后一道防线。
+    """
     result = {'name': '运行时产物污染', 'ok': True, 'messages': []}
     bad_patterns = ['web_*_result*.json', 'test_min*.bat', '18)']
     web_root = root / 'trace-engine-web'
@@ -63,11 +70,36 @@ def check_no_runtime_artifacts(root: Path) -> dict:
                     found.append(f'{name}/ ({len(children)} 项内容)')
             except PermissionError:
                 found.append(f'{name}/ (无法读取)')
+
+    # P1 修缮: 扩展覆盖 edm-takens-web 的运行时产物
+    edm_web = root / 'edm-takens-web'
+    if edm_web.exists():
+        # SQLite 数据库污染检查（jobs.sqlite / *.sqlite / *.db）
+        for pat in ['jobs.sqlite', '*.sqlite', '*.sqlite-journal',
+                    '*.sqlite-wal', '*.sqlite-shm', '*.db']:
+            for f in edm_web.glob(pat):
+                found.append(f'edm-takens-web/{f.name}')
+        # 非空 outputs/ uploads/ results/ 目录
+        # P0 修缮（ROUND32 三视角评审-架构师）: 新增 results/ 检查,
+        # results/<job_id>/config_*.json 含开发者用户名绝对路径, 必须排除.
+        for name in ['outputs', 'uploads', 'data/uploads', 'results']:
+            p = edm_web / name
+            if p.exists() and p.is_dir():
+                try:
+                    children = list(p.iterdir())
+                    if children:
+                        found.append(f'edm-takens-web/{name}/ ({len(children)} 项内容)')
+                except PermissionError:
+                    found.append(f'edm-takens-web/{name}/ (无法读取)')
+        # 日志文件
+        for f in edm_web.glob('*.log'):
+            found.append(f'edm-takens-web/{f.name}')
+
     if found:
         result['ok'] = False
         result['messages'].append(f'发现残留: {found}')
     else:
-        result['messages'].append('无残留运行时产物')
+        result['messages'].append('无残留运行时产物（覆盖 trace-engine-web 与 edm-takens-web）')
     return result
 
 
@@ -101,19 +133,25 @@ print('IMPORT_OK')
 
 
 def check_engine_health(engine: Path) -> dict:
-    """复用 trace-engine/health_check.py，与 Web 端健康检查对齐。"""
+    """复用 trace-engine/health_check.py，与 Web 端健康检查对齐。
+
+    P0 修缮（2026-08-03）: 调用 --quick 模式跳过 torch/transformers 等重依赖
+    顺序导入导致的超时。原版 60s 超时下 check_optional_deps() 会触发 TimeoutExpired。
+    --quick 模式仅检查核心 5 项（dowhy/numpy/pandas/sklearn/scipy），实测 ~10s。
+    """
     result = {'name': 'trace-engine 独立健康检查', 'ok': True, 'messages': []}
     script = engine / 'health_check.py'
     if not script.exists():
         result['messages'].append('未找到 health_check.py，跳过')
         return result
-    proc = subprocess.run([sys.executable, str(script)],
-                          capture_output=True, text=True, timeout=60)
+    # --quick 跳过重依赖; 超时放宽到 90s（原 60s 在慢机器上仍可能不够）
+    proc = subprocess.run([sys.executable, str(script), '--quick'],
+                          capture_output=True, text=True, timeout=90)
     if proc.returncode != 0:
         result['ok'] = False
         result['messages'].append(proc.stderr or proc.stdout)
     else:
-        result['messages'].append('health_check.py 通过')
+        result['messages'].append('health_check.py --quick 通过')
         result['messages'].append(proc.stdout[:300])
     return result
 
@@ -136,7 +174,8 @@ def check_engine_tests(engine: Path) -> dict:
 
 
 def install_npm_deps(web: Path) -> dict:
-    result = {'name': 'npm 依赖安装', 'ok': True, 'messages': []}
+    result = {'name': 'npm 依赖安装', 'ok': True, 'messages': [],
+              'skipped': False, 'skip_reason': ''}
     if (web / 'node_modules').exists():
         result['messages'].append('node_modules 已存在')
         return result
@@ -145,13 +184,24 @@ def install_npm_deps(web: Path) -> dict:
         result['ok'] = False
         result['messages'].append('缺失 package.json，无法安装依赖')
         return result
-    proc = subprocess.run(
-        ['npm', 'install'],
-        cwd=str(web),
-        capture_output=True,
-        text=True,
-        timeout=300,
-    )
+    # P0 修缮（2026-08-03）: npm 不在 PATH 时优雅降级为 SKIP，而非崩溃
+    # 便携目录验证不应因 npm 缺失而整盘失败
+    try:
+        proc = subprocess.run(
+            ['npm', 'install'],
+            cwd=str(web),
+            capture_output=True,
+            text=True,
+            timeout=300,
+        )
+    except FileNotFoundError:
+        # npm 不可用：标记为 SKIP 而非 FAIL（环境限制，非代码缺陷）
+        result['ok'] = True
+        result['skipped'] = True
+        result['skip_reason'] = 'npm 不可用（不在 PATH 中）'
+        result['messages'].append('npm 不可用（不在 PATH 中），跳过依赖安装')
+        result['messages'].append('提示: 请手动运行 npm install 或确保 Node.js 已安装')
+        return result
     if proc.returncode != 0:
         result['ok'] = False
         result['messages'].append('npm install 失败')
@@ -174,6 +224,10 @@ def check_web_health(root: Path) -> dict:
     result['messages'].extend(npm_result['messages'])
     if not npm_result['ok']:
         result['ok'] = False
+        return result
+    # npm 不可用时跳过 Web 健康检查（环境限制，非代码缺陷）
+    if npm_result.get('skipped'):
+        result['messages'].append(f'SKIP: {npm_result.get("skip_reason", "")}')
         return result
 
     port = find_free_port()
@@ -421,7 +475,12 @@ def check_portable_code_fixes(root: Path) -> dict:
 
 
 def check_docs_sync(root: Path) -> dict:
-    """Round 17 新增：校验 Docs/ 目录关键文档已同步。"""
+    """Round 17 新增：校验 Docs/ 目录关键文档已同步。
+
+    P1 修缮（2026-08-03）: 扩展校验便携目录根的关键文档（PORTABLE_TECHNICAL_GUIDE.md）。
+    病灶: 原版 sync_product.py 误删 PORTABLE_TECHNICAL_GUIDE.md, 而 verify_portable.py
+    未校验其存在, 导致文档断裂未被检测到。现新增校验作为契约防线。
+    """
     result = {'name': 'Docs 同步', 'ok': True, 'messages': []}
     # root 是 TRACE Engine(EDM-Takens CCM)/，Docs/ 在其上一级
     docs_dir = root.parent / 'Docs'
@@ -430,20 +489,37 @@ def check_docs_sync(root: Path) -> dict:
         docs_dir = root / 'Docs'
     if not docs_dir.exists():
         result['messages'].append('未找到 Docs/ 目录，跳过')
-        return result
+    else:
+        required_docs = [
+            'META_AUDIT_CHANGELOG.md',
+            'MICROSERVICE_API_DESIGN.md',
+            '00-README.md',
+        ]
+        for doc in required_docs:
+            if not (docs_dir / doc).exists():
+                result['ok'] = False
+                result['messages'].append(f'Docs/ 缺失: {doc}')
 
-    required_docs = [
-        'META_AUDIT_CHANGELOG.md',
-        'MICROSERVICE_API_DESIGN.md',
-        '00-README.md',
+        if result['ok']:
+            result['messages'].append(f'Docs/ 关键文档齐全 ({len(required_docs)} 项)')
+
+    # P1 修缮: 校验便携目录根的关键文档
+    portable_root_docs = [
+        'PORTABLE_TECHNICAL_GUIDE.md',  # 便携目录技术指南（曾被误删）
+        'README.md',                     # 便携目录说明
+        'test_mcp_protocol.py',          # MCP 协议测试脚手架
+        'test_cross_project_http.py',    # 跨项目 HTTP 契约测试
     ]
-    for doc in required_docs:
-        if not (docs_dir / doc).exists():
-            result['ok'] = False
-            result['messages'].append(f'Docs/ 缺失: {doc}')
+    missing_portable = []
+    for doc in portable_root_docs:
+        if not (root / doc).exists():
+            missing_portable.append(doc)
+    if missing_portable:
+        result['ok'] = False
+        result['messages'].append(f'便携目录根缺失: {missing_portable}')
+    else:
+        result['messages'].append(f'便携目录根关键文档齐全 ({len(portable_root_docs)} 项)')
 
-    if result['ok']:
-        result['messages'].append(f'Docs/ 关键文档齐全 ({len(required_docs)} 项)')
     return result
 
 

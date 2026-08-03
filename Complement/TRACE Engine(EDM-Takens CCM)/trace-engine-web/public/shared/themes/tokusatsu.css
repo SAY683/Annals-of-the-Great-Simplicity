@@ -346,20 +346,6 @@ body::after {
   animation: pulse-dot 1.4s ease-in-out infinite;
 }
 
-/* P1-2 (§20.12): 隧道模式下未配置跨项目 URL 的视觉提示 */
-.base-nav a.tunnel-unconfigured {
-  color: #f2c94c;
-  border-color: rgba(242, 201, 76, 0.5);
-  background: rgba(242, 201, 76, 0.06);
-  cursor: help;
-  animation: pulse-dot 2s ease-in-out infinite;
-}
-
-.base-nav a.tunnel-unconfigured:hover {
-  background: rgba(242, 201, 76, 0.14);
-  border-color: #f2c94c;
-}
-
 /* ── 任务时钟 ── */
 .mission-clock {
   background: var(--panel-2);
@@ -485,7 +471,7 @@ body::after {
   display: grid;
   grid-template-columns: 360px 1fr;
   gap: clamp(12px, 1.6vw, 20px);
-  align-items: stretch;
+  align-items: start;
 }
 
 /* 所有列都允许收缩到 0，避免内容撑破网格导致布局断裂 */
@@ -508,7 +494,7 @@ body::after {
   .command-grid.three-col { grid-template-columns: 1fr 1fr; }
 }
 
-@media (max-width: 760px) {
+@media (max-width: 900px) {
   .command-grid,
   .command-grid.three-col {
     grid-template-columns: 1fr;
@@ -1114,12 +1100,13 @@ label {
 }
 
 /* ── SUPER 模式全屏脉冲（已弱化，避免黄色过强） ── */
+/* z-index 9998: 高于普通内容(z~2)与 CRT 扫描线(999)之下，低于 modal(10000) 与 toast(10001) */
 .super-mode-active::before {
   content: "";
   position: fixed;
   inset: 0;
   pointer-events: none;
-  z-index: 9999;
+  z-index: 9998;
   border: 1px solid rgba(255, 159, 67, 0.35);
   box-shadow: inset 0 0 18px rgba(255, 159, 67, 0.05);
   animation: super-pulse 3s ease-in-out infinite;

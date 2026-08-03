@@ -34,6 +34,9 @@ trace2dowhy:
 dowhy:
   estimation_method: "backdoor.linear_regression"  # 估计方法
   refutation_deviation_threshold: 0.3  # 反驳偏差阈值 (30%) {0.1-0.5}
+  # SYNC-4 (2026-07-30 审计): 此阈值现已被 simulation_model.py 读取，
+  # 通过 TRACE2DoWhy.__init__(refutation_deviation_threshold=) 传入。
+  # placebo 阈值为偏差阈值的 2/3（更敏感，因 placebo 应趋近0）。
   confidence_level: 0.95              # 置信水平 {0.8-0.99}
 
 # ═══════════════════════════════════════════════════════
