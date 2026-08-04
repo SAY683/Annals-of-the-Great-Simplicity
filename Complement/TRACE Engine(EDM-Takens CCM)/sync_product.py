@@ -590,8 +590,18 @@ def sync_edm_takens_projects():
     """
     print('\n[ROUND28] 同步 EDM-TAKENS 核心库和 Web 项目')
 
+    # R48-A 修复 (ROUND48 P0): 自包含布局下 src==dst 时跳过, 防止自我删除.
+    # 病灶: 自包含布局下若 Complement/Skill/ 不存在, _dev_skill_root 回退到
+    # _SCRIPT_DIR, 导致 src_edm_takens == dst_edm_takens. 原 safe_rmtree 删除后
+    # copytree 找不到源路径, 抛 FileNotFoundError, sync_research_reports() 因
+    # 异常未执行 — 这就是 ROUND37 声称"研究汇报文件夹创建"但实际不存在的根因.
+    _edm_takens_self_overlap = src_edm_takens.resolve() == dst_edm_takens.resolve()
+    _edm_takens_web_self_overlap = src_edm_takens_web.resolve() == dst_edm_takens_web.resolve()
+
     # 1. 同步 edm-takens 核心库 (CLI)
-    if src_edm_takens.exists():
+    if _edm_takens_self_overlap:
+        print('  跳过: 自包含布局下 edm-takens 源==目标, 无需同步')
+    elif src_edm_takens.exists():
         print(f'  源: {src_edm_takens}')
         # 删除旧目标后复制 (不保留 node_modules, 因为 edm-takens 是纯 Python)
         if dst_edm_takens.exists():
@@ -623,7 +633,9 @@ def sync_edm_takens_projects():
         print(f'  跳过: 未找到 edm-takens 源码目录 {src_edm_takens}')
 
     # 2. 同步 edm-takens-web (Web 服务)
-    if src_edm_takens_web.exists():
+    if _edm_takens_web_self_overlap:
+        print('  跳过: 自包含布局下 edm-takens-web 源==目标, 无需同步')
+    elif src_edm_takens_web.exists():
         print(f'  源: {src_edm_takens_web}')
         # 保留 node_modules (如果已存在), 避免每次重新 npm install
         safe_copytree(src_edm_takens_web, dst_edm_takens_web,

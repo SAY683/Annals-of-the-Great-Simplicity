@@ -221,7 +221,112 @@ trace-to-edm 仅负责触发与转译，统计保证由 EDM-TAKENS 流水线承�
 
 ---
 
-## §6 修订记录
+## §6 ROUND48 三层算法数学验证（2026-08-04）
+
+> 本章节记录 ROUND48 对 trace-to-edm 三层算法的数学正确性验证结果。
+> 验证方法：数学家+算法工程师+架构师三视角并行审计，逐函数检查数学实现。
+
+### 6.1 Layer 1 验证结果
+
+| 函数 | 数学实现 | 验证状态 |
+|------|---------|---------|
+| `_deep_get` | 嵌套字典点号路径取值，处理 None/非 dict/数组越界 | ✓ 鲁棒 |
+| `_safe_percent` | 值域守卫 [0,100]，小数比例自动转百分比 | ✓ 正确（启发式） |
+| `_safe_float` | 百分比字符串→float 转换 | ✓ 正确 |
+| `consensus_score` | `1 - std/max_std`，`max_std=√(2/9)≈0.471` | ✓ 数学正确 |
+| `consensus_direction` | ATE 符号 + CCM verdict + causallearn 共识 | ✓ 保守策略正确 |
+
+**consensus_score 数学验证**:
+- 3 个 [0,1] 值的理论最大标准差：当 values={0,0,1} 时，mean=1/3，var=2/9，std=√(2/9)≈0.471
+- 归一化：`consensus = 1 - std_v / max_std`，值域 [0,1]
+- {x,x,x} → std=0 → consensus=1（完全一致）✓
+- {0,0,1} → std=0.471 → consensus=0（完全背离）✓
+
+**consensus_direction 保守策略说明**:
+- CCM verdict 的 forward/reverse 表示因果方向（X→Y vs Y→X）
+- ATE 符号表示因果效应正负（X增加→Y增加/减少）
+- 两者语义维度正交，不应直接比较
+- 代码中的 `pass` 是有意保守策略，非缺陷
+
+### 6.2 Layer 2 验证结果
+
+| 函数 | 数学实现 | 验证状态 |
+|------|---------|---------|
+| `project` | PCA 投影：`z_pca_i = (x - mean) · components[i]` | ✓ 正确（含中心化） |
+| `secular_entropy` | z²能量→概率→Shannon熵→归一化 | ✓ 数学正确 |
+| `_refit_pca` | sklearn PCA 拟合，n_components=min(3,n,d) | ✓ 正确 |
+| `_get_active_mean` | 优先项目PCA，回退背景PCA | ✓ 正确 |
+
+**PCA 投影中心化验证** (Q9 P1-17 修复):
+- 原实现：`z_pca_i = np.dot(embedding, components[i])`（未中心化）
+- 修复后：`centered = embedding - mean; z_pca_i = np.dot(centered, components[i])`
+- 数学正确性：PCA 投影必须减去训练时均值，否则 z_pca 包含常数偏移 mean·components[i] ✓
+
+**世俗熵验证**:
+- 能量定义：`energy_i = z_pca_i²`（等价于各主轴方差贡献）✓
+- 概率归一化：`prob_i = energy_i / total_energy` ✓
+- Shannon 熵：`entropy = -Σ prob_i · log(prob_i)` ✓
+- 归一化：`secular_entropy = entropy / log(n_axes)`，值域 [0,1] ✓
+
+### 6.3 Layer 3 验证结果
+
+| 函数 | 数学实现 | 验证状态 |
+|------|---------|---------|
+| `_project_with_vector` | 余弦相似度：`sim = w·h_x`（均已 L2 归一化） | ✓ 正确 |
+| `encode_text` | SVD 聚合：第一右奇异向量 > mean-pooling | ✓ 正确 |
+| `_gram_schmidt` | 经典 GS 正交化 | ✓ 正确 |
+| `_modified_gram_schmidt` | 修正 GS 正交化 | ✓ 正确 |
+| `project_with_orthogonalization` | `new_coords = Q.T @ h_x` | ✓ 正确 |
+| `ZScoreNormalizer` | `(z - μ) / (σ + ε)`，滚动窗口 W=20 | ✓ 正确 |
+| `compute_axis_weights` | per-axis off-diagonal 自适应降权 | ✓ 正确 |
+
+**余弦相似度验证**:
+- 两个 L2 归一化向量的点积 = 余弦相似度 ✓
+- 值域 [-1, 1]，0 表示完全正交 ✓
+
+**SVD 聚合验证**:
+- 多 chunk 嵌入矩阵 M [n_chunks, hidden_size]
+- SVD: M = U Σ V^T
+- 第一右奇异向量 V^T[0] 是数据最大方差方向 ✓
+- 比 mean-pooling 更优：找到最佳 1 维表示 ✓
+
+**Gram-Schmidt 正交化验证**:
+- 经典 GS: `Q[:,i] -= (Q[:,j]·Q[:,i]) * Q[:,j]` 然后 `Q[:,i] /= ||Q[:,i]||` ✓
+- 修正 GS: 先归一化 `Q[:,i]`，再从后续列减去投影 ✓
+- 正交化后重投影: `new_coords = Q.T @ h_x`（Q 列张成与 W 相同子空间但彼此正交）✓
+
+**Z-Score 归一化验证**:
+- 公式: `z_score = (z - μ_rolling) / (σ_rolling + ε)` ✓
+- 窗口 W=20，per-axis 独立 ✓
+- 样本不足（<5）返回 0.0（中性）✓
+- ddof=0（总体标准差），滚动窗口下无偏性不必要 ✓
+
+### 6.4 csv_builder.py 88 列契约验证
+
+| 列组 | 列数 | 来源 |
+|------|------|------|
+| Meta | 3 | time_step, text_hash, source_label |
+| 诊断标记 | 3 | trace_status, trace_error, trace_mode |
+| Layer 1 | 30 | config.LAYER1_COLUMNS 动态构建 |
+| Layer 2 | 4 | z_pca_1/2/3, secular_entropy |
+| Layer 3 绝对投影 | 8 | f"z_{short}" for short in SACRED_BOOKS |
+| Layer 3 一阶差分 | 8 | f"dz_{short}" |
+| Layer 3 二阶差分 | 8 | f"d2z_{short}" |
+| z-score 归一化 | 24 | z/dz/d2z × 8 轴 |
+| **总计** | **88** | ✓ 契约完整 |
+
+### 6.5 审计结论
+
+**三层算法数学实现全部正确，未发现需要修复的数学错误。**
+
+- Layer 1: consensus_score 归一化数学正确，consensus_direction 保守策略合理
+- Layer 2: PCA 投影中心化正确，世俗熵计算正确
+- Layer 3: 余弦相似度、SVD 聚合、Gram-Schmidt 正交化、Z-Score 归一化全部正确
+- csv_builder: 88 列契约完整，列顺序动态构建，列错位检测守卫到位
+
+---
+
+## §7 修订记录
 
 | 轮次 | 项 | 摘要 |
 |------|----|------|
@@ -233,3 +338,4 @@ trace-to-edm 仅负责触发与转译，统计保证由 EDM-TAKENS 流水线承�
 | ROUND28 | P2-03 | csv_builder 列总数断言守卫 |
 | ROUND28 | P2-05 | consensus_score 哨兵值 -1.0 |
 | ROUND28 | P2-06 | bridge L2/L3 失败标记 PARTIAL |
+| ROUND48 | §6 | 三层算法数学验证：L1 consensus_score归一化、L2 PCA中心化、L3 Gram-Schmidt正交化全部正确 |
