@@ -41,8 +41,8 @@ graphrag_query(question="种子在书中象征什么？", method="local")
 
 **返回**（JSON）：
 ```json
-{ "project": "…", "exists": true, "entities": 3709, "relationships": 4773,
-  "communities": 500, "entity_types": { "CONCEPT": 1712, … } }
+{ "project": "…", "exists": true, "entities": 3038, "relationships": 3987,
+  "communities": 555, "entity_types": { "CONCEPT": 1712, … } }
 ```
 
 ## 工具 3：graphrag_get_context
@@ -93,7 +93,7 @@ codex mcp add graphrag -- python <归档路径>\mcp\graphrag_mcp.py
 **三工具实测**：
 - `graphrag_query(question="我当前应该怎么做？无关于目标，只是我应该遵循何种策略。", method="global")` → 完整策略综合回答（见 `示例-策略问答.md`）
 - `graphrag_get_context(entity="爱")` → CONCEPT，degree 44，邻居/关系齐全
-- `graphrag_list_projects()` → 3709/4773/500 全量统计
+- `graphrag_list_projects() → 3038/3987/555 全量统计（2026-08-05 19:00 最终重建后实测）
 
 **通用性要点**：
 1. 传输层：服务端与客户端均由 mcp SDK 以 **UTF-8** 包装 stdio（`encoding="utf-8"`），中文安全。
