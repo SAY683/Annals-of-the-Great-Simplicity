@@ -23,6 +23,14 @@ TRACE Engine 便携目录独立运行审计脚本
 import sys
 sys.dont_write_bytecode = True
 
+# ROUND51: UTF-8 输出重配置, 避免 GBK 控制台打印 E2E 冒烟输出 (含 ✓ 等字符)
+# 时 UnicodeEncodeError 崩溃. errors=replace 兜底, 保证审计永不因打印失败.
+try:
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+except Exception:
+    pass
+
 import json
 import os
 import shutil
@@ -259,7 +267,7 @@ def check_web_health(root: Path) -> dict:
         env=env,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
-        text=True,
+        text=False,  # 按字节读取, 避免 Windows locale (GBK) 解码 UTF-8 服务输出崩溃
     )
 
     # 强制直连，避免环境中的 HTTP_PROXY/HTTPS_PROXY（尤其格式错误的代理）
@@ -324,7 +332,11 @@ def check_web_health(root: Path) -> dict:
                 proc.wait(timeout=5)
             except subprocess.TimeoutExpired:
                 pass
-        stdout, stderr = proc.stdout.read() if proc.stdout else '', proc.stderr.read() if proc.stderr else ''
+        stdout, stderr = proc.stdout.read() if proc.stdout else b'', proc.stderr.read() if proc.stderr else b''
+        # ROUND51: 按字节读取后以 UTF-8 解码 (replace 兜底), 原 text=True 会
+        # 用 Windows locale (GBK) 解码导致 UnicodeDecodeError 崩溃
+        stdout = stdout.decode('utf-8', errors='replace') if isinstance(stdout, bytes) else (stdout or '')
+        stderr = stderr.decode('utf-8', errors='replace') if isinstance(stderr, bytes) else (stderr or '')
         if stderr or stdout:
             result['messages'].append('服务端输出:')
             result['messages'].append(stderr or stdout)
@@ -815,7 +827,68 @@ def check_bat_encoding(root: Path) -> dict:
     return result
 
 
+def check_e2e_smoke(root: Path) -> dict:
+    """ROUND51 新增: 端到端全链路冒烟测试 (smoke_e2e.py).
+
+    真实启动三服务 (edm-takens-web / trace-engine-web / trace-to-edm),
+    跑通 文本→TRACE→trace-to-edm→EDM 全链路并对结果做断言.
+    这是把 verify 从"查文件存在"升级为"查行为正确"的关键一环:
+    其余 15 项契约只能证明"文件在", 本检查证明"链路真的能跑".
+
+    耗时较长 (约 5-15 分钟, 视机器与 EDM 分析速度而定).
+    可用 --no-e2e 参数或环境变量 SMOKE_E2E_OFF=1 跳过.
+    前置依赖缺失 (node/npm) 时按 SKIP 处理 (环境限制, 非便携目录缺陷).
+
+    smoke_e2e.py 退出码: 0=通过 | 1=失败 | 2=SKIP
+    """
+    result = {'name': 'E2E 全链路冒烟', 'ok': True, 'messages': []}
+    if os.environ.get('SMOKE_E2E_OFF') == '1':
+        result['messages'].append('SKIP: SMOKE_E2E_OFF=1 (显式跳过)')
+        return result
+    script = root / 'smoke_e2e.py'
+    if not script.exists():
+        result['ok'] = False
+        result['messages'].append('缺失 smoke_e2e.py')
+        return result
+
+    # 输出写入临时日志文件 (显式 utf-8), 避免 Windows 控制台 GBK 解码乱码
+    log_path = Path(os.environ.get('TEMP', '/tmp')) / 'smoke_e2e_verify.log'
+    try:
+        with open(log_path, 'w', encoding='utf-8') as lf:
+            proc = subprocess.run(
+                [sys.executable, str(script)],
+                cwd=str(root),
+                stdout=lf,
+                stderr=subprocess.STDOUT,
+                # 后盾超时: smoke_e2e.py 内部有自己的 12 分钟总预算
+                timeout=1500,
+            )
+    except subprocess.TimeoutExpired:
+        result['ok'] = False
+        result['messages'].append('smoke_e2e.py 超时 (1500s), 查看日志排查')
+        return result
+
+    try:
+        output = log_path.read_text(encoding='utf-8', errors='replace')
+    except Exception:
+        output = ''
+    result['messages'].append(output.strip())
+
+    if proc.returncode == 2:
+        result['messages'].append('SKIP: 前置依赖缺失 (node/npm 不在 PATH), 环境限制非缺陷')
+        return result
+    if proc.returncode != 0:
+        result['ok'] = False
+        result['messages'].append(f'smoke_e2e.py 退出码 {proc.returncode} (FAIL)')
+    return result
+
+
 def main():
+    import sys as _sys
+    if '--no-e2e' in _sys.argv or '-q' in _sys.argv:
+        # ROUND51: 快速模式 — 跳过耗时的 E2E 全链路冒烟 (约 5-15 分钟)
+        os.environ['SMOKE_E2E_OFF'] = '1'
+        print('[INFO] --no-e2e: 跳过 E2E 全链路冒烟测试 (快速模式)')
     root = find_product_root(Path(__file__).resolve().parent)
     print('=' * 60)
     print('TRACE Engine 便携目录独立运行审计')
@@ -825,6 +898,7 @@ def main():
     # Round 17：从 7 项扩充到 11 项，覆盖 trace-to-edm 契约、代码修缮落地、Docs/Skill 同步
     # ROUND28: 从 11 项扩充到 14 项, 新增 EDM-TAKENS CLI 导入、科研披露字段、sync_check
     # ROUND47: 从 14 项扩充到 15 项, 新增 .bat 文件编码合规检查
+    # ROUND51: 从 15 项扩充到 16 项, 新增 E2E 全链路冒烟测试 (smoke_e2e.py)
     checks = [
         check_structure(root),
         check_no_runtime_artifacts(root),
@@ -843,6 +917,9 @@ def main():
         check_edm_takens_sync_check(root),
         # ROUND47 新增: .bat 文件编码合规检查 (防止 GBK 乱码导致命令截断)
         check_bat_encoding(root),
+        # ROUND51 新增: E2E 全链路冒烟 (真实启动三服务, 跑通完整链路)
+        # 可通过 --no-e2e 或 SMOKE_E2E_OFF=1 跳过
+        check_e2e_smoke(root),
     ]
 
     all_ok = True
@@ -861,7 +938,7 @@ def main():
             all_ok = False
 
     print('\n' + '=' * 60)
-    print(f'汇总: {n_pass} PASS / {n_fail} FAIL / {len(checks)} 项 (ROUND47 15项契约)')
+    print(f'汇总: {n_pass} PASS / {n_fail} FAIL / {len(checks)} 项 (ROUND51 16项契约)')
     if all_ok:
         print('审计结果: 全部通过，便携目录可独立运行。')
         return 0

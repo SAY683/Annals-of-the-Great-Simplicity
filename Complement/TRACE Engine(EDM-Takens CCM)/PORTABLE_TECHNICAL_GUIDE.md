@@ -14,7 +14,7 @@
 
 - **可移植**: 所有路径基于脚本自身位置推断，无硬编码绝对路径
 - **可独立运行**: 不依赖外部开发目录即可启动全部 5 个子项目
-- **可论证**: `verify_portable.py` 14 项契约 + `sync_check.py` 20 项一致性校验
+- **可论证**: `verify_portable.py` 16 项契约 + `sync_check.py` 20 项一致性校验
 - **可维修**: `sync_product.py` 支持自包含布局（脚本所在目录即成品根）
 
 ### 1.2 五大子项目
@@ -72,9 +72,9 @@
 
 ---
 
-## 3. 便携目录验证契约（14 项）
+## 3. 便携目录验证契约（16 项）
 
-`verify_portable.py` 执行 14 项独立运行审计（**P1 修缮后扩展**）：
+`verify_portable.py` 执行 16 项独立运行审计（ROUND51 契约，含 E2E 全链路冒烟）：
 
 | # | 检查项 | 文件位置 |
 |---|---|---|
@@ -86,12 +86,14 @@
 | 6 | SUPER 模式导入路径（无 `presets.py` 遮蔽） | `check_super_worker_imports` |
 | 7 | trace-engine-web 健康检查 + `/api/config` 契约 | `check_web_health` |
 | 8 | trace-to-edm 轨迹表契约 | `check_trace_to_edm_contract` |
-| 9 | 便携式代码修缮落地 | `check_portable_fixes` |
+| 9 | 便携式代码修缮落地 | `check_portable_code_fixes` |
 | 10 | Docs 同步 | `check_docs_sync` |
-| 11 | EDM-TAKENS 项目同步完整性 | `check_edm_takens_projects` |
+| 11 | EDM-TAKENS 项目同步完整性 | `check_skill_projects` |
 | 12 | EDM-TAKENS CLI 模块导入（7 模块） | `check_edm_takens_cli` |
-| 13 | EDM-TAKENS 科研披露字段（4 字段） | `check_edm_takens_disclosure` |
+| 13 | EDM-TAKENS 科研披露字段（4 字段） | `check_edm_takens_disclosure_fields` |
 | 14 | EDM-TAKENS 跨项目 sync_check | `check_edm_takens_sync_check` |
+| 15 | BAT 编码合规（无中文 + `chcp 65001`） | `check_bat_encoding` |
+| 16 | **E2E 全链路冒烟**（真实启动三服务，跑通 文本→TRACE→trace-to-edm→EDM） | `check_e2e_smoke` → `smoke_e2e.py` |
 
 ### 3.1 P1 修缮扩展：jobs.sqlite 污染防护
 

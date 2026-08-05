@@ -276,8 +276,9 @@ app.include_router(_analyze_router)
 app.include_router(_history_router)
 
 # ROUND29 MCP: 补齐 MCP 协议端点 (JSON-RPC 2.0 over HTTP)
+# MCP 内部自调用走 127.0.0.1:{port}, 端口必须与 uvicorn 监听端口一致 (EDM_PORT 覆盖)
 from mcp import create_mcp_router
-app.include_router(create_mcp_router(8000))
+app.include_router(create_mcp_router(int(os.environ.get("EDM_PORT", "8000"))))
 
 # ── Re-export route handlers for backward compatibility ──
 from routes.datasets import (

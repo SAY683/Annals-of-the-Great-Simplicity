@@ -50,7 +50,12 @@ _IS_PORTABLE_LAYOUT = (
 # TRACE 引擎路径（所有布局下都是同级，无须分支）
 TRACE_ENGINE_WEB_DIR = PROJECT_ROOT.parent / "trace-engine-web"
 TRACE_BRIDGE_SCRIPT = TRACE_ENGINE_WEB_DIR / "py_bridge.py"
-TRACE_WORK_DIR = TRACE_ENGINE_WEB_DIR / "work" / "outputs"
+# E2E 冒烟隔离 (smoke_e2e.py): TRACE 任务输出目录支持环境变量覆盖 (与
+# trace-engine-web 的 TRACE_WORK_DIR 同语义), 默认仍是 trace-engine-web/work/outputs.
+# 病灶: 原版硬编码, smoke 运行时 bridge.py 把每次 TRACE 的任务输出写进便携目录,
+# 造成 work/outputs 下累积大量 task 目录污染.
+TRACE_WORK_DIR = Path(os.environ.get(
+    "TRACE_WORK_DIR", str(TRACE_ENGINE_WEB_DIR / "work" / "outputs")))
 
 # EDM-Takens Web 路径（候选探测，取第一个存在的）
 # 当前便携布局与开发布局均为同级; 旧便携布局在 Skill/ 下跨父目录。
@@ -59,8 +64,11 @@ _EDM_TAKENS_CANDIDATES = [
     PROJECT_ROOT.parent.parent / "Skill" / "edm-takens-web",     # 旧便携布局：Skill/ 跨父目录
 ]
 EDM_TAKENS_DIR = next((p for p in _EDM_TAKENS_CANDIDATES if p.exists()), _EDM_TAKENS_CANDIDATES[0])
-EDM_DATA_DIR = EDM_TAKENS_DIR / "data"
-EDM_API_URL = "http://localhost:8000"
+# E2E 冒烟隔离 (smoke_e2e.py): EDM 数据目录与 API 地址支持环境变量覆盖,
+# 避免把轨迹 CSV 复制进便携目录的 edm-takens-web/data/ (覆盖被 git 跟踪的文件).
+# 默认值不变 (便携目录 data/ + localhost:8000), 仅测试时重定向.
+EDM_DATA_DIR = Path(os.environ.get("EDM_DATA_DIR", str(EDM_TAKENS_DIR / "data")))
+EDM_API_URL = os.environ.get("EDM_API_URL", "http://localhost:8000")
 
 # Qwen 模型路径
 # 优先级: 环境变量 > 便携式布局探测 > 开发布局 fallback
@@ -91,7 +99,8 @@ IS_PORTABLE_LAYOUT = _IS_PORTABLE_LAYOUT
 # 本项目的输入/输出目录 (重组后)
 DATA_DIR = PROJECT_ROOT / "data"
 INPUTS_DIR = DATA_DIR / "inputs"
-OUTPUTS_DIR = DATA_DIR / "outputs"
+# E2E 冒烟隔离: 轨迹输出目录支持环境变量覆盖, 默认 data/outputs 不变
+OUTPUTS_DIR = Path(os.environ.get("TRACE_TO_EDM_OUTPUTS_DIR", str(DATA_DIR / "outputs")))
 CACHE_DIR = DATA_DIR / "cache"
 ARCHIVE_DIR = PROJECT_ROOT / "archive"
 SACRED_TEXTS_DIR = PROJECT_ROOT / "sacred_texts"
@@ -110,7 +119,9 @@ def _get_default_csv():
 TRAJECTORY_CSV = OUTPUTS_DIR / "narrative_meta_trajectories.csv"  # 向后兼容
 
 # 项目目录
-PROJECTS_DIR = PROJECT_ROOT / "projects"
+# E2E 冒烟隔离: 项目目录支持环境变量覆盖, 避免把轨迹 CSV / _index.json
+# 写进便携目录 projects/. 默认值不变 (便携目录 projects/).
+PROJECTS_DIR = Path(os.environ.get("TRACE_TO_EDM_PROJECTS_DIR", str(PROJECT_ROOT / "projects")))
 # ENG-04 修复: _active_model.txt 按项目隔离
 # 原实现 MODEL_CACHE_DIR = CACHE_DIR 指向全局 data/cache/，
 # 导致所有项目共享同一个 _active_model.txt，项目 A 切换模型后项目 B 也受影响。

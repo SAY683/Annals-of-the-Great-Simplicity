@@ -35,9 +35,11 @@ const ROOT = __dirname;
 const PUBLIC_DIR = path.join(ROOT, 'public');
 const BRIDGE_SCRIPT = path.join(ROOT, 'bridge.py');
 const PYTHON_CMD = process.env.TRACE_PYTHON_CMD || 'python';
-const TRAJECTORY_CSV = path.join(ROOT, 'data', 'outputs', 'narrative_meta_trajectories.csv');
-const PROJECTS_DIR = path.join(ROOT, 'projects');
-const LOG_FILE = path.join(ROOT, 'data', 'logs', 'server.log');
+// E2E 冒烟隔离 (smoke_e2e.py): 项目目录/轨迹CSV/日志支持环境变量覆盖,
+// 避免把运行时产物写进便携目录. 默认值不变, 仅测试时重定向.
+const TRAJECTORY_CSV = process.env.TRACE_TO_EDM_TRAJECTORY_CSV || path.join(ROOT, 'data', 'outputs', 'narrative_meta_trajectories.csv');
+const PROJECTS_DIR = process.env.TRACE_TO_EDM_PROJECTS_DIR || path.join(ROOT, 'projects');
+const LOG_FILE = process.env.TRACE_TO_EDM_LOG_FILE || path.join(ROOT, 'data', 'logs', 'server.log');
 // P1修复: 默认 CORS 限制为本地回环，避免生产环境通配符风险 (原默认 '*')
 // debt-12.15 隧道支持: 自动读取 tunnel_url.txt，把 trycloudflare 域名加入白名单
 function _loadTunnelOrigins() {
@@ -1648,13 +1650,19 @@ app.post('/api/edm/trigger', (req, res) => {
   const { target, q, time_start, time_end, predict_window } = req.body;
 
   // P0-4 (Round 21 §P0-A): 入参校验 — 防止恶意输入触发 Python 端异常或长时间运行
-  // target: 字符串白名单 (ate/ci_width/refuted_count/identifiable 等已知列名)
-  // q: 正整数 [2, 20]
-  // time_start/time_end: 数字 (时间步索引)
-  // predict_window: 非负整数 [0, 1000]
+  // target: 白名单校验, 必须为轨迹 CSV 中实际存在的数值列
+  // ROUND51 E2E 修复: 原白名单含 n_significant_edges (result.json 键名, 非 CSV 列,
+  // CSV 列是 edge_count) 且缺少 L2/L3 有方差列 (z_pca_*, z_存在 等), 导致 LIGHT 模式
+  // 下 ate 全 0 时无任何可用的 EDM 目标. 现对齐 edm_trigger.list_recommended_targets().
   const ALLOWED_TARGETS = new Set([
+    // Layer 1: 元 SCM (ate 在 LIGHT 模式可能全 0, 保留兼容)
     'ate', 'ate_ci_lower', 'ate_ci_upper', 'ci_width', 'refuted_count',
-    'identifiable', 'n_significant_edges', 'trace_status', 'trace_error',
+    'identifiable', 'edge_count', 'concept_count', 'adj_density',
+    'max_delta_nll', 'ccm_coverage_pct',
+    // Layer 2: 世俗语义 PCA (LIGHT 模式保证有方差)
+    'z_pca_1', 'z_pca_2', 'z_pca_3', 'secular_entropy',
+    // 兼容旧调用方 (非 CSV 列, 由 EDM 侧回退)
+    'n_significant_edges',
   ]);
   if (target != null && (typeof target !== 'string' || !ALLOWED_TARGETS.has(target))) {
     return res.status(400).json({ success: false, error: `target 必须为白名单值: ${Array.from(ALLOWED_TARGETS).join('/')}`, code: 'INVALID_TARGET' });
@@ -1757,29 +1765,48 @@ app.get('/api/edm/poll/:jobId', (req, res) => {
 
   reqLog(req, 'info', `EDM poll proxy → ${url}`);
 
+  // ROUND51 E2E 修复: 响应防重入守卫.
+  // 病灶: 原实现 setTimeout(5s) 触发时 res.json(504), 随后 upstream.destroy()
+  // 触发 'error' 事件 → error 处理器再次 res.json(502) → ERR_HTTP_HEADERS_SENT
+  // 抛异常崩溃整个 trace-to-edm 进程, 使 EDM 轮询链路被杀死 (EDM 后端分析
+  // 正常运行但前端永远等不到结果). 现用 responded 标志保证三种响应路径
+  // (end / error / timeout) 只响应一次, 竞争安全.
+  let responded = false;
+  const respond = (fn) => {
+    if (responded) return;
+    responded = true;
+    try { fn(); } catch (_) { /* res 可能已关闭, 静默 */ }
+  };
+
   const upstream = mod.get(url, { timeout: 5000 }, (upRes) => {
     let body = '';
     upRes.on('data', chunk => body += chunk);
     upRes.on('end', () => {
-      try {
-        res.json(JSON.parse(body));
-      } catch {
-        res.status(502).json({ error: 'invalid upstream response', raw: body.slice(0, 200) });
-      }
+      respond(() => {
+        try {
+          res.json(JSON.parse(body));
+        } catch {
+          res.status(502).json({ error: 'invalid upstream response', raw: body.slice(0, 200) });
+        }
+      });
     });
   });
 
   upstream.on('error', (err) => {
     reqLog(req, 'warn', `EDM poll failed: ${err.message}`);
-    res.status(502).json({
-      error: `edm-takens-web unreachable: ${err.message}`,
-      hint: '请确保 edm-takens-web 后端已启动 (python run_backend.py, 端口 8000)'
+    respond(() => {
+      res.status(502).json({
+        error: `edm-takens-web unreachable: ${err.message}`,
+        hint: '请确保 edm-takens-web 后端已启动 (python run_backend.py, 端口 8000)'
+      });
     });
   });
 
   upstream.setTimeout(5000, () => {
-    upstream.destroy();
-    res.status(504).json({ error: 'edm-takens-web timeout' });
+    respond(() => {
+      res.status(504).json({ error: 'edm-takens-web timeout' });
+    });
+    try { upstream.destroy(); } catch (_) {}
   });
 });
 

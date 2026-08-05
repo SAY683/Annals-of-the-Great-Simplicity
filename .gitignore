@@ -9,10 +9,15 @@ __pycache__/
 *.pyo
 *.log
 node_modules/
+package-lock.json
 jobs.sqlite
 tunnel_url.txt
 tunnel_logs/
 outputs/
 web_*_result*.json
 .tmp_*.py
+
+# ROUND51: trace-engine-web 运行时工作目录 (TRACE 任务输出), smoke_e2e 隔离后
+# 不再写入, 但保留 ignore 兜底 (历史 work/outputs 累积的任务目录)
+Complement/TRACE Engine(EDM-Takens CCM)/trace-engine-web/work/
 

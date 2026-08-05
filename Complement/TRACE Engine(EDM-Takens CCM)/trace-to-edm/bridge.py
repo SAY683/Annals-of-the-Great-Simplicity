@@ -47,6 +47,15 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, Optional
 
+# ROUND51 E2E 修复: GBK 控制台无法编码 ✓/✗ 等字符导致 UnicodeEncodeError 崩溃.
+# server.js 启动时设置了 PYTHONIOENCODING=utf-8 (走 HTTP 无此问题), 但 CLI 直跑会崩.
+# reconfigure 让 stdout/stderr 以 UTF-8 + replace 兜底输出, 与 terminal_theme.py 同模式.
+try:
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+except Exception:
+    pass
+
 # ── 路径设置 ────────────────────────────────────────────────
 _PROJECT_DIR = Path(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, str(_PROJECT_DIR))

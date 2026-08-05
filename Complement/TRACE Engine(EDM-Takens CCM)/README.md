@@ -15,7 +15,7 @@
 ```
 .
 ├── README.md                 # 本文件
-├── verify_portable.py        # 独立运行性审计脚本 (14 项契约)
+├── verify_portable.py        # 独立运行性审计脚本 (16 项契约)
 ├── sync_product.py           # 同步脚本 (支持 EDM-TAKENS 项目)
 ├── trace-engine/             # Python 因果推断引擎
 │   ├── health_check.py       # 引擎健康检查
@@ -212,9 +212,9 @@ $env:TRACE_PRODUCT_DIR = "C:\path\to\portable"
 python sync_product.py
 ```
 
-### verify_portable.py 14 项审计契约
+### verify_portable.py 16 项审计契约
 
-`verify_portable.py` 执行以下 14 项独立运行审计（ROUND28 契约）：
+`verify_portable.py` 执行以下 16 项独立运行审计（ROUND51 契约）：
 
 1. 目录结构（`trace-engine/` 与 `trace-engine-web/` 存在）
 2. 运行时产物污染（无 `web_*_result*.json`、`test_min*.bat` 残留）
@@ -225,11 +225,13 @@ python sync_product.py
 7. trace-engine-web 健康检查（`/api/health` + `/api/config` 契约）
 8. trace-to-edm 轨迹表契约（`bridge.py` 写入 + `app.js` 渲染 + CSS 状态色）
 9. 便携式代码修缮落地（主机绑定 127.0.0.1、CCM verdict 三级语义、FCI 实现）
-10. Docs 同步（`META_AUDIT_CHANGELOG.md` 等 3 项关键文档）
+10. Docs 同步（`DEPENDENCY_MATRIX.md` 等 3 项关键文档）
 11. EDM-TAKENS 项目同步（`edm-takens/` 与 `edm-takens-web/` 在便携目录内完整）
 12. EDM-TAKENS CLI 模块导入（7 个核心算法模块可导入：pipeline/ccm/havok/edm/constants/surrogate/final_interpretation）
 13. EDM-TAKENS 科研披露字段（4 个字段存在：is_strict_confirmatory/methodology_disclaimer/effective_lib_sizes/out_of_sample_used）
 14. EDM-TAKENS 跨项目 sync_check（核心库与 Web 副本 SHA256 一致）
+15. BAT 编码合规（无中文 + `chcp 65001`，防止 GBK 命令截断）
+16. **E2E 全链路冒烟**（`smoke_e2e.py`：真实启动三服务，跑通 文本→TRACE→trace-to-edm→EDM，断言轨迹列契约 + EDM 科研披露字段；约 5-15 分钟，可用 `--no-e2e` 或 `SMOKE_E2E_OFF=1` 跳过，node/npm 缺失时 SKIP）
 
 ## 支持与故障排查
 

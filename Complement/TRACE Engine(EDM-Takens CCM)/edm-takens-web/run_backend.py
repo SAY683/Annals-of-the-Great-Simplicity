@@ -32,17 +32,25 @@ os.environ['MKL_NUM_THREADS'] = '1'
 # debt-22: os.chdir 从 api.py 移至此入口点。pipeline 内部硬编码了相对
 # 路径 results/，必须在进程启动时统一 cwd。原先在 api.py 模块加载时
 # chdir 会产生导入副作用，且直接 `uvicorn api:app` 时行为不一致。
-os.chdir(_PROJECT_ROOT)
+# E2E 冒烟隔离 (smoke_e2e.py): EDMTAKENS_WORKDIR 覆盖工作目录, 使 pipeline
+# 的相对 results/ 写入落入临时目录而非便携目录. 默认仍为项目根.
+_EDM_WORKDIR = os.environ.get("EDMTAKENS_WORKDIR", _PROJECT_ROOT)
+os.chdir(_EDM_WORKDIR)
 
 if __name__ == "__main__":
     # Ensure runtime directories exist
-    os.makedirs(os.path.join(_PROJECT_ROOT, "data"), exist_ok=True)
-    os.makedirs(os.path.join(_PROJECT_ROOT, "results"), exist_ok=True)
+    _data_dir = os.environ.get("EDMTAKENS_DATA_DIR", os.path.join(_PROJECT_ROOT, "data"))
+    _results_dir = os.environ.get("EDMTAKENS_RESULTS_DIR", os.path.join(_PROJECT_ROOT, "results"))
+    os.makedirs(_data_dir, exist_ok=True)
+    os.makedirs(_results_dir, exist_ok=True)
 
     uvicorn.run(
         "api:app",
-        app_dir="backend",
+        # ROUND51 E2E 修复: app_dir 用绝对路径, 而非相对 "backend".
+        # EDMTAKENS_WORKDIR 覆盖时 cwd 变为临时目录, 相对 app_dir 会
+        # 找不到 backend/api.py → "Could not import module api".
+        app_dir=os.path.join(_PROJECT_ROOT, "backend"),
         host="127.0.0.1",  # Q9 P1-23 修复：仅绑定本地回环，避免暴露到所有网络接口
-        port=8000,
+        port=int(os.environ.get("EDM_PORT", "8000")),  # EDM_PORT 覆盖 (README 已文档化, 此前未实现)
         reload=False,
     )

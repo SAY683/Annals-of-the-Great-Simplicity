@@ -26,9 +26,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
 
-from config import PROJECT_ROOT, VERBOSE
+from config import PROJECT_ROOT, PROJECTS_DIR, VERBOSE
 
-PROJECTS_DIR = PROJECT_ROOT / "projects"
 INDEX_FILE = PROJECTS_DIR / "_index.json"
 
 

@@ -11,9 +11,19 @@ import threading
 # ── Path setup ────────────────────────────────────────────
 _BACKEND_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _PROJECT_ROOT = os.path.dirname(_BACKEND_DIR)
-DATA_DIR = os.path.join(_PROJECT_ROOT, "data")
-RESULTS_DIR = os.path.join(_PROJECT_ROOT, "results")
-ARCHIVE_DIR = os.path.join(_PROJECT_ROOT, "archive")
+
+# E2E 冒烟隔离 (smoke_e2e.py): 数据/结果/归档目录支持环境变量覆盖,
+# 避免把运行时产物写进便携目录 (data/narrative_meta_trajectories.csv 是
+# 被 git 跟踪的文件, results/ 会被 verify 污染检查标记). 默认值不变.
+# EDMTAKENS_DATA_DIR 与 edmtakens/_paths.py 的 env 读取保持一致.
+def _env_dir(name: str, default: str) -> str:
+    v = os.environ.get(name)
+    return os.path.abspath(v) if v else default
+
+
+DATA_DIR = _env_dir("EDMTAKENS_DATA_DIR", os.path.join(_PROJECT_ROOT, "data"))
+RESULTS_DIR = _env_dir("EDMTAKENS_RESULTS_DIR", os.path.join(_PROJECT_ROOT, "results"))
+ARCHIVE_DIR = _env_dir("EDMTAKENS_ARCHIVE_DIR", os.path.join(_PROJECT_ROOT, "archive"))
 os.makedirs(DATA_DIR, exist_ok=True)
 os.makedirs(RESULTS_DIR, exist_ok=True)
 os.makedirs(ARCHIVE_DIR, exist_ok=True)
