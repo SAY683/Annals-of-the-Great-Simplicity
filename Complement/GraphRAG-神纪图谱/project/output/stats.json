@@ -1,68 +1,68 @@
 {
-    "total_runtime": 1708.8785574436188,
+    "total_runtime": 5844.135527610779,
     "num_documents": 1,
     "update_documents": 0,
     "input_load_time": 0,
     "workflows": {
         "load_input_documents": {
-            "overall": 0.14453935623168945,
-            "peak_memory_bytes": 2131908,
-            "memory_delta_bytes": 704689,
-            "tracemalloc_overhead_bytes": 422832
+            "overall": 0.0677797794342041,
+            "peak_memory_bytes": 2128494,
+            "memory_delta_bytes": 700976,
+            "tracemalloc_overhead_bytes": 420880
         },
         "create_base_text_units": {
-            "overall": 2.675588607788086,
+            "overall": 1.444117784500122,
             "peak_memory_bytes": 42830680,
-            "memory_delta_bytes": 24702869,
-            "tracemalloc_overhead_bytes": 29855984
+            "memory_delta_bytes": 24702580,
+            "tracemalloc_overhead_bytes": 29856080
         },
         "create_final_documents": {
-            "overall": 0.08007097244262695,
-            "peak_memory_bytes": 1723629,
-            "memory_delta_bytes": 984286,
-            "tracemalloc_overhead_bytes": 96368
+            "overall": 0.03981804847717285,
+            "peak_memory_bytes": 1724470,
+            "memory_delta_bytes": 985914,
+            "tracemalloc_overhead_bytes": 97488
         },
         "extract_graph": {
-            "overall": 129.56066060066223,
-            "peak_memory_bytes": 22202906,
-            "memory_delta_bytes": 3943025,
-            "tracemalloc_overhead_bytes": 3827952
+            "overall": 2928.029566049576,
+            "peak_memory_bytes": 18632918,
+            "memory_delta_bytes": 5228628,
+            "tracemalloc_overhead_bytes": 4010288
         },
         "finalize_graph": {
-            "overall": 5.4163901805877686,
-            "peak_memory_bytes": 13268583,
-            "memory_delta_bytes": 2410541,
-            "tracemalloc_overhead_bytes": 3239664
+            "overall": 2.8398306369781494,
+            "peak_memory_bytes": 8963244,
+            "memory_delta_bytes": 2089079,
+            "tracemalloc_overhead_bytes": 3139568
         },
         "extract_covariates": {
-            "overall": 0.0005517005920410156,
+            "overall": 0.00021338462829589844,
             "peak_memory_bytes": 3470,
             "memory_delta_bytes": 448,
             "tracemalloc_overhead_bytes": 2384
         },
         "create_communities": {
-            "overall": 5.490488529205322,
-            "peak_memory_bytes": 7013197,
-            "memory_delta_bytes": 480048,
-            "tracemalloc_overhead_bytes": 1116688
+            "overall": 2.96980357170105,
+            "peak_memory_bytes": 6073245,
+            "memory_delta_bytes": 407609,
+            "tracemalloc_overhead_bytes": 809200
         },
         "create_final_text_units": {
-            "overall": 2.416008710861206,
-            "peak_memory_bytes": 5975397,
-            "memory_delta_bytes": 168475,
-            "tracemalloc_overhead_bytes": 196048
+            "overall": 1.2816755771636963,
+            "peak_memory_bytes": 3460724,
+            "memory_delta_bytes": 112113,
+            "tracemalloc_overhead_bytes": 177552
         },
         "create_community_reports": {
-            "overall": 213.9670729637146,
-            "peak_memory_bytes": 37622846,
-            "memory_delta_bytes": 5154024,
-            "tracemalloc_overhead_bytes": 2135120
+            "overall": 721.0744340419769,
+            "peak_memory_bytes": 35128192,
+            "memory_delta_bytes": 6548888,
+            "tracemalloc_overhead_bytes": 3672592
         },
         "generate_text_embeddings": {
-            "overall": 1348.8769731521606,
-            "peak_memory_bytes": 65875516,
-            "memory_delta_bytes": 30952803,
-            "tracemalloc_overhead_bytes": 16397120
+            "overall": 2186.259337425232,
+            "peak_memory_bytes": 65536749,
+            "memory_delta_bytes": 21527531,
+            "tracemalloc_overhead_bytes": 15133216
         }
     }
 }

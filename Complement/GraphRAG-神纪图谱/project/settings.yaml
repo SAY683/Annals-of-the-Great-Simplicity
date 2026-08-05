@@ -1,4 +1,4 @@
-﻿completion_models:
+completion_models:
   default_completion_model:
     model_provider: openai
     model: deepseek-v4-flash
@@ -6,6 +6,18 @@
       extra_body:
         reasoning_effort: none
       max_tokens: 12000
+    auth_method: api_key
+    api_base: http://127.0.0.1:15721/v1
+    api_key: dummy
+    retry:
+      type: exponential_backoff
+  extraction_model:
+    model_provider: openai
+    model: deepseek-v4-flash
+    call_args:
+      extra_body:
+        reasoning_effort: high
+      max_tokens: 32000
     auth_method: api_key
     api_base: http://127.0.0.1:15721/v1
     api_key: dummy
@@ -63,7 +75,7 @@ embed_text:
   batch_size: 16
   batch_max_tokens: 8191
 extract_graph:
-  completion_model_id: default_completion_model
+  completion_model_id: extraction_model
   prompt: prompts/extract_graph.txt
   entity_types:
   - concept
@@ -120,4 +132,5 @@ basic_search:
   embedding_model_id: default_embedding_model
   prompt: prompts/basic_search_system_prompt.txt
 concurrent_requests: 24
+
 

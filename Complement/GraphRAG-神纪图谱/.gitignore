@@ -1,0 +1,5 @@
+# portable archive git hygiene
+# generated/transient artifacts stay out of git (zero-secret storage principle)
+project/cache/
+project/logs/
+*.log

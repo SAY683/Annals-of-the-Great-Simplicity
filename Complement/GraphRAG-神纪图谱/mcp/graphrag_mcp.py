@@ -66,7 +66,26 @@ def _resolve_project(project: str | None) -> str:
     )
 
 
-def _query_graph(project: str, question: str, method: str = "local", community_level: int = 2) -> dict:
+# ---------- 解经模式 (decode mode) ----------
+# 把"密语/经文式"语料翻译成平白的概念语言，避免"念经式"复读。
+# 通用设计：不绑定任何特定语料，任何隐喻/宗教/玄学文本都适用。
+_DECODE_WRAPPER = (
+    "（解经模式）请以解经者(exegete)身份回答下面的问题。对检索到的文本："
+    "1) 用平白的概念语言翻译每一处密语/隐喻的寓意，不要复读原文字句；"
+    "2) 区分哪些是字面叙事、哪些是象征义，并给出判断标准；"
+    "3) 最后给出可直接操作的结论：这些内容对一个现代读者意味着什么，如何改变他的日常判断。"
+    "请引用原文出处。问题：{question}"
+)
+
+
+def _apply_decode(question: str, decode: bool) -> str:
+    """Wrap question with exegesis instruction when decode=True."""
+    if not decode:
+        return question
+    return _DECODE_WRAPPER.format(question=question)
+
+
+def _query_graph(project: str, question: str, method: str = "local", community_level: int = 2, decode: bool = False) -> dict:
     """Run graphrag query and return structured JSON."""
     import subprocess
 
@@ -87,7 +106,7 @@ def _query_graph(project: str, question: str, method: str = "local", community_l
     if not Path(cli).exists():
         cli = "graphrag"
 
-    cmd = [cli, "query", "--root", project, "--method", method, question]
+    cmd = [cli, "query", "--root", project, "--method", method, _apply_decode(question, decode)]
     if method == "global":
         cmd += ["--community-level", str(community_level)]
 
@@ -107,7 +126,7 @@ def _query_graph(project: str, question: str, method: str = "local", community_l
 
 
 @server.tool()
-async def graphrag_query(question: str, method: str = "local", community_level: int = 2, project: str | None = None) -> str:
+async def graphrag_query(question: str, method: str = "local", community_level: int = 2, decode: bool = False, project: str | None = None) -> str:
     """Query the indexed GraphRAG knowledge graph.
 
     Args:
@@ -115,6 +134,9 @@ async def graphrag_query(question: str, method: str = "local", community_level: 
         method: Search strategy - 'local' (specific entities/relationships), 'global' (whole-corpus themes),
                 'drift' (multi-hop complex), 'basic' (vector baseline). Default 'local'.
         community_level: For global search, Leiden hierarchy level (higher = smaller communities). Default 2.
+        decode: If True, wrap the question with an exegesis instruction: translate encoded/metaphorical
+                language into plain conceptual terms, separate literal vs symbolic, and give actionable
+                conclusions (avoids 'chanting-style' answers). Works with any corpus. Default False.
         project: Optional project root. Defaults to GRAPHRAG_PROJECT env or the configured default.
 
     Returns:
@@ -122,7 +144,7 @@ async def graphrag_query(question: str, method: str = "local", community_level: 
     """
     root = _resolve_project(project)
     loop = asyncio.get_running_loop()
-    result = await loop.run_in_executor(None, _query_graph, root, question, method, community_level)
+    result = await loop.run_in_executor(None, _query_graph, root, question, method, community_level, decode)
     return json.dumps(result, ensure_ascii=False)
 
 

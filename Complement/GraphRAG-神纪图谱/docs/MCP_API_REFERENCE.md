@@ -14,6 +14,7 @@
 | question | str | 是 | — | 问题（任意语言，如"什么是爱"） |
 | method | str | 否 | local | local / global / drift / basic |
 | community_level | int | 否 | 2 | global 搜索的 Leiden 层级（越大社区越小） |
+| decode | bool | 否 | false | 解经模式：把密语/隐喻翻译成平白概念、区分字面与象征、给出可操作结论（避免"念经式"复读） |
 | project | str | 否 | 自动 | 项目根目录；缺省自动探测 |
 
 **返回**（JSON 字符串）：
@@ -26,6 +27,7 @@
 ```
 graphrag_query(question="神姬是谁？", method="global")
 graphrag_query(question="什么是觉悟？", method="drift")
+graphrag_query(question="我应该相信什么？", method="drift", decode=true)  // 解经模式
 graphrag_query(question="种子在书中象征什么？", method="local")
 ```
 
