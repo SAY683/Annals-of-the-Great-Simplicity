@@ -10,6 +10,10 @@
 | `edm-takens-web/` | Python + JS Web 服务 | EDM-TAKENS 的 Web 前端 + 科研披露字段渲染 |
 | `trace-to-edm/` | Python + JS 桥接服务 | TRACE → EDM 轨迹表转换与可视化 |
 
+> **兄弟项目（Complement 同级）**：`GraphRAG-神纪图谱/` — 独立的 GraphRAG 知识图谱成品
+> （《神纪》典籍，开箱即用的 MCP 工具，非本因果分析链路组成部分），详见
+> [`../../GraphRAG-神纪图谱/README.md`](../../GraphRAG-神纪图谱/README.md)。
+
 ## 目录结构
 
 ```

@@ -1,13 +1,13 @@
-# 五大项目整体说明书
+# Complement 项目整体说明书
 
-> **Annals of the Great Simplicity — 因果分析工具链**
-> 版本：2026-07-21 | 维护状态：活跃
+> **Annals of the Great Simplicity — 因果分析工具链 + 神纪知识图谱**
+> 版本：2026-08-05 | 维护状态：活跃
 
 ---
 
 ## 项目总览
 
-本工具链由五个相互关联的项目组成，提供从**文本因果发现**到**时间序列动力学分析**的完整能力：
+本工具链由五个相互关联的因果分析项目 + 一个 GraphRAG 知识图谱成品组成：
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -34,7 +34,10 @@
     └─────────────────────┘
 ```
 
-## 五大项目
+> 另附 **GraphRAG-神纪图谱**：独立的 GraphRAG 知识图谱成品（《神纪》典籍，
+> 开箱即用的 MCP 工具，非因果分析链路组成部分），见 [GraphRAG-神纪图谱](../GraphRAG-神纪图谱/README.md)。
+
+## 五大因果分析项目 + GraphRAG
 
 | # | 项目 | 类型 | 端口 | 技术栈 | 核心能力 |
 |---|------|------|------|--------|----------|
@@ -43,6 +46,7 @@
 | 3 | **trace-engine** | CLI 库 | — | Python | TRACE 因果发现 + 六战士诊断 + LLaMA 模型 |
 | 4 | **trace-engine-web** | Web 服务 | 3000 | Node.js + Koa | trace-engine 的 Web 前端 |
 | 5 | **trace-to-edm** | 桥接服务 | 3100 | Node.js + Python | 将 TRACE 输出转为 EDM 输入，触发 EDM 分析 |
+| 6 | **GraphRAG-神纪图谱** | 知识图谱 + MCP | — | Python GraphRAG + lancedb | 《神纪》典籍 Local/Global/Drift/Basic 问答，暴露为标准 MCP 工具 |
 
 ## 文档索引
 
@@ -77,6 +81,12 @@ powershell -File start.ps1     # TRACE Web → http://localhost:3000
 
 cd "TRACE Engine(EDM-Takens CCM)\trace-to-edm"
 node server.js                 # 桥接服务 → http://localhost:3100
+
+# 4. GraphRAG 神纪知识图谱 (独立成品, 见 GraphRAG-神纪图谱/README.md)
+cd "GraphRAG-神纪图谱"
+.\scripts\00-start-embedding.bat   # 终端 1: 启动向量服务
+.\scripts\01-start-mcp.bat         # 终端 2: 启动 MCP (保持窗口开启)
+.\scripts\02-selfcheck-query.bat   # 终端 3: 自检 (结构化回答即链路正常)
 ```
 
 ## 目录结构
@@ -84,6 +94,12 @@ node server.js                 # 桥接服务 → http://localhost:3100
 ```
 Complement/
 ├── Docs/                          # 本文档集
+├── GraphRAG-神纪图谱/              # 项目 6: 神纪知识图谱 (GraphRAG + MCP)
+│   ├── docs/                      # 技术文档 (架构/配置/数据/维护/扩展/合规)
+│   ├── mcp/graphrag_mcp.py        # MCP 服务器 (免配置)
+│   ├── project/                   # GraphRAG 项目根 (含已构建索引)
+│   ├── scripts/                   # 一键启动/自检/重建/停止
+│   └── visualization/             # graphml + 图谱全景/核心图
 ├── start_all.bat / start_all.ps1  # 统一启动脚本
 └── TRACE Engine(EDM-Takens CCM)/
     ├── edm-takens/                # 项目 1: EDM 核心库
