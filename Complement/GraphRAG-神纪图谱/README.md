@@ -18,7 +18,7 @@
 | 社区 / 社区报告 | 500 / 500 |
 | 文本块 | 119 |
 | 向量库 | 3 个（entity_description / community_full_content / text_unit_text，1024 维） |
-| 构建成本 | 0 元（opencode Go 订阅，~493 万 tokens） |
+| 构建成本 | ~$5.25（经 CC Switch 代理路由到**官方 DeepSeek**，~493 万 tokens；原记\"0 元 opencode\"有误，见归档） |
 
 ## 二、目录结构
 
