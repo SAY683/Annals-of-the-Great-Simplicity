@@ -109,6 +109,7 @@ function runPythonAnalysisStream(text, outputId, mode, bridgeConfig, res, schema
     env: {
       ...process.env,
       PYTHONIOENCODING: 'utf-8',
+      PYTHONDONTWRITEBYTECODE: '1',
       TRACE_BRIDGE_CONFIG: cfg,
     },
   });
@@ -740,7 +741,7 @@ function runPythonAnalysisSync(text, outputId, mode = 'light', bridgeConfig = ''
     args.push(inputFilePath);
 
     const py = spawn(CONFIG.pythonCmd, args, {
-      env: { ...process.env, PYTHONIOENCODING: 'utf-8' },
+      env: { ...process.env, PYTHONIOENCODING: 'utf-8', PYTHONDONTWRITEBYTECODE: '1' },
     });
 
     // 深度复审修复：sync 路径也需注册 activeJobs，否则绕过并发限制且无法取消

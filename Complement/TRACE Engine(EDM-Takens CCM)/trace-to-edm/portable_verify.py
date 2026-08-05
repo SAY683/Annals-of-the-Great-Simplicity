@@ -191,12 +191,14 @@ def verify_config_portable_detection():
         else:
             R.fail(f"QWEN_MODEL_PATH_3B 未指向便携式 Models/: {qwen_3b}")
 
-        # 检查 EDM_TAKENS_DIR 跨父目录
+        # 检查 EDM_TAKENS_DIR 指向 edm-takens-web
+        # R50 fix: 便携目录已改为同级布局 (TRACE Engine(EDM-Takens CCM)/edm-takens-web),
+        # 不再要求路径含 Skill/; 仅要求目录存在且名为 edm-takens-web。
         edm_dir = config.EDM_TAKENS_DIR
-        if "Skill" in str(edm_dir) and "edm-takens-web" in str(edm_dir):
+        if edm_dir.exists() and edm_dir.name == "edm-takens-web":
             R.ok(f"EDM_TAKENS_DIR = {edm_dir}")
         else:
-            R.fail(f"EDM_TAKENS_DIR 未指向 Skill/edm-takens-web: {edm_dir}")
+            R.fail(f"EDM_TAKENS_DIR 未指向 edm-takens-web: {edm_dir}")
 
         # 检查 Qwen 模型实际存在
         if qwen_1_5b.exists():
@@ -342,8 +344,11 @@ def verify_trace_engine_web_bridge():
     else:
         R.warn(f"work/outputs/ 不存在（首次运行时自动创建）: {work_outputs}")
 
-    # 检查 EDM-Takens Web（跨父目录）
-    edm_web = HERE.parent.parent / "Skill" / "edm-takens-web"
+    # 检查 EDM-Takens Web（当前便携布局为同级，旧布局在 Skill/ 下）
+    # R50 fix: 便携目录已改为同级布局, edm-takens-web 与 trace-to-edm 同级。
+    edm_web = HERE.parent / "edm-takens-web"
+    if not edm_web.exists():
+        edm_web = HERE.parent.parent / "Skill" / "edm-takens-web"
     if edm_web.exists():
         R.ok(f"edm-takens-web 存在: {edm_web}")
     else:

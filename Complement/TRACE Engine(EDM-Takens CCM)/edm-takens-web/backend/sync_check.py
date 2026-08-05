@@ -218,7 +218,7 @@ def _check_portable_sync(quiet: bool) -> int:
             print(f"  - {i}")
         print("\n请将开发目录的算法层修复同步到便携目录:")
         print("  开发目录: TRACE Engine(EDM-Takens CCM)/edm-takens/src/")
-        print("  便携目录: Skill/edm-takens/src/ (及对应 web 副本)")
+        print("  便携目录: TRACE Engine(EDM-Takens CCM)/edm-takens/src/ (及对应 web 副本)")
         return 1
     elif not quiet:
         print(f"  便携目录算法层检查通过 ({n_checked} 副本, "

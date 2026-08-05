@@ -1019,10 +1019,10 @@ Windows x86_64 推荐 `cloudflared-windows-amd64.msi`（安装版）或 `cloudfl
 
 ```
 Complement\
-├── Skill\
-│   └── edm-takens-web\
-│       └── 启动隧道.bat          ← 同步
 └── TRACE Engine(EDM-Takens CCM)\
+    ├── edm-takens-web\
+    │   ├── 启动隧道.bat          ← 同步
+    │   └── 启动隧道.ps1          ← 同步
     ├── trace-engine-web\
     │   └── 启动隧道.bat          ← 同步
     └── trace-to-edm\

@@ -14,6 +14,9 @@ import sys
 import tempfile
 import uvicorn
 
+# R49 fix: 防止后端启动时生成 __pycache__ 污染便携目录
+os.environ['PYTHONDONTWRITEBYTECODE'] = '1'
+
 _PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
 # debt-17: 使用 append 而非 insert(0)，确保已通过 `pip install -e .`
 # 安装的可编辑包具有更高导入优先级。副本目录仅作为回退。

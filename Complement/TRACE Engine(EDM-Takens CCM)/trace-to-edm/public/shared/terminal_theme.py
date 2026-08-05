@@ -17,6 +17,17 @@ import os
 import sys
 from datetime import datetime
 
+# R50 fix: 统一终端输出为 UTF-8 + errors='replace'。Windows GBK 控制台 (中文
+# locale) 无法编码 ICONS/边框字符 (◉ ╔ ═ ╗ ║ ╚ ╝ ✓ ✖) 时抛 UnicodeEncodeError,
+# 导致 CLI (run_cli.py env 等) 在 GBK 控制台/管道下崩溃。与代码库
+# PYTHONIOENCODING=utf-8 惯例一致; 对已是 UTF-8 的流 (Web 子进程) 重配置等效。
+for _stream in (sys.stdout, sys.stderr):
+    if hasattr(_stream, 'reconfigure'):
+        try:
+            _stream.reconfigure(encoding='utf-8', errors='replace')
+        except Exception:
+            pass
+
 
 class T:
     """ANSI 颜色与样式（自动检测终端支持）"""

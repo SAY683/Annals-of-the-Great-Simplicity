@@ -31,11 +31,10 @@ Set-Location $scriptDir
 # 便携目录布局:
 #   Complement\
 #   ├── start_all.ps1 (本脚本)
-#   ├── TRACE Engine(EDM-Takens CCM)\
-#   │   ├── trace-engine-web\
-#   │   └── trace-to-edm\
-#   └── Skill\
-#       └── edm-takens-web\
+#   └── TRACE Engine(EDM-Takens CCM)\
+#       ├── edm-takens-web\
+#       ├── trace-engine-web\
+#       └── trace-to-edm\
 # 开发目录布局 (.skills):
 #   .skills\
 #   ├── start_all.ps1 (本脚本)
@@ -83,7 +82,7 @@ function Ensure-NpmDeps($projectDir, $label, $subDir = "") {
     return $true
 }
 
-$edmDir   = Find-ProjectDir "edm-takens-web"   @("Skill\edm-takens-web", "edm-takens-web")
+$edmDir   = Find-ProjectDir "edm-takens-web"   @("TRACE Engine(EDM-Takens CCM)\edm-takens-web", "edm-takens-web", "Skill\edm-takens-web")
 $traceDir = Find-ProjectDir "trace-engine-web" @("TRACE Engine(EDM-Takens CCM)\trace-engine-web", "trace-engine-web")
 $bridgeDir = Find-ProjectDir "trace-to-edm"    @("TRACE Engine(EDM-Takens CCM)\trace-to-edm", "trace-to-edm")
 

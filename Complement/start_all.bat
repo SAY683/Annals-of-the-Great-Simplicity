@@ -19,9 +19,9 @@ if exist "%~dp0TRACE Engine(EDM-Takens CCM)\trace-to-edm\tunnel_url.txt" (
     type "%~dp0TRACE Engine(EDM-Takens CCM)\trace-to-edm\tunnel_url.txt"
     echo.
 )
-if exist "%~dp0Skill\edm-takens-web\tunnel_url.txt" (
+if exist "%~dp0TRACE Engine(EDM-Takens CCM)\edm-takens-web\tunnel_url.txt" (
     echo [INFO] Previous edm-takens-web URL:
-    type "%~dp0Skill\edm-takens-web\tunnel_url.txt"
+    type "%~dp0TRACE Engine(EDM-Takens CCM)\edm-takens-web\tunnel_url.txt"
     echo.
 )
 

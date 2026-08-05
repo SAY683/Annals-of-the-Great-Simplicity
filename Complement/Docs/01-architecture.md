@@ -111,8 +111,8 @@ trace-to-edm/
     └── trace-engine-web/sync_product.py → 同步 trace-engine + trace-engine-web + trace-to-edm
 
 便携目录 (G:\git\...\Complement\)
-    ├── Skill/edm-takens/          (核心库)
-    ├── Skill/edm-takens-web/      (Web 服务，含 edmtakens/ 副本)
+    ├── TRACE Engine(EDM-Takens CCM)/edm-takens/      (核心库)
+    ├── TRACE Engine(EDM-Takens CCM)/edm-takens-web/  (Web 服务，含 edmtakens/ 副本)
     ├── TRACE Engine(EDM-Takens CCM)/trace-engine/
     ├── TRACE Engine(EDM-Takens CCM)/trace-engine-web/
     └── TRACE Engine(EDM-Takens CCM)/trace-to-edm/

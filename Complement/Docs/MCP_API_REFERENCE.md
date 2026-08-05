@@ -518,7 +518,7 @@ python "f:\攻略\研发测试\TRACE Engine(EDM-Takens CCM)\test_mcp_protocol.py
 
 ### 9.1 便携目录同步
 
-便携目录 `Skill/edm-takens-web/backend/` 需与工作目录 `TRACE Engine(EDM-Takens CCM)/edm-takens-web/backend/` 保持以下文件 SHA256 一致：
+便携目录 `Complement\TRACE Engine(EDM-Takens CCM)\edm-takens-web\backend\` 需与工作目录 `F:\攻略\研发测试\TRACE Engine(EDM-Takens CCM)\edm-takens-web\backend\` 保持以下文件 SHA256 一致：
 
 | 文件 | 同步方向 | 验证方式 |
 |------|----------|----------|
@@ -526,12 +526,12 @@ python "f:\攻略\研发测试\TRACE Engine(EDM-Takens CCM)\test_mcp_protocol.py
 | `api.py` | 工作目录 → 便携目录 | `Get-FileHash` SHA256 比对 |
 | `edmtakens/*.py` | 双向 | `python sync_check.py` |
 
-> **注**：trace-engine-web 和 trace-to-edm 不在便携目录 `Skill/` 下，仅工作目录维护。
+> **注**：trace-engine-web 和 trace-to-edm 直接位于 `Complement\TRACE Engine(EDM-Takens CCM)\` 下，与 edm-takens-web 同级，均在工作目录维护后同步。
 
 ### 9.2 sync_check.py 验证
 
 ```powershell
-python "f:\攻略\研发测试\Skill\edm-takens-web\backend\sync_check.py"
+python "f:\攻略\研发测试\TRACE Engine(EDM-Takens CCM)\edm-takens-web\backend\sync_check.py"
 ```
 
 预期输出：

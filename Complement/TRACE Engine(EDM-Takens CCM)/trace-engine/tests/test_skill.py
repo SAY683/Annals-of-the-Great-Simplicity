@@ -30,6 +30,13 @@ import sys
 import traceback
 from pathlib import Path
 
+# R50 fix: Windows GBK 控制台无法编码 U+FFFD 替换字符（run() 以 errors='replace'
+# 解码子进程输出时产生），导致 print 崩溃 → verify_portable.py 契约 5 FAIL。
+# 保留控制台原编码，仅将不可编码字符替换为 '?' 而非抛异常。
+for _stream in (sys.stdout, sys.stderr):
+    if hasattr(_stream, 'reconfigure'):
+        _stream.reconfigure(errors='replace')
+
 ROOT = Path(__file__).resolve().parent.parent
 EXAMPLES = ROOT / 'examples' / 'counterfactual_hybrid'
 

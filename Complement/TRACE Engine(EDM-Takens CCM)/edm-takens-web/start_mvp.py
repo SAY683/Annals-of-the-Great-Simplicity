@@ -11,6 +11,9 @@ import time
 import shutil
 import subprocess
 
+# R49 fix: 防止后端启动时生成 __pycache__ 污染便携目录
+os.environ['PYTHONDONTWRITEBYTECODE'] = '1'
+
 _PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
 _FRONTEND_DIR = os.path.join(_PROJECT_ROOT, "frontend")
 _DIST_DIR = os.path.join(_FRONTEND_DIR, "dist")
@@ -20,14 +23,7 @@ _FRONTEND_CMD = [_NPM, "run", "dev"]
 
 
 def _ensure_frontend_deps():
-    """重启后 node_modules 可能缺失，启动前自动安装。
-
-    R47-A fix (ROUND47 P0): Add --allow-scripts to npm install.
-    Root cause: npm 10+ "allow-scripts" security feature blocks esbuild
-    postinstall (node install.js) by default, causing "npm warn allow-scripts"
-    and potentially missing platform binary (@esbuild/win32-x64/esbuild.exe).
-    Fix: Explicitly allow scripts during install so esbuild postinstall runs.
-    """
+    """重启后 node_modules 可能缺失，启动前自动安装。"""
     node_modules = os.path.join(_FRONTEND_DIR, "node_modules")
     if os.path.isdir(node_modules):
         return
@@ -35,8 +31,7 @@ def _ensure_frontend_deps():
         print("[!] 未找到 npm，无法自动安装前端依赖，前端可能无法启动。")
         return
     print("[INFO] frontend/node_modules 缺失，自动执行 npm install...")
-    subprocess.run([_NPM, "install", "--no-audit", "--no-fund", "--allow-scripts"],
-                   cwd=_FRONTEND_DIR, check=False)
+    subprocess.run([_NPM, "install", "--no-audit", "--no-fund"], cwd=_FRONTEND_DIR, check=False)
     print("[OK] 前端依赖安装完成。")
 
 
@@ -70,9 +65,12 @@ def main():
     # P1 fix: 先启动后端并等待就绪，再启动前端。
     # 后端启动时会运行 sync_check 等导入逻辑，耗时较长；
     # 若前端先就绪，浏览器会立即请求 /api/* 导致 ECONNREFUSED。
+    # R49 fix: stdin=DEVNULL 防止后端继承父进程 stdin，在 Windows 双击启动
+    # 场景下 stdin 可能无效，导致 uvicorn 检测到 stdin 关闭而立即退出。
     backend = subprocess.Popen(
         _BACKEND_CMD,
         cwd=_PROJECT_ROOT,
+        stdin=subprocess.DEVNULL,
         stdout=None,
         stderr=None,
     )
@@ -117,6 +115,7 @@ def main():
     frontend = subprocess.Popen(
         _FRONTEND_CMD,
         cwd=os.path.join(_PROJECT_ROOT, "frontend"),
+        stdin=subprocess.DEVNULL,
         stdout=None,
         stderr=None,
     )

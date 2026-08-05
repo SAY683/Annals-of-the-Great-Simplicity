@@ -69,7 +69,7 @@ python "TRACE Engine(EDM-Takens CCM)\verify_portable.py"
 .\start_all.bat
 
 # 3. 或单独启动各服务
-cd "Skill\edm-takens-web"
+cd "TRACE Engine(EDM-Takens CCM)\edm-takens-web"
 python run_backend.py          # EDM Web → http://localhost:8000
 
 cd "TRACE Engine(EDM-Takens CCM)\trace-engine-web"
@@ -83,12 +83,11 @@ node server.js                 # 桥接服务 → http://localhost:3100
 
 ```
 Complement/
-── docs/                          # 本文档集
-── start_all.bat / start_all.ps1  # 统一启动脚本
-├── Skill/
-│   ├── edm-takens/                # 项目 1: EDM 核心库
-│   └── edm-takens-web/            # 项目 2: EDM Web 服务
+├── Docs/                          # 本文档集
+├── start_all.bat / start_all.ps1  # 统一启动脚本
 └── TRACE Engine(EDM-Takens CCM)/
+    ├── edm-takens/                # 项目 1: EDM 核心库
+    ├── edm-takens-web/            # 项目 2: EDM Web 服务
     ├── trace-engine/              # 项目 3: TRACE 引擎
     ├── trace-engine-web/          # 项目 4: TRACE Web 服务
     ├── trace-to-edm/              # 项目 5: 桥接层

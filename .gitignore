@@ -2,3 +2,17 @@
 .ms_upload_cache
 Complement/TRACE Engine(EDM-Takens CCM)/Models/Qwen*/
 Complement/TRACE Engine(EDM-Takens CCM)/Models/
+
+# ── 运行时产物（便携目录契约：排除污染，见 Docs/07-deployment.md §2） ──
+__pycache__/
+*.pyc
+*.pyo
+*.log
+node_modules/
+jobs.sqlite
+tunnel_url.txt
+tunnel_logs/
+outputs/
+web_*_result*.json
+.tmp_*.py
+

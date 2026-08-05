@@ -5,18 +5,16 @@
 ```
 Complement/
 ├── start_all.bat / start_all.ps1     # 统一启动脚本
-├── Skill/
-│   ├── edm-takens/                    # 项目 1: 核心库
-│   ├── edm-takens-web/                # 项目 2: Web 服务
-│   └── README.md
-├── TRACE Engine(EDM-Takens CCM)/
-│   ├── trace-engine/                  # 项目 3: 引擎
-│   ├── trace-engine-web/              # 项目 4: Web 服务
-│   ├── trace-to-edm/                  # 项目 5: 桥接层
-│   ├── Models/                        # LLaMA 模型
-│   ├── verify_portable.py             # 便携验证
-│   └── sync_product.py                # 同步脚本
-└── docs/                              # 本文档集
+├── Docs/                             # 本文档集
+└── TRACE Engine(EDM-Takens CCM)/
+    ├── edm-takens/                   # 项目 1: EDM 核心库
+    ├── edm-takens-web/               # 项目 2: EDM Web 服务
+    ├── trace-engine/                 # 项目 3: TRACE 引擎
+    ├── trace-engine-web/             # 项目 4: TRACE Web 服务
+    ├── trace-to-edm/                 # 项目 5: 桥接层
+    ├── Models/                       # LLaMA 模型
+    ├── verify_portable.py            # 便携验证
+    └── sync_product.py               # 同步脚本
 ```
 
 ## 2. 同步机制

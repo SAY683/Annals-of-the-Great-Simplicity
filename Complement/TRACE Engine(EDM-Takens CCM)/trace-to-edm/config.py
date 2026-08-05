@@ -17,15 +17,23 @@ PROJECT_ROOT = Path(os.path.dirname(os.path.abspath(__file__)))
 
 # 便携式布局自动探测
 # ----------------------------------------------------------
-# 便携式目录结构:
+# 便携式目录结构 (当前):
+#   Complement/
+#     TRACE Engine(EDM-Takens CCM)/
+#       Models/Qwen2.5-X-Instruct/  (Qwen 模型，便携式专属)
+#       edm-takens-web/             (同级)
+#       trace-engine-web/           (同级)
+#       trace-to-edm/               (本项目 = PROJECT_ROOT)
+#
+# 旧便携式目录结构 (已废弃, Skill/ 布局):
 #   Complement/
 #     Skill/edm-takens-web/         (跨父目录的兄弟)
 #     TRACE Engine(EDM-Takens CCM)/
-#       Models/Qwen2.5-X-Instruct/  (Qwen 模型，便携式专属)
-#       trace-engine-web/           (同级，开发布局也正确)
-#       trace-to-edm/                (本项目 = PROJECT_ROOT)
+#       Models/Qwen2.5-X-Instruct/
+#       trace-engine-web/
+#       trace-to-edm/
 #
-# 开发布局:
+# 开发布局 (.skills):
 #   .skills/
 #     trace-engine-web/             (同级)
 #     edm-takens-web/               (同级)
@@ -39,18 +47,18 @@ _IS_PORTABLE_LAYOUT = (
     and (_PORTABLE_MODELS_DIR / "Qwen2.5-1.5B-Instruct").exists()
 )
 
-# TRACE 引擎路径（两种布局下都是同级，无须分支）
+# TRACE 引擎路径（所有布局下都是同级，无须分支）
 TRACE_ENGINE_WEB_DIR = PROJECT_ROOT.parent / "trace-engine-web"
 TRACE_BRIDGE_SCRIPT = TRACE_ENGINE_WEB_DIR / "py_bridge.py"
 TRACE_WORK_DIR = TRACE_ENGINE_WEB_DIR / "work" / "outputs"
 
-# EDM-Takens Web 路径
-if _IS_PORTABLE_LAYOUT:
-    # 便携式: edm-takens-web 在 Skill/ 下，跨父目录
-    EDM_TAKENS_DIR = PROJECT_ROOT.parent.parent / "Skill" / "edm-takens-web"
-else:
-    # 开发布局: 同级目录
-    EDM_TAKENS_DIR = PROJECT_ROOT.parent / "edm-takens-web"
+# EDM-Takens Web 路径（候选探测，取第一个存在的）
+# 当前便携布局与开发布局均为同级; 旧便携布局在 Skill/ 下跨父目录。
+_EDM_TAKENS_CANDIDATES = [
+    PROJECT_ROOT.parent / "edm-takens-web",                      # 当前便携/开发：同级
+    PROJECT_ROOT.parent.parent / "Skill" / "edm-takens-web",     # 旧便携布局：Skill/ 跨父目录
+]
+EDM_TAKENS_DIR = next((p for p in _EDM_TAKENS_CANDIDATES if p.exists()), _EDM_TAKENS_CANDIDATES[0])
 EDM_DATA_DIR = EDM_TAKENS_DIR / "data"
 EDM_API_URL = "http://localhost:8000"
 
