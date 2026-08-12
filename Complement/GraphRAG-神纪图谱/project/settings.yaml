@@ -7,8 +7,8 @@ completion_models:
         reasoning_effort: none
       max_tokens: 12000
     auth_method: api_key
-    api_base: http://127.0.0.1:15721/v1
-    api_key: dummy
+    api_base: http://127.0.0.1:15721/v1   # CC Switch 本地代理；实测路由到官方 DeepSeek，并非 opencode Go
+    api_key: dummy                          # 代理模式可填 dummy；直连官方改 api_base=https://api.deepseek.com + api_key=${GRAPHRAG_API_KEY}
     retry:
       type: exponential_backoff
   extraction_model:
@@ -19,8 +19,8 @@ completion_models:
         reasoning_effort: high
       max_tokens: 32000
     auth_method: api_key
-    api_base: http://127.0.0.1:15721/v1
-    api_key: dummy
+    api_base: http://127.0.0.1:15721/v1   # CC Switch 本地代理；实测路由到官方 DeepSeek，并非 opencode Go
+    api_key: dummy                          # 代理模式可填 dummy；直连官方改 api_base=https://api.deepseek.com + api_key=${GRAPHRAG_API_KEY}
     retry:
       type: exponential_backoff
 embedding_models:
@@ -132,5 +132,4 @@ basic_search:
   embedding_model_id: default_embedding_model
   prompt: prompts/basic_search_system_prompt.txt
 concurrent_requests: 24
-
 

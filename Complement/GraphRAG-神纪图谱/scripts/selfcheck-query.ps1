@@ -1,7 +1,7 @@
 ﻿#Requires -Version 5.0
 <#
   selfcheck-query.ps1 - Self-test: run a global search against the portable index.
-  Requires: embedding service (00-start-embedding) + LLM provider (CC Switch / DeepSeek).
+  Requires: embedding service (00-start-embedding) + LLM provider (DeepSeek official API or CC Switch proxy).
 #>
 $ErrorActionPreference = "Stop"
 . "$PSScriptRoot\common.ps1"

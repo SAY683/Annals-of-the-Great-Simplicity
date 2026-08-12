@@ -18,7 +18,7 @@
 | 社区 / 社区报告 | 555 / 555 |
 | 文本块 | 119 |
 | 向量库 | 3 个（entity_description / community_full_content / text_unit_text，1024 维） |
-| 构建成本 | ~$5.25（经 CC Switch 代理路由到**官方 DeepSeek**，~493 万 tokens；原记\"0 元 opencode\"有误，见归档） |
+| 构建成本 | ~$5.25（经 CC Switch 代理路由到**官方 DeepSeek** `api.deepseek.com`，~493 万 tokens；opencode Go 未承担全量构建，原记"0 元 opencode"有误，见归档） |
 
 ## 二、目录结构
 
@@ -49,7 +49,8 @@ GraphRAG-神纪图谱\
 
 前置依赖（本机已具备，换机器需安装）：
 - Python 3.10+ 且已安装 `graphrag` 包（本归档在 `G:\Python` 环境构建）
-- **CC Switch** 运行中，且已登录 **opencode Go**（提供 LLM，端口 127.0.0.1:15721）
+- **LLM 通道（当前实际链路为 DeepSeek 官方）**：现有 `settings.yaml` 走 `127.0.0.1:15721` 代理（`api_key: dummy`）即可
+- 直连官方：`api_base: https://api.deepseek.com` + 环境变量 `GRAPHRAG_API_KEY`；**opencode Go 不是实际链路**
 - `llama-server` + bge-m3 GGUF（提供本地向量，见脚本默认路径）
 
 步骤：
@@ -64,7 +65,7 @@ GraphRAG-神纪图谱\
 > 唯一可能需调整的是 `scripts` 中 llama-server / 模型 / Python 的默认路径（可用环境变量覆盖）。
 
 > **脚本可配置环境变量**（全部有默认值，换机器时按需设置）：
-> `GRAPHRAG_PYTHON`（Python 路径）、`LLAMA_SERVER` / `BGE_MODEL` / `EMBED_PORT`（向量服务）、
+> `GRAPHRAG_PYTHON`（Python 路径）、`GRAPHRAG_API_KEY`（官方 DeepSeek key）、`LLAMA_SERVER` / `BGE_MODEL` / `EMBED_PORT`（向量服务）、
 > `EMBED_WAIT_SECONDS`（加载等待秒数，默认 90）。Python 会自动探测能 `import graphrag` 的解释器。
 ## 四、依赖清单
 
@@ -73,14 +74,14 @@ GraphRAG-神纪图谱\
 | graphrag (Python) | 索引与查询引擎 | G:\Python（pip install graphrag） |
 | llama-server | 本地向量（bge-m3） | G:\AI\llama-cpp\llama-server.exe |
 | bge-m3 FP16 GGUF | 嵌入模型（1024 维） | G:\AI\轻量大模型\bge-m3\bge-m3-FP16.gguf |
-| CC Switch | opencode Go 网关（LLM） | G:\AI\CC-Switch（127.0.0.1:15721） |
-| opencode Go | 订阅制 LLM（deepseek-v4-flash） | 网页订阅 + API key |
+| DeepSeek 官方 API | 生成 LLM（deepseek-v4-flash，OpenAI 兼容） | https://api.deepseek.com + GRAPHRAG_API_KEY |
+| CC Switch（可选） | 本地代理；实测路由到官方 DeepSeek | G:\AI\CC-Switch（127.0.0.1:15721） |
 
 ## 五、常见问题速查（详见 docs\04）
 
 - 查询报错"没有 output 目录" → 检查 `GRAPHRAG_PROJECT` 是否被设成错误路径，或直接传 `project=` 参数
 - MCP 返回乱码路径 → 本归档路径全 ASCII，天然免疫；工作副本已加多候选路径容错
-- 查询超时 → 确认 CC Switch 运行中（端口 15721）且 embedding 服务在线（8081）
+- 查询超时 → 确认 LLM 通道可用（官方 DeepSeek；走代理则确认 15721）且 embedding 服务在线（8081）
 - 想换模型 / 调实体类型 → 见 `docs\02-配置详解.md` 与 `docs\05-扩展与自定义.md`
 
 - 想理解"通用问法 vs 语料词汇问法"的差异 → `docs\示例-信念问答.md`（global 对照 + drift 主答）
