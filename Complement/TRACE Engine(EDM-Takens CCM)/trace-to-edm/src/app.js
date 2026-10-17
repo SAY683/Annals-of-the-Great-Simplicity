@@ -12,6 +12,7 @@ const { getActiveTrajectoryCSV, readTrajectoryCSV, buildTrajectoryReport, buildT
 const { activeJobs, jobHistory, createJobId, emitSSE, streamBridgeProcess } = require('./services/job-service');
 const { pyDS, getDatasetExports, markDatasetProcessed } = require('./services/dataset-service');
 const { validateInputPathMiddleware } = require('./middleware/input-path');
+const { installAsyncBoundary } = require('./lib/async-boundary');
 const { createMcpRouter } = require('../mcp');
 
 function createApp({ getPort }) {
@@ -50,22 +51,6 @@ function createApp({ getPort }) {
       res.header('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
     }
     next();
-  });
-
-  // 全局错误处理: 捕获 body-parser PayloadTooLargeError 等
-  app.use((err, _req, res, _next) => {
-    if (err && err.type === 'entity.too.large') {
-      return res.status(413).json({ error: 'payload too large' });
-    }
-    if (err) {
-      // ROUND28 P1-02: 生产模式不泄露内部错误细节
-      console.error('[Server] 全局错误:', err);
-      const isDev = process.env.NODE_ENV !== 'production';
-      return res.status(500).json({
-        error: isDev ? (err.message || 'internal error') : 'Internal Server Error'
-      });
-    }
-    _next();
   });
 
   // CORS: 白名单模式（localhost + 隧道域名），生产通过 TRACE_CORS_ORIGIN 收窄
@@ -147,7 +132,24 @@ function createApp({ getPort }) {
     buildTrajectoryReportHTML, getCached, setCached, invalidateCache, pyDS,
     getDatasetExports, markDatasetProcessed, pipelineState,
   };
+  installAsyncBoundary(app);
   require('./routes')(app, routeContext);
+
+  // 全局错误处理: 捕获 body-parser PayloadTooLargeError 等
+  app.use((err, _req, res, _next) => {
+    if (err && err.type === 'entity.too.large') {
+      return res.status(413).json({ error: 'payload too large' });
+    }
+    if (err) {
+      // ROUND28 P1-02: 生产模式不泄露内部错误细节
+      console.error('[Server] 全局错误:', err);
+      const isDev = process.env.NODE_ENV !== 'production';
+      return res.status(500).json({
+        error: isDev ? (err.message || 'internal error') : 'Internal Server Error'
+      });
+    }
+    _next();
+  });
 
   return app;
 }
