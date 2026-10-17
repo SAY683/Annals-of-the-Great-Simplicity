@@ -235,6 +235,8 @@ Annals-of-the-Great-Simplicity/
 
 ### 模型获取
 
+> **模型许可**：本仓库自训练的 `shehui-llama`、`shenji-llama`、`shehui-llama-v4-archive` 采用与项目整体一致的 **MIT License**，详见 [`MODEL_LICENSE.md`](Complement/TRACE%20Engine(EDM-Takens%20CCM)/MODEL_LICENSE.md)。ModelScope 模型卡中的许可证字段应同步更新为该许可。
+
 模型权重文件因超出 GitHub 文件大小限制（100MB），托管于 **魔搭（ModelScope）**。成品根 `Models/` 中保留模型配置文件（`.json`、`.vocab`），权重下载后放置于对应目录：
 
 ```bash

@@ -28,7 +28,7 @@
 | GraphRAG 数据 | `data_version.json`、计数/hash 一致性、LanceDB 向量/parquet ID 同步、U+FFFD、别名 schema 均由 `verify-env.py` 校验 |
 | GraphRAG 服务门控 | 8081/15721 默认仅告警；`--require-services` 用于查询前严格门控；`--no-services` 用于 CI/静态检查 |
 | 模型路径 | `Models/` 与历史 `models/` 大小写兼容；`verify_models.py`、`sync_product.py`、`_config.py`、`trace-to-edm/config.py` 同步修正 |
-| 模型授权 | `Docs/10-models.md` 记录 ModelScope License 字段为空的核验事实，不擅自替作者指定许可证 |
+| 模型授权 | 作者确认自训练模型采用 MIT；新增 `MODEL_LICENSE.md` 与 `trace-engine/models/LICENSE`，并同步 `Docs/10-models.md` 与根 README |
 | 隧道安全 | 登录跳转限制为站内路径；畸形 Cookie 不再崩溃；支持 https upstream；token 要求 ≥32 字符 |
 | 依赖卫生 | 移除 `trace-to-edm` 未使用的 `multer`；升级 `trace-engine-web` 的 `multer` 与 `uuid`，审计归零 |
 | `trace-to-edm` 路由 | `server.js` 从约 2487 行降到 46 行；新增 `src/app.js`、7 个 route 模块、配置/日志/缓存/Python/任务/数据集/轨迹服务，并补 HTTP 契约测试 |
@@ -40,7 +40,6 @@
 
 | 项目 | 原因 |
 |---|---|
-| 自训练模型许可证 | ModelScope 当前 `License/LicenseName/LicenseLink` 为空；是否采用 MIT/Apache-2.0/自定义研究许可属于作者与法律决策 |
 | 30/40 条新闻历史实验 | 仓库内缺少完整原始输出；历史论文已加“未重新验证”横幅，不能当作当前回归结论 |
 
 ## 4. 架构级 deferred（本轮不强行拆）

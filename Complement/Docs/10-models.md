@@ -75,6 +75,6 @@ python tools\verify_models.py --json
 
 - 代码遵循仓库根 `LICENSE`（MIT）。
 - Qwen 模型目录自带许可证文件，分发时请保留。
-- `shehui-llama`、`shenji-llama` 是作者自训练模型。2026-10-17 核验：两个 ModelScope 模型页与 API 的 `License`、`LicenseName`、`LicenseLink` 字段均为空，目录内也没有独立 LICENSE 文件；因此**不能推定存在开源再分发授权**。
-- 若要进行第三方分发、商用或再训练发布，作者应先选择一个明确许可证（例如 MIT/Apache-2.0/自定义研究许可），并同时更新 ModelScope 模型卡与仓库说明；在此之前按“保留所有权利、仅作者授权范围内使用”理解更稳妥。
+- `shehui-llama`、`shenji-llama`、`shehui-llama-v4-archive` 是作者自训练模型；作者已确认采用与本仓库整体一致的 **MIT License**。完整文本见 `MODEL_LICENSE.md` 与 `trace-engine/models/LICENSE`。
+- ModelScope 当前模型页的 `License/LicenseName/LicenseLink` 字段尚未同步为 MIT；第三方再分发时应以仓库中的 `MODEL_LICENSE.md` 为准，并建议作者在 ModelScope 模型卡中同步许可证。
 - GraphRAG 的源文本与图谱属于《神纪》作品体系，见 `GraphRAG-神纪图谱/docs/06-责任与合规.md`。
