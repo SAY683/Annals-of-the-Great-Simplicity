@@ -85,11 +85,13 @@ edm-takens-web/
 ### 统一启动
 
 ```powershell
-# start_all.bat 集中启动三个隧道
+# 默认仅本地（127.0.0.1）
 .\start_all.bat
+# 需要受保护的 Cloudflare 隧道时：
+.\start_all.bat tunnel
 ```
 
-`start_all.ps1` 依次启动三个服务 + 隧道，每个在独立窗口中运行。
+`start_all.ps1` 默认只启动本地服务；`-EnableTunnel` 时额外启动 3300/3301/3302 token 网关并把 cloudflared 指向网关。Ctrl+C 会清理服务、网关和隧道。
 
 ## 4. 端口管理
 
@@ -110,6 +112,11 @@ edm-takens-web/
 | `TRACE_STAGE_TIMEOUT_MS` | SUPER 模式看门狗超时 | 900000 |
 | `EDMTAKENS_DATA_DIR` | EDM 数据目录 | 自动探测 |
 | `JOBS_DB` | EDM 任务数据库路径 | `jobs.sqlite` |
+| `EDM_PYTHON_CMD` | EDM Web Python 解释器 | 自动探测 |
+| `GRAPHRAG_PYTHON` | GraphRAG Python 解释器 | 自动探测 |
+| `TRACE_TO_EDM_PORT` | trace-to-edm 起始端口 | `3100` |
+| `EDM_TRUST_PROXY` | 设为 `1` 才信任 X-Forwarded-For / CF-Connecting-IP | `0` |
+| `TUNNEL_ACCESS_TOKEN` | 隧道网关访问令牌 | 启动时生成 |
 
 ## 6. 维护清单
 
@@ -126,5 +133,5 @@ edm-takens-web/
 
 ### 模型更新
 - [ ] 新模型放入 `Models/` 目录（不带版本后缀）
-- [ ] 同步到 `trace-engine/models/`
+- [ ] 同步到 `trace-engine/Models/`
 - [ ] 更新 `presets.yaml` 参数（如需要）

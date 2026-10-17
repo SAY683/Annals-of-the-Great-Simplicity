@@ -28,8 +28,8 @@
 │    └─ SUPER 模式依赖: Models/ (Qwen2.5, shehui-llama, shenji-llama) │
 │    └─ 被: trace-engine-web, trace-to-edm 调用                      │
 │                                                                    │
-│  trace-engine-web (Node.js + Koa)                                  │
-│    └─ 依赖: trace-engine (Python via py_bridge), koa, vite          │
+│  trace-engine-web (Node.js + Express)                                  │
+│    └─ 依赖: trace-engine (Python via py_bridge), express, vite          │
 │    └─ 端口: 3000 (PORT 可覆盖)                                      │
 │    └─ 绑定: 127.0.0.1                                              │
 │                                                                    │
@@ -77,7 +77,7 @@
 
 | 依赖 | 版本要求 | 用途 |
 |------|----------|------|
-| koa | >=2.14 | Web 框架 |
+| express | >=4.18 | Web 框架 |
 | vite | >=5.0 | 前端构建 |
 | trace-engine | 本地 | 通过 py_bridge.py 调用 |
 

@@ -162,7 +162,7 @@ function createMcpRouter(port) {
           const v = req.get(h);
           if (v) fwdHeaders[h] = v;
         }
-        const result = await callTool(name, args, port, fwdHeaders);
+        const result = await callTool(name, args, typeof port === "function" ? port() : port, fwdHeaders);
         const content = result.json !== null ? JSON.stringify(result.json, null, 2) : result.text;
         return res.json({ jsonrpc: '2.0', id, result: { content: [{ type: 'text', text: content }], isError: result.status >= 400 } });
       } catch (err) {

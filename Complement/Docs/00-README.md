@@ -30,7 +30,7 @@
     ┌──────────▼──────────┐
     │   trace-engine-web  │
     │   (Web 服务)         │
-    │   Node.js + Koa     │
+    │   Node.js + Express     │
     └─────────────────────┘
 ```
 
@@ -44,7 +44,7 @@
 | 1 | **edm-takens** | CLI 库 | — | Python | EDM + HAVOK + CCM 时间序列动力学分析 |
 | 2 | **edm-takens-web** | Web 服务 | 8000 | FastAPI + Vite | edm-takens 的 Web 前端 |
 | 3 | **trace-engine** | CLI 库 | — | Python | TRACE 因果发现 + 六战士诊断 + LLaMA 模型 |
-| 4 | **trace-engine-web** | Web 服务 | 3000 | Node.js + Koa | trace-engine 的 Web 前端 |
+| 4 | **trace-engine-web** | Web 服务 | 3000 | Node.js + Express | trace-engine 的 Web 前端 |
 | 5 | **trace-to-edm** | 桥接服务 | 3100 | Node.js + Python | 将 TRACE 输出转为 EDM 输入，触发 EDM 分析 |
 | 6 | **GraphRAG-神纪图谱** | 知识图谱 + MCP | — | Python GraphRAG + lancedb | 《神纪》典籍 Local/Global/Drift/Basic 问答，暴露为标准 MCP 工具 |
 
@@ -61,16 +61,24 @@
 | [07-deployment.md](07-deployment.md) | 部署、隧道、便携目录维护 |
 | [08-debugging.md](08-debugging.md) | 故障排查、常见问题、调试技巧 |
 | [09-data-pipeline.md](09-data-pipeline.md) | 数据流转、文件格式、分析流程 |
+| [10-models.md](10-models.md) | 模型位置、ModelScope 来源、大小校验 |
+| [11-dependencies.md](11-dependencies.md) | Python/Node 依赖、解释器选择、锁文件 |
+| [12-security.md](12-security.md) | 本地/隧道鉴权、API Key、网关边界 |
+| [13-maintenance-debt.md](13-maintenance-debt.md) | P2 维护债务与后续顺序 |
 
 ## 快速开始
 
 ```powershell
 # 1. 验证便携目录完整性
 cd "Complement"
+python tools\check_env.py          # 选择具备 jieba/dowhy/causallearn 的解释器
 python "TRACE Engine(EDM-Takens CCM)\verify_portable.py"
+# 若缺依赖：powershell -File tools\bootstrap.ps1
 
-# 2. 启动所有 Web 服务 + 隧道
+# 2. 启动所有 Web 服务（默认仅本地）
 .\start_all.bat
+# 需要受保护的 Cloudflare 隧道时：
+.\start_all.bat tunnel
 
 # 3. 或单独启动各服务
 cd "TRACE Engine(EDM-Takens CCM)\edm-takens-web"

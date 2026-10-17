@@ -1,6 +1,5 @@
 # Counterfactual Sentai — Locked dependency versions
 # Generated from current environment (2026-07-12)
-# NOTE: causallearn is optional and not currently installed.
 
 torch==2.9.1
 transformers==5.13.0
@@ -9,6 +8,8 @@ numpy==2.4.6
 tokenizers==0.22.2
 accelerate==1.14.0
 dowhy==0.14
+causal-learn==0.1.4.8
+pydot==4.0.1
 graphviz==0.21
 matplotlib==3.11.0
 networkx==3.6.1

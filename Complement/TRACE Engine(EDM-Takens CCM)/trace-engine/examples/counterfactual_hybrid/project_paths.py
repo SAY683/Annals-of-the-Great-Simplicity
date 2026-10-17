@@ -43,16 +43,16 @@ class ProjectPaths:
         """
         查找 TRACE 模型目录。
         候选位置（按优先级）:
-          1. TRACE_ROOT/models/<name>
+          1. TRACE_ROOT/Models/<name>（兼容 models/）
           2. TRACE_ROOT/<name>           （便携/成品目录布局）
-          3. <project_root>/TRACE/models/<name>
+          3. <project_root>/TRACE/Models/<name>
         若均不存在，返回首选位置并允许调用方自行处理缺失。
         """
         normalized = name.strip().lower().replace('_', '-')
         candidates = [
             get_trace_models_dir() / normalized,
             self.trace_dir / normalized,           # 成品目录：模型直接放在 trace-engine/ 根下
-            self.project_root / "TRACE" / "models" / normalized,
+            self.project_root / "TRACE" / "Models" / normalized,
         ]
         for c in candidates:
             if c.exists():

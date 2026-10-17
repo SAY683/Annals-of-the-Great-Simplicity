@@ -197,7 +197,7 @@ trace-to-edm 仅负责触发与转译，统计保证由 EDM-TAKENS 流水线承�
 | `edm_trigger` | `EDM_FORMAL_THRESHOLD` | `30` | 正式分析行数下限 |
 | `edm_trigger` | `check_readiness()` → `confidence_level` | `insufficient`/`exploratory`/`formal` | 分级置信度 |
 | `edm_trigger` | `check_readiness()` → `confidence_disclaimer` | （中文长字符串） | 分级 disclaimer |
-| `csv_builder` | `COLUMN_COUNT` | `88` | 列总数契约（Meta 6 + L1 30 + L2 4 + L3 48） |
+| `csv_builder` | `COLUMN_COUNT` | `89` | 列总数契约（Meta 7 + L1 30 + L2 4 + L3 48） |
 
 ### 5.2 前端披露契约（P1-04/05 + app.js）
 
@@ -217,7 +217,7 @@ trace-to-edm 仅负责触发与转译，统计保证由 EDM-TAKENS 流水线承�
 `portable_verify.py` 新增三项审计：
 1. `ALGORITHM_AUDIT.md` 存在性；
 2. `layer3_sacred.METHODOLOGY_TAG` / `METHODOLOGY_DISCLAIMER` 可导入；
-3. `csv_builder.COLUMN_COUNT` 与 `_EXPECTED_COLUMN_COUNT` 一致（=88）。
+3. `csv_builder.COLUMN_COUNT` 与 `_EXPECTED_COLUMN_COUNT` 一致（=89）。
 
 ---
 
@@ -301,7 +301,7 @@ trace-to-edm 仅负责触发与转译，统计保证由 EDM-TAKENS 流水线承�
 - 样本不足（<5）返回 0.0（中性）✓
 - ddof=0（总体标准差），滚动窗口下无偏性不必要 ✓
 
-### 6.4 csv_builder.py 88 列契约验证
+### 6.4 csv_builder.py 89 列契约验证
 
 | 列组 | 列数 | 来源 |
 |------|------|------|
@@ -322,7 +322,7 @@ trace-to-edm 仅负责触发与转译，统计保证由 EDM-TAKENS 流水线承�
 - Layer 1: consensus_score 归一化数学正确，consensus_direction 保守策略合理
 - Layer 2: PCA 投影中心化正确，世俗熵计算正确
 - Layer 3: 余弦相似度、SVD 聚合、Gram-Schmidt 正交化、Z-Score 归一化全部正确
-- csv_builder: 88 列契约完整，列顺序动态构建，列错位检测守卫到位
+- csv_builder: 89 列契约完整，列顺序动态构建，列错位检测守卫到位
 
 ---
 

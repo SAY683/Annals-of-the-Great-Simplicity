@@ -1,4 +1,4 @@
-<#
+﻿<#
   TRACE Engine Web MVP 启动脚本 (PowerShell)
   ===========================================
   自动检测并安装 npm 依赖，然后启动 NodeJS 服务。
@@ -46,6 +46,19 @@ function Write-Log($msg, $level = "INFO") {
     }
 }
 
+# Python interpreter selection (cross-machine)
+$sharedPython = Join-Path (Split-Path $scriptDir -Parent) 'shared\python_env.ps1'
+if (Test-Path $sharedPython) {
+    . $sharedPython
+    $pyProbe = Resolve-ComplementPython -Required @('numpy','pandas','scipy','sklearn','jieba','dowhy','causallearn') -Preferred $env:TRACE_PYTHON_CMD
+    if (-not $pyProbe -or -not $pyProbe.Ok) {
+        Write-ComplementPythonHint $pyProbe
+        Read-Host "按 Enter 退出"
+        exit 1
+    }
+    $env:TRACE_PYTHON_CMD = $pyProbe.Path
+    Write-Log "Python: $($pyProbe.Path) ($($pyProbe.Version))"
+}
 Write-Log "启动脚本开始，目录: $scriptDir"
 
 # 检查 Node.js 与 npm
@@ -90,7 +103,7 @@ $basePort = 3000
 $maxPort = 3020
 $port = $basePort
 while ($port -le $maxPort) {
-    $inUse = Get-NetTCPConnection -LocalPort $port -ErrorAction SilentlyContinue
+    $inUse = Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue
     if (-not $inUse) { break }
     Write-Log "端口 $port 已被占用，尝试下一个..." "WARN"
     $port++

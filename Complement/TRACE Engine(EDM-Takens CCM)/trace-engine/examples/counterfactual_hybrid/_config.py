@@ -23,6 +23,27 @@ def _env_path(name: str) -> Path | None:
     return None
 
 
+def _find_child_dir(parent: Path, preferred_name: str) -> Path:
+    """Return an existing child directory case-insensitively.
+
+    The portable archive uses ``Models/``. Older layouts may still contain
+    ``models/``; on case-sensitive filesystems we must not assume the two are
+    interchangeable. An exact match wins, then a case-insensitive match, then
+    the preferred path is returned for callers that want to create it.
+    """
+    exact = parent / preferred_name
+    if exact.is_dir():
+        return exact
+    wanted = preferred_name.casefold()
+    try:
+        for child in parent.iterdir():
+            if child.is_dir() and child.name.casefold() == wanted:
+                return child
+    except OSError:
+        pass
+    return exact
+
+
 def _is_portable_trace_root(path: Path) -> bool:
     """判断是否为成品/便携版 TRACE 根目录（模型直接放在根下）。
 
@@ -37,8 +58,8 @@ def _is_portable_trace_root(path: Path) -> bool:
 
 
 def _is_nested_engine_trace_root(path: Path) -> bool:
-    """判断是否为层级目录布局：模型放在 path/trace-engine/models/ 下。"""
-    base = path / "trace-engine" / "models"
+    """判断是否为层级目录布局：模型放在 path/trace-engine/Models/ 下。"""
+    base = _find_child_dir(path / "trace-engine", "Models")
     return (
         (base / "shehui-llama" / "model.safetensors").exists()
         or (base / "shenji-llama" / "model.safetensors").exists()
@@ -52,7 +73,7 @@ def _find_trace_root(skill_dir: Path) -> Path | None:
     识别特征（按优先级）:
       1. 工作副本: <project_root>/TRACE/README.md
       2. 工作副本: <project_root>/.skills/trace-engine/SKILL.md
-      3. 层级副本: <dir>/trace-engine/models/<model>/model.safetensors
+      3. 层级副本: <dir>/trace-engine/Models/<model>/model.safetensors
       4. 成品/便携副本: <dir>/shehui-llama/model.safetensors 等（全小写目录名）
     """
     current = skill_dir.resolve()
@@ -63,7 +84,7 @@ def _find_trace_root(skill_dir: Path) -> Path | None:
         if (current / ".skills" / "trace-engine" / "SKILL.md").exists():
             # .skills 目录位于项目根下，真正的 TRACE 数据/模型目录在项目根/TRACE
             return current / "TRACE"
-        # 层级副本: trace-engine-web 与 trace-engine 处于同一父目录，模型在 trace-engine/models
+        # 层级副本: trace-engine-web 与 trace-engine 处于同一父目录，模型在 trace-engine/Models
         if _is_nested_engine_trace_root(current):
             return current / "trace-engine"
         # 成品/便携副本: 模型直接放在当前目录
@@ -82,7 +103,7 @@ def get_skill_dir() -> Path:
 
 def get_trace_root() -> Path:
     """
-    返回 TRACE 项目根目录（含 scripts/、models/、date/）。
+    返回 TRACE 项目根目录（含 scripts/、Models/、date/）。
     解析顺序:
       1. TRACE_ROOT 环境变量
       2. 从 Skill 目录向上探测 TRACE/
@@ -111,8 +132,8 @@ def get_trace_scripts_dir() -> Path:
 
 
 def get_trace_models_dir() -> Path:
-    """返回 TRACE/models/ 目录。"""
-    return get_trace_root() / "models"
+    """返回 TRACE/Models/ 目录（兼容历史小写 models/ 布局）。"""
+    return _find_child_dir(get_trace_root(), "Models")
 
 
 def get_trace_data_dir() -> Path:

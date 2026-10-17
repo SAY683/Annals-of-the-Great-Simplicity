@@ -9,14 +9,14 @@ smoke_e2e.py — 便携目录端到端冒烟测试 (ROUND51)
 
 链路 (全走 HTTP, 真实服务):
   1. 启动 edm-takens-web  (FastAPI)    — EDM 分析服务
-  2. 启动 trace-engine-web (Node+Koa)  — TRACE 前端服务
+  2. 启动 trace-engine-web (Node+Express)  — TRACE 前端服务
   3. 启动 trace-to-edm    (Node+Express) — 桥接服务 (编排链路)
   4. 三服务 /api/health 全绿
   5. trace-engine-web /api/config 契约 (SUPER 模式 + max_segments)
   6. 文本→数据集: trace-to-edm /api/dataset/add-text 喂入 15 条文本
   7. TRACE→轨迹: trace-to-edm /api/pipeline/run 批量 TRACE 分析 → 轨迹 CSV
        断言: SSE done 事件 success=true, trajectory_rows>=15, edm_ready=true
-       断言: 轨迹 CSV 含 trace_status/trace_error/trace_mode 列, 至少 1 行非失败
+       断言: 轨迹 CSV 含 trace_status/trace_error/trace_mode/trace_data_source 列, 至少 1 行非失败
   8. 轨迹→EDM: trace-to-edm /api/edm/trigger (target=z_pca_1) → EDM job
   9. 轮询:     trace-to-edm /api/edm/poll/:jobId 至完成
   10. 断言: EDM job 完成且结果含 4 个科研披露字段
@@ -472,7 +472,7 @@ def main():
             print("[SKIP] 全链路冒烟")
             print("  trace-engine-web 依赖安装失败 (npm 不可用或 install 失败), 无法启动服务")
             return 2
-        log("启动 trace-engine-web (Node+Koa)...")
+        log("启动 trace-engine-web (Node+Express)...")
         tew_svc = start_node_service(
             "trace-engine-web", TRACE_WEB_DIR, find_free_port(3400, 3500), {
                 "TRACE_WORK_DIR": str(trace_work),
@@ -590,9 +590,10 @@ def main():
             with open(traj_csv, "r", encoding="utf-8", newline="") as f:
                 reader = list(_csv.DictReader(f))
             headers = list(reader[0].keys()) if reader else []
-            for col in ["trace_status", "trace_error", "trace_mode"]:
+            for col in ["trace_status", "trace_error", "trace_mode", "trace_data_source"]:
                 csv_check.require(col in headers, f"列 {col} 存在", f"列 {col} 缺失")
             n_ok = sum(1 for r in reader if r.get("trace_status") in ("OK", "PARTIAL"))
+            csv_check.require(all(r.get("trace_data_source") in ("synthetic_sem", "observed", "unknown") for r in reader), "trace_data_source 值有效", "trace_data_source 含非法值")
             csv_check.require(n_ok >= 1, f"{n_ok}/{len(reader)} 行 trace_status=OK/PARTIAL", "无成功行 (trace_status 全失败)")
             csv_check.require(len(reader) >= EDM_MIN_ROWS, f"轨迹行数 {len(reader)} >= {EDM_MIN_ROWS}", f"行数不足: {len(reader)}")
         if not csv_check.finish():

@@ -170,8 +170,8 @@ def _prepare_pipeline_data(
     rewriting the entire algorithm, we transparently map the user's columns
     for computation and keep the original names for display.
 
-    R34-D 修复 (DEBT-ROUND33-01): 新增88列轨迹数据智能检测.
-    当检测到 CSV 是 trace-to-edm 的88列轨迹数据时, 跳过 game-log 重映射,
+    R34-D 修复 (DEBT-ROUND33-01): 新增89列轨迹数据智能检测.
+    当检测到 CSV 是 trace-to-edm 的89列轨迹数据时, 跳过 game-log 重映射,
     保留原始列名 (ate/consensus_score/max_delta_nll 等), 避免 CI 边界与
     ate 共线导致 HAVOK 退化, 以及真实因果变量被 CCM 忽略.
     pipeline.py 的 CCM candidate_pairs 已改为动态选择 (R34-D), 支持
@@ -185,7 +185,7 @@ def _prepare_pipeline_data(
     df = _read_csv_robust(csv_path)
     column_map: dict[str, str] = {}  # original -> pipeline alias
 
-    # R34-D 修复: 检测88列轨迹数据 (trace-to-edm 输出)
+    # R34-D 修复: 检测89列轨迹数据 (trace-to-edm 输出)
     # 特征列: ate, consensus_score, max_delta_nll, text_hash, trace_mode 等
     _TRAJECTORY_SIGNATURES = {
         "ate", "consensus_score", "text_hash", "trace_mode",
@@ -195,8 +195,8 @@ def _prepare_pipeline_data(
     _is_trajectory = len(_TRAJECTORY_SIGNATURES & _csv_columns) >= 4
 
     if _is_trajectory:
-        # 88列轨迹数据: 跳过 game-log 重映射, 保留原始列名
-        print(f"[API] 检测到88列轨迹数据 (trace-to-edm 输出), 跳过 game-log 重映射")
+        # 89列轨迹数据: 跳过 game-log 重映射, 保留原始列名
+        print(f"[API] 检测到89列轨迹数据 (trace-to-edm 输出), 跳过 game-log 重映射")
         print(f"[API] 保留原始列名: target={target_col}, vars={selected_vars}")
         display_map = {}  # 无重映射
         return csv_path, target_col, selected_vars, original_target, display_map
@@ -219,18 +219,29 @@ def _prepare_pipeline_data(
         df = df.rename(columns={target_col: "result"})
         column_map[target_col] = "result"
 
-    # Map up to 3 non-target variables to kills/damage/deaths so the
-    # cross-validation stage has its expected CCM candidates.
+    # Map only non-canonical variables into canonical aliases.
+    # Canonical columns that the user explicitly selected are reserved and are
+    # preserved exactly as-is. An *unselected* canonical column is still a
+    # conflict: it must be backed up before a different selected variable claims
+    # that alias. This keeps the historical no-data-loss contract without ever
+    # swapping an existing deaths/damage pair positionally.
     other_vars = [v for v in selected_vars if v != target_col]
-    for alias, orig in zip(schema_aliases, other_vars):
-        if orig == alias:
+    reserved_aliases = {v for v in other_vars if v in schema_aliases}
+    for orig in other_vars:
+        if orig in schema_aliases:
             continue
         if orig not in df.columns:
             continue
+        alias = next(
+            (a for a in schema_aliases if a not in reserved_aliases),
+            None,
+        )
+        if alias is None:
+            break
         df = _stash_conflict(df, alias)
         df = df.rename(columns={orig: alias})
         column_map[orig] = alias
-
+        reserved_aliases.add(alias)
     display_map = {alias: orig for orig, alias in column_map.items()}
 
     # Q9 P1-16 修缮: 增加变量映射透明度，便于追踪原始列与管道别名之间的对应关系

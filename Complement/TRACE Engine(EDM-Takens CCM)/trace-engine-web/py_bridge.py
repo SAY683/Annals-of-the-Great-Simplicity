@@ -657,6 +657,8 @@ def main():
             "refuted": bool(check.get('refuted', False)) if isinstance(check, dict) else bool(getattr(r, 'refuted', False)),
             "display_metric": float(dm) if dm is not None and np.isfinite(float(dm)) else None,
             "display_label": check.get('display_label') if isinstance(check, dict) else None,
+            "data_source": getattr(bridge, "data_source", "synthetic_sem"),
+            "scope": "internal_consistency" if getattr(bridge, "data_source", "") == "synthetic_sem" else "observed_data",
         })
 
     scan_list = []
@@ -752,6 +754,9 @@ def main():
         "max_edges_for_dowhy": max_edges_for_dowhy,
         "n_samples": bridge.data_df.shape[0] if hasattr(bridge.data_df, 'shape') else len(bridge.data_df),
         "backend": "DoWhy" if not bridge.simulation else "SimulationModel(SEM)",
+        "data_source": getattr(bridge, "data_source", "synthetic_sem"),
+        "data_source_detail": getattr(bridge, "data_source_detail", ""),
+        "refutation_scope": "internal_consistency_on_synthetic_sem" if getattr(bridge, "data_source", "") == "synthetic_sem" else "observed_data",
         "simulation": bool(bridge.simulation),
         "dowhy_available": bool(getattr(sys.modules.get("counterfactual_bridge"), "_DOWHY_AVAILABLE", False)),
         "causallearn_available": bool(getattr(sys.modules.get("counterfactual_bridge"), "_CAUSALLEARN_AVAILABLE", False)),

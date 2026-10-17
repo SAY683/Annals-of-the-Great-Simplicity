@@ -36,7 +36,7 @@ const {
 } = utils;
 const { sendSSE, sendSSERetryHeader, runPythonAnalysisStream, runSuperAnalysisStream, runPythonAnalysisSync, processJobQueue } = analysis;
 
-// 文件上传配置（使用 diskStorage，兼容 multer 1.x 与 2.x）
+// 文件上传配置（使用 diskStorage，multer 2.x）
 const upload = multer({
   storage: multer.diskStorage({
     destination: (_req, _file, cb) => {

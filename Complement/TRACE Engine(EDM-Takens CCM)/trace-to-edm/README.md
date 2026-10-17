@@ -15,7 +15,7 @@
            ──→ Qwen编码 ──────├─ Layer 2: 世俗PCA投影 (4列 · 科学层)
                               └─ Layer 3: 八正道审计 (48列 · 诠释层)
                                        ↓
-                              narrative_meta_trajectories.csv (88列)
+                              narrative_meta_trajectories.csv (89列)
                                        ↓
                               EDM-Takens 动力学预测 → 相变预警
 ```
@@ -36,7 +36,7 @@ trace-to-edm/
 ├── project_manager.py     # 项目CRUD (每个项目自包含)
 ├── dataset_manager.py     # 数据集注册表 (dataset.json)
 ├── work_scanner.py        # TRACE工作目录扫描 + 清理
-├── csv_builder.py         # 轨迹CSV构建器 (88列对齐 · 列总数断言守卫)
+├── csv_builder.py         # 轨迹CSV构建器 (89列对齐 · 列总数断言守卫)
 ├── edm_trigger.py         # EDM-Takens API 触发器 (分级 confidence_level)
 │
 ├── layer1_meta_scm.py     # L1: 元SCM参数提取 (30列 · 科学层)
@@ -160,9 +160,9 @@ python bridge.py --status                  # 轨迹状态
 
 > L3 目标在 EDM 触发面板标注"(诠释)"，结果不得与 L1/L2 并列用于投资决策。
 
-## 数据列全表 (88列)
+## 数据列全表 (89列)
 
-> 列总数由 `csv_builder.COLUMN_COUNT` 断言守卫保护（= Meta 6 + L1 30 + L2 4 + L3 48）。
+> 列总数由 `csv_builder.COLUMN_COUNT` 断言守卫保护（= Meta 7 + L1 30 + L2 4 + L3 48）。
 > 变更 `config.LAYER1_COLUMNS` / `config.SACRED_BOOKS` 后须同步更新本表与 `ALGORITHM_AUDIT.md §5.1`。
 
 | 分组 | 列数 | 内容 |

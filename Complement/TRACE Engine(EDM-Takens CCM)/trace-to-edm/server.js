@@ -30,7 +30,7 @@ const fsPromises = fs.promises;
 const realpathAsync = util.promisify(fs.realpath);
 
 // ── 配置 ──────────────────────────────────────────────────
-const PORT = process.env.PORT || 3100;
+let PORT = parseInt(process.env.PORT || process.env.TRACE_TO_EDM_PORT || "3100", 10);
 const ROOT = __dirname;
 const PUBLIC_DIR = path.join(ROOT, 'public');
 const BRIDGE_SCRIPT = path.join(ROOT, 'bridge.py');
@@ -60,6 +60,10 @@ const CORS_ALLOWED_ORIGINS = [
   CORS_ORIGIN,
   'http://127.0.0.1:3100',
   'http://localhost:3100',
+  'http://127.0.0.1:3000',
+  'http://localhost:3000',
+  'http://127.0.0.1:5173',
+  'http://localhost:5173',
   ..._loadTunnelOrigins(),
 ];
 // debt-12.13: 版本号从 package.json 读取，避免硬编码与实际版本漂移
@@ -339,7 +343,7 @@ app.use(validateInputPathMiddleware);
 // P0 修缮（2026-08-03）: 原版 MCP 挂载在 auth 之前, 导致 /mcp 完全绕过鉴权。
 // 现移至 auth + 输入校验之后, 确保所有 MCP 工具调用都经过 CROSS_PROJECT_API_KEY 鉴权。
 const { createMcpRouter } = require('./mcp');
-app.use('/mcp', createMcpRouter(PORT));
+app.use('/mcp', createMcpRouter(() => PORT));
 
 // ── 工具函数 ──────────────────────────────────────────────
 
@@ -459,7 +463,7 @@ function buildTrajectoryReport() {
     try { return new Date(iso).toLocaleString('zh-CN', { hour12: false }); } catch (_) { return String(iso); }
   };
 
-  // 列分层映射: 为全部 88 列提供层级, 不再出现 '(其他)'
+  // 列分层映射: 为全部 89 列提供层级, 不再出现 '(其他)'
   const colLayer = {
     time_step: 'L0 元信息', text_hash: 'L0 元信息', source_label: 'L0 元信息',
     trace_status: 'L0 元信息', trace_mode: 'L0 元信息', trace_error: 'L0 元信息',
@@ -494,7 +498,7 @@ function buildTrajectoryReport() {
     if (col.endsWith('_zscore') && !colLayer[col]) colLayer[col] = 'L3 标准化';
   });
 
-  // 列含义: 为全部 88 列提供人话解释
+  // 列含义: 为全部 89 列提供人话解释
   const colDesc = {
     time_step: '原始时间戳 — 轨迹行对应的文本事件时间',
     text_hash: '文本哈希 — 输入文本的短指纹, 用于去重与追踪',
@@ -718,7 +722,7 @@ function buildTrajectoryReport() {
 }
 
 // ── P2 (§20.12): 生成人话版 HTML 报告 ─────────────────────
-// 暗色主题、可折叠卡片、按层级分组，减少 88 列大表的压迫感。
+// 暗色主题、可折叠卡片、按层级分组，减少 89 列大表的压迫感。
 function buildTrajectoryReportHTML(baseReport) {
   const {
     projectName, generated, traj, numericStats, colLayer, colDesc, edmReady, active, history,
@@ -2453,7 +2457,9 @@ print(json.dumps({"text": text or ""}, ensure_ascii=False))
 // 原实现 app.listen(PORT) 未指定 host，等价于隐式 0.0.0.0（暴露至 LAN/公网）
 // 默认仅本机访问；如需外部访问，显式设置 TRACE_HOST=0.0.0.0
 const HOST = process.env.TRACE_HOST || '127.0.0.1';
-app.listen(PORT, HOST, () => {
+function listenWithFallback(port) {
+  PORT = port;
+  const server = app.listen(port, HOST, () => {
   console.log('');
   console.log('╔══════════════════════════════════════════════════╗');
   console.log(`║   trace-to-edm Web 操纵台 v${PACKAGE_VERSION.padEnd(6)}            ║`);
@@ -2467,4 +2473,15 @@ app.listen(PORT, HOST, () => {
   console.log('║   版本查询         GET  /api/version             ║');
   console.log('╚══════════════════════════════════════════════════╝');
   console.log('');
-});
+  });
+  server.on('error', (err) => {
+    if (err.code === 'EADDRINUSE' && port < 3120) {
+      console.warn('[port] ' + port + ' in use, trying ' + (port + 1) + '...');
+      listenWithFallback(port + 1);
+    } else {
+      console.error('[fatal] listen failed: ' + err.message);
+      process.exit(1);
+    }
+  });
+}
+listenWithFallback(PORT);

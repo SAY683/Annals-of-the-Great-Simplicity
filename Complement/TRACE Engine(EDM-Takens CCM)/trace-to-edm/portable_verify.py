@@ -178,15 +178,18 @@ def verify_config_portable_detection():
         else:
             R.ok("config.IS_PORTABLE_LAYOUT = True")
 
-        # 检查 Qwen 模型路径是否指向便携式 Models/
+        # 检查 Qwen 模型路径是否指向便携式 Models/（大小写不敏感）
+        def _has_models_component(path) -> bool:
+            return any(part.casefold() == "models" for part in Path(path).parts)
+
         qwen_1_5b = config.QWEN_MODEL_PATH
-        if "Models" in str(qwen_1_5b) and "Qwen2.5-1.5B-Instruct" in str(qwen_1_5b):
+        if _has_models_component(qwen_1_5b) and "Qwen2.5-1.5B-Instruct" in str(qwen_1_5b):
             R.ok(f"QWEN_MODEL_PATH = {qwen_1_5b}")
         else:
             R.fail(f"QWEN_MODEL_PATH 未指向便携式 Models/: {qwen_1_5b}")
 
         qwen_3b = config.QWEN_MODEL_PATH_3B
-        if "Models" in str(qwen_3b) and "Qwen2.5-3B-Instruct" in str(qwen_3b):
+        if _has_models_component(qwen_3b) and "Qwen2.5-3B-Instruct" in str(qwen_3b):
             R.ok(f"QWEN_MODEL_PATH_3B = {qwen_3b}")
         else:
             R.fail(f"QWEN_MODEL_PATH_3B 未指向便携式 Models/: {qwen_3b}")
@@ -361,7 +364,7 @@ def verify_methodology_audit():
     验证三项:
       a. ALGORITHM_AUDIT.md 存在 (layer3_sacred.py 引用 "详见 ALGORITHM_AUDIT.md §3");
       b. layer3_sacred.METHODOLOGY_TAG / METHODOLOGY_DISCLAIMER 可导入且非空;
-      c. csv_builder.COLUMN_COUNT == 88 (列总数契约, 防止 LAYER1_COLUMNS/SACRED_BOOKS
+      c. csv_builder.COLUMN_COUNT == 89 (列总数契约, 防止 LAYER1_COLUMNS/SACRED_BOOKS
          变更后列数漂移不被发现).
     """
     print("\n[7/8] 验证方法学审计契约")
@@ -401,10 +404,10 @@ def verify_methodology_audit():
         # c. csv_builder 列总数契约
         import csv_builder
         col_count = getattr(csv_builder, "COLUMN_COUNT", None)
-        if col_count == 88:
+        if col_count == 89:
             R.ok(f"csv_builder.COLUMN_COUNT = {col_count} (契约一致)")
         else:
-            R.fail(f"csv_builder.COLUMN_COUNT = {col_count} (期望 88, 列数契约漂移)")
+            R.fail(f"csv_builder.COLUMN_COUNT = {col_count} (期望 89, 列数契约漂移)")
     except Exception as e:
         R.fail(f"方法学常量导入异常: {e}")
     finally:

@@ -201,6 +201,15 @@ function renderResult(data) {
 
   // Parameters — 质谱级参数网格
   const paramGrid = document.getElementById('paramGrid');
+  const priorWarning = document.getElementById('dataSourceWarning');
+  if (priorWarning) priorWarning.remove();
+  if ((r.data_source || 'synthetic_sem') === 'synthetic_sem') {
+    const warning = document.createElement('div');
+    warning.id = 'dataSourceWarning';
+    warning.className = 'data-source-warning';
+    warning.textContent = '数据来源：合成 SEM。ATE / CI 为模型隐含效应，不是观测数据估计。';
+    paramGrid.parentElement.insertBefore(warning, paramGrid);
+  }
   paramGrid.innerHTML = '';
   const params = [
     { k: 'Treatment', v: r.treatment },
@@ -212,7 +221,8 @@ function renderResult(data) {
     { k: 'Analysis Mode', v: (r.analysis_mode || 'light').toUpperCase() },
     { k: 'LLaMA Model', v: r.model ? r.model : 'N/A' },
     { k: 'Backend', v: r.backend ?? 'DoWhy' },
-    { k: 'Simulation', v: r.simulation ? 'YES' : 'NO' },
+    { k: 'Backend Fallback', v: r.simulation ? 'YES' : 'NO' },
+    { k: 'Data Source', v: r.data_source === 'observed' ? 'observed' : 'synthetic SEM' },
     { k: 'Estimand Type', v: r.estimand_type ?? 'N/A' },
     { k: 'N Samples', v: r.n_samples ?? '-' },
     { k: 'Confidence Method', v: r.confidence_method ?? 'bootstrap' },

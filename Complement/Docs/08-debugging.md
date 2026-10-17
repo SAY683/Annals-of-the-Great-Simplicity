@@ -133,8 +133,9 @@ taskkill /F /IM cloudflared.exe
 - 设置 `OMP_NUM_THREADS=1`
 
 ### dowhy + pydot 兼容性
-- `dowhy>=0.14` 搭配 `pydot>=3.0` 出现 `Graph.get_strict()` API 不兼容
-- 使用 `pydot<3.0` 解决
+- 当前参考环境已验证 `dowhy==0.14` + `pydot==4.0.1`，全量测试通过。
+- `trace-engine-web/requirements.txt` 使用 `pydot>=4.0,<5`，lock 固定 `4.0.1`。
+- 若遇到旧日志中的 `Graph.get_strict()` 错误，先确认 pydot 版本并重装依赖，不要继续沿用历史上的 `pydot<3.0` 约束。
 
 ### Shehui-LLaMA 因果边稀少
 - 模型对 TRACE mask interventions 不敏感（训练/权重问题）

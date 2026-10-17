@@ -31,10 +31,18 @@ _LOCAL_HOSTS = {"127.0.0.1", "localhost", "::1"}
 
 
 def _client_ip(request: Request) -> str:
-    """获取客户端 IP. 优先取 X-Forwarded-For 首段 (反代场景), 否则取 client.host."""
-    xff = request.headers.get("x-forwarded-for")
-    if xff:
-        return xff.split(",")[0].strip()
+    """获取客户端 IP.
+
+    默认只信任 socket 对端地址；只有显式设置 EDM_TRUST_PROXY=1 时才读取
+    CF-Connecting-IP / X-Forwarded-For，避免客户端伪造本地地址绕过鉴权。
+    """
+    if os.environ.get("EDM_TRUST_PROXY", "0") == "1":
+        cf = request.headers.get("cf-connecting-ip")
+        if cf:
+            return cf.strip()
+        xff = request.headers.get("x-forwarded-for")
+        if xff:
+            return xff.split(",")[0].strip()
     return request.client.host if request.client else "unknown"
 
 
@@ -53,17 +61,19 @@ def require_auth(
     api_key = os.environ.get("EDM_API_KEY")
 
     if not api_key:
-        # 本地开发模式: 仅允许环回地址
+        # 本地开发模式: 允许本机/网关，但拒绝直接来自隧道的代理请求
         ip = _client_ip(request)
-        if ip not in _LOCAL_HOSTS:
-            raise HTTPException(
-                status_code=401,
-                detail={
-                    "error": "UNAUTHORIZED",
-                    "message": "Remote access requires EDM_API_KEY environment variable.",
-                },
-            )
-        return
+        proxied = request.headers.get("cf-connecting-ip") or request.headers.get("x-forwarded-for")
+        from_gate = request.headers.get("x-complement-gate") == "1"
+        if ip in _LOCAL_HOSTS and (from_gate or not proxied):
+            return
+        raise HTTPException(
+            status_code=401,
+            detail={
+                "error": "UNAUTHORIZED",
+                "message": "Remote access requires EDM_API_KEY environment variable or the local tunnel gate.",
+            },
+        )
 
     # 生产模式: 必须提供 X-API-Key 且匹配
     if not x_api_key:

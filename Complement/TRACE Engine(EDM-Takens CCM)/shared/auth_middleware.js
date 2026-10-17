@@ -67,7 +67,9 @@ function createAuthMiddleware(options = {}) {
     // 3. 开发模式 (未配置 API Key): 仅允许环回地址
     const ip = req.ip || (req.connection && req.connection.remoteAddress) || '';
     const isLoopback = ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1';
-    if (isLoopback) {
+    const proxied = req.headers['cf-connecting-ip'] || req.headers['x-forwarded-for'];
+    const fromGate = req.headers['x-complement-gate'] === '1';
+    if (isLoopback && (!proxied || fromGate)) {
       return next();
     }
 

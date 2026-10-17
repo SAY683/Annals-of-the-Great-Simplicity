@@ -20,6 +20,8 @@
 | 向量库 | 3 个（entity_description / community_full_content / text_unit_text，1024 维） |
 | 构建成本 | ~$5.25（经 CC Switch 代理路由到**官方 DeepSeek** `api.deepseek.com`，~493 万 tokens；opencode Go 未承担全量构建，原记"0 元 opencode"有误，见归档） |
 
+> **数据版本与质量**：`project/output/data_version.json` 记录生成时间、实体/关系/社区/文本块计数和 `text_unit_hash`；`scripts/repair-text-units.py` 修复分块产生的 U+FFFD；`mcp/entity_aliases.json` 提供查询期别名合并；`graphrag_get_data_quality` 可直接查看质量摘要。
+
 ## 二、目录结构
 
 ```
@@ -58,8 +60,9 @@ GraphRAG-神纪图谱\
 1. **启动向量服务**（终端 1）：双击 `scripts\00-start-embedding.bat`
 2. **启动 MCP**（终端 2）：双击 `scripts\01-start-mcp.bat`（保持窗口开启）
 3. **自检**（终端 3）：双击 `scripts\02-selfcheck-query.bat`，看到结构化回答即链路正常
-4. 在支持 MCP 的宿主中把 `mcp\graphrag_mcp.py` 注册为 MCP 服务器，即可调用
-   `graphrag_query` / `graphrag_list_projects` / `graphrag_get_context`
+4. **环境自检**：`python scripts\verify-env.py`（依赖版本、data_version 计数/hash、LanceDB 向量同步、U+FFFD；8081/15721 默认仅告警，严格门控用 `--require-services`）
+5. 在支持 MCP 的宿主中把 `mcp\graphrag_mcp.py` 注册为 MCP 服务器，即可调用
+   `graphrag_query` / `graphrag_list_projects` / `graphrag_get_context` / `graphrag_get_data_quality`
 
 > 若移动整个文件夹：**无需改任何配置**——MCP 与脚本均按自身位置解析 `project\`。
 > 唯一可能需调整的是 `scripts` 中 llama-server / 模型 / Python 的默认路径（可用环境变量覆盖）。

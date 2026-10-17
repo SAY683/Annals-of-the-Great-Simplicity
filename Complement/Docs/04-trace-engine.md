@@ -33,7 +33,7 @@ trace-engine/
 │   ├── minimal_dataframe.py          # 最小数据框
 │   ├── run_cli.py                    # CLI 入口
 │   └── run_real_pipeline.py          # 真实管线入口
-├── models/                           # LLaMA 模型
+├── Models/                           # LLaMA 模型
 │   ├── shehui-llama/                 # 社会模型（27M）
 │   ├── shenji-llama/                 # 神纪模型（469M）
 │   └── shehui-llama-v4-archive/      # 归档模型（470M）
@@ -55,17 +55,25 @@ trace-engine/
 | **DEEP** | jieba 概念图 + 完整六战士诊断 | 10-60 秒 | jieba + dowhy |
 | **SUPER** | LLaMA 模型 token-level TRACE + 完整诊断 | 视文本长度 | LLaMA 模型 |
 
+> LIGHT/DEEP 默认在概念邻接矩阵上生成 1000 行合成 SEM 数据再估计 ATE。结果 JSON 的 `data_source=synthetic_sem` 表示这是模型隐含效应；`simulation=false` 只表示没有回退到 SimulationModel，不代表数据是观测数据。
+
 ## 六战士诊断体系
 
-六个独立的因果验证模块，从不同角度检验因果关系的可靠性：
+`six_warriors.py` 明确将其定义为“异质性诊断联盟”，不是六个等价算法：
 
-1. **DoWhy 适配** — 基于 Pearl 因果图的反事实推理
-2. **causal-learn 验证** — 基于约束/评分的因果发现
-3. **复合诊断** — 多指标综合评估
-4. **反事实桥接** — TRACE 输出到 DoWhy 的转换
-5. **可复现仪表板** — 结果稳定性检验
-6. **六面板可视化** — 多维度结果展示
+**Tier-A：真算法层（4 名）**
 
+1. **TRACE** — ΔNLL 掩码干预 / 共现近似（取决于 LIGHT/DEEP/SUPER）
+2. **HAVOK** — Hankel + SVD + 强迫项定位
+3. **DoWhy + CF** — do-calculus + Pearl 三步反事实
+4. **causal-learn** — PC/GES 独立验证
+
+**Tier-B：启发式诊断层（2 名，标注 HEURISTIC_FALLBACK）**
+
+5. **CCM** — 概念覆盖率统计；Web 快速分析未调用真实 `ccm_with_convergence`
+6. **EDM** — 间隔变异系数近似 ρ，不是 Sugihara EDM
+
+> 读结果时不要把 Tier-B 当作独立因果证据；它用于诊断文本/矩阵结构，而不是替代真实 CCM/EDM。
 ## LLaMA 模型规格
 
 | 模型 | 参数量 | 大小 | max_position | 适用场景 | 建议显存 |
@@ -111,7 +119,7 @@ torch>=2.0
 transformers>=4.30
 jieba>=0.42
 dowhy>=0.14
-pydot<3.0
+pydot>=4.0,<5
 networkx>=2.8
 causal-learn>=0.1
 ```

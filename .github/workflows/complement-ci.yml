@@ -1,0 +1,71 @@
+name: Complement CI
+
+on:
+  push:
+    paths:
+      - 'Complement/**'
+      - '.github/workflows/complement-ci.yml'
+  pull_request:
+    paths:
+      - 'Complement/**'
+      - '.github/workflows/complement-ci.yml'
+
+jobs:
+  verify:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install Python dependencies
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r "Complement/TRACE Engine(EDM-Takens CCM)/trace-engine/requirements.txt"
+          python -m pip install -r "Complement/TRACE Engine(EDM-Takens CCM)/trace-engine-web/requirements.txt"
+          python -m pip install -r "Complement/TRACE Engine(EDM-Takens CCM)/edm-takens/requirements.txt"
+          python -m pip install -r "Complement/TRACE Engine(EDM-Takens CCM)/edm-takens-web/requirements.txt"
+      - name: Install Node dependencies
+        shell: pwsh
+        run: |
+          npm ci --prefix "Complement/TRACE Engine(EDM-Takens CCM)/trace-engine-web"
+          npm ci --prefix "Complement/TRACE Engine(EDM-Takens CCM)/trace-to-edm"
+          npm ci --prefix "Complement/TRACE Engine(EDM-Takens CCM)/edm-takens-web/frontend"
+      - name: Tunnel gate helper tests
+        shell: pwsh
+        run: node --test Complement/shared/gate_helpers.test.js
+      - name: Python doctor
+        shell: pwsh
+        run: python Complement/tools/check_env.py
+      - name: Trace-engine tests
+        shell: pwsh
+        working-directory: "Complement/TRACE Engine(EDM-Takens CCM)/trace-engine"
+        run: python -m pytest tests -q
+      - name: EDM-takens tests
+        shell: pwsh
+        working-directory: "Complement/TRACE Engine(EDM-Takens CCM)/edm-takens"
+        run: python -m pytest tests -q
+      - name: EDM web mapping regression
+        shell: pwsh
+        working-directory: "Complement/TRACE Engine(EDM-Takens CCM)/edm-takens-web"
+        run: python -m pytest tests/test_pipeline_mapping.py -q
+      - name: trace-to-edm CSV contract tests
+        shell: pwsh
+        working-directory: "Complement/TRACE Engine(EDM-Takens CCM)/trace-to-edm"
+        run: python -m pytest tests -q
+      - name: GraphRAG data integrity
+        shell: pwsh
+        working-directory: "Complement/GraphRAG-神纪图谱"
+        run: |
+          python -m pip install "pandas==3.0.3" "pyarrow==25.0.0"
+          python scripts/verify-env.py --data-only --no-services
+      - name: Portable audit (no E2E)
+        shell: pwsh
+        run: python "Complement/TRACE Engine(EDM-Takens CCM)/verify_portable.py" --no-e2e
+        env:
+          SMOKE_E2E_OFF: '1'

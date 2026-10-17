@@ -1,4 +1,4 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 """GraphRAG MCP Server - 通用知识图谱问答接口
 
 暴露工具:
@@ -64,6 +64,72 @@ def _resolve_project(project: str | None) -> str:
         "No GraphRAG project found. Pass project=... or set GRAPHRAG_PROJECT. "
         "Checked: " + "; ".join(seen)
     )
+
+
+# ---------- 数据版本、质量摘要与别名 ----------
+ALIAS_FILE = Path(__file__).resolve().parent / "entity_aliases.json"
+
+
+def _load_alias_data() -> dict:
+    try:
+        return json.loads(ALIAS_FILE.read_text(encoding="utf-8"))
+    except Exception:
+        return {"version": 0, "groups": []}
+
+
+_ALIAS_DATA = _load_alias_data()
+
+
+def _alias_group(name: str) -> dict | None:
+    needle = str(name or "").strip().lower()
+    if not needle:
+        return None
+    for group in _ALIAS_DATA.get("groups", []):
+        aliases = [str(x) for x in group.get("aliases", [])]
+        if any(needle == a.lower() for a in aliases):
+            return group
+    return None
+
+
+def _alias_hints(question: str) -> list[dict]:
+    text = str(question or "").lower()
+    out = []
+    for group in _ALIAS_DATA.get("groups", []):
+        aliases = [str(x) for x in group.get("aliases", [])]
+        if any(a.lower() in text for a in aliases if a):
+            out.append({"canonical": group.get("canonical"), "aliases": aliases})
+    return out
+
+
+def _data_version(project: str) -> dict:
+    path = Path(project) / "output" / "data_version.json"
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return {"generated_at": None, "source": "data_version.json not generated"}
+
+
+def _quality_summary(project: str) -> dict:
+    import pandas as pd
+    out = Path(project) / "output"
+    try:
+        e = pd.read_parquet(out / "entities.parquet")
+        r = pd.read_parquet(out / "relationships.parquet")
+        c = pd.read_parquet(out / "communities.parquet")
+        t = pd.read_parquet(out / "text_units.parquet")
+        isolates = int((e["degree"].fillna(0) == 0).sum()) if "degree" in e.columns else None
+        ufffd = int(t["text"].fillna("").str.count("\ufffd").sum()) if "text" in t.columns else None
+        return {
+            "entities": int(len(e)),
+            "relationships": int(len(r)),
+            "communities": int(len(c)),
+            "text_units": int(len(t)),
+            "isolates": isolates,
+            "ufffd_chars": ufffd,
+            "alias_groups": len(_ALIAS_DATA.get("groups", [])),
+        }
+    except Exception as ex:
+        return {"error": str(ex)}
 
 
 # ---------- 解经模式 (decode mode) ----------
@@ -145,6 +211,10 @@ async def graphrag_query(question: str, method: str = "local", community_level: 
     root = _resolve_project(project)
     loop = asyncio.get_running_loop()
     result = await loop.run_in_executor(None, _query_graph, root, question, method, community_level, decode)
+    result["data_version"] = _data_version(root)
+    hints = _alias_hints(question)
+    if hints:
+        result["alias_hints"] = hints
     return json.dumps(result, ensure_ascii=False)
 
 
@@ -173,6 +243,8 @@ async def graphrag_list_projects(project: str | None = None) -> str:
                 "relationships": int(len(r)),
                 "communities": int(len(c)),
                 "entity_types": e["type"].value_counts().to_dict() if "type" in e.columns else {},
+                "data_version": _data_version(root),
+                "quality": _quality_summary(root),
             })
         except Exception as ex:
             stats["error"] = str(ex)
@@ -180,15 +252,26 @@ async def graphrag_list_projects(project: str | None = None) -> str:
 
 
 @server.tool()
+async def graphrag_get_data_quality(project: str | None = None) -> str:
+    """Return data version, entity/relationship counts, isolates, U+FFFD and alias summary."""
+    root = _resolve_project(project)
+    return json.dumps({
+        "project": root,
+        "data_version": _data_version(root),
+        "quality": _quality_summary(root),
+    }, ensure_ascii=False)
+
+@server.tool()
 async def graphrag_get_context(entity: str, project: str | None = None) -> str:
-    """Get the graph context (neighbors, relationships, community) for a specific entity.
+    """Get merged graph context for an entity and its curated aliases.
 
     Args:
-        entity: The entity name to look up, e.g. "爱", "美姬", "弥赛亚".
+        entity: Entity name (Chinese or English), e.g. "桔梗", "KIKYO", "爱".
         project: Optional project root.
 
     Returns:
-        JSON string with entity info, neighbors and relationship descriptions.
+        JSON string with canonical name, aliases, matched titles, merged neighbors,
+        data_version and quality metadata.
     """
     import pandas as pd
 
@@ -197,37 +280,65 @@ async def graphrag_get_context(entity: str, project: str | None = None) -> str:
     e = pd.read_parquet(out / "entities.parquet")
     r = pd.read_parquet(out / "relationships.parquet")
 
-    # match by title (case-insensitive, exact then contains)
+    group = _alias_group(entity)
+    names = [str(x) for x in group.get("aliases", [])] if group else [entity]
     titles = e["title"].astype(str)
-    exact = titles.str.lower() == entity.lower()
-    if exact.any():
-        match = e[exact]
-    else:
-        match = e[titles.str.contains(entity, case=False, na=False)]
+    masks = []
+    for name in names:
+        exact = titles.str.lower() == name.lower()
+        if exact.any():
+            masks.append(exact)
+        else:
+            masks.append(titles.str.contains(name, case=False, regex=False, na=False))
+    mask = masks[0]
+    for extra in masks[1:]:
+        mask = mask | extra
+    match = e[mask]
     if match.empty:
-        return json.dumps({"ok": False, "entity": entity, "error": "entity not found"}, ensure_ascii=False)
+        return json.dumps({
+            "ok": False,
+            "entity": entity,
+            "aliases": names,
+            "error": "entity not found",
+            "data_version": _data_version(root),
+        }, ensure_ascii=False)
 
-    row = match.iloc[0]
-    ename = row["title"]
-    rels = r[(r["source"] == ename) | (r["target"] == ename)]
+    matched_titles = [str(x) for x in match["title"].tolist()]
+    primary = match.sort_values("degree", ascending=False).iloc[0] if "degree" in match.columns else match.iloc[0]
+    rels = r[(r["source"].isin(matched_titles)) | (r["target"].isin(matched_titles))]
+
     neighbors = []
+    seen = set()
     for _, rel in rels.iterrows():
-        other = rel["target"] if rel["source"] == ename else rel["source"]
+        src = str(rel["source"])
+        dst = str(rel["target"])
+        other = dst if src in matched_titles else src
+        key = (other, str(rel.get("description", "")))
+        if key in seen:
+            continue
+        seen.add(key)
         neighbors.append({
             "entity": other,
             "relationship": str(rel.get("description", "")),
             "weight": float(rel.get("weight", 0)) if "weight" in rel else None,
         })
     neighbors.sort(key=lambda x: x["weight"] or 0, reverse=True)
+
     return json.dumps({
         "ok": True,
-        "entity": ename,
-        "type": row.get("type", ""),
-        "description": str(row.get("description", ""))[:500],
-        "degree": int(row.get("degree", 0)) if "degree" in row else None,
+        "entity": str(primary["title"]),
+        "canonical": group.get("canonical") if group else str(primary["title"]),
+        "aliases": names,
+        "matched_titles": matched_titles,
+        "type": primary.get("type", ""),
+        "description": str(primary.get("description", ""))[:500],
+        "degree": int(primary.get("degree", 0)) if "degree" in primary else None,
+        "merged_degree": len(neighbors),
         "top_neighbors": neighbors[:20],
         "total_neighbors": len(neighbors),
+        "data_version": _data_version(root),
     }, ensure_ascii=False)
+
 
 
 def main():

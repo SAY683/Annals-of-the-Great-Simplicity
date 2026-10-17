@@ -12,6 +12,22 @@ trace-to-edm 全局配置
 import os
 from pathlib import Path
 
+
+def _existing_child_dir(parent: Path, preferred_name: str) -> Path:
+    """Return an existing child directory, tolerating Models/models casing."""
+    exact = parent / preferred_name
+    if exact.is_dir():
+        return exact
+    wanted = preferred_name.casefold()
+    try:
+        for child in parent.iterdir():
+            if child.is_dir() and child.name.casefold() == wanted:
+                return child
+    except OSError:
+        pass
+    return exact
+
+
 # ── 路径配置 ────────────────────────────────────────────────
 PROJECT_ROOT = Path(os.path.dirname(os.path.abspath(__file__)))
 
@@ -41,7 +57,7 @@ PROJECT_ROOT = Path(os.path.dirname(os.path.abspath(__file__)))
 #   Qwen2.5-X-Instruct/             (PROJECT_ROOT.parent.parent)
 #
 # 探测信号: PROJECT_ROOT.parent / "Models" 存在且包含 Qwen2.5-1.5B-Instruct
-_PORTABLE_MODELS_DIR = PROJECT_ROOT.parent / "Models"
+_PORTABLE_MODELS_DIR = _existing_child_dir(PROJECT_ROOT.parent, "Models")
 _IS_PORTABLE_LAYOUT = (
     _PORTABLE_MODELS_DIR.exists()
     and (_PORTABLE_MODELS_DIR / "Qwen2.5-1.5B-Instruct").exists()
@@ -87,8 +103,8 @@ if _IS_PORTABLE_LAYOUT:
     _DEFAULT_SHEHUI = str(_PORTABLE_MODELS_DIR / "shehui-llama")
     _DEFAULT_SHENJI = str(_PORTABLE_MODELS_DIR / "shenji-llama")
 else:
-    _DEFAULT_SHEHUI = str(PROJECT_ROOT.parent.parent / "Models" / "shehui-llama")
-    _DEFAULT_SHENJI = str(PROJECT_ROOT.parent.parent / "Models" / "shenji-llama")
+    _DEFAULT_SHEHUI = str(_existing_child_dir(PROJECT_ROOT.parent.parent, "Models") / "shehui-llama")
+    _DEFAULT_SHENJI = str(_existing_child_dir(PROJECT_ROOT.parent.parent, "Models") / "shenji-llama")
 
 SHEHUI_MODEL_PATH = Path(os.environ.get("SHEHUI_MODEL_PATH", _DEFAULT_SHEHUI))
 SHENJI_MODEL_PATH = Path(os.environ.get("SHENJI_MODEL_PATH", _DEFAULT_SHENJI))

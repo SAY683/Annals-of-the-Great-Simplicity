@@ -19,6 +19,8 @@ timestamp,result,kills,damage,deaths,total_ms,z_pca_1
 - 无缺失值（NaN/Inf 会被自动处理但影响结果）
 - 第一列通常为时间戳或索引
 
+> TRACE 轨迹 CSV 额外包含 `trace_status` / `trace_error` / `trace_mode` / `trace_data_source`。`trace_data_source=synthetic_sem` 表示 ATE/CI 来自合成 SEM 数据，不是观测数据估计。
+
 ### 输入：文本语料（TRACE 分析）
 
 ```

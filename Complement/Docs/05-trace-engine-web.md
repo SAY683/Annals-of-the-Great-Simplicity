@@ -2,14 +2,14 @@
 
 ## 概述
 
-基于 Node.js (Koa) 的 Web 前端，提供 TRACE 因果分析的图形界面。
+基于 Node.js (Express) 的 Web 前端，提供 TRACE 因果分析的图形界面。
 支持三种分析模式（LIGHT/DEEP/SUPER），通过 SSE 实时推送日志。
 
 ## 目录结构
 
 ```
 trace-engine-web/
-├── server.js                 # HTTP + SSE 服务端（Koa）
+├── server.js                 # HTTP + SSE 服务端（Express）
 ├── start.bat / start.ps1     # 启动脚本
 ├── stop_servers.bat / stop_servers.ps1  # 停止脚本
 ├── py_bridge.py              # Python 子进程桥接
@@ -52,22 +52,26 @@ trace-engine-web/
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
-| POST | `/api/analyze` | 提交分析任务 |
-| GET | `/api/jobs` | 任务列表 |
-| GET | `/api/jobs/:id` | 任务详情 |
-| GET | `/api/jobs/:id/log` | SSE 实时日志 |
-| POST | `/api/retry/:id` | 重试任务（不支持 SUPER） |
-| GET | `/api/config` | 配置信息（含 bridgeParamSchema） |
+| POST | `/api/analyze-text` | 提交纯文本分析 |
+| POST | `/api/analyze-file` | 上传文本文件分析 |
+| GET/POST | `/api/analyze-stream` | SSE 实时阶段/日志/结果 |
+| POST | `/api/cancel/:id` | 取消任务 |
+| GET | `/api/result/:id` | 获取结果 JSON |
+| GET | `/api/report/:id` | 获取 Markdown 报告 |
+| GET | `/api/jobs` | 任务历史列表 |
+| GET | `/api/jobs/:id` | 单任务状态 |
+| POST | `/api/retry/:id` | 重试任务（SUPER 除外） |
+| GET | `/api/config` | 配置 + `bridgeParamSchema` |
 | GET | `/api/presets` | 参数预设 |
-| GET | `/api/schema` | Schema 定义 |
+| GET | `/api/schema` | Bridge/Result Schema |
 | GET | `/api/health` | 健康检查 |
-
+| GET | `/api/version` | 版本信息 |
 ## 进程架构
 
 ```
 ──────────────┐     ┌──────────────┐
 │  server.js   │────▶│  py_bridge.py │──▶ trace-engine CLI
-│  (Koa :3000) │     │  (subprocess) │
+│  (Express :3000) │     │  (subprocess) │
 └──────────────┘     └──────────────┘
                             │
                      ┌──────▼──────┐

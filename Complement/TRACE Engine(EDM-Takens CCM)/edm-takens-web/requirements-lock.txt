@@ -1,0 +1,17 @@
+# edm-takens-web — direct dependency lock
+# Reference environment: Python 3.13.2, Windows, 2026-10-17.
+fastapi==0.139.0
+uvicorn==0.51.0
+python-multipart==0.0.32
+pandas==3.0.3
+numpy==2.4.6
+scipy==1.18.0
+pyEDM==2.5.0
+scikit-learn==1.9.0
+statsmodels==0.14.6
+matplotlib==3.11.0
+pytest==9.1.1
+httpx==0.28.1
+# Optional, not installed in the reference environment:
+# ruptures>=1.1
+# arch>=5.0

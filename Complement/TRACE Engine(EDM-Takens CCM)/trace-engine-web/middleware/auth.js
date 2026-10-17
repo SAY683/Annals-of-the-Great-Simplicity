@@ -90,8 +90,20 @@ function createAuthMiddleware() {
   }
 
   return function authMiddleware(req, res, next) {
-    // 鉴权未启用：直接放行
-    if (!authEnabled) return next();
+    // 鉴权未启用：允许本机/网关，但拒绝直接来自隧道的代理请求
+    if (!authEnabled) {
+      const proxied = req.headers['cf-connecting-ip'] || req.headers['x-forwarded-for'];
+      const fromGate = req.headers['x-complement-gate'] === '1';
+      if (proxied && !fromGate) {
+        return res.status(403).json({
+          success: false,
+          error: 'External tunnel access requires the local gate or TRACE_API_KEY',
+          code: 'AUTH_FALLBACK',
+          traceId: req.traceId,
+        });
+      }
+      return next();
+    }
 
     const reqPath = req.path;
     // 静态资源与非 /api/ 且非 /mcp 路径放行

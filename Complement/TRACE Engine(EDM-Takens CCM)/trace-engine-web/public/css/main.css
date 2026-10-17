@@ -1539,3 +1539,15 @@ details > div { padding: 0.75rem; }
   line-height: 1.3;
   font-size: clamp(0.6rem, 0.82vw, 0.7rem);
 }
+
+/* Data provenance warning: synthetic SEM ATE is not an observed-data estimate. */
+.data-source-warning {
+  margin: 0 0 10px;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 170, 60, 0.45);
+  border-radius: 8px;
+  background: rgba(255, 170, 60, 0.08);
+  color: #ffd28a;
+  font-size: 0.78rem;
+  line-height: 1.5;
+}

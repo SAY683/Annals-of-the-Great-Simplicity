@@ -15,6 +15,21 @@ import tempfile
 import warnings
 from pathlib import Path
 
+
+def _existing_child_dir(parent: Path, preferred_name: str) -> Path:
+    """Prefer ``Models/`` but reuse an existing case-variant directory."""
+    exact = parent / preferred_name
+    if exact.is_dir():
+        return exact
+    wanted = preferred_name.casefold()
+    try:
+        for child in parent.iterdir():
+            if child.is_dir() and child.name.casefold() == wanted:
+                return child
+    except OSError:
+        pass
+    return exact
+
 # P0-03 修复：移除所有硬编码绝对路径，改为基于脚本自身位置推断。
 # 支持两种布局：
 #   1. 开发布局：脚本在 trace-engine-web/work/sync_product.py
@@ -345,7 +360,7 @@ def copy_data_to_engine():
 
 
 def copy_models_to_engine():
-    """将 TRACE/models 下的 LLaMA 训练模型复制到成品 trace-engine/models 与成品根 Models/，
+    """将源模型复制到成品 trace-engine/Models 与成品根 Models/，
     使 SUPER 模式无需额外下载即可使用，同时满足 trace-to-edm config.py 的便携式布局探测。
     大文件默认跳过 .gitignore 排除项。"""
     # P0 修复 (2026-07-30): 移除硬编码绝对路径，改为基于脚本位置推断 + 环境变量覆盖。
@@ -365,8 +380,8 @@ def copy_models_to_engine():
         print(f'  跳过: 未找到源模型目录 (候选: {[str(c) for c in _candidate_models]})')
         return
 
-    # 目标 1: trace-engine/models（引擎内部使用）
-    dst_models = dst_engine / 'models'
+    # 目标 1: trace-engine/Models（引擎内部使用；复用已有大小写变体）
+    dst_models = _existing_child_dir(dst_engine, 'Models')
     dst_models.mkdir(parents=True, exist_ok=True)
 
     # 目标 2: 成品根 Models/（供 trace-to-edm / config.py 便携式布局探测）

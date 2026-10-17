@@ -113,7 +113,7 @@ def check_optional_deps(per_import_timeout=_DEFAULT_PER_IMPORT_TIMEOUT, quick=Fa
 def check_models(root: Path):
     """按项目实际布局探测 LLaMA 模型，兼容开发/层级成品/便携根三种目录结构。"""
     models = {}
-    # 优先使用 project_paths 解析（覆盖 TRACE_ROOT/models、trace-engine/models、便携根等）
+    # 优先使用 project_paths 解析（覆盖 TRACE_ROOT/Models、trace-engine/Models、便携根等）
     sys.path.insert(0, str(root / 'examples' / 'counterfactual_hybrid'))
     try:
         from project_paths import resolve_paths
@@ -127,7 +127,8 @@ def check_models(root: Path):
             candidates.append(paths.model_dir(name))
         # 兼容历史布局：模型直接放在 trace-engine/ 根下
         candidates.append(root / name)
-        # 兼容标准小写 models/ 子目录
+        # 规范布局使用 Models/；保留小写 models/ 作为历史布局兼容
+        candidates.append(root / 'Models' / name)
         candidates.append(root / 'models' / name)
 
         found = None

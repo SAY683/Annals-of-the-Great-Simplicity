@@ -70,7 +70,7 @@ else:
 # 不强制设置 TRACE_ROOT：project_paths / _config 会根据 SKILL_DIR 自动探测
 #   - 开发布局 -> <project_root>/TRACE
 #   - 层级成品布局 -> <product>/trace-engine
-# 这样 dev 与 product 两种布局都能正确找到 models/ 目录。
+# 这样 dev 与 product 两种布局都能正确找到 Models/ 目录（兼容历史 models/）。
 
 # 先插入 TRACE_ENGINE_DIR，再插入 SKILL_DIR，确保 SKILL_DIR 优先级更高
 # （防止 trace-engine/ 根目录下的同名文件遮蔽 counterfactual_hybrid/ 下的模块）
@@ -1359,6 +1359,9 @@ def run_super_job(job: dict):
         "max_concepts": config.get('max_concepts', 12),
         "concept_min_freq": config.get('concept_min_freq', 2),
         "backend": "DoWhy",
+        "data_source": getattr(bridge, "data_source", "synthetic_sem"),
+        "data_source_detail": getattr(bridge, "data_source_detail", ""),
+        "refutation_scope": "internal_consistency_on_synthetic_sem" if getattr(bridge, "data_source", "") == "synthetic_sem" else "observed_data",
         "simulation": False,
     }
     timer.end()

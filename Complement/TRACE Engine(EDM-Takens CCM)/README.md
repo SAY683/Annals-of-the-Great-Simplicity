@@ -25,7 +25,7 @@
 │   ├── health_check.py       # 引擎健康检查
 │   ├── examples/
 │   │   └── counterfactual_hybrid/  # 六战士因果分析核心
-│   ├── models/               # 训练好的 LLaMA 模型（SUPER 模式使用）
+│   ├── Models/               # 训练好的 LLaMA 模型（SUPER 模式使用）
 │   ├── tests/test_skill.py   # 引擎自检测试
 │   └── date/                 # 训练/测试数据
 ├── trace-engine-web/         # Node.js Web 服务
@@ -102,9 +102,9 @@ Web 界面提供三种分析模式：
 
 - **LIGHT**：jieba 概念图 + 简化流程（1–3 秒）
 - **DEEP**：jieba 概念图 + 完整六战士深度诊断（10–60 秒）
-- **SUPER**：调用 `trace-engine/models/` 下可选的三个 LLaMA 模型之一执行真正的 token-level TRACE 因果发现，再走完整六合一诊断（首次需加载模型，分析耗时视文本长度与模型规模而定）
+- **SUPER**：调用 `trace-engine/Models/` 下可选的三个 LLaMA 模型之一执行真正的 token-level TRACE 因果发现，再走完整六合一诊断（首次需加载模型，分析耗时视文本长度与模型规模而定）
 
-> SUPER 模式由常驻 LLaMA Worker 处理，单线程顺序执行。模型文件较大，首次同步时自动复制到 `trace-engine/models/`。
+> SUPER 模式由常驻 LLaMA Worker 处理，单线程顺序执行。模型文件较大，首次同步时自动复制到 `trace-engine/Models/`。
 >
 > 可选模型规格（三选一）：
 > - **shehui-llama**（默认，27M 参数 / ~108MB / max_position=256）：轻量高效，~800 pps，适合大规模文本快速刨析，建议显存 ≥1.5GB

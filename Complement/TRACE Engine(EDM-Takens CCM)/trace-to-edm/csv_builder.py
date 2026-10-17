@@ -83,6 +83,8 @@ class TrajectoryCSV:
         "trace_status", "trace_error",
         # ── TRACE 模式（P2 修缮）：light/deep，让下游解读六战士 0 值的语义 ──
         "trace_mode",
+        # Data provenance: synthetic_sem / observed / unknown
+        "trace_data_source",
     ] + [
         # ── Layer 1: 元 SCM（从 config.LAYER1_COLUMNS 程序化绑定） ──
         c[0] for c in LAYER1_COLUMNS
@@ -168,6 +170,8 @@ class TrajectoryCSV:
                 # P2 修缮：历史行没有 trace_mode 列时补 unknown
                 if "trace_mode" not in clean_row or not clean_row.get("trace_mode"):
                     clean_row["trace_mode"] = "unknown"
+                if "trace_data_source" not in clean_row or not clean_row.get("trace_data_source"):
+                    clean_row["trace_data_source"] = "unknown"
                 self._rows.append(clean_row)
                 # 更新实例级已知列（同样跳过 _ 前缀）
                 for key in clean_row.keys():
@@ -210,7 +214,7 @@ class TrajectoryCSV:
 
         Note:
             以 ``_`` 开头的键视为内部元数据（如 ``_orthogonality_report``、
-            ``_method``），不会作为新列追加，从而保持 54 列规范不被污染。
+            ``_method``），不会作为新列追加，从而保持跨版本规范列不被污染。
             若需保留此类字段，应在调用方先重命名为正式列名。
         """
         # 确保所有已知列都存在
@@ -294,7 +298,7 @@ class TrajectoryCSV:
         refutations_attempted/consensus_score/consensus_direction (6列),
         Meta 漏了 trace_status/trace_error/trace_mode (3列),
         导致 print_summary 显示 "Meta:3 / L1:24 / 其他:9" 而非
-        正确的 "Meta:6 / L1:30 / 其他:0"。
+        正确的 "Meta:7 / L1:30 / 其他:0"。
         """
         groups = {
             "meta": [],
@@ -304,10 +308,10 @@ class TrajectoryCSV:
             "other": [],
         }
 
-        # Meta 列完整集合 (6列)
+        # Meta 列完整集合 (7列)
         meta_cols = {
             "time_step", "text_hash", "source_label",
-            "trace_status", "trace_error", "trace_mode",
+            "trace_status", "trace_error", "trace_mode", "trace_data_source",
         }
 
         # L1 前缀匹配 + 显式列名 (覆盖 config.LAYER1_COLUMNS 全部 30 列)
@@ -361,7 +365,7 @@ class TrajectoryCSV:
 # ── ROUND28 P2-03: 列总数断言守卫 (模块级, 类定义完成后执行) ──
 # 防止 LAYER1_COLUMNS / SACRED_BOOKS 变更后 COLUMN_ORDER 列数漂移不被发现
 _EXPECTED_COLUMN_COUNT = (
-    6  # Meta: time_step, text_hash, source_label, trace_status, trace_error, trace_mode
+    7  # Meta: time_step, text_hash, source_label, trace_status, trace_error, trace_mode, trace_data_source
     + len(LAYER1_COLUMNS)
     + 4  # L2: z_pca_1, z_pca_2, z_pca_3, secular_entropy
     + 8  # L3 绝对投影

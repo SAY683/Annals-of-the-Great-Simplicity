@@ -54,7 +54,25 @@ def _wait_for_port(host: str, port: int, timeout: float = 30.0):
     return False
 
 
+os.environ.setdefault("VITE_PORT", "5173")
+
+
+def _check_runtime_deps():
+    """Check the core modules required by the FastAPI backend."""
+    import importlib.util
+    required = ["fastapi", "uvicorn", "numpy", "pandas", "scipy", "sklearn"]
+    missing = [m for m in required if importlib.util.find_spec(m) is None]
+    if missing:
+        print(f"[ERROR] Python {sys.version.split()[0]} is missing: {', '.join(missing)}")
+        print(f"[HINT]  {sys.executable} -m pip install -r requirements.txt")
+        print("[HINT]  Or set EDM_PYTHON_CMD / TRACE_PYTHON_CMD to a complete interpreter.")
+        return False
+    print(f"[OK] Python runtime: {sys.executable} ({sys.version.split()[0]})")
+    return True
+
 def main():
+    if not _check_runtime_deps():
+        return 1
     print("=" * 60)
     print("  EDM-Takens Web MVP 启动器")
     print("=" * 60)

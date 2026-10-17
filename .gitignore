@@ -27,3 +27,19 @@ Complement/神纪-注释工程/
 
 # 存在显影（本地工作/教学用器，不入库）
 Miscellanies/存在显影/
+
+# Reproducible Node locks for the portable web apps
+!Complement/TRACE Engine(EDM-Takens CCM)/trace-engine-web/package-lock.json
+!Complement/TRACE Engine(EDM-Takens CCM)/trace-to-edm/package-lock.json
+!Complement/TRACE Engine(EDM-Takens CCM)/edm-takens-web/frontend/package-lock.json
+
+# Tunnel secrets/runtime
+tunnel_token.txt
+tunnel_access_url.txt
+Complement/tunnel_logs/
+tunnel_logs/
+
+.venv/
+
+# Vite build output
+Complement/TRACE Engine(EDM-Takens CCM)/edm-takens-web/frontend/dist/

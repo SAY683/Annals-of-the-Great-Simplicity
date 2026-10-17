@@ -278,6 +278,8 @@ class TRACE2DoWhy:
         # 这确保 _DOWHY_AVAILABLE 等变量在使用前被解析,同时避免模块加载时的 import 开销。
         _resolve_availability_flags()
         self.simulation = simulation or not _DOWHY_AVAILABLE
+        self.data_source = 'unknown'
+        self.data_source_detail = ''
         self.rng = np.random.default_rng(random_state)
 
         # v3: 自适应过滤参数
@@ -573,6 +575,11 @@ class TRACE2DoWhy:
         # 数据矩阵
         if data_df is None:
             data_df = self._simulate_data(C)
+            self.data_source = 'synthetic_sem'
+            self.data_source_detail = f'SEM generated from concept adjacency; n_samples={len(data_df)}'
+        else:
+            self.data_source = 'observed'
+            self.data_source_detail = f'external data; n_samples={len(data_df)}'
 
         # 估计 SEM 系数（用于 Pearl 反事实）
         raw_data = data_df.values if hasattr(data_df, 'values') else np.asarray(data_df)

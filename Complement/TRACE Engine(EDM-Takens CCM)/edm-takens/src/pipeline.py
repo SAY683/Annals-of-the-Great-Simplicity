@@ -631,7 +631,7 @@ def run_pipeline(config: PipelineConfig = None,
         from ccm_causality import ccm_batch_test
         print(f"\n  [CCM Batch Check (Victim Mirror + Secret 13 correction)]")
         # R34-D 修复 (DEBT-ROUND33-01): CCM candidate_pairs 从硬编码改为动态选择.
-        # 原代码硬编码 ['kills', 'damage', 'deaths'] 作为 cause, 对88列轨迹数据
+        # 原代码硬编码 ['kills', 'damage', 'deaths'] 作为 cause, 对89列轨迹数据
         # (ate/ate_ci_lower/consensus_score 等) 完全不适用.
         # 修改为: 优先使用 config.columns 中除 target_col 外的所有列,
         # 回退到 game-log schema (kills/damage/deaths) 保持向后兼容.

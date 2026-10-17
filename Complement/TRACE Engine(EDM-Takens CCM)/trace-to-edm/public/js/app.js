@@ -1341,7 +1341,7 @@ async function refreshTable() {
       'dz_福音', 'dz_存在', 'dz_觉爱', 'dz_奥美',
       // TRACE 诊断列（R13-4 修缮：让"系统错位"显形）
       // trace_error 可能长达 300 字符，单元格里截断显示，完整内容放 title 提示
-      'trace_status', 'trace_mode', 'trace_error',
+      'trace_status', 'trace_mode', 'trace_data_source', 'trace_error',
     ];
     const cols = preferredCols.filter(c => d.columns.includes(c));
     // 按层分组着色
@@ -1403,6 +1403,11 @@ async function refreshTable() {
             replay: 'tmode-replay', unknown: 'tstat-skipped',
           };
           statusClass = modeColors[v] || '';
+        }
+        // trace_data_source: synthetic SEM vs observed data
+        if (c === 'trace_data_source') {
+          const dsColors = { synthetic_sem: 'tstat-partial', observed: 'tstat-ok', unknown: 'tstat-skipped' };
+          statusClass = dsColors[v] || '';
         }
         h += `<td class="${isNum?'num':''} ${diffEmpty?'dim':''} ${statusClass}"${titleAttr}>${display}</td>`;
       });

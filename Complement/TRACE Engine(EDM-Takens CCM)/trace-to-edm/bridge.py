@@ -449,6 +449,7 @@ def process_single_text(
     # trace_mode 列：记录本次 TRACE 模式（light/deep），让下游能正确解读
     #                六战士字段在 LIGHT 模式下为 0 是设计（未跑六战士），不是失败
     row["trace_mode"] = trace_mode
+    row["trace_data_source"] = "unknown"
     if not skip_trace:
         trace_output_dir, trace_err = run_trace_analysis(text, mode=trace_mode)
         if trace_output_dir is None:

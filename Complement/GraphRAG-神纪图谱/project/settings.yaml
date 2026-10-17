@@ -3,24 +3,28 @@ completion_models:
     model_provider: openai
     model: deepseek-v4-flash
     call_args:
+      extra_headers:
+        x-opencode-session: complement-graphrag
       extra_body:
         reasoning_effort: none
       max_tokens: 12000
     auth_method: api_key
-    api_base: http://127.0.0.1:15721/v1   # CC Switch 本地代理；实测路由到官方 DeepSeek，并非 opencode Go
-    api_key: dummy                          # 代理模式可填 dummy；直连官方改 api_base=https://api.deepseek.com + api_key=${GRAPHRAG_API_KEY}
+    api_base: http://127.0.0.1:15721/v1   # local proxy; x-opencode-session is passed above for proxy compatibility
+    api_key: dummy                          # proxy mode: dummy. Direct official API: set api_base to https://api.deepseek.com and put a real key here or in a local .env; do not commit it.
     retry:
       type: exponential_backoff
   extraction_model:
     model_provider: openai
     model: deepseek-v4-flash
     call_args:
+      extra_headers:
+        x-opencode-session: complement-graphrag
       extra_body:
         reasoning_effort: high
       max_tokens: 32000
     auth_method: api_key
-    api_base: http://127.0.0.1:15721/v1   # CC Switch 本地代理；实测路由到官方 DeepSeek，并非 opencode Go
-    api_key: dummy                          # 代理模式可填 dummy；直连官方改 api_base=https://api.deepseek.com + api_key=${GRAPHRAG_API_KEY}
+    api_base: http://127.0.0.1:15721/v1   # local proxy; x-opencode-session is passed above for proxy compatibility
+    api_key: dummy                          # proxy mode: dummy. Direct official API: set api_base to https://api.deepseek.com and put a real key here or in a local .env; do not commit it.
     retry:
       type: exponential_backoff
 embedding_models:

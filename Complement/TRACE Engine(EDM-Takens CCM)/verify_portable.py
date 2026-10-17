@@ -390,8 +390,8 @@ def check_super_worker_imports(root: Path) -> dict:
 def check_trace_to_edm_contract(root: Path) -> dict:
     """R13-4：校验 trace-to-edm 轨迹表契约。
 
-    确保 bridge.py 写入 trace_status/trace_error/trace_mode 列，
-    且前端 app.js 的 preferredCols 数组包含这三列。
+    确保 bridge.py 写入 trace_status/trace_error/trace_mode/trace_data_source 列，
+    且前端 app.js 的 preferredCols 数组包含这四列。
     否则会出现"系统错位被静默吞掉"的回归。
     """
     result = {'name': 'trace-to-edm 轨迹表契约', 'ok': True, 'messages': []}
@@ -407,16 +407,16 @@ def check_trace_to_edm_contract(root: Path) -> dict:
         result['messages'].append('缺失 trace-to-edm/public/js/app.js')
         return result
 
-    # 1. bridge.py 必须写入这三列
+    # 1. bridge.py 必须写入这四列
     bridge_text = bridge_py.read_text(encoding='utf-8')
-    for col in ['trace_status', 'trace_error', 'trace_mode']:
+    for col in ['trace_status', 'trace_error', 'trace_mode', 'trace_data_source']:
         if f'"{col}"' not in bridge_text and f"'{col}'" not in bridge_text:
             result['ok'] = False
             result['messages'].append(f'bridge.py 未写入列: {col}')
 
-    # 2. app.js preferredCols 必须包含这三列
+    # 2. app.js preferredCols 必须包含这四列
     app_text = app_js.read_text(encoding='utf-8')
-    for col in ['trace_status', 'trace_mode', 'trace_error']:
+    for col in ['trace_status', 'trace_mode', 'trace_data_source', 'trace_error']:
         if col not in app_text:
             result['ok'] = False
             result['messages'].append(f'app.js preferredCols 缺少列: {col}')

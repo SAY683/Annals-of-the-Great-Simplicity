@@ -288,6 +288,9 @@ def extract_meta_scm_params(result_json_path: Path) -> Dict[str, Any]:
     params["consensus_score"] = _compute_consensus_score(params)
     params["consensus_direction"] = _compute_consensus_direction(params)
 
+    # Data provenance: synthetic_sem / observed / unknown
+    params["trace_data_source"] = str(data.get("data_source", "unknown"))
+
     return params
 
 

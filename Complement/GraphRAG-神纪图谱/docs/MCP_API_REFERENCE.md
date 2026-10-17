@@ -1,4 +1,4 @@
-﻿# MCP_API_REFERENCE · GraphRAG MCP 工具接口
+# MCP_API_REFERENCE · GraphRAG MCP 工具接口
 
 ## 概览
 
@@ -19,7 +19,7 @@
 
 **返回**（JSON 字符串）：
 ```json
-{ "ok": true, "method": "global", "question": "…", "answer": "…", "error": null }
+{ "ok": true, "method": "global", "question": "…", "answer": "…", "error": null, "data_version": { "generated_at": "…", "text_unit_hash": "…" }, "alias_hints": [] }
 ```
 `answer` 为 Markdown 文本，带 `[Data: Reports (…)]` 引用。
 
@@ -42,7 +42,7 @@ graphrag_query(question="种子在书中象征什么？", method="local")
 **返回**（JSON）：
 ```json
 { "project": "…", "exists": true, "entities": 3038, "relationships": 3987,
-  "communities": 555, "entity_types": { "CONCEPT": 1712, … } }
+  "communities": 555, "entity_types": { "CONCEPT": 1262, … } }
 ```
 
 ## 工具 3：graphrag_get_context
@@ -56,6 +56,15 @@ graphrag_query(question="种子在书中象征什么？", method="local")
 
 **返回**：JSON，含实体信息、邻居、关系描述。
 
+## 工具 4：graphrag_get_data_quality
+
+**用途**：返回数据版本与质量摘要，便于在回答前确认索引状态。
+
+| 参数 | 类型 | 必填 | 默认 | 说明 |
+|---|---|---|---|---|
+| project | str | 否 | 自动 | 项目根目录 |
+
+**返回**：JSON，含 `data_version`（生成时间、计数、`text_unit_hash`）与 `quality`（实体/关系/社区/文本块、孤立实体、U+FFFD、别名组数）。
 ## 项目路径解析规则（可移植性）
 
 1. 显式 `project=` 参数优先
@@ -92,7 +101,7 @@ codex mcp add graphrag -- python <归档路径>\mcp\graphrag_mcp.py
 
 **三工具实测**：
 - `graphrag_query(question="我当前应该怎么做？无关于目标，只是我应该遵循何种策略。", method="global")` → 完整策略综合回答（见 `示例-策略问答.md`）
-- `graphrag_get_context(entity="爱")` → CONCEPT，degree 44，邻居/关系齐全
+- `graphrag_get_context(entity="爱")` → CONCEPT，degree 16（别名合并后可能更高），邻居/关系齐全
 - `graphrag_list_projects() → 3038/3987/555 全量统计（2026-08-05 19:00 最终重建后实测）
 
 **通用性要点**：

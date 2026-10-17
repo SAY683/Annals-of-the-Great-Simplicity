@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "description": "Curated query-time alias groups. This does not rewrite parquet; graphrag_get_context merges the listed entities.",
+  "groups": [
+    {"canonical": "KIKYO", "aliases": ["KIKYO", "桔梗"], "note": "Chinese/English duplicate observed in the index"},
+    {"canonical": "LOVE", "aliases": ["LOVE", "爱"], "note": "Chinese/English duplicate observed in the index"},
+    {"canonical": "SAORI", "aliases": ["SAORI", "纱织"], "note": "candidate alias; verify against source when interpreting"},
+    {"canonical": "AMUT", "aliases": ["AMUT", "阿姆特"], "note": "candidate alias; verify against source when interpreting"},
+    {"canonical": "WORLD", "aliases": ["WORLD", "世界"], "note": "candidate alias; verify against source when interpreting"},
+    {"canonical": "GOD", "aliases": ["GOD", "神"], "note": "candidate alias; verify against source when interpreting"},
+    {"canonical": "SHRINE", "aliases": ["SHRINE", "神社"], "note": "candidate alias; verify against source when interpreting"},
+    {"canonical": "THE CHURCH", "aliases": ["THE CHURCH", "教会"], "note": "candidate alias; verify against source when interpreting"}
+  ]
+}
