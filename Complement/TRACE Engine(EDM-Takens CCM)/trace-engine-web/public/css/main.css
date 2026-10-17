@@ -1300,6 +1300,15 @@ details > div { padding: 0.75rem; }
   /* 任务历史卡片进一步紧凑 */
   .terminal-line.job-card { padding: 0.35rem 0.4rem; }
   .terminal-line.job-card .job-actions a { padding: 0.2rem 0.35rem; font-size: 0.62rem; }
+
+  /* 2026-10-17 UI audit: prevent mobile panel toolbars and wide matrices
+     from widening the document viewport. */
+  .panel-header > div { flex-wrap: wrap; min-width: 0; }
+  .panel-header button { width: auto; flex: 1 1 90px; min-width: 0; }
+  #mainMatrixView,
+  #adjMatrixWrap,
+  .adj-matrix-wrap { max-width: 100%; min-width: 0; box-sizing: border-box; }
+  #adjMatrixWrap { overflow-x: auto; }
 }
 
 @media (prefers-reduced-motion: reduce) {
