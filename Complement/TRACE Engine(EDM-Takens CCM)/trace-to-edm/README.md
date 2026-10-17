@@ -28,7 +28,14 @@
 
 ```
 trace-to-edm/
-├── server.js              # Node.js Web 服务 (Express + SSE, 端口3100)
+├── server.js              # 进程入口（仅端口/监听/启动横幅）
+├── src/
+│   ├── app.js             # Express 组装（中间件/鉴权/MCP/路由挂载）
+│   ├── config.js          # 路径与运行配置
+│   ├── routes/            # core/trajectory/pipeline/edm/dataset/models/projects
+│   ├── services/          # python/job/dataset/trajectory/logger
+│   ├── middleware/        # 输入路径安全校验
+│   └── lib/               # 缓存等无状态工具
 ├── bridge.py              # Python CLI 入口 (三层管线 + 项目管理)
 ├── start.bat              # 一键启动脚本
 │
@@ -91,39 +98,39 @@ start.bat
 
 | # | 方法 | 端点 | 说明 | server.js 行号 |
 |---|------|------|------|----------------|
-| 1 | GET | `/api/health` | 健康检查（服务名 + 时间戳） | 1035 |
-| 2 | GET | `/api/version` | 版本号（从 package.json 读取） | 1041 |
-| 3 | GET | `/api/status` | 轨迹状态 + EDM 就绪度 | 1053 |
-| 4 | GET | `/api/orthogonality` | 八正道正交性报告（Frobenius 距离等元审计） | 1106 |
-| 5 | GET | `/api/trajectory` | 当前轨迹 CSV (JSON) | 1128 |
-| 6 | POST | `/api/trajectory/clear` | 清空当前项目轨迹 | 1133 |
-| 7 | GET | `/api/trajectory/export/md` | 一键导出人话版 Markdown 报告 | 1154 |
-| 8 | GET | `/api/trajectory/report` | 查看最新人话版报告（支持 ?format=html） | 1173 |
-| 9 | POST | `/api/run` | 提交文本管线任务 (Mode A, SSE) | 1192 |
-| 10 | POST | `/api/replay` | 提交回填任务 (Mode B, SSE) | 1285 |
-| 11 | POST | `/api/edm/trigger` | 触发 EDM 分析 | 1374 |
-| 12 | GET | `/api/edm/poll/:jobId` | EDM 轮询代理（避免 CORS） | 1460 |
-| 13 | GET | `/api/jobs` | 任务历史 (active + 50 条) | 1495 |
-| 14 | GET | `/api/inputs` | 列出全局/项目输入 CSV 文件 | 1531 |
-| 15 | GET | `/api/dataset` | 当前项目数据集 entries + summary | 1553 |
-| 16 | POST | `/api/dataset/add` | 批量加入 replay UUID 条目 | 1562 |
-| 17 | POST | `/api/dataset/add-text` | 批量加入文本条目（含 EDM 反馈环） | 1572 |
-| 18 | POST | `/api/dataset/remove` | 删除单条条目 | 1592 |
-| 19 | POST | `/api/dataset/clear-processed` | 清理已处理标记 | 1597 |
-| 20 | POST | `/api/dataset/reset` | 重置全部为 pending | 1602 |
-| 21 | POST | `/api/dataset/update-ts` | 更新条目 timestamp | 1607 |
-| 22 | POST | `/api/pipeline/run` | 统一管线（聚合回填+文本, SSE） | 1754 |
-| 23 | GET | `/api/models` | 列出可选 Qwen 模型 | 1845 |
-| 24 | POST | `/api/models/activate` | 激活 Qwen 模型（白名单校验） | 1859 |
-| 25 | GET | `/api/projects` | 列出项目 | 1898 |
-| 26 | POST | `/api/projects` | 创建项目 | 1919 |
-| 27 | PUT | `/api/projects/activate` | 切换激活项目 | 1933 |
-| 28 | DELETE | `/api/projects/:name` | 删除项目 | 1948 |
-| 29 | GET | `/api/work-scan` | 扫描 TRACE 工作目录 | 1964 |
-| 30 | DELETE | `/api/work-uuid/:uuid` | 删除指定 UUID 工作目录 | 1973 |
-| 31 | POST | `/api/work-clean` | 清理孤儿/无效工作目录 | 1996 |
-| 32 | POST | `/api/replay-uuids` | 选定 UUID 回填到当前项目 (SSE) | 2024 |
-| 33 | GET | `/api/work-uuid/:uuid/text` | 读取指定 UUID 工作目录的输入文本 | 2098 |
+| 1 | GET | `/api/health` | 健康检查（服务名 + 时间戳） | `src/routes/core.js` |
+| 2 | GET | `/api/version` | 版本号（从 package.json 读取） | `src/routes/core.js` |
+| 3 | GET | `/api/status` | 轨迹状态 + EDM 就绪度 | `src/routes/core.js` |
+| 4 | GET | `/api/orthogonality` | 八正道正交性报告（Frobenius 距离等元审计） | `src/routes/core.js` |
+| 5 | GET | `/api/trajectory` | 当前轨迹 CSV (JSON) | `src/routes/trajectory.js` |
+| 6 | POST | `/api/trajectory/clear` | 清空当前项目轨迹 | `src/routes/trajectory.js` |
+| 7 | GET | `/api/trajectory/export/md` | 一键导出人话版 Markdown 报告 | `src/routes/trajectory.js` |
+| 8 | GET | `/api/trajectory/report` | 查看最新人话版报告（支持 ?format=html） | `src/routes/trajectory.js` |
+| 9 | POST | `/api/run` | 提交文本管线任务 (Mode A, SSE) | `src/routes/pipeline.js` |
+| 10 | POST | `/api/replay` | 提交回填任务 (Mode B, SSE) | `src/routes/pipeline.js` |
+| 11 | POST | `/api/edm/trigger` | 触发 EDM 分析 | `src/routes/edm.js` |
+| 12 | GET | `/api/edm/poll/:jobId` | EDM 轮询代理（避免 CORS） | `src/routes/edm.js` |
+| 13 | GET | `/api/jobs` | 任务历史 (active + 50 条) | `src/routes/pipeline.js` |
+| 14 | GET | `/api/inputs` | 列出全局/项目输入 CSV 文件 | `src/routes/dataset.js` |
+| 15 | GET | `/api/dataset` | 当前项目数据集 entries + summary | `src/routes/dataset.js` |
+| 16 | POST | `/api/dataset/add` | 批量加入 replay UUID 条目 | `src/routes/dataset.js` |
+| 17 | POST | `/api/dataset/add-text` | 批量加入文本条目（含 EDM 反馈环） | `src/routes/dataset.js` |
+| 18 | POST | `/api/dataset/remove` | 删除单条条目 | `src/routes/dataset.js` |
+| 19 | POST | `/api/dataset/clear-processed` | 清理已处理标记 | `src/routes/dataset.js` |
+| 20 | POST | `/api/dataset/reset` | 重置全部为 pending | `src/routes/dataset.js` |
+| 21 | POST | `/api/dataset/update-ts` | 更新条目 timestamp | `src/routes/dataset.js` |
+| 22 | POST | `/api/pipeline/run` | 统一管线（聚合回填+文本, SSE） | `src/routes/pipeline.js` |
+| 23 | GET | `/api/models` | 列出可选 Qwen 模型 | `src/routes/models.js` |
+| 24 | POST | `/api/models/activate` | 激活 Qwen 模型（白名单校验） | `src/routes/models.js` |
+| 25 | GET | `/api/projects` | 列出项目 | `src/routes/projects.js` |
+| 26 | POST | `/api/projects` | 创建项目 | `src/routes/projects.js` |
+| 27 | PUT | `/api/projects/activate` | 切换激活项目 | `src/routes/projects.js` |
+| 28 | DELETE | `/api/projects/:name` | 删除项目 | `src/routes/projects.js` |
+| 29 | GET | `/api/work-scan` | 扫描 TRACE 工作目录 | `src/routes/projects.js` |
+| 30 | DELETE | `/api/work-uuid/:uuid` | 删除指定 UUID 工作目录 | `src/routes/projects.js` |
+| 31 | POST | `/api/work-clean` | 清理孤儿/无效工作目录 | `src/routes/projects.js` |
+| 32 | POST | `/api/replay-uuids` | 选定 UUID 回填到当前项目 (SSE) | `src/routes/pipeline.js` |
+| 33 | GET | `/api/work-uuid/:uuid/text` | 读取指定 UUID 工作目录的输入文本 | `src/routes/projects.js` |
 
 > 注：根 `/`（express.static 托管前端面板）不计入 33 个 API 端点之列。`POST /api/replay-all` 由 `/api/replay` 以 `replay_all=true` 复用。
 

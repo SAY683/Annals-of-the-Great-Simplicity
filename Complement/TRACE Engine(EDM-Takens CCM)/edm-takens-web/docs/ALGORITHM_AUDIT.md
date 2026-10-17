@@ -108,7 +108,7 @@
 ## §2.3 跨项目同步修复记录（ROUND28 科研披露落地）
 
 **同步日期**：2026-07-31
-**同步范围**： edm-takens 核心库 (`Skill/edm-takens/src/`) → edm-takens-web 副本 (`backend/edmtakens/`)
+**依赖范围**： edm-takens-web 直接导入 `edm-takens/src/` 唯一真源；不再维护算法副本
 **触发原因**： ROUND26-27 科研严谨性审查发现 Web 副本失同步 10 个文件 + 1 个缺失文件，导致 4 个科研披露字段端到端缺失。
 
 ### 同步失同步文件清单（11 项）

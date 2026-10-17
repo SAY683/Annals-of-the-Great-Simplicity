@@ -20,16 +20,8 @@ edm-takens-web/
 │   │   └── summary_builder.py  # 报告摘要生成
 │   ├── workers/            # 后台任务
 │   │   └── analysis_worker.py  # 分析任务执行器
-│   ├── edmtakens/          # EDM 核心库（从 edm-takens/src/ 同步）
-│   │   ├── _usability.py   # 可用性判定（统一入口）
-│   │   ├── data_quality.py # 数据质量诊断
-│   │   ├── edm_auditor.py  # 审计防火墙（6档verdict）
-│   │   ├── pipeline.py     # 主流水线
-│   │   ├── sovereign_havok.py # HAVOK 分析
-│   │   ├── _numpy_edm.py   # EDM/CCM/Multiview 纯 numpy 实现
-│   │   └── ...
 │   ├── job_store.py        # JobStore ABC + SQLite/InMemory 实现
-│   └── sync_check.py       # 副本一致性校验
+│   └── sync_check.py       # 单一真源布局校验
 ├── data/                   # 上传的 CSV 存放处
 ├── results/                # 运行时生成的图片/配置（按 task_id 分目录）
 ├── archive/                # 历史任务 zip 归档
@@ -194,10 +186,7 @@ EDM 要求变量处于度量空间。若 CSV 中大部分是 0/1 指示变量（
 
 ## 与原 Skill 的关系
 
-- `backend/edmtakens/` 是从 `edm-takens/src/` 复制而来。
-- Web 版对 `backend/edmtakens/` 共有 4 处适应性修改（详见 `docs/ALGORITHM_AUDIT.md`），仅以下文件与源不同：
-  - `_paths.py`（路径适配）
-  - `__init__.py`（包注释）
-  - `enhanced_cross_validate.py`（数据路径适配）
-  - `environment_check.py`（路径检查适配）
-- `backend/api.py` 是网页版新增封装，未修改原 `edm-takens/` 目录下的任何文件。
+- Web 端直接导入 `../edm-takens/src`，不再保留 `backend/edmtakens/` 算法副本。
+- `EDMTAKENS_DATA_DIR` 在分析 worker 启动时注入，因此路径适配不需要第二份源码。
+- `sync_check.py` 现在验证“单一真源布局”：源目录完整、可导入，且副本目录不存在。
+- `backend/api.py` 是网页版新增封装。

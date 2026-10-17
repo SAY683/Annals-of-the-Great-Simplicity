@@ -1,370 +1,67 @@
-"""
-副本同步检查脚本（NEW-7）。
-对比 edm-takens 核心库（src/）与 edm-takens-web 副本（backend/edmtakens/）
-中共享文件的 SHA256 校验和，发现不一致时报告差异并以非零退出码退出。
+#!/usr/bin/env python3
+"""Verify the web layer consumes the single canonical edm-takens source."""
+from __future__ import annotations
 
-S1-5 修复 (科研披露落地 Round 28): 扩展校验范围至文档层 (docs/ALGORITHM_AUDIT.md),
-并新增披露字段存在性检查 (DISCLOSURE_FIELDS), 确保 4 个科研披露字段
-(is_strict_confirmatory / methodology_disclaimer / effective_lib_sizes /
-out_of_sample_used) 在 ccm_causality.py 和 _numpy_edm.py 中存在定义,
-防止未来重构丢失这些科研级披露字段.
-
-R34-A 修复 (ROUND34 P0): 新增便携目录算法层 SHA256 一致性检查.
-ROUND33-G3 发现便携目录 (Skill/) 的 sovereign_havok.py 和 ccm_causality.py
-完全未同步 ROUND32 修复 (4/√3 极限值 + 自适应步长 + hashlib.md5 种子),
-导致便携目录算法实现与开发目录不一致. 本修复扩展 sync_check.py 检查范围
-到便携目录, 确保开发目录的算法层修复同步到便携目录的所有副本.
-
-用法:
-    python sync_check.py          # 检查所有共享文件 + 文档 + 披露字段 + 便携目录
-    python sync_check.py --quiet  # 仅输出差异，无差异时静默
-    python sync_check.py --no-docs  # 跳过文档同步检查
-    python sync_check.py --no-disclosure  # 跳过披露字段存在性检查
-    python sync_check.py --no-portable  # 跳过便携目录同步检查
-
-注意：_paths.py 在副本中被有意修改（支持 EDMTAKENS_DATA_DIR 环境变量），
-故列入 EXPECTED_DIFFERS 白名单，不视为同步失败。
-"""
-import hashlib
-import os
+import argparse
+import importlib.util
 import sys
+from pathlib import Path
 
-# ── 路径配置 ──────────────────────────────────────────────
-_BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
-_WEB_EDMTAKENS = os.path.join(_BACKEND_DIR, "edmtakens")
-_CORE_SRC = os.path.abspath(
-    os.path.join(_BACKEND_DIR, "..", "..", "edm-takens", "src")
-)
-# S1-5 修复: 文档层路径
-_CORE_DOCS = os.path.abspath(
-    os.path.join(_BACKEND_DIR, "..", "..", "edm-takens", "docs")
-)
-_WEB_DOCS = os.path.join(_BACKEND_DIR, "..", "docs")
+sys.dont_write_bytecode = True
 
-# 副本中独有的文件（核心库不存在），跳过检查
-# 修缮 A4 已将 data_quality.py 和 analysis_profiles.py 回迁到核心库 src/，
-# 两份副本现在完全一致，不再属于 web 独有文件；移出白名单后由 sync_check
-# 持续监控一致性，防止未来再次漂移。
-WEB_ONLY_FILES: set = set()
-
-# 有意差异的文件（副本因 web 环境需求做了定制），不视为同步失败
-EXPECTED_DIFFERS = {
-    "_paths.py",                  # 副本支持 EDMTAKENS_DATA_DIR 环境变量
-    "__init__.py",                # 副本为 backend 包说明注释，与核心库源码包注释不同
-}
-
-# S1-5 修复: 文档层预期差异 (Web 版有 §2.3 节, 核心库也有但内容不同)
-# 这两个文档不要求 SHA256 一致, 但要求关键章节存在
-EXPECTED_DOC_DIFFERS = {
-    "ALGORITHM_AUDIT.md",  # Web 版有额外的 §2.3 节 (科研披露落地记录)
-}
-
-# S1-5 修复: 文档层关键章节存在性检查
-# 这些章节必须在两份文档中都存在, 否则视为同步失败
-# 章节标识符支持多种格式匹配: "§2.3" 或 "### 2.3" 或 "## 2.3"
-# 核心库用 "### 2.3" 格式, Web 副本用 "§2.3" 格式, 两者都视为存在
-REQUIRED_DOC_SECTIONS = {
-    "ALGORITHM_AUDIT.md": [
-        "2.3",  # 跨项目同步修复记录 (匹配 "§2.3" / "### 2.3" / "## 2.3")
-    ],
-}
-
-# S1-5 修复: 披露字段存在性检查
-# 这 4 个字段是科研级产品的核心披露, 必须在指定文件中存在定义
-# 防止未来重构意外丢失这些字段
-DISCLOSURE_FIELDS = {
-    "ccm_causality.py": [
-        "is_strict_confirmatory",        # BH uniform-null 假设披露
-        "methodology_disclaimer",        # 方法学免责声明
-    ],
-    "_numpy_edm.py": [
-        "effective_lib_sizes",           # out-of-sample 实际建树库大小
-        "out_of_sample_used",            # 评估模式标志
-    ],
-}
-
-# R34-A 修复 (ROUND34 P0): 便携目录算法层关键文件
-# 这些文件是算法实现的核心, 必须在开发目录和便携目录的所有副本中保持一致.
-# ROUND33-G3 发现便携目录的 sovereign_havok.py 和 ccm_causality.py 未同步
-# ROUND32 修复, 导致便携目录算法实现与开发目录不一致.
-# 路径相对于 _PROJECT_ROOT (即 研发测试/, 开发目录 TRACE Engine(EDM-Takens CCM)/
-# 与便携目录 Skill/ 的共同父目录).
-PORTABLE_ALGORITHM_FILES = {
-    "sovereign_havok.py": [   # HAVOK 核心 (Gavish-Donoho 4/√3 修复)
-        "TRACE Engine(EDM-Takens CCM)/edm-takens/src",                          # 开发目录核心库
-        "TRACE Engine(EDM-Takens CCM)/edm-takens-web/backend/edmtakens",        # 开发目录 Web 副本
-        "Skill/edm-takens/src",                                                 # 便携目录核心库
-        "Skill/edm-takens-web/backend/edmtakens",                               # 便携目录 Web 副本
-    ],
-    "ccm_causality.py": [     # CCM 核心 (自适应步长 + hashlib.md5 种子修复)
-        "TRACE Engine(EDM-Takens CCM)/edm-takens/src",
-        "TRACE Engine(EDM-Takens CCM)/edm-takens-web/backend/edmtakens",
-        "Skill/edm-takens/src",
-        "Skill/edm-takens-web/backend/edmtakens",
-    ],
-}
-
-# R34-A: 项目根目录 (研发测试/, 开发目录与便携目录的共同父目录)
-# _BACKEND_DIR = .../TRACE Engine(EDM-Takens CCM)/edm-takens-web/backend
-# 需要 3 个 .. 回到 研发测试/
-_PROJECT_ROOT = os.path.abspath(
-    os.path.join(_BACKEND_DIR, "..", "..", "..")
-)
-
-
-def _sha256(filepath: str) -> str:
-    """计算文件的 SHA256 哈希值。"""
-    h = hashlib.sha256()
-    with open(filepath, "rb") as f:
-        for chunk in iter(lambda: f.read(8192), b""):
-            h.update(chunk)
-    return h.hexdigest()
-
-
-def _check_disclosure_fields(quiet: bool) -> int:
-    """S1-5 修复: 检查科研披露字段在源文件中存在定义.
-
-    这些字段是科研级产品的核心披露, 防止未来重构意外丢失.
-    检查方式: 在文件内容中搜索字段名字符串 (作为 dict key 或属性).
-    """
-    if not quiet:
-        print("\n── 披露字段存在性检查 (S1-5) ──────────────")
-    missing = []
-    for fname, fields in DISCLOSURE_FIELDS.items():
-        # 检查核心库和副本两份
-        for src_dir, label in [(_CORE_SRC, "核心库"), (_WEB_EDMTAKENS, "Web 副本")]:
-            filepath = os.path.join(src_dir, fname)
-            if not os.path.exists(filepath):
-                missing.append(f"{label}/{fname} (文件缺失)")
-                continue
-            with open(filepath, "r", encoding="utf-8") as f:
-                content = f.read()
-            for field in fields:
-                # 搜索字段名作为 dict key ("field_name") 或赋值 (field_name =)
-                # 这是宽松检查, 避免误报; 严格检查需要 AST 解析
-                if f'"{field}"' not in content and f"'{field}'" not in content:
-                    missing.append(f"{label}/{fname}: 字段 '{field}' 未找到")
-                elif not quiet:
-                    print(f"  [OK]   {label}/{fname}: '{field}'")
-
-    if missing:
-        print(f"\n[FAIL] 披露字段存在性检查失败 ({len(missing)} 项):")
-        for m in missing:
-            print(f"  - {m}")
-        return 1
-    elif not quiet:
-        print(f"  披露字段检查通过 ({sum(len(v) for v in DISCLOSURE_FIELDS.values()) * 2} 项)")
-    return 0
-
-
-def _check_portable_sync(quiet: bool) -> int:
-    """R34-A 修复 (ROUND34 P0): 检查便携目录算法层 SHA256 一致性.
-
-    确保 sovereign_havok.py 和 ccm_causality.py 在开发目录和便携目录的
-    所有 4 个副本中保持一致, 防止 ROUND33-G3 同步遗漏再现.
-
-    所有路径相对于 _PROJECT_ROOT (研发测试/).
-
-    R39-C 修复 (ROUND39 P0): 当 Skill/ 目录不存在时 (如 Complement 外部成品目录),
-    降级为 SKIP 而非 FAIL. _PROJECT_ROOT 在 Complement 目录下是 Complement/,
-    不含 Skill/ 子目录, 这是环境差异而非同步缺陷.
-    """
-    if not quiet:
-        print("\n── 便携目录算法层同步检查 (R34-A) ──────────────")
-    if not os.path.isdir(_PROJECT_ROOT):
-        print(f"[ERROR] 项目根目录不存在: {_PROJECT_ROOT}", file=sys.stderr)
-        return 2
-
-    # R39-C 修复: 检测 Skill/ 目录是否存在 (Complement 外部成品目录无此子目录)
-    _skill_dir = os.path.join(_PROJECT_ROOT, "Skill")
-    _has_skill = os.path.isdir(_skill_dir)
-    if not _has_skill and not quiet:
-        print(f"  [SKIP] Skill/ 目录不存在于 {_PROJECT_ROOT}")
-        print(f"  (Complement 外部成品目录无需 Skill/ 子目录, 降级为 SKIP)")
-        print(f"  仅检查 TRACE Engine(EDM-Takens CCM)/ 内的副本一致性")
-
-    issues = []
-    n_checked = 0
-    n_expected = 0
-    for fname, rel_paths in PORTABLE_ALGORITHM_FILES.items():
-        hashes = {}
-        for rel in rel_paths:
-            # R39-C 修复: Skill/ 不存在时跳过 Skill/ 路径
-            if not _has_skill and rel.startswith("Skill/"):
-                continue
-            n_expected += 1
-            full = os.path.join(_PROJECT_ROOT, rel, fname)
-            if not os.path.exists(full):
-                issues.append(f"文件缺失: {rel}/{fname}")
-                continue
-            hashes[rel] = _sha256(full)
-            n_checked += 1
-
-        # 比较所有副本的哈希
-        unique_hashes = set(hashes.values())
-        if len(unique_hashes) == 0:
-            issues.append(f"{fname}: 所有副本均缺失")
-        elif len(unique_hashes) > 1:
-            # 找出哪个副本不一致
-            issues.append(f"{fname}: 副本不一致 ({len(unique_hashes)} 种哈希)")
-            for rel, h in hashes.items():
-                issues.append(f"  - {rel}: {h[:16]}...")
-        elif not quiet:
-            print(f"  [OK]   {fname}: {len(hashes)} 副本一致")
-
-    if issues:
-        print(f"\n[FAIL] 便携目录算法层同步检查失败 ({len(issues)} 项):")
-        for i in issues:
-            print(f"  - {i}")
-        print("\n请将开发目录的算法层修复同步到便携目录:")
-        print("  开发目录: TRACE Engine(EDM-Takens CCM)/edm-takens/src/")
-        print("  便携目录: TRACE Engine(EDM-Takens CCM)/edm-takens/src/ (及对应 web 副本)")
-        return 1
-    elif not quiet:
-        print(f"  便携目录算法层检查通过 ({n_checked} 副本, "
-              f"{n_expected} 预期)")
-    return 0
-
-
-def _check_docs_sync(quiet: bool) -> int:
-    """S1-5 修复: 检查文档层同步状态.
-
-    文档不要求 SHA256 一致 (Web 版有额外章节), 但要求关键章节存在.
-    章节匹配规则: 搜索 "§X.Y" 或 markdown 标题 "# X.Y" / "## X.Y" / "### X.Y"
-    避免匹配到正文中的版本号或行号.
-    """
-    if not quiet:
-        print("\n── 文档同步检查 (S1-5) ──────────────")
-    if not os.path.isdir(_CORE_DOCS):
-        if not quiet:
-            print(f"  [WARN] 核心库文档目录不存在: {_CORE_DOCS}")
-        return 0
-    if not os.path.isdir(_WEB_DOCS):
-        if not quiet:
-            print(f"  [WARN] Web 副本文档目录不存在: {_WEB_DOCS}")
-        return 0
-
-    import re
-    issues = []
-    for fname, sections in REQUIRED_DOC_SECTIONS.items():
-        core_path = os.path.join(_CORE_DOCS, fname)
-        web_path = os.path.join(_WEB_DOCS, fname)
-        if not os.path.exists(core_path):
-            issues.append(f"核心库文档缺失: {fname}")
-            continue
-        if not os.path.exists(web_path):
-            issues.append(f"Web 副本文档缺失: {fname}")
-            continue
-        with open(core_path, "r", encoding="utf-8") as f:
-            core_content = f.read()
-        with open(web_path, "r", encoding="utf-8") as f:
-            web_content = f.read()
-        for section in sections:
-            # 构建章节标题正则: 匹配 "§X.Y" 或 markdown 标题 "X.Y" (前面有 #)
-            # 避免匹配到正文中的版本号或行号
-            section_pattern = re.compile(
-                rf'(?:§{re.escape(section)}|^\s*#+\s*{re.escape(section)}\s)',
-                re.MULTILINE
-            )
-            if not section_pattern.search(core_content):
-                issues.append(f"核心库 {fname}: 缺少章节 '{section}'")
-            elif not quiet:
-                print(f"  [OK]   核心库 {fname}: 章节 '{section}' 存在")
-            if not section_pattern.search(web_content):
-                issues.append(f"Web 副本 {fname}: 缺少章节 '{section}'")
-            elif not quiet:
-                print(f"  [OK]   Web 副本 {fname}: 章节 '{section}' 存在")
-
-    if issues:
-        print(f"\n[FAIL] 文档同步检查失败 ({len(issues)} 项):")
-        for i in issues:
-            print(f"  - {i}")
-        return 1
-    return 0
+ROOT = Path(__file__).resolve().parents[2]
+SRC = ROOT / "edm-takens" / "src"
+PYPROJECT = ROOT / "edm-takens" / "pyproject.toml"
+DUPLICATE_COPY = ROOT / "edm-takens-web" / "backend" / "edmtakens"
+REQUIRED = [
+    "_numpy_edm", "sovereign_havok", "pipeline", "edm_auditor",
+    "enhanced_cross_validate", "environment_check", "final_interpretation",
+    "ccm_causality", "_edm_bridge", "_paths", "verify_algorithms",
+    "edm_adaptive_pipeline", "edm_tau_optimization", "sensitivity_config",
+    "router", "surrogate_test", "multiview_svd_monitor", "_usability",
+    "data_quality", "analysis_profiles",
+]
 
 
 def main() -> int:
-    quiet = "--quiet" in sys.argv
-    skip_docs = "--no-docs" in sys.argv
-    skip_disclosure = "--no-disclosure" in sys.argv
-    skip_portable = "--no-portable" in sys.argv
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--quiet", action="store_true")
+    args = ap.parse_args()
+    failures = []
 
-    if not os.path.isdir(_CORE_SRC):
-        print(f"[ERROR] 核心库目录不存在: {_CORE_SRC}", file=sys.stderr)
-        return 2
-    if not os.path.isdir(_WEB_EDMTAKENS):
-        print(f"[ERROR] 副本目录不存在: {_WEB_EDMTAKENS}", file=sys.stderr)
-        return 2
+    if not SRC.is_dir():
+        failures.append(f"canonical source missing: {SRC}")
+    if not PYPROJECT.is_file():
+        failures.append(f"editable package metadata missing: {PYPROJECT}")
+    if DUPLICATE_COPY.exists():
+        failures.append(f"duplicate algorithm copy still exists: {DUPLICATE_COPY}")
 
-    core_files = {
-        f for f in os.listdir(_CORE_SRC)
-        if f.endswith(".py") and f not in WEB_ONLY_FILES
-    }
-    web_files = {
-        f for f in os.listdir(_WEB_EDMTAKENS)
-        if f.endswith(".py") and f not in WEB_ONLY_FILES
-    }
+    missing = [name for name in REQUIRED if not (SRC / f"{name}.py").is_file()]
+    if missing:
+        failures.append("missing source modules: " + ", ".join(missing))
 
-    common = sorted(core_files & web_files)
-    only_core = sorted(core_files - web_files)
-    only_web = sorted(web_files - core_files)
+    if SRC.is_dir() and str(SRC) not in sys.path:
+        sys.path.append(str(SRC))
+    if importlib.util.find_spec("pipeline") is None:
+        failures.append("pipeline module is not importable from canonical source")
 
-    mismatches = []
-    matches = 0
-    expected_differs = 0
+    if failures:
+        print("SOURCE-LAYOUT CHECK FAILED")
+        for item in failures:
+            print(f"  [FAIL] {item}")
+        return 1
 
-    print("── 源码同步检查 ──────────────")
-    for fname in common:
-        core_hash = _sha256(os.path.join(_CORE_SRC, fname))
-        web_hash = _sha256(os.path.join(_WEB_EDMTAKENS, fname))
-        if core_hash == web_hash:
-            matches += 1
-            if not quiet:
-                print(f"  [OK]   {fname}")
-        else:
-            if fname in EXPECTED_DIFFERS:
-                expected_differs += 1
-                if not quiet:
-                    print(f"  [SKIP] {fname}  (预期差异：副本定制)")
-            else:
-                mismatches.append(fname)
-                print(f"  [DIFF] {fname}  核心库与副本不一致！")
-
-    # 报告仅存在于一方的文件
-    for fname in only_core:
-        print(f"  [WARN] {fname} 仅存在于核心库，副本缺失")
-    for fname in only_web:
-        print(f"  [INFO] {fname} 仅存在于副本（web 专有）")
-
-    # 汇总
-    print(f"\n源码汇总: {matches} 一致 / {expected_differs} 预期差异 / "
-          f"{len(mismatches)} 不一致 / {len(only_core)} 副本缺失")
-
-    exit_code = 0
-    if mismatches:
-        print("\n不一致文件列表:")
-        for f in mismatches:
-            print(f"  - {f}")
-        print("\n请手动同步核心库的更改到副本，或反向同步。")
-        exit_code = 1
-
-    # S1-5 修复: 披露字段存在性检查
-    if not skip_disclosure:
-        if _check_disclosure_fields(quiet) != 0:
-            exit_code = 1
-
-    # S1-5 修复: 文档层同步检查
-    if not skip_docs:
-        if _check_docs_sync(quiet) != 0:
-            exit_code = 1
-
-    # R34-A 修复: 便携目录算法层同步检查
-    if not skip_portable:
-        if _check_portable_sync(quiet) != 0:
-            exit_code = 1
-
-    return exit_code
+    if args.quiet:
+        print(f"source-only layout OK: {len(REQUIRED)} modules in edm-takens/src")
+    else:
+        print("EDM-TAKENS source layout check")
+        print("=" * 64)
+        print(f"canonical source: {SRC}")
+        print("web duplicate copy: absent")
+        print(f"required modules: {len(REQUIRED)}/{len(REQUIRED)} present")
+        print("pipeline import: OK")
+    return 0
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    raise SystemExit(main())

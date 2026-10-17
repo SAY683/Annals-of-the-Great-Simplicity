@@ -58,6 +58,10 @@ jobs:
         shell: pwsh
         working-directory: "Complement/TRACE Engine(EDM-Takens CCM)/trace-to-edm"
         run: python -m pytest tests -q
+      - name: trace-to-edm HTTP route contract
+        shell: pwsh
+        working-directory: "Complement/TRACE Engine(EDM-Takens CCM)/trace-to-edm"
+        run: node --test tests/http-contract.test.js
       - name: GraphRAG data integrity
         shell: pwsh
         working-directory: "Complement/GraphRAG-神纪图谱"

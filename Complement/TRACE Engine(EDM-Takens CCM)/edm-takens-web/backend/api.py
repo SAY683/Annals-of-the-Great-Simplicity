@@ -40,11 +40,12 @@ logger = logging.getLogger("edm_takens_web")
 # 安装可编辑包，使模块在全局可导入。此处 sys.path.append 仅作为
 # 未安装时的回退机制——使用 append 而非 insert(0) 确保已安装的
 # 可编辑包具有更高导入优先级，副本目录不覆盖全局安装。
-# Make the bundled edmtakens package importable.
-# We append the edmtakens directory itself so the copied src modules can keep
-# their sibling-style imports (e.g. `from _paths import data_path`).
+# Single source of truth: edm-takens/src. An editable/wheel installation wins
+# because this path is appended, but the portable tree works without a pip step.
 _BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
-sys.path.append(os.path.join(_BACKEND_DIR, "edmtakens"))
+_PROJECT_ROOT = os.path.dirname(_BACKEND_DIR)
+_EDM_SRC_DIR = os.path.join(os.path.dirname(_PROJECT_ROOT), "edm-takens", "src")
+sys.path.append(_EDM_SRC_DIR)
 
 import _paths
 from pipeline import PipelineConfig, run_full_analysis
@@ -270,10 +271,14 @@ app.add_middleware(TraceIdAndCacheMiddleware)
 from routes.datasets import router as _datasets_router
 from routes.analyze import router as _analyze_router
 from routes.history import router as _history_router
+from routes.archives import router as _archives_router
+from routes.exports import router as _exports_router
 
 app.include_router(_datasets_router)
 app.include_router(_analyze_router)
 app.include_router(_history_router)
+app.include_router(_archives_router)
+app.include_router(_exports_router)
 
 # ROUND29 MCP: 补齐 MCP 协议端点 (JSON-RPC 2.0 over HTTP)
 # MCP 内部自调用走 127.0.0.1:{port}, 端口必须与 uvicorn 监听端口一致 (EDM_PORT 覆盖)
@@ -304,15 +309,21 @@ from routes.history import (
     download_task,
     delete_task,
     cleanup_history,
+    batch_history,
+    compare_tasks,
+    get_history_detail,
+)
+from routes.archives import (
     list_archives,
     restore_archive,
     delete_archive,
-    batch_history,
-    compare_tasks,
+    preview_archive,
+)
+from routes.exports import (
     export_task_json,
     export_task_csv,
-    get_history_detail,
-    preview_archive,
+    export_task_md,
+    export_task_html,
 )
 
 # ── Static frontend serving (debt-Q9):

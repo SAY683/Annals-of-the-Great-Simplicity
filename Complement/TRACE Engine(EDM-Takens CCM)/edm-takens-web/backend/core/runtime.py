@@ -30,8 +30,8 @@ def create_job_store() -> JobStore:
 
 _JOB_STORE: JobStore = create_job_store()
 
-# P1-2: 启动时自动同步检查（副本一致性）
-# 在模块首次导入时检查 backend/edmtakens/ 是否与 edm-takens/src/ 一致。
+# P1-2: 启动时检查单一真源布局。
+# Web 必须直接消费 edm-takens/src，且 backend/edmtakens/ 副本不得存在。
 # 非零退出会终止服务启动（ERROR），但生产环境也可通过
 # EDM_SKIP_SYNC_CHECK=1 环境变量绕过（如 CI 已验证一致性）。
 def _auto_sync_check():

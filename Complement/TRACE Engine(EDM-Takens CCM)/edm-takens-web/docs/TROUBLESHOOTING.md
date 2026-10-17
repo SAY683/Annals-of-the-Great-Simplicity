@@ -182,7 +182,7 @@ logging.basicConfig(level=logging.DEBUG)
 ### 2. 检查算法中间结果
 
 ```python
-from edmtakens.pipeline import run_full_analysis
+from pipeline import run_full_analysis
 result = run_full_analysis(config, auto_fix=False)
 print(result.keys())
 ```
@@ -190,7 +190,7 @@ print(result.keys())
 ### 3. 验证数据质量
 
 ```python
-from edmtakens.data_quality import evaluate_dataframe
+from data_quality import evaluate_dataframe
 report = evaluate_dataframe(df, target_col='target', selected_vars=['var1', 'var2'])
 print(report)
 ```
@@ -198,7 +198,7 @@ print(report)
 ### 4. 测试单个算法
 
 ```python
-from edmtakens._edm_bridge import EmbedDimension
+from _edm_bridge import EmbedDimension
 import pandas as pd
 
 df = pd.read_csv('test.csv')

@@ -18,9 +18,9 @@ import uvicorn
 os.environ['PYTHONDONTWRITEBYTECODE'] = '1'
 
 _PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
-# debt-17: 使用 append 而非 insert(0)，确保已通过 `pip install -e .`
-# 安装的可编辑包具有更高导入优先级。副本目录仅作为回退。
-sys.path.append(os.path.join(_PROJECT_ROOT, "backend", "edmtakens"))
+# Single source of truth: consume edm-takens/src directly. An editable/wheel
+# installation still wins because this path is appended rather than inserted.
+sys.path.append(os.path.join(os.path.dirname(_PROJECT_ROOT), "edm-takens", "src"))
 
 # debt-22: 环境变量从 pipeline.py 移至此入口点，确保在 numpy/matplotlib
 # 导入前生效。库模块不应在导入时设置进程级环境变量。

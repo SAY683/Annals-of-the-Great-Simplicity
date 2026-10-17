@@ -10,7 +10,7 @@ import pandas as pd
 
 WEB_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(WEB_ROOT / "backend"))
-sys.path.insert(0, str(WEB_ROOT / "backend" / "edmtakens"))
+sys.path.insert(0, str(WEB_ROOT.parent / "edm-takens" / "src"))
 
 from services.file_management import _prepare_pipeline_data  # noqa: E402
 

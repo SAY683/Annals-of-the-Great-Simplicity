@@ -10,8 +10,8 @@
 
 - `trace-engine`：22 passed
 - `edm-takens`：93 passed
-- `edm-takens-web` 列映射回归：2 passed
-- `trace-to-edm` CSV 契约：3 passed
+- `edm-takens-web` 路由/列映射：5 passed
+- `trace-to-edm` CSV 契约：3 passed；HTTP 路由契约：2 passed
 - `verify_portable.py --no-e2e`：**16 PASS / 0 FAIL**
 - `smoke_e2e.py`：**全链路通过**（15 条文本 → TRACE → trace-to-edm → EDM）
 - 浏览器实测：三页面无 console error / warning；EDM 真实分析完成后 `column_mapping = null`；TRACE LIGHT 得到 12 概念 / 8 显著边 / ATE -0.2200，并显示合成 SEM 警告
@@ -31,6 +31,10 @@
 | 模型授权 | `Docs/10-models.md` 记录 ModelScope License 字段为空的核验事实，不擅自替作者指定许可证 |
 | 隧道安全 | 登录跳转限制为站内路径；畸形 Cookie 不再崩溃；支持 https upstream；token 要求 ≥32 字符 |
 | 依赖卫生 | 移除 `trace-to-edm` 未使用的 `multer`；升级 `trace-engine-web` 的 `multer` 与 `uuid`，审计归零 |
+| `trace-to-edm` 路由 | `server.js` 从约 2487 行降到 46 行；新增 `src/app.js`、7 个 route 模块、配置/日志/缓存/Python/任务/数据集/轨迹服务，并补 HTTP 契约测试 |
+| `edm-takens-web` 历史路由 | `history.py` 从 1464 行降到 108 行；拆出 archives/exports 路由、schemas、history/archive/export 服务与 task repository，并补 5 个路由测试 |
+| `render.js` | 从 1641 行降到 556 行；拓扑、矩阵、3D/2D、切换器拆为独立浏览器脚本，版本号更新防止旧缓存 |
+| 算法副本 | 删除 `edm-takens-web/backend/edmtakens/` 副本；Web 直接导入 `edm-takens/src` 唯一真源，`sync_check.py` 改为拒绝副本复活 |
 
 ## 3. 仍需作者决策
 
@@ -43,14 +47,11 @@
 
 | 项目 | 现状 | 建议 |
 |---|---|---|
-| `trace-to-edm/server.js` 约 107 KB | 路由集中，改动风险高 | 后续按 projects/dataset/edm/mcp 拆路由 |
-| `edm-takens-web/backend/routes/history.py` 约 67 KB | 历史/归档/导出集中 | 拆 history/archive/export 模块 |
-| `trace-engine-web/public/js/render.js` 约 72 KB | 渲染逻辑集中 | 拆 result/graph/log/summary 渲染器 |
-| `edm-takens-web/backend/edmtakens/` 副本 | 与 `edm-takens/src/` 有同步契约 | 保持 `sync_check.py`，未来改为正式包依赖 |
-| GraphRAG site-packages 补丁 | pip 升级会覆盖 | 已保留 `reapply-graphrag-patches.py` + 版本锁定；升级后必须重放 |
-| 完整 CI E2E | 需要模型/8081/15721/本地端口专用 runner | 当前 CI 跑单测与静态审计；E2E 作为本地发布门禁 |
+| GraphRAG site-packages 补丁 | pip 升级会覆盖 | 已保留 `reapply-graphrag-patches.py` + 版本锁定；升级后必须重放。长期应改为上游修复或 compat wheel |
+| 完整 CI E2E | 需要模型/8081/15721/本地端口专用 runner | 当前 CI 跑单测、路由契约与静态审计；E2E 作为本地发布门禁 |
 | 像素级视觉回归 | 已有 Playwright smoke + 截图 | 后续可加稳定基线与截图 diff，避免动画/字体造成假阳性 |
+| `trace-engine-web` 其他大文件 | `jobs.js` 约 32 KB、`app.js` 约 25 KB | 当前低于主要债务阈值，后续可按任务历史/输入控制再拆 |
 
 ## 5. 结论
 
-当前功能链路、数据完整性、鉴权边界和可复现安装已达到可交付状态。剩余项主要是**大文件架构拆分、作者授权决策和专用 E2E runner**，不应在本轮以“改完即算”的方式草率处理。
+当前功能链路、数据完整性、鉴权边界、可复现安装和主要大文件拆分已达到可交付状态。剩余项主要是**GraphRAG 上游兼容、作者授权决策、专用 E2E runner 和视觉基线**。

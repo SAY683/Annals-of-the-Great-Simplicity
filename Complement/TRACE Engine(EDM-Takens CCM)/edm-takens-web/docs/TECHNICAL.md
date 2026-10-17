@@ -18,8 +18,8 @@
                                           │  ├ /api/archives/*    │  │
                                           │  └───────────────────────┘  │
                                           │  ┌───────────────────────┐  │
-                                          │  │  backend/edmtakens/   │  │
-                                          │  │  复制的原 Skill src   │  │
+                                          │  │  edm-takens/src/      │  │
+                                          │  │  唯一算法真源         │  │
                                           │  └───────────────────────┘  │
                                           └─────────────────────────────┘
 ```
@@ -28,7 +28,7 @@
 
 - 前端：Vite + 原生 JS，负责上传 CSV、选择列、展示实时日志与结果图。
 - 后端：FastAPI，负责变量校验、调用 `run_full_analysis()`、流式返回日志。
-- 算法层：从 `edm-takens/src/` 复制到 `backend/edmtakens/`，共有 4 处适应性修改（详见 `docs/ALGORITHM_AUDIT.md`），其中 `_paths.py` 支持运行时数据目录覆盖。
+- 算法层：直接导入 `../edm-takens/src` 的唯一真源；`EDMTAKENS_DATA_DIR` 在 worker 启动时注入，避免复制源码。
 
 ## 2. 目录结构
 
@@ -48,16 +48,8 @@ edm-takens-web/
 │   │   └── summary_builder.py  # 报告摘要生成
 │   ├── workers/            # 后台任务
 │   │   └── analysis_worker.py  # 分析任务执行器
-│   ├── edmtakens/          # EDM 核心库（从 edm-takens/src/ 同步）
-│   │   ├── _usability.py   # 可用性判定（统一入口）
-│   │   ├── data_quality.py # 数据质量诊断
-│   │   ├── edm_auditor.py  # 审计防火墙（6档verdict）
-│   │   ├── pipeline.py     # 主流水线
-│   │   ├── sovereign_havok.py # HAVOK 分析
-│   │   ├── _numpy_edm.py   # EDM/CCM/Multiview 纯 numpy 实现
-│   │   └── ...
 │   ├── job_store.py        # JobStore ABC + SQLite/InMemory 实现
-│   └── sync_check.py       # 副本一致性校验
+│   └── sync_check.py       # 单一真源布局校验
 ├── frontend/
 │   ├── index.html
 │   ├── src/
@@ -243,12 +235,10 @@ GET /api/analyze/jobs/{job_id}/stream
 
 ### 3.6 与原 Skill 的关系
 
-- `backend/edmtakens/` 复制自 `edm-takens/src/`，共有 4 处适应性修改（详见 `docs/ALGORITHM_AUDIT.md`），仅以下文件与源不同：
-  - `_paths.py`（路径适配）
-  - `__init__.py`（包注释）
-  - `enhanced_cross_validate.py`（数据路径适配）
-  - `environment_check.py`（路径检查适配）
-- `backend/api.py`、前端、启动脚本、文档均为网页版新增，未修改原 `edm-takens/` 目录。
+- Web 端直接消费 `../edm-takens/src`，不存在 `backend/edmtakens/` 副本。
+- `sync_check.py` 验证源目录完整、pipeline 可导入，并拒绝副本目录重新出现。
+- 数据目录通过 `EDMTAKENS_DATA_DIR` 在 worker 启动时注入。
+- `backend/api.py`、前端、启动脚本、文档均为网页版新增。
 
 ### 3.7 数据质量诊断与嵌入维度曲线
 

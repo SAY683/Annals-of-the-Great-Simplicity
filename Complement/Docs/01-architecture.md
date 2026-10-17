@@ -87,7 +87,10 @@ trace-engine-web/
     └── services/            分析服务
 
 trace-to-edm/
-    ├── server.js            HTTP 服务
+    ├── server.js            进程入口
+    ├── src/app.js           Express 组装
+    ├── src/routes/          按业务域拆分的路由
+    ├── src/services/        Python/任务/数据集/轨迹服务
     ├── edm_trigger.py       EDM 触发器
     ├── layer1_meta_scm.py   元数据 SCM
     ├── layer2_semantic.py   语义层

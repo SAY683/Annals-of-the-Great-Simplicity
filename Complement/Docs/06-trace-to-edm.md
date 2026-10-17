@@ -10,7 +10,10 @@
 
 ```
 trace-to-edm/
-├── server.js                 # HTTP 服务（Node.js）
+├── server.js                 # 进程入口（端口/监听）
+├── src/routes/               # core/trajectory/pipeline/edm/dataset/models/projects
+├── src/services/             # Python/任务/数据集/轨迹/日志服务
+├── src/app.js                # Express 组装
 ├── edm_trigger.py            # EDM 触发器（Python）
 ├── bridge.py                 # 桥接逻辑
 ├── config.py                 # 配置

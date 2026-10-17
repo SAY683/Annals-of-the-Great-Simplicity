@@ -607,8 +607,8 @@ def check_skill_projects(root: Path) -> dict:
             edm_takens_web / 'backend' / 'api.py',
             edm_takens_web / 'backend' / 'sync_check.py',
             edm_takens_web / 'backend' / 'services' / 'summary_builder.py',
-            edm_takens_web / 'backend' / 'edmtakens' / 'pipeline.py',
-            edm_takens_web / 'backend' / 'edmtakens' / 'ccm_causality.py',
+            root / 'edm-takens' / 'src' / 'pipeline.py',
+            root / 'edm-takens' / 'src' / 'ccm_causality.py',
             edm_takens_web / 'frontend' / 'src' / 'main.js',
             edm_takens_web / 'frontend' / 'src' / 'style.css',
             edm_takens_web / 'frontend' / 'index.html',
@@ -720,10 +720,10 @@ def check_edm_takens_disclosure_fields(root: Path) -> dict:
 
 
 def check_edm_takens_sync_check(root: Path) -> dict:
-    """ROUND28 新增: 在便携目录内运行 sync_check.py, 验证核心库与 Web 副本一致.
+    """ROUND28 新增: 在便携目录内运行 sync_check.py, 验证单一算法真源布局.
 
-    sync_check.py 比对 edm-takens/src/ 和 edm-takens-web/backend/edmtakens/ 的
-    SHA256 一致性, 确保便携目录内的两个项目没有失同步.
+    sync_check.py 验证 edm-takens-web 直接消费 edm-takens/src/ 唯一真源，
+    并确认 backend/edmtakens/ 副本不存在。
     """
     result = {'name': 'EDM-TAKENS 跨项目 sync_check', 'ok': True, 'messages': []}
     sync_check = root / 'edm-takens-web' / 'backend' / 'sync_check.py'
@@ -732,7 +732,7 @@ def check_edm_takens_sync_check(root: Path) -> dict:
         result['messages'].append('缺失 edm-takens-web/backend/sync_check.py')
         return result
 
-    # sync_check.py 依赖相对路径 ../edm-takens/src, 需在 backend/ 目录下运行
+    # sync_check.py 通过脚本位置解析 edm-takens/src，并在 backend/ 目录下运行
     backend_dir = root / 'edm-takens-web' / 'backend'
     proc = subprocess.run(
         [sys.executable, str(sync_check), '--quiet'],
@@ -753,7 +753,7 @@ def check_edm_takens_sync_check(root: Path) -> dict:
                     result['messages'].append(f'sync_check: {line.strip()}')
                     break
         else:
-            result['messages'].append('sync_check 通过 (核心库与 Web 副本一致)')
+            result['messages'].append('sync_check 通过 (Web 直接消费 edm-takens/src 唯一真源)')
     return result
 
 
