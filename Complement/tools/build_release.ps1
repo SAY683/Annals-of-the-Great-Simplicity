@@ -78,6 +78,8 @@ try {
             throw 'No complete Python interpreter found. Set TRACE_PYTHON_CMD or run tools\bootstrap.ps1.'
         }
         Write-Host "[release] audit interpreter: $python" -ForegroundColor DarkGray
+        & $python 'Complement\tools\check_docs.py'
+        if ($LASTEXITCODE -ne 0) { throw 'Documentation link audit failed; release was not built.' }
         & $python 'Complement\TRACE Engine(EDM-Takens CCM)\verify_portable.py' --no-e2e
         if ($LASTEXITCODE -ne 0) { throw 'Portable audit failed; release was not built.' }
     }
