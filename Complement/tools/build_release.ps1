@@ -31,15 +31,30 @@ try {
     }
 
     if (-not $SkipAudit) {
-        $python = $env:TRACE_PYTHON_CMD
-        if (-not $python) {
+        $python = $null
+        $candidates = @(
+            $env:TRACE_PYTHON_CMD,
+            $env:EDM_PYTHON_CMD,
+            $env:GRAPHRAG_PYTHON,
+            (Join-Path $repoRoot 'Complement\.venv\Scripts\python.exe'),
+            'G:\Python\python.exe',
+            'python'
+        )
+        foreach ($candidate in $candidates) {
+            if ([string]::IsNullOrWhiteSpace($candidate)) { continue }
+            $exe = $candidate
+            if (-not (Test-Path -LiteralPath $exe)) {
+                $cmd = Get-Command $candidate -ErrorAction SilentlyContinue
+                if (-not $cmd) { continue }
+                $exe = $cmd.Source
+            }
             try {
-                . (Join-Path $repoRoot 'Complement\shared\python_env.ps1')
-                $resolved = Resolve-ComplementPython -Required @('numpy', 'pandas', 'scipy', 'sklearn', 'jieba', 'dowhy', 'causallearn')
-                if ($resolved -and $resolved.Ok) { $python = $resolved.Path }
+                & $exe -c "import numpy,pandas,scipy,sklearn,jieba,dowhy,causallearn" 2>$null
+                if ($LASTEXITCODE -eq 0) { $python = $exe; break }
             } catch { }
         }
         if (-not $python) { $python = 'python' }
+        Write-Host "[release] audit interpreter: $python" -ForegroundColor DarkGray
         & $python 'Complement\TRACE Engine(EDM-Takens CCM)\verify_portable.py' --no-e2e
         if ($LASTEXITCODE -ne 0) { throw 'Portable audit failed; release was not built.' }
     }
