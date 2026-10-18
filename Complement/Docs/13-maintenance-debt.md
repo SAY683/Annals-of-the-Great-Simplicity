@@ -28,7 +28,7 @@
 | Bridge 数据隔离 | 修复 Bridge 触发 EDM 时覆盖固定 `edm-takens-web/data/narrative_meta_trajectories.csv` 的问题；改为 `trace_to_edm_<project>.csv` 项目隔离文件名 |
 | 归档回看 | 新增归档图片直读端点，归档任务无需先恢复到 `results/` 即可完整显示图片；补充路径穿越与 zip 读取测试 |
 | 模型平台授权 | ModelScope 三个自训练模型的 README front matter 与平台 `License` 字段已同步为 MIT，并通过公开 API 核验 |
-| 运行时目录 | 忽略 `edm-takens-web/results/`、归档 zip、Bridge 生成的 EDM 临时数据集与 `projects/_index.json`，避免运行产物污染发布工作树 |
+| 运行时目录 | 忽略 `edm-takens-web/results/`、归档 zip、Bridge 生成的 EDM 临时数据集与 `projects/_index.json`；`clean_runtime.ps1` 可清理空脚手架，`trace-to-edm/data/outputs` 在使用时自动重建 |
 | EDM 列映射 | 修复 `deaths/damage` 位置式互换；规范列保留、冲突列备份、非规范列映射到未占用别名 |
 | CSV 契约 | 统一为 **89 列**（Meta 7 + L1 30 + L2 4 + L3 48），新增 `trace_data_source` 并补测试 |
 | GraphRAG 数据 | `data_version.json`、计数/hash 一致性、LanceDB 向量/parquet ID 同步、U+FFFD、别名 schema 均由 `verify-env.py` 校验 |
@@ -43,6 +43,7 @@
 | `edm-takens-web` 历史路由 | `history.py` 从 1464 行降到 108 行；拆出 archives/exports 路由、schemas、history/archive/export 服务与 task repository，并补 5 个路由测试 |
 | `render.js` | 从 1641 行降到 556 行；拓扑、矩阵、3D/2D、切换器拆为独立浏览器脚本，版本号更新防止旧缓存 |
 | 算法副本 | 删除 `edm-takens-web/backend/edmtakens/` 副本；Web 直接导入 `edm-takens/src` 唯一真源，`sync_check.py` 改为拒绝副本复活 |
+| 发布卫生 | `check_docs.py` 校验 82 条相对链接；`build_release.ps1` fail-closed 检查 709 个 ZIP 条目，拒绝运行状态、密钥与本地模型；源码包 115.5 MB，SHA256 manifest 一致 |
 
 ## 3. 仍需作者决策
 

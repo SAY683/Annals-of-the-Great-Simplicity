@@ -87,8 +87,10 @@ print(json.dumps({
 }
 
 function markDatasetProcessed(ids) {
-  // 使用临时文件传递 IDs (避免特殊字符破坏 Python 字符串)
-  const tmpFile = path.join(ROOT, 'data', 'outputs', `_mark_ids_${Date.now()}.json`);
+  // 使用临时文件传递 IDs，路径通过环境变量传给 Python，避免引号和转义问题。
+  const outputDir = path.join(ROOT, 'data', 'outputs');
+  fs.mkdirSync(outputDir, { recursive: true });
+  const tmpFile = path.join(outputDir, `_mark_ids_${Date.now()}_${process.pid}.json`);
   fs.writeFileSync(tmpFile, JSON.stringify(ids));
   const script = `
 import sys, json, os; sys.path.insert(0, '.')
@@ -96,7 +98,8 @@ from project_manager import get_project_manager
 from dataset_manager import DatasetManager
 pm = get_project_manager()
 dm = DatasetManager(pm.current_dir)
-with open('${tmpFile.replace(/\\/g, '\\\\')}', 'r', encoding='utf-8') as f:
+mark_ids_file = os.environ['MARK_IDS_FILE']
+with open(mark_ids_file, 'r', encoding='utf-8') as f:
     ids = json.load(f)
 errors = []
 for eid in ids:
@@ -107,15 +110,23 @@ rows = 0
 if os.path.exists(pm.current_csv):
     with open(pm.current_csv, 'r', encoding='utf-8') as f:
         rows = sum(1 for _ in f) - 1
-os.remove('${tmpFile.replace(/\\/g, '\\\\')}')
+try:
+    os.remove(mark_ids_file)
+except OSError:
+    pass
 print(json.dumps({"rows": rows, "edm_ready": rows >= 15}, ensure_ascii=False))
   `.trim();
   return new Promise((resolve) => {
-    const proc = spawn(PYTHON_CMD, ['-c', script], { cwd: ROOT, env: { ...process.env, PYTHONIOENCODING: 'utf-8' }, timeout: 10000 });
+    const cleanup = () => { try { fs.unlinkSync(tmpFile); } catch {} };
+    const proc = spawn(PYTHON_CMD, ['-c', script], {
+      cwd: ROOT,
+      env: { ...process.env, PYTHONIOENCODING: 'utf-8', MARK_IDS_FILE: tmpFile },
+      timeout: 10000,
+    });
     let out = '';
     proc.stdout.on('data', d => out += d.toString());
-    proc.on('close', () => { try { resolve(JSON.parse(out)); } catch { resolve({}); } });
-    proc.on('error', () => resolve({}));
+    proc.on('close', () => { cleanup(); try { resolve(JSON.parse(out)); } catch { resolve({}); } });
+    proc.on('error', () => { cleanup(); resolve({}); });
   });
 }
 
