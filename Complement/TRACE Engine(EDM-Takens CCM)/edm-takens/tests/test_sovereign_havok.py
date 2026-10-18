@@ -11,14 +11,16 @@ This module tests the current SovereignHAVOK class directly:
   - constant-data warning
   - discrete eigenvalue stability
 """
-import os, sys, warnings
+import os
+import sys
+import warnings
+
 import numpy as np
+import pytest
 
 _SKILL_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _SKILL_SRC = os.path.join(_SKILL_ROOT, 'src')
 sys.path.insert(0, _SKILL_SRC)
-
-warnings.filterwarnings('ignore')
 
 
 def test_fit_basic():
@@ -32,7 +34,6 @@ def test_fit_basic():
     assert -10.0 < sh.kurtosis_vr_ < 10.0
     print(f"  [PASS] fit basic: r={sh.r_}, kurt={sh.kurtosis_vr_:.3f}, "
           f"expl_var={sh.explained_var_:.1%}")
-    return True
 
 
 def test_vu_basis_consistency():
@@ -45,7 +46,6 @@ def test_vu_basis_consistency():
     delta = abs(sh_v.kurtosis_vr_ - sh_u.kurtosis_vr_)
     assert delta < 0.5, f"V/U kurtosis delta={delta:.3f} too large"
     print(f"  [PASS] V/U basis: r={sh_v.r_}, delta_kurt={delta:.4f}")
-    return True
 
 
 def test_predict_next_state():
@@ -61,49 +61,61 @@ def test_predict_next_state():
     traj = sh.predict_n_steps(v0, np.zeros(5), 5)
     assert traj.shape == (6, sh.r_ - 1)
     print(f"  [PASS] predict_next_state: shape={nxt.shape}, finite=OK")
-    return True
 
 
-def test_small_sample_sg_cap():
+def test_small_sample_sg_cap(monkeypatch):
     np.random.seed(0)
     small = np.random.randn(32) * 0.5 + np.sin(np.linspace(0, 4 * np.pi, 32))
-    from sovereign_havok import SovereignHAVOK
-    sh = SovereignHAVOK(q_delays=6, window_length=11, poly_order=2).fit(small)
-    # SG window must be auto-capped at p//4 for small data
+    import sovereign_havok
+
     p = len(small) - 6 + 1
-    expected_cap = max(5, p // 4)
+    expected_cap = max(3, p // 4)
     if expected_cap % 2 == 0:
         expected_cap -= 1
+
+    captured = []
+    real_savgol = sovereign_havok.savgol_filter
+
+    def capture_savgol(*args, **kwargs):
+        captured.append(kwargs.get("window_length"))
+        return real_savgol(*args, **kwargs)
+
+    monkeypatch.setattr(sovereign_havok, "savgol_filter", capture_savgol)
+    sh = sovereign_havok.SovereignHAVOK(
+        q_delays=6,
+        window_length=11,
+        poly_order=2,
+    ).fit(small)
     assert sh.is_valid_
-    print(f"  [PASS] small sample: r={sh.r_}, p={p}, SG cap~{expected_cap}")
-    return True
+    assert captured, "Savitzky-Golay path was not exercised"
+    assert captured[0] == expected_cap, (
+        f"SG window {captured[0]} != expected cap {expected_cap}"
+    )
+    print(f"  [PASS] small sample: r={sh.r_}, p={p}, SG window={captured[0]}")
 
 
 def test_nan_rejection():
     from sovereign_havok import SovereignHAVOK
     bad = np.array([1.0, 2.0, np.nan, 4.0, 5.0, 6.0, 7.0, 8.0])
     sh = SovereignHAVOK(q_delays=3)
-    try:
+    with pytest.raises(ValueError, match="NaN|Inf"):
         sh.fit(bad)
-        print("  [FAIL] NaN data should have raised ValueError")
-        return False
-    except ValueError as e:
-        assert "NaN" in str(e) or "Inf" in str(e)
-        print(f"  [PASS] NaN rejection: {str(e)[:50]}")
-        return True
+    print("  [PASS] NaN rejection")
 
 
 def test_constant_data_warning():
     from sovereign_havok import SovereignHAVOK
     const = np.ones(50) * 3.0
     sh = SovereignHAVOK(q_delays=5)
-    with warnings.catch_warnings(record=True) as w:
+    with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
         sh.fit(const)
-        assert any("constant" in str(x.message).lower() or "rank-1" in str(x.message)
-                   for x in w), "expected constant-data warning"
-    print(f"  [PASS] constant data warning issued")
-    return True
+        assert any(
+            "constant" in str(item.message).lower()
+            or "rank-1" in str(item.message).lower()
+            for item in caught
+        ), "expected constant-data warning"
+    print("  [PASS] constant data warning issued")
 
 
 def test_eigenvalue_stability():
@@ -116,7 +128,6 @@ def test_eigenvalue_stability():
     assert np.all(np.abs(sh.eigenvalues_d_) < 1e6), "eigenvalues exploded"
     print(f"  [PASS] eigenvalues finite & bounded: "
           f"max|eig_d|={np.max(np.abs(sh.eigenvalues_d_)):.4f}")
-    return True
 
 
 def run_all():
@@ -136,13 +147,12 @@ def run_all():
     for name, fn in tests:
         print(f'\n--- {name} ---')
         try:
-            if fn():
-                passed += 1
-            else:
-                failed += 1
-        except Exception as e:
-            print(f'  [ERROR] {name}: {e}')
-            import traceback; traceback.print_exc()
+            fn()
+            passed += 1
+        except Exception as error:
+            print(f'  [ERROR] {name}: {error}')
+            import traceback
+            traceback.print_exc()
             failed += 1
     print(f"\n{'=' * 60}")
     print(f"  Total: {passed + failed}  |  Passed: {passed}  |  Failed: {failed}")

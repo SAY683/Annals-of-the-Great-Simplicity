@@ -49,6 +49,9 @@ html, body {
 /* 缩放控制：进一步压缩，避免 header 右侧被撑开 */
 .scale-control {
   display: flex;
+  min-width: 0;
+  max-width: 100%;
+  flex: 0 1 auto;
   align-items: center;
   gap: 0.25rem;
   font-family: var(--font-mono);
@@ -64,6 +67,9 @@ html, body {
   accent-color: var(--accent);
 }
 .scale-control button {
+  width: auto;
+  min-width: 0;
+  flex: 0 0 auto;
   padding: 0.12rem 0.25rem;
   font-size: clamp(0.52rem, 0.75vw, 0.6rem);
 }
@@ -778,6 +784,11 @@ button.danger:hover:not(:disabled) { background: rgba(255, 77, 77, 0.08); }
   font-family: var(--font-mono);
   font-size: clamp(0.78rem, 1.05vw, 0.88rem);
 }
+.param-grid > *,
+.param {
+  min-width: 0;
+}
+
 .param {
   display: flex;
   justify-content: space-between;
@@ -786,8 +797,32 @@ button.danger:hover:not(:disabled) { background: rgba(255, 77, 77, 0.08); }
   border: 1px solid var(--border);
   border-radius: 5px;
 }
-.param .k { color: var(--muted); }
-.param .v { color: var(--text); text-align: right; max-width: 60%; word-break: break-word; }
+.param .k {
+  min-width: 0;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.param .v {
+  color: var(--text);
+  text-align: right;
+  max-width: 60%;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.param input,
+.param select {
+  min-width: 0;
+  max-width: 45%;
+}
+
+/* Status values can carry backend diagnostics; wrap them instead of clipping. */
+.status-card .stat-label,
+.status-card .stat-value {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
 
 .warrior-grid {
   display: grid;
@@ -1303,6 +1338,8 @@ details > div { padding: 0.75rem; }
 
   /* 2026-10-17 UI audit: prevent mobile panel toolbars and wide matrices
      from widening the document viewport. */
+  .scale-control { width: 100%; }
+  .scale-control button { width: auto; min-height: 32px; margin-bottom: 0; }
   .panel-header > div { flex-wrap: wrap; min-width: 0; }
   .panel-header button { width: auto; flex: 1 1 90px; min-width: 0; }
   #mainMatrixView,
@@ -1543,7 +1580,9 @@ details > div { padding: 0.75rem; }
   order: 4;
   width: 100%;
   max-width: 100%;
+  margin-left: 0;
   margin-top: 0.12rem;
+  padding-left: 1.5rem;
   padding-top: 0.12rem;
   line-height: 1.3;
   font-size: clamp(0.6rem, 0.82vw, 0.7rem);

@@ -132,8 +132,42 @@
 
 /* ── Panels ─────────────────────────────── */
 .panel {
+  min-width: 0;
   padding: 14px;
   margin-bottom: 12px;
+}
+
+.command-grid > *,
+.col-left,
+.col-right {
+  min-width: 0;
+}
+
+.panel h2,
+.panel h2 > span {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.status-card .stat-label,
+.status-card .stat-value,
+#dsSummary,
+#edmStatus,
+#edmDataRange,
+.edm-confidence-banner {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+/* Compact controls must never inherit the shared mobile button { width:100% }. */
+.btn-mini {
+  width: auto;
+  flex: 0 0 auto;
+  max-width: 100%;
 }
 .panel h2 {
   font-size: clamp(0.78rem, 1.05vw, 0.88rem);
@@ -583,6 +617,8 @@ tr:hover td { background: #151d28; }
 .ws-row {
   display: flex;
   align-items: center;
+  min-width: 0;
+  max-width: 100%;
   gap: 6px;
   padding: 5px 0;
   border-bottom: 1px solid rgba(255,255,255,0.03);
@@ -591,7 +627,12 @@ tr:hover td { background: #151d28; }
   flex-shrink: 0;
 }
 .ws-row:hover { background: #151d28; }
-.ws-row input[type=checkbox] { accent-color: var(--accent); }
+.ws-row input[type=checkbox] { accent-color: var(--accent); flex: 0 0 auto; }
+.ws-row > :not(input) {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
 
 .ws-row-header {
   font-weight: 700;

@@ -1118,6 +1118,25 @@ main {
   overflow-y: auto;
   overflow-x: hidden;
   padding-right: 4px;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+#summary *,
+#historyList *,
+#archiveList * {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.status-card .stat-label,
+.status-card .stat-value,
+#columnInfo,
+.col-chip {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 /* 结果摘要区有适当高度限制 */
@@ -1127,6 +1146,8 @@ main {
   overflow-y: auto;
   overflow-x: hidden;
   padding-right: 4px;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 /* 空态提示统一风格 */
