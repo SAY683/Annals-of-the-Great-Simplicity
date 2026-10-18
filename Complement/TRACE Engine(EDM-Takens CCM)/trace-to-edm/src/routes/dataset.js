@@ -44,21 +44,15 @@ app.post('/api/dataset/add', async (req, res) => {
 
 app.post('/api/dataset/add-text', async (req, res) => {
   try {
-    const { texts } = req.body;
-    let rows = texts || [];
-    // validateInputPathMiddleware 已校验 csv_path 并写入 req.resolvedInputPath
-    const csvFullPath = req.resolvedInputPath;
-    if (csvFullPath) {
-      if (fs.existsSync(csvFullPath)) {
-        const content = fs.readFileSync(csvFullPath, 'utf-8');
-        const lines = content.trim().split('\n');
-        const headers = lines[0].split(',');
-        rows = lines.slice(1).map(line => { const vals = line.split(','); const obj = {}; headers.forEach((h, i) => obj[h.trim()] = (vals[i]||'').trim()); return obj; });
-      }
+    // validateInputPathMiddleware has already resolved and constrained csv_path.
+    if (req.resolvedInputPath) {
+      const added = await pyDS('add_text_csv', [req.resolvedInputPath]);
+      return res.json({ added });
     }
+    const rows = Array.isArray(req.body.texts) ? req.body.texts : [];
     if (!rows.length) return res.status(400).json({ error: 'no text rows' });
-    const result = await pyDS('add_text_entries', [rows]);
-    res.json(result);
+    const added = await pyDS('add_text_entries', [rows]);
+    res.json({ added });
   } catch (e) { res.status(500).json(errorResponse(e)); }
 });
 

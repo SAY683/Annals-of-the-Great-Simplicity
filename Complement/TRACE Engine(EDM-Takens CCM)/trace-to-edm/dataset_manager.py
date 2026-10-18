@@ -177,6 +177,24 @@ class DatasetManager:
                 print(f"[DS] 添加 {added} 个 text 条目")
         return added
 
+    def add_text_csv(self, csv_path: str) -> int:
+        """Import a UTF-8 text CSV (timestamp/text/source) with quoted fields."""
+        path = Path(csv_path)
+        if not path.is_file():
+            raise FileNotFoundError(f"text CSV not found: {path}")
+        rows: List[Dict[str, str]] = []
+        with path.open("r", encoding="utf-8-sig", newline="") as handle:
+            reader = csv.DictReader(handle)
+            for raw in reader:
+                row = {
+                    str(key).strip(): ("" if value is None else str(value).strip())
+                    for key, value in raw.items()
+                    if key is not None
+                }
+                if row:
+                    rows.append(row)
+        return self.add_text_entries(rows)
+
     # ── 操作 ────────────────────────────────────────────
 
     def mark_processed(self, entry_id: str):

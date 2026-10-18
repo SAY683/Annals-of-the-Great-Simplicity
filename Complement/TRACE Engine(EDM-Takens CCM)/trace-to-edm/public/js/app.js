@@ -1252,11 +1252,11 @@ async function triggerEDMWithFeedback() {
       } catch (e) {
         t(`  [${attempts}] 轮询失败: ${e.message}`, 'warn');
       }
-      if (attempts > 60) { t('⏰ EDM超时', 'warn'); break; }
+      if (attempts > 240) { t('⏰ EDM超时 (12分钟)', 'warn'); break; }
     }
 
     // 3. 检查结果 — 是否有非线性检测
-    if (status === 'completed') {
+    if (status === 'completed' || status === 'done') {
       t('✓ EDM分析完成', 'done');
       // 通信管线：EDM OBS 阶段激活
       const edmStage = document.querySelector('.pipe-stage[data-stage="edm"]');

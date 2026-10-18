@@ -4,25 +4,54 @@ const { spawn } = require('child_process');
 const { ROOT, PYTHON_CMD } = require('../config');
 
 function pyDS(action, args) {
-  // 元审计 P1 修缮: Python 注入防护加固
-  // 之前对字符串参数仅做 replace(/'/g, "\\'")，遇到 \\ 等转义序列仍可能注入
-  // 现统一用 JSON 序列化传递所有参数，Python 侧用 json.loads 解码
-  // action 限定为 DatasetManager 的方法名（白名单校验）
+  // Pass JSON over stdin instead of embedding it in the Python command line.
+  // This avoids Windows command-line length limits and quoting/injection risks.
   const ALLOWED_ACTIONS = new Set([
-    'add_replay_uuids', 'add_text_entries', 'remove_entry', 'clear_processed',
-    'reset_all_pending', 'entries', 'summary', 'export_replay_csv', 'export_text_csv',
+    'add_replay_uuids', 'add_text_entries', 'add_text_csv', 'remove_entry',
+    'clear_processed', 'reset_all_pending', 'entries', 'summary',
+    'export_replay_csv', 'export_text_csv',
   ]);
   if (!ALLOWED_ACTIONS.has(action)) {
     return Promise.reject(new Error(`invalid action: ${action}`));
   }
 
-  const argsJson = JSON.stringify(args || []);
-  const script = `import sys, json; sys.path.insert(0, '.'); from project_manager import get_project_manager; from dataset_manager import DatasetManager; pm = get_project_manager(); dm = DatasetManager(pm.current_dir); _args = json.loads('${argsJson.replace(/'/g, "\\'")}'); result = dm.${action}(*_args); print(json.dumps(result if not isinstance(result, (list,dict)) else result, ensure_ascii=False, default=str))`;
+  const script = `
+import sys, json
+sys.path.insert(0, '.')
+from project_manager import get_project_manager
+from dataset_manager import DatasetManager
+
+payload = json.load(sys.stdin)
+pm = get_project_manager()
+dm = DatasetManager(pm.current_dir)
+result = getattr(dm, payload["action"])(*payload["args"])
+print(json.dumps(result, ensure_ascii=False, default=str))
+  `.trim();
+
   return new Promise((resolve, reject) => {
-    const proc = spawn(PYTHON_CMD, ['-c', script], { cwd: ROOT, env: { ...process.env, PYTHONIOENCODING: 'utf-8' }, timeout: 15000 });
-    let out = ''; proc.stdout.on('data', d => out += d.toString());
-    proc.on('close', () => { try { resolve(JSON.parse(out)); } catch { resolve({ raw: out }); } });
-    proc.on('error', e => reject(e));
+    const proc = spawn(PYTHON_CMD, ['-c', script], {
+      cwd: ROOT,
+      env: { ...process.env, PYTHONIOENCODING: 'utf-8' },
+      timeout: 15000,
+    });
+    let out = '';
+    let err = '';
+    proc.stdout.on('data', chunk => { out += chunk.toString(); });
+    proc.stderr.on('data', chunk => { err += chunk.toString(); });
+    proc.on('close', code => {
+      if (code !== 0) {
+        reject(new Error(err.trim() || `dataset manager exited with code ${code}`));
+        return;
+      }
+      try {
+        resolve(JSON.parse(out));
+      } catch {
+        reject(new Error(`dataset manager returned invalid JSON: ${out.slice(0, 500)}`));
+      }
+    });
+    proc.on('error', reject);
+    proc.stdin.write(JSON.stringify({ action, args: args || [] }));
+    proc.stdin.end();
   });
 }
 

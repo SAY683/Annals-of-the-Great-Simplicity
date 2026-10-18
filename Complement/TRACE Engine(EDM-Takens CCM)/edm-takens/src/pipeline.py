@@ -308,6 +308,28 @@ class PipelineConfig:
 # Layer 3: Orchestrated Pipeline
 # ============================================================
 
+def _spike_target_label(row, target_col: str, is_binary: bool = False) -> str:
+    """Format the target value for spike reporting without assuming a 'result' column."""
+    if target_col not in row.index:
+        return f"{target_col}=?"
+    value = row.get(target_col)
+    try:
+        if value is None or bool(pd.isna(value)):
+            return f"{target_col}=?"
+    except (TypeError, ValueError):
+        pass
+    if is_binary:
+        try:
+            if int(value) == 1:
+                return 'W'
+            if int(value) == 0:
+                return 'L'
+        except (TypeError, ValueError):
+            pass
+    if isinstance(value, (int, float, np.number)) and not isinstance(value, bool):
+        return f"{target_col}={float(value):.3g}"
+    return f"{target_col}={value}"
+
 def run_pipeline(config: PipelineConfig = None,
                  auto_fix: bool = False,
                  report_only: bool = False):
@@ -610,7 +632,7 @@ def run_pipeline(config: PipelineConfig = None,
                     row = df.iloc[gi]
                     fs = forcing[si]
                     direction = "UP" if fs > 0 else "DOWN"
-                    res = 'W' if row['result'] == 1 else 'L'
+                    res = _spike_target_label(row, config.target_col, config.is_binary)
                     kd = ""
                     if 'kills' in df.columns and 'deaths' in df.columns:
                         kd = f", K/D={int(row['kills'])}/{int(row['deaths'])}"

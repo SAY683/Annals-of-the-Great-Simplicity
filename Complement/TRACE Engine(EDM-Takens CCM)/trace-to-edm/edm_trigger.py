@@ -19,6 +19,7 @@ EDM-Takens 分析触发器
 
 import os
 import time
+import re
 import shutil
 import json
 import urllib.request
@@ -161,7 +162,10 @@ class EDMTrigger:
 
     def copy_to_edm_data(self, time_start: str = None, time_end: str = None) -> Path:
         """将轨迹 CSV 复制到 edm-takens-web 的 data/ 目录。支持时间范围过滤。"""
-        target_name = "narrative_meta_trajectories.csv"
+        project_name = self.csv_path.parent.name or "default"
+        safe_project = re.sub(r"[^A-Za-z0-9_-]+", "_", project_name).strip("_")[:48] or "default"
+        target_name = f"trace_to_edm_{safe_project}.csv"
+        self.uploaded_filename = target_name
         target_path = EDM_DATA_DIR / target_name
         EDM_DATA_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -303,7 +307,7 @@ class EDMTrigger:
 
         # 提交分析任务
         result = self._api_call("POST", "/api/analyze/jobs", {
-            "filename": "narrative_meta_trajectories.csv",
+            "filename": self.uploaded_filename,
             "target_col": target_col,
             "q": str(q),
             "auto_fix": str(auto_fix).lower(),
