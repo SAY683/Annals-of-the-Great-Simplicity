@@ -1,4 +1,4 @@
-#Requires -Version 5.0
+﻿#Requires -Version 5.0
 <#
 .SYNOPSIS
   Audit or remove known Complement runtime artifacts.
@@ -86,6 +86,13 @@ if ($IncludeTaskHistory) {
         'Complement\TRACE Engine(EDM-Takens CCM)\trace-to-edm\projects\default\inputs',
         'Complement\TRACE Engine(EDM-Takens CCM)\trace-to-edm\projects\_index.json',
         'Complement\TRACE Engine(EDM-Takens CCM)\trace-engine\examples\counterfactual_hybrid\outputs'
+        'Complement\GraphRAG-神纪图谱\logs',
+        'Complement\TRACE Engine(EDM-Takens CCM)\edm-takens\examples\yinshen\reference\figures',
+        'Complement\TRACE Engine(EDM-Takens CCM)\edm-takens\examples\yinshen\reference\reports',
+        'Complement\TRACE Engine(EDM-Takens CCM)\trace-engine-web\light',
+        'Complement\TRACE Engine(EDM-Takens CCM)\trace-engine\examples\zhihu_consensus\figures',
+        'Complement\TRACE Engine(EDM-Takens CCM)\trace-engine\shared',
+        'Complement\TRACE Engine(EDM-Takens CCM)\trace-to-edm\projects\default'
     )
     foreach ($relative in $historyTargets) { Add-Target (Join-Path $repoRoot $relative) }
 
