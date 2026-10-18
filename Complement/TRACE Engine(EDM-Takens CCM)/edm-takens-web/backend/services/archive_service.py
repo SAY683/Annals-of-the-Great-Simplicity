@@ -2,6 +2,7 @@
 import os
 import shutil
 import tempfile
+import zipfile
 
 from core.locks import ARCHIVE_DIR
 from repositories.task_repository import delete_task
@@ -68,6 +69,19 @@ def preview_archive(task_id: str):
         except Exception:
             pass
 
+
+def read_archive_image(task_id: str, filename: str):
+    """Read a single image from an archived task without exposing arbitrary zip paths."""
+    if not filename or filename != os.path.basename(filename) or filename in ('.', '..'):
+        raise ValueError('Invalid image filename')
+    zip_path = _safe_task_path(task_id + '.zip', ARCHIVE_DIR)
+    if not zip_path or not os.path.exists(zip_path):
+        raise FileNotFoundError(task_id)
+    with zipfile.ZipFile(zip_path) as archive:
+        for member in archive.namelist():
+            if not member.endswith('/') and os.path.basename(member) == filename:
+                return archive.read(member)
+    raise FileNotFoundError(filename)
 
 def delete_archive(task_id: str):
     zip_path = _safe_task_path(task_id + '.zip', ARCHIVE_DIR)

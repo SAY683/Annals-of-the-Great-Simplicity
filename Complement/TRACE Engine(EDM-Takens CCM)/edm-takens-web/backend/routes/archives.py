@@ -1,5 +1,7 @@
 """Archive management routes."""
-from fastapi import APIRouter, Depends, HTTPException
+import mimetypes
+
+from fastapi import APIRouter, Depends, HTTPException, Response
 
 from core.auth import require_auth, require_auth_optional
 from services import archive_service
@@ -36,6 +38,19 @@ def preview_archive(task_id: str):
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Preview failed: {exc}")
 
+
+@router.get("/api/archives/{task_id}/images/{filename}", dependencies=[Depends(require_auth_optional)])
+def archive_image(task_id: str, filename: str):
+    try:
+        data = archive_service.read_archive_image(task_id, filename)
+        media_type = mimetypes.guess_type(filename)[0] or 'application/octet-stream'
+        return Response(content=data, media_type=media_type)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="Archived image not found")
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid image filename")
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Archive image failed: {exc}")
 
 @router.delete("/api/archives/{task_id}", dependencies=[Depends(require_auth)])
 def delete_archive(task_id: str):

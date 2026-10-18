@@ -875,7 +875,7 @@ function renderSummary(summary) {
   $('#summary').innerHTML = rows.join('')
 }
 
-function renderImages(images, taskId) {
+function renderImages(images, taskId, fromArchive = false) {
   const container = $('#images')
   container.innerHTML = ''
   if (!images.length) {
@@ -889,7 +889,9 @@ function renderImages(images, taskId) {
     const title = document.createElement('h4')
     title.textContent = name
     const img = document.createElement('img')
-    img.src = `${API_PREFIX}/results/${prefix}${encodeURIComponent(name)}?t=${Date.now()}`
+    img.src = fromArchive
+      ? `${API_PREFIX}/archives/${encodeURIComponent(taskId)}/images/${encodeURIComponent(name)}?t=${Date.now()}`
+      : `${API_PREFIX}/results/${prefix}${encodeURIComponent(name)}?t=${Date.now()}`
     img.alt = name
     wrapper.appendChild(title)
     wrapper.appendChild(img)
@@ -1557,10 +1559,9 @@ async function viewArchiveTask(taskId) {
     if (d.summary && typeof renderSummary === 'function') {
       renderSummary(d.summary)
     }
-    // 归档预览模式：图片渲染依赖 results/ 静态服务，若任务目录尚未恢复
-    // 则图片不可达。这里仍尝试渲染（若用户已恢复过同名任务，图片可见）。
+    // 归档预览直接从 zip 读取图片，不依赖已恢复的 results/ 目录。
     if (d.images && typeof renderImages === 'function') {
-      renderImages(d.images, taskId)
+      renderImages(d.images, taskId, true)
     }
     // 在摘要顶部插入归档回看标识
     const summaryEl = document.getElementById('summary')

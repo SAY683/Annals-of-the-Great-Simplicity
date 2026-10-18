@@ -9,9 +9,9 @@
 本轮最终验收：
 
 - `trace-engine`：22 passed
-- `edm-takens`：93 passed
-- `edm-takens-web` 路由/列映射：5 passed
-- `trace-to-edm` CSV 契约：3 passed；HTTP 路由契约：2 passed
+- `edm-takens`：96 passed
+- `edm-takens-web` 路由/列映射/归档：7 passed
+- `trace-to-edm` Python 契约：6 passed；HTTP 路由契约：2 passed
 - `verify_portable.py --no-e2e`：**16 PASS / 0 FAIL**
 - `smoke_e2e.py`：**全链路通过**（15 条文本 → TRACE → trace-to-edm → EDM）
 - 浏览器实测：三页面无 console error / warning；EDM 真实分析完成后 `column_mapping = null`；TRACE LIGHT 得到 12 概念 / 8 显著边 / ATE -0.2200，并显示合成 SEM 警告
@@ -22,7 +22,13 @@
 | 项目 | 结果 |
 |---|---|
 | CI | `.github/workflows/complement-ci.yml` 覆盖 Python/Node 测试、便携审计、列映射、CSV 契约、GraphRAG 数据 hash、provider 兼容层单测与隧道网关单测 |
-| 浏览器回归 | 新增 `Complement/tools/browser_smoke.py`，支持三页面加载与 `--full` 真实分析；Playwright 为可选依赖 |
+| 浏览器回归 | `Complement/tools/browser_smoke.py` 支持三页面加载与 `--full` 真实分析；本轮另完成 TRACE LIGHT/DEEP/SUPER、Bridge 回填管线与 EDM 触发、EDM 上传/质量曲线/历史导出/归档恢复/对比/删除全流程浏览器实测，修复项复测后 console error/warning 均为 0 |
+| CSV 导入 | 修复文本 CSV 导入的逗号/引号解析与 Windows 命令行长度问题；CSV 在 Python 端用 `csv.DictReader` 解析，`pyDS` 改由 stdin 传递 JSON；40 行 `news_40_csv_input.csv` 导入实测通过 |
+| Bridge EDM | 修复 EDM 任务成功状态 `done` 未被前端识别、180 秒过早超时、轨迹目标列硬编码 `result` 的问题；16 行回填链路得到 `pipeline=ok / cross_validation=ok / interpretation=ok` |
+| Bridge 数据隔离 | 修复 Bridge 触发 EDM 时覆盖固定 `edm-takens-web/data/narrative_meta_trajectories.csv` 的问题；改为 `trace_to_edm_<project>.csv` 项目隔离文件名 |
+| 归档回看 | 新增归档图片直读端点，归档任务无需先恢复到 `results/` 即可完整显示图片；补充路径穿越与 zip 读取测试 |
+| 模型平台授权 | ModelScope 三个自训练模型的 README front matter 与平台 `License` 字段已同步为 MIT，并通过公开 API 核验 |
+| 运行时目录 | 忽略 `edm-takens-web/results/`、归档 zip、Bridge 生成的 EDM 临时数据集与 `projects/_index.json`，避免运行产物污染发布工作树 |
 | EDM 列映射 | 修复 `deaths/damage` 位置式互换；规范列保留、冲突列备份、非规范列映射到未占用别名 |
 | CSV 契约 | 统一为 **89 列**（Meta 7 + L1 30 + L2 4 + L3 48），新增 `trace_data_source` 并补测试 |
 | GraphRAG 数据 | `data_version.json`、计数/hash 一致性、LanceDB 向量/parquet ID 同步、U+FFFD、别名 schema 均由 `verify-env.py` 校验 |
@@ -50,6 +56,7 @@
 |---|---|---|
 | GraphRAG provider 兼容 | 已改为运行时能力探测与回退，不再依赖 `site-packages` 补丁 | `reapply-graphrag-patches.py` 仅作旧版本排障兜底；正常查询/索引统一走 `graphrag_compat_cli.py` |
 | 完整 CI E2E | 需要模型/8081/15721/本地端口专用 runner | 当前 CI 跑单测、路由契约与静态审计；E2E 作为本地发布门禁 |
+| 全文本 40 行 L3 管线耗时 | CPU 环境下逐条 L3 语义投影可能达到 20 分钟以上；回填路径约数秒至数分钟 | 发布文档已给出回填优先策略；后续可增加并行 L3 与更准确的 ETA |
 | 像素级视觉回归 | 已有 Playwright smoke + 截图 | 后续可加稳定基线与截图 diff，避免动画/字体造成假阳性 |
 | `trace-engine-web` 其他大文件 | `jobs.js` 约 32 KB、`app.js` 约 25 KB | 当前低于主要债务阈值，后续可按任务历史/输入控制再拆 |
 
