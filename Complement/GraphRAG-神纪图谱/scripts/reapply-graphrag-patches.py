@@ -1,9 +1,12 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 """
-reapply-graphrag-patches.py - Re-apply GraphRAG site-packages patches after an upgrade.
+reapply-graphrag-patches.py - LEGACY fallback for GraphRAG site-packages patches.
 
-WHY: the patches live inside G:\\Python\\Lib\\site-packages\\graphrag\\ and pip
-overwrites them on every upgrade. Run this once after `pip install --upgrade graphrag`.
+Normal operation no longer needs this script. Queries, indexing and MCP calls use
+scripts/graphrag_compat_cli.py, which installs an in-memory provider-capability
+layer before GraphRAG imports its completion modules. Keep this script only for
+diagnosing an old/broken GraphRAG environment; it must not be part of the normal
+installation or upgrade path.
 
 IDEMPOTENT + ROBUST: each patch is gated by a marker (function/import/string).
   - marker already present  -> "already applied (skip)"

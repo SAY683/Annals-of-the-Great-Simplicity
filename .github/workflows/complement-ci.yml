@@ -68,6 +68,10 @@ jobs:
         run: |
           python -m pip install "pandas==3.0.3" "pyarrow==25.0.0"
           python scripts/verify-env.py --data-only --no-services
+      - name: GraphRAG compatibility tests
+        shell: pwsh
+        working-directory: "Complement/GraphRAG-神纪图谱"
+        run: python -m pytest graphrag_compat/tests -q
       - name: Portable audit (no E2E)
         shell: pwsh
         run: python "Complement/TRACE Engine(EDM-Takens CCM)/verify_portable.py" --no-e2e

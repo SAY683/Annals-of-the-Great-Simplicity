@@ -165,14 +165,16 @@ def _query_graph(project: str, question: str, method: str = "local", community_l
     env["PYTHONIOENCODING"] = "utf-8"
     env["PYTHONUTF8"] = "1"
 
-    # Locate graphrag CLI (prefer known location, then fall back)
-    cli = r"G:\Python\Scripts\graphrag.exe"
-    if not Path(cli).exists():
+    # Use the project compatibility entrypoint so provider capability detection
+    # is installed before GraphRAG imports its completion modules.
+    compat_cli = Path(__file__).resolve().parents[1] / "scripts" / "graphrag_compat_cli.py"
+    if compat_cli.exists():
+        cmd = [sys.executable, str(compat_cli), "query", "--root", project, "--method", method, _apply_decode(question, decode)]
+    else:
         cli = str(Path(sys.executable).parent / "Scripts" / "graphrag.exe")
-    if not Path(cli).exists():
-        cli = "graphrag"
-
-    cmd = [cli, "query", "--root", project, "--method", method, _apply_decode(question, decode)]
+        if not Path(cli).exists():
+            cli = "graphrag"
+        cmd = [cli, "query", "--root", project, "--method", method, _apply_decode(question, decode)]
     if method == "global":
         cmd += ["--community-level", str(community_level)]
 

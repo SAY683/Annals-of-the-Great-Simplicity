@@ -16,13 +16,13 @@ if (-not (Test-Path -LiteralPath "$project\output")) {
 }
 
 $Python = Assert-GraphRagPython
-$graphragCli = Get-GraphRagCli -Python $Python
+$graphragCli = Join-Path $scriptDir "graphrag_compat_cli.py"
 $env:PYTHONIOENCODING = "utf-8"
 $env:PYTHONUTF8 = "1"
 
 Write-Host "[GraphRAG] 自检：Global Search 查询 '什么是爱？'" -ForegroundColor Cyan
 Write-Host "  project : $project"
-Write-Host "  cli     : $graphragCli"
-& $graphragCli query --root $project --method global "什么是爱？"
+Write-Host "  cli     : $Python $graphragCli"
+& $Python $graphragCli query --root $project --method global "什么是爱？"
 Write-Host ""
 Write-Host "[完成] 若上方出现结构化回答，则索引与链路正常。" -ForegroundColor Green

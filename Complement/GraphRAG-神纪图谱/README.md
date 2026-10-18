@@ -34,6 +34,7 @@ GraphRAG-神纪图谱\
 │   ├── 04-维护与故障排查.md
 │   ├── 05-扩展与自定义.md
 │   ├── 06-责任与合规.md
+│   ├── 07-provider-compatibility.md
 │   └── MCP_API_REFERENCE.md
 ├── project\                   ← GraphRAG 项目根（便携核心）
 │   ├── settings.yaml          ← 模型 / 向量 / 管线配置
@@ -42,7 +43,7 @@ GraphRAG-神纪图谱\
 │   └── output\                ← 已构建索引（parquet + lancedb + graphml）
 ├── mcp\
 │   └── graphrag_mcp.py        ← MCP 服务器（脚本相对路径，免配置）
-├── scripts\                   ← 一键启动/自检/重建/重打补丁/停止（含 common.ps1 共享助手）
+├── scripts\                   ← 一键启动/自检/重建/兼容入口/停止（含 common.ps1 共享助手）
 ├── visualization\             ← graphml + 全景/核心 PNG
 └── 图谱项目训练经验归档.md      ← 完整踩坑与经验
 ```
@@ -69,7 +70,9 @@ GraphRAG-神纪图谱\
 
 > **脚本可配置环境变量**（全部有默认值，换机器时按需设置）：
 > `GRAPHRAG_PYTHON`（Python 路径）、`GRAPHRAG_API_KEY`（官方 DeepSeek key）、`LLAMA_SERVER` / `BGE_MODEL` / `EMBED_PORT`（向量服务）、
-> `EMBED_WAIT_SECONDS`（加载等待秒数，默认 90）。Python 会自动探测能 `import graphrag` 的解释器。
+> `EMBED_WAIT_SECONDS`（加载等待秒数，默认 90）、`GRAPHRAG_JSON_MODE=auto|on|off`（provider JSON mode 能力覆盖）。Python 会自动探测能 `import graphrag` 的解释器。
+>
+> 查询、重建与 MCP 统一使用 `scripts\graphrag_compat_cli.py`。兼容层在 GraphRAG 导入前安装，不需要修改 `site-packages`；`reapply-graphrag-patches.py` 仅作旧版本排障兜底。设计与验证细节见 `docs\07-provider-compatibility.md`。
 ## 四、依赖清单
 
 | 组件 | 用途 | 位置/来源 |

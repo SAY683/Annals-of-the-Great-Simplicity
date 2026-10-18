@@ -15,13 +15,13 @@ $archiveRoot = Split-Path -Parent $scriptDir
 $project = Join-Path $archiveRoot "project"
 
 $Python = Assert-GraphRagPython
-$graphragCli = Get-GraphRagCli -Python $Python
+$graphragCli = Join-Path $scriptDir "graphrag_compat_cli.py"
 $env:PYTHONIOENCODING = "utf-8"
 $env:PYTHONUTF8 = "1"
 
 Write-Host "[GraphRAG] 重建索引 ..." -ForegroundColor Cyan
 Write-Host "  project : $project"
-Write-Host "  cli     : $graphragCli"
+Write-Host "  cli     : $Python $graphragCli"
 
 # ---- pre-flight checks ----
 $embedPort = if ($env:EMBED_PORT) { [int]$env:EMBED_PORT } else { 8081 }
@@ -47,5 +47,5 @@ if ($missing.Count -gt 0) {
     Read-Host | Out-Null
 }
 
-& $graphragCli index --root $project
+& $Python $graphragCli index --root $project
 Write-Host "[完成] 索引重建结束。" -ForegroundColor Green

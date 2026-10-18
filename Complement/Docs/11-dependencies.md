@@ -66,14 +66,18 @@ npm ci
 
 若换机器且没有网络，可先在有网机器执行 `npm ci` 后整体拷贝 `node_modules`，但更推荐保留 lockfile 并用 `npm ci` 复现。
 
-## 5. GraphRAG 依赖与补丁
+## 5. GraphRAG 依赖与 provider 兼容层
 
-- `GraphRAG-神纪图谱/requirements.txt` 锁定 `graphrag`/`lancedb` 等关键版本。
-- `scripts/reapply-graphrag-patches.py` 负责重打 DeepSeek `response_format` 兼容补丁。
-- 升级 `graphrag` 后必须重新运行补丁脚本；否则 drift/local 查询可能返回 HTTP 400。
+- `GraphRAG-神纪图谱/requirements.txt` 锁定 `graphrag`/`lancedb`/`json-repair` 等关键版本。
+- 正常查询、索引与 MCP 调用统一经由 `scripts/graphrag_compat_cli.py`。该入口在 GraphRAG 导入前安装运行时兼容层，不需要修改 `site-packages`。
+- 兼容层会按模型/provider 探测 JSON response mode 支持情况；DeepSeek、Ollama 与本地代理默认关闭该参数。provider 仍返回 400/404/422 或明确的 unsupported-parameter 错误时，会自动去掉 JSON mode 重试一次，并用统一的容错解析器处理代码围栏、额外说明文字与尾逗号。
+- 覆盖 `completion`、`completion_async`、`completion_batch` 与 `completion_thread_pool`，因此索引和各类搜索路径使用同一套能力决策。
+- `GRAPHRAG_JSON_MODE=auto|on|off` 可显式覆盖探测结果；默认 `auto`。
+- `scripts/reapply-graphrag-patches.py` 仅保留为旧版本排障兜底，不再是正常安装步骤。升级 GraphRAG 后也不应先改 `site-packages`；先运行兼容层测试与静态检查。
 
 ```powershell
-python scripts\reapply-graphrag-patches.py
+python -m pytest graphrag_compat\tests -q
+python scripts\graphrag_compat_cli.py --help
 python scripts\verify-env.py --no-services   # 数据/依赖检查；查询前可改用 --require-services
 python scripts\verify-env.py --data-only --no-services   # CI：只验证 parquet/data_version
 ```
