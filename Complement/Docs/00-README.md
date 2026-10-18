@@ -1,7 +1,7 @@
 # Complement 项目整体说明书
 
 > **Annals of the Great Simplicity — 因果分析工具链 + 神纪知识图谱**
-> 版本：2026-08-05 | 维护状态：活跃
+> 版本：2026-10-18 | 维护状态：活跃
 
 ---
 
@@ -95,9 +95,15 @@ cd "GraphRAG-神纪图谱"
 .\scripts\00-start-embedding.bat   # 终端 1: 启动向量服务
 .\scripts\01-start-mcp.bat         # 终端 2: 启动 MCP (保持窗口开启)
 .\scripts\02-selfcheck-query.bat   # 终端 3: 自检 (结构化回答即链路正常)
+
+# 5. 发布前清理运行残留与构建干净源码包
+cd "Complement"
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\clean_runtime.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\build_release.ps1
 ```
 
 ## 目录结构
+
 
 ```
 Complement/

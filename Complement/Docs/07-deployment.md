@@ -1,70 +1,106 @@
-# 部署、隧道与便携目录维护
+# 部署、发布整洁性与便携目录维护
 
 ## 1. 便携目录结构
 
-```
+```text
 Complement/
 ├── start_all.bat / start_all.ps1     # 统一启动脚本
+├── tools/                            # 环境检查、浏览器回归、运行产物清理、发布打包
 ├── Docs/                             # 本文档集
 └── TRACE Engine(EDM-Takens CCM)/
-    ├── edm-takens/                   # 项目 1: EDM 核心库
-    ├── edm-takens-web/               # 项目 2: EDM Web 服务
-    ├── trace-engine/                 # 项目 3: TRACE 引擎
-    ├── trace-engine-web/             # 项目 4: TRACE Web 服务
-    ├── trace-to-edm/                 # 项目 5: 桥接层
-    ├── Models/                       # LLaMA 模型
-    ├── verify_portable.py            # 便携验证
-    └── sync_product.py               # 同步脚本
+    ├── edm-takens/                   # EDM 核心库
+    ├── edm-takens-web/               # EDM Web 服务
+    ├── trace-engine/                 # TRACE 引擎
+    ├── trace-engine-web/             # TRACE Web 服务
+    ├── trace-to-edm/                 # TRACE → EDM 桥接服务
+    ├── Models/                       # 本地模型资源（不入 Git）
+    ├── verify_portable.py            # 便携目录独立运行审计
+    └── sync_product.py               # 可选的跨目录打包镜像工具
 ```
 
-## 2. 同步机制
+## 2. 唯一代码源与同步边界
 
-### 从源目录同步到便携目录
+本仓库自身就是唯一可维护代码源，不再依赖仓库外的 `.skills`、`F:\攻略` 或其他制作目录。
 
-```powershell
-# 同步 edm-takens + edm-takens-web
-cd F:\攻略\研发测试\.skills
-python sync_all_portable.py
+- `edm-takens/src/` 是 EDM 算法唯一真源。
+- `edm-takens-web` 直接导入上述算法源，不再维护 `backend/edmtakens/` 副本。
+- `trace-engine/`、`trace-engine-web/` 与 `trace-to-edm/` 都从当前仓库内的相对路径运行。
+- `sync_product.py` 只用于显式构建另一个便携镜像目录，不是日常运行或升级前置步骤。
+- 模型权重、`node_modules/`、任务历史、日志和缓存均属于分发附属物或运行时状态，不由代码同步脚本猜测覆盖。
 
-# 同步 trace-engine + trace-engine-web + trace-to-edm
-cd F:\攻略\研发测试\.skills\trace-engine-web
-python sync_product.py
-```
-
-### 同步规则
-
-- **白名单文件**：`sync_all_portable.py` 使用黑名单排除运行时产物
-- **排除项**：`__pycache__/`、`outputs/`、`tunnel_logs/`、`*.log`、`jobs.sqlite`、`tunnel_url.txt`
-- **同步方式**：覆盖而非先删后写（保留 `verify_portable.py` 和 `README.md`）
-- **副本检查**：`edm-takens-web/backend/sync_check.py` 验证 `edmtakens/` 与 `edm-takens/src/` 一致性
-
-### 便携目录验证
+便携审计：
 
 ```powershell
 cd "Complement"
 python "TRACE Engine(EDM-Takens CCM)\verify_portable.py"
 ```
 
-检查项：
-- 目录结构完整性
-- 无运行时产物污染
-- 引擎模块导入与健康状态
-- Web 服务健康检查
-- API 配置契约（`/api/config` 含 SUPER mode、`bridgeParamSchema` 含 `max_segments`）
+审计覆盖目录完整性、运行时污染、引擎导入与健康检查、API 契约以及 EDM/TRACE 跨项目同步。
 
-## 3. Cloudflare 隧道
+## 3. 发布前整洁策略
 
-### 隧道脚本结构
+原则：**Git 跟踪文件定义发布物；运行状态不进入代码包。**
 
-每个 Web 服务都有独立的隧道脚本：
+### 3.1 查看并清理运行残留
 
+```powershell
+cd "Complement"
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\clean_runtime.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\clean_runtime.ps1 -Apply
 ```
+
+默认只处理日志、缓存、临时脚本与过期隧道状态，不删除任务历史。确认确实要清理本机任务历史时：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\clean_runtime.ps1 -Apply -IncludeTaskHistory
+```
+
+`-IncludeTaskHistory` 会清理 `results/`、`archive/`、`work/`、`jobs.sqlite` 和测试任务数据。执行前应先做好需要的备份。
+
+### 3.2 构建干净源码包
+
+```powershell
+cd "Complement"
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\build_release.ps1
+```
+
+脚本要求工作树干净，并先运行 `verify_portable.py --no-e2e`，随后使用：
+
+```text
+git archive HEAD
+```
+
+生成 `release/Annals-of-the-Great-Simplicity-<commit>.zip` 和对应的 SHA256 manifest。由于只打包 Git 跟踪文件，以下内容不会进入源码包：
+
+- `node_modules/`
+- `results/`、`archive/`、`work/`
+- `jobs.sqlite`、日志、缓存、PID、隧道 URL
+- 本地模型权重
+
+模型权重继续作为独立 artifact 分发；Node 依赖通过 lockfile + `npm ci` 重建，Python 依赖通过 `requirements*.txt` 重建。
+
+### 3.3 发布前检查
+
+```powershell
+git status --short
+git diff --check
+python tools\check_env.py
+python "TRACE Engine(EDM-Takens CCM)\verify_portable.py" --no-e2e
+```
+
+要求：工作树干净、便携审计 0 FAIL、发布 zip 的 manifest 已生成。
+
+## 4. Cloudflare 隧道
+
+每个 Web 服务都有独立隧道脚本：
+
+```text
 trace-engine-web/
-├── 启动隧道.bat       # GBK 编码，cmd 入口
-└── tunnel.ps1         # UTF-8 编码，PowerShell 主体
+├── 启动隧道.bat
+└── tunnel.ps1
 
 trace-to-edm/
-── 启动隧道.bat
+├── 启动隧道.bat
 └── tunnel.ps1
 
 edm-takens-web/
@@ -72,66 +108,73 @@ edm-takens-web/
 └── tunnel.ps1
 ```
 
-### 隧道脚本要点
-
-- **编码**：`.bat` 使用 GBK + CRLF；`.ps1` 使用 UTF-8 + BOM
-- **路径**：全部使用相对路径（`cd /d "%~dp0"` 后引用 `"tunnel.ps1"`）
-- **日志**：时间戳命名，归档到 `tunnel_logs/` 子目录，每次启动只保留最新
-- **URL 写入**：`[System.IO.File]::WriteAllText` + `UTF8Encoding $false`（无 BOM）
-- **进程清理**：仅清理自身 cloudflared 进程，不误杀其他隧道
-- **预检查**：检测 `cloudflared` 是否安装，缺失时提供安装链接
-- **错误处理**：`.ps1` 包含 `catch` 块防止窗口关闭
-
-### 统一启动
+统一入口：
 
 ```powershell
-# 默认仅本地（127.0.0.1）
-.\start_all.bat
-# 需要受保护的 Cloudflare 隧道时：
-.\start_all.bat tunnel
+.\start_all.bat          # 默认仅本地 127.0.0.1
+.\start_all.bat tunnel   # 启动本地 token 网关与 Cloudflare 隧道
 ```
 
-`start_all.ps1` 默认只启动本地服务；`-EnableTunnel` 时额外启动 3300/3301/3302 token 网关并把 cloudflared 指向网关。Ctrl+C 会清理服务、网关和隧道。
+隧道模式要求在本地网关上配置 `TUNNEL_ACCESS_TOKEN`。公开 URL 本身不构成鉴权。
 
-## 4. 端口管理
+## 5. 默认端口
 
-| 服务 | 默认端口 | 回退范围 | 检测方式 |
-|------|----------|----------|----------|
-| trace-engine-web | 3000 | 3000-3020 | PowerShell `Get-NetTCPConnection` |
-| trace-to-edm | 3100 | 3100-3120 | 同上 |
-| edm-takens-web | 8000 | 固定 | — |
+| 服务 | 默认端口 | 备注 |
+|---|---:|---|
+| trace-engine-web | 3000 | 冲突时可在 3000-3020 间回退 |
+| trace-to-edm | 3100 | Node.js 桥接服务 |
+| edm-takens-web backend | 8000 | FastAPI |
+| edm-takens-web frontend (Vite) | 5173 | 开发/便携启动 |
+| GraphRAG LLM proxy | 15721 | 按本地代理配置启用 |
+| GraphRAG embedding | 8081 | bge-m3/llama-server |
 
-## 5. 环境变量
+启动前检查端口：
+
+```powershell
+Get-NetTCPConnection -State Listen |
+  Where-Object { $_.LocalPort -in 3000,3100,5173,8000,8081,15721 }
+```
+
+## 6. 关键环境变量
 
 | 变量 | 说明 | 默认值 |
-|------|------|--------|
+|---|---|---|
 | `TRACE_WORK_DIR` | TRACE 工作/输出目录 | 脚本目录 |
 | `TRACE_ENGINE_SKILL_DIR` | 引擎 Skill 路径 | 自动探测 |
-| `TRACE_PYTHON_CMD` | Python 命令 | `python` |
-| `PORT` | Web 服务端口 | 各项目默认值 |
-| `TRACE_STAGE_TIMEOUT_MS` | SUPER 模式看门狗超时 | 900000 |
-| `EDMTAKENS_DATA_DIR` | EDM 数据目录 | 自动探测 |
-| `JOBS_DB` | EDM 任务数据库路径 | `jobs.sqlite` |
-| `EDM_PYTHON_CMD` | EDM Web Python 解释器 | 自动探测 |
+| `TRACE_PYTHON_CMD` | TRACE Python 解释器 | 自动探测 |
+| `EDM_PYTHON_CMD` | EDM Python 解释器 | 自动探测 |
 | `GRAPHRAG_PYTHON` | GraphRAG Python 解释器 | 自动探测 |
 | `TRACE_TO_EDM_PORT` | trace-to-edm 起始端口 | `3100` |
-| `EDM_TRUST_PROXY` | 设为 `1` 才信任 X-Forwarded-For / CF-Connecting-IP | `0` |
+| `EDMTAKENS_DATA_DIR` | EDM 数据目录 | 自动探测 |
+| `JOBS_DB` | EDM 任务数据库路径 | `jobs.sqlite` |
+| `EDM_TRUST_PROXY` | 设为 `1` 才信任转发头 | `0` |
 | `TUNNEL_ACCESS_TOKEN` | 隧道网关访问令牌 | 启动时生成 |
+| `GRAPHRAG_JSON_MODE` | GraphRAG JSON mode 能力覆盖 | `auto` |
 
-## 6. 维护清单
+## 7. 维护清单
 
 ### 日常维护
-- [ ] 运行 `verify_portable.py` 验证便携目录完整性
-- [ ] 检查 `sync_check.py` 确认副本一致性
-- [ ] 清理 `tunnel_logs/` 旧日志（脚本自动处理）
+
+- [ ] 运行 `verify_portable.py`
+- [ ] 确认无遗留服务进程占用 3000/3100/5173/8000
+- [ ] 需要转发或公开访问时，先确认隧道网关和 token
 
 ### 代码修改后
-- [ ] 修改 `edm-takens/src/` 后同步到 `edm-takens-web/backend/edmtakens/`
-- [ ] 运行 `sync_check.py` 验证
-- [ ] 运行 `sync_all_portable.py` 同步到便携目录
-- [ ] 运行 `verify_portable.py` 确认
+
+- [ ] 运行相关单元测试与 `browser_smoke.py`
+- [ ] 运行 `git diff --check`
+- [ ] 运行 `verify_portable.py --no-e2e`
+- [ ] 更新受影响的 Docs 与验收记录
+
+### 发布前
+
+- [ ] `git status --short` 为空
+- [ ] `clean_runtime.ps1` 无意外运行残留
+- [ ] `build_release.ps1` 成功并记录 SHA256
+- [ ] 模型权重作为独立 artifact 校验，不混入源码包
 
 ### 模型更新
-- [ ] 新模型放入 `Models/` 目录（不带版本后缀）
-- [ ] 同步到 `trace-engine/Models/`
-- [ ] 更新 `presets.yaml` 参数（如需要）
+
+- [ ] 新模型放入 `Models/`，保留对应配置与 LICENSE
+- [ ] 需要镜像到 `trace-engine/Models/` 时显式执行同步
+- [ ] 更新 `presets.yaml`、`Docs/10-models.md` 与模型 SHA256 信息

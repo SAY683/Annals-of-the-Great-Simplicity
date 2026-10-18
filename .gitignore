@@ -49,3 +49,6 @@ Complement/TRACE Engine(EDM-Takens CCM)/edm-takens-web/results/
 Complement/TRACE Engine(EDM-Takens CCM)/edm-takens-web/archive/
 Complement/TRACE Engine(EDM-Takens CCM)/edm-takens-web/data/trace_to_edm_*.csv
 Complement/TRACE Engine(EDM-Takens CCM)/trace-to-edm/projects/_index.json
+
+# Generated release artifacts
+release/
