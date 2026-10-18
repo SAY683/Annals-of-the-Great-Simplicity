@@ -106,19 +106,23 @@ trace-to-edm/
 | trace-to-edm | 3100 | 3100-3120 | HTTP |
 | edm-takens-web | 8000 | 固定 | HTTP + SSE |
 
-## 5. 同步关系
+## 5. 源码与同步关系
+
+本仓库是唯一可维护源码树，不依赖仓库外的开发目录或 `.skills` 镜像：
 
 ```
-源目录 (F:\攻略\研发测试\.skills\)
-    ├── sync_all_portable.py → 同步 edm-takens + edm-takens-web
-    └── trace-engine-web/sync_product.py → 同步 trace-engine + trace-engine-web + trace-to-edm
-
-便携目录 (G:\git\...\Complement\)
-    ├── TRACE Engine(EDM-Takens CCM)/edm-takens/      (核心库)
-    ├── TRACE Engine(EDM-Takens CCM)/edm-takens-web/  (Web 服务，含 edmtakens/ 副本)
-    ├── TRACE Engine(EDM-Takens CCM)/trace-engine/
-    ├── TRACE Engine(EDM-Takens CCM)/trace-engine-web/
-    └── TRACE Engine(EDM-Takens CCM)/trace-to-edm/
+Complement/
+├── shared/                        共享启动与解释器探测
+├── tools/                         安装、审计、清理与发布工具
+├── Docs/                          项目文档
+└── TRACE Engine(EDM-Takens CCM)/
+    ├── edm-takens/                算法唯一真源
+    ├── edm-takens-web/            Web 服务；直接导入 edm-takens/src
+    ├── trace-engine/              因果发现引擎
+    ├── trace-engine-web/          引擎 Web 服务
+    └── trace-to-edm/              桥接服务
 ```
 
-副本同步检查：`edm-takens-web/backend/sync_check.py` 对比 `edmtakens/` 与 `edm-takens/src/` 的 SHA256 哈希。
+`edm-takens-web/backend/sync_check.py` 负责确认 Web 端没有重新引入
+`backend/edmtakens/` 算法副本，而不是与另一个外部“源目录”比对。`sync_product.py`
+只用于显式构建另一个便携镜像，不是日常启动、升级或发布前置步骤。

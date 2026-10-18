@@ -1,14 +1,18 @@
 ﻿#Requires -Version 5.0
 <#
   start-embedding.ps1 - Start local bge-m3 embedding service (llama-server) on port 8081.
-  Configurable via env vars: LLAMA_SERVER, BGE_MODEL, EMBED_PORT.
+  Configurable via env vars: LLAMA_SERVER, BGE_MODEL, EMBED_PORT, or an ignored
+  scripts/local-paths.ps1 copied from local-paths.example.ps1.
   Health check retries up to EMBED_WAIT_SECONDS (default 90s) because bge-m3 FP16 can take 10-30s to load.
 #>
 $ErrorActionPreference = "Stop"
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 
-$LlamaServer = if ($env:LLAMA_SERVER) { $env:LLAMA_SERVER } else { "G:\AI\llama-cpp\llama-server.exe" }
-$Model       = if ($env:BGE_MODEL)     { $env:BGE_MODEL }     else { "G:\AI\轻量大模型\bge-m3\bge-m3-FP16.gguf" }
+$localConfig = Join-Path $PSScriptRoot 'local-paths.ps1'
+if (Test-Path -LiteralPath $localConfig) { . $localConfig }
+
+$LlamaServer = if ($env:LLAMA_SERVER) { $env:LLAMA_SERVER } else { '' }
+$Model       = if ($env:BGE_MODEL) { $env:BGE_MODEL } else { '' }
 $Port        = if ($env:EMBED_PORT)    { [int]$env:EMBED_PORT } else { 8081 }
 $WaitSec     = if ($env:EMBED_WAIT_SECONDS) { [int]$env:EMBED_WAIT_SECONDS } else { 90 }
 
@@ -17,9 +21,19 @@ Write-Host "  llama-server : $LlamaServer"
 Write-Host "  model        : $Model"
 Write-Host "  port         : $Port"
 
+if (-not $LlamaServer) {
+    Write-Host '[ERROR] LLAMA_SERVER is not configured.' -ForegroundColor Red
+    Write-Host '        Copy scripts\local-paths.example.ps1 to scripts\local-paths.ps1 and fill both paths.' -ForegroundColor Yellow
+    exit 1
+}
 if (-not (Test-Path -LiteralPath $LlamaServer)) {
     Write-Host "[ERROR] 找不到 llama-server：$LlamaServer" -ForegroundColor Red
     Write-Host "        请设置环境变量 LLAMA_SERVER 指向 llama-server.exe" -ForegroundColor Yellow
+    exit 1
+}
+if (-not $Model) {
+    Write-Host '[ERROR] BGE_MODEL is not configured.' -ForegroundColor Red
+    Write-Host '        Copy scripts\local-paths.example.ps1 to scripts\local-paths.ps1 and fill both paths.' -ForegroundColor Yellow
     exit 1
 }
 if (-not (Test-Path -LiteralPath $Model)) {

@@ -3,28 +3,43 @@
   common.ps1 - shared helpers for GraphRAG portable scripts.
   Dot-source:  . "$PSScriptRoot\common.ps1"
   Provides:
-    Get-GraphRagPython  - detect a python that can import `graphrag` (respects $env:GRAPHRAG_PYTHON)
+    Get-GraphRagPython  - detect a python that can import `graphrag`
+                          (respects GRAPHRAG_PYTHON and COMPLEMENT_PYTHON_CANDIDATES)
     Get-GraphRagCli     - locate graphrag.exe next to that python
 #>
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 
 function Get-GraphRagPython {
     <#
-      Returns the path of a python.exe that can import `graphrag`, or $null.
-      Candidate order: $env:GRAPHRAG_PYTHON -> known installs -> `python` on PATH.
+      Candidate order is portable-first: explicit variable, project .venv,
+      caller-provided candidates, py launcher, PATH.
     #>
     $candidates = @()
     if ($env:GRAPHRAG_PYTHON) { $candidates += $env:GRAPHRAG_PYTHON }
-    $candidates += "G:\Python\python.exe"
-    $candidates += "C:\Python313\python.exe"
-    $candidates += "C:\Python312\python.exe"
-    $candidates += "C:\Python311\python.exe"
-    $candidates += "python"
+    $projectRoot = Split-Path $PSScriptRoot -Parent
+    $candidates += (Join-Path $projectRoot '.venv\Scripts\python.exe')
+    $candidates += (Join-Path $projectRoot '.venv\bin\python')
+    if ($env:COMPLEMENT_PYTHON_CANDIDATES) {
+        $candidates += ($env:COMPLEMENT_PYTHON_CANDIDATES -split [IO.Path]::PathSeparator)
+    }
+    $pyLauncher = Get-Command py -ErrorAction SilentlyContinue
+    if ($pyLauncher) {
+        foreach ($ver in @('-3.13', '-3.12', '-3.11', '-3.10')) {
+            try {
+                $resolved = & py $ver -c "import sys; print(sys.executable)" 2>$null
+                if ($LASTEXITCODE -eq 0 -and $resolved) { $candidates += $resolved.Trim() }
+            } catch { }
+        }
+    }
+    $candidates += 'python'
+    $candidates += 'python3'
+    $seen = @{}
     foreach ($py in $candidates) {
         if (-not $py) { continue }
         $cmd = Get-Command $py -ErrorAction SilentlyContinue
         $exe = if ($cmd) { $cmd.Source } else { $py }
-        if (-not (Test-Path -LiteralPath $exe)) { continue }
+        if (-not (Test-Path -LiteralPath $exe) -or $seen.ContainsKey($exe)) { continue }
+        $seen[$exe] = $true
         try {
             $out = & $exe -c "import graphrag; print('OK')" 2>$null | Select-Object -Last 1
             if ($out -match '^OK$') { return $exe }
@@ -41,6 +56,8 @@ function Get-GraphRagCli {
     if ($Python -and (Test-Path -LiteralPath $Python)) {
         $cli = Join-Path (Split-Path $Python) "Scripts\graphrag.exe"
         if (Test-Path -LiteralPath $cli) { return $cli }
+        $posixCli = Join-Path (Split-Path $Python) "graphrag"
+        if (Test-Path -LiteralPath $posixCli) { return $posixCli }
     }
     return "graphrag"
 }
@@ -54,14 +71,14 @@ function Assert-GraphRagPython {
     $py = Get-GraphRagPython
     if (-not $py) {
         Write-Host "[ERROR] 未找到可用的 Python（需要能 import graphrag）。" -ForegroundColor Red
-        Write-Host "        请设置环境变量 GRAPHRAG_PYTHON 指向正确的 python.exe，或安装 graphrag 后重试。" -ForegroundColor Yellow
+        Write-Host "        请设置 GRAPHRAG_PYTHON 指向正确的 python.exe，或先创建项目 .venv。" -ForegroundColor Yellow
         exit 1
     }
     if ($ExtraModule) {
         $mods = $ExtraModule -split ","
         $missing = @()
         foreach ($m in $mods) {
-            $chk = & $py -c "import $m" 2>$null
+            & $py -c "import $m" 2>$null
             if ($LASTEXITCODE -ne 0) { $missing += $m }
         }
         if ($missing.Count -gt 0) {

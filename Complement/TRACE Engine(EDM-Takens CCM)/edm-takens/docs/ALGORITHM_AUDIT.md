@@ -1,6 +1,6 @@
 # EDM-Takens 算法与工程审计报告
 
-> 审计对象：`f:\攻略\研发测试\Skill\edm-takens`（原生项目，非 Web 版本）  
+> 审计对象：`edm-takens`（原生项目，非 Web 版本）
 > 审计日期：2026-07-13  
 > 审计范围：`src/pipeline.py`、`src/enhanced_cross_validate.py`、`src/ccm_causality.py`、`src/sovereign_havok.py`、`src/edm_auditor.py`、`src/final_interpretation.py`、`src/_edm_bridge.py`、`src/_numpy_edm.py`  
 > 结论：核心算法实现正确，测试全部通过；本轮审计修复了 2 处真实隐患，另有若干已知限制已在下文明示。
@@ -135,9 +135,9 @@ total_rise > 0.05 and spear_rho > 0.7 and spear_p < 0.1 and abs(final_rho) > 0.2
 
 | 文件 | 变更类型 | 变更理由 |
 |------|----------|----------|
-| `f:\攻略\研发测试\Skill\edm-takens\src\_numpy_edm.py` | 修改 | 统一 numpy 回退 CCM 收敛判定与 `ccm_causality_test()`，补全 `spearman_p` 返回字段。 |
-| `f:\攻略\研发测试\Skill\edm-takens\src\pipeline.py` | 修改 | 小样本 Hankel 自校正报告校正后比例，并在不可达 `p/q>=10` 时显式提示用户。 |
-| `f:\攻略\研发测试\Skill\edm-takens\docs\ALGORITHM_AUDIT.md` | 新建 | 汇总本轮审计发现、修复与剩余风险，作为当前权威审计文档。 |
+| `edm-takens/src/_numpy_edm.py` | 修改 | 统一 numpy 回退 CCM 收敛判定与 `ccm_causality_test()`，补全 `spearman_p` 返回字段。 |
+| `edm-takens/src/pipeline.py` | 修改 | 小样本 Hankel 自校正报告校正后比例，并在不可达 `p/q>=10` 时显式提示用户。 |
+| `edm-takens/docs/ALGORITHM_AUDIT.md` | 新建 | 汇总本轮审计发现、修复与剩余风险，作为当前权威审计文档。 |
 
 ---
 

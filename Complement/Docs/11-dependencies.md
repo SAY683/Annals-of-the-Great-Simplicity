@@ -6,7 +6,7 @@
 
 | 组件 | 版本 |
 |---|---|
-| Python（完整） | 3.13.2（`G:\Python\python.exe`） |
+| Python（完整） | 3.13.2（通过 Windows `py -3.13` 自动解析） |
 | Python（默认 PATH 示例） | 3.12.13（Anaconda，可能缺 TRACE 依赖） |
 | Node.js | 24.21.0 |
 | npm | 11.17.0 |
@@ -31,14 +31,14 @@
 
 `start_all.ps1` 与 `trace-engine-web/start.ps1` 会通过 `shared/python_env.ps1` 自动探测：
 
-1. `TRACE_PYTHON_CMD`
-2. `EDM_PYTHON_CMD`
-3. `GRAPHRAG_PYTHON`
-4. `G:\Python\python.exe`（本机便携默认）
-5. PATH 中的 `python`
-6. `py -3.13 / -3.12 / -3.11 / -3.10`
+1. `TRACE_PYTHON_CMD` / `EDM_PYTHON_CMD` / `GRAPHRAG_PYTHON`
+2. `Complement\.venv\Scripts\python.exe`（或 POSIX `.venv/bin/python`）
+3. `COMPLEMENT_PYTHON_CANDIDATES`（`;` 分隔的额外候选路径/命令）
+4. `py -3.13 / -3.12 / -3.11 / -3.10`（Windows 启动器）
+5. PATH 中的 `python` / `python3`
 
-探测结果若缺少必需模块，会打印缺项和安装命令，而不是等到分析阶段才报错。
+探测结果若缺少必需模块，会打印缺项和安装命令，而不是等到分析阶段才报错。脚本不写死
+机器盘符；本机通过 `py -3.13` 命中完整环境，其它机器可用 venv 或环境变量适配。
 
 - 一键创建本地 venv：`powershell -NoProfile -ExecutionPolicy Bypass -File tools\bootstrap.ps1`；之后 `start_all.ps1` 会自动探测 `.venv\Scripts\python.exe`。
 - 五个 Python 子项目均保留 `requirements.txt`（跨平台下限）与 `requirements-lock.txt`（参考环境直接依赖锁定；`edm-takens-web`、`trace-engine-web`、`trace-to-edm` 本轮补齐）。

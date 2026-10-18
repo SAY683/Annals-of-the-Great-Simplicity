@@ -12,7 +12,7 @@
 
 > **兄弟项目（Complement 同级）**：`GraphRAG-神纪图谱/` — 独立的 GraphRAG 知识图谱成品
 > （《神纪》典籍，开箱即用的 MCP 工具，非本因果分析链路组成部分），详见
-> [`../../GraphRAG-神纪图谱/README.md`](../../GraphRAG-神纪图谱/README.md)。
+> [`../GraphRAG-神纪图谱/README.md`](../GraphRAG-神纪图谱/README.md)。
 
 ## 目录结构
 
@@ -266,4 +266,4 @@ ROUND28 遗留的 P3-P5 剩余债务已全部收口，旧档案记录已清理�
 
 **验证**: verify_portable.py 14/14 + portable_verify.py 61/61 + sync_check.py 20一致
 
-详细修复经验见 [经验记忆归档.md](../经验记忆归档.md) §十二，技术细节见 [PORTABLE_TECHNICAL_GUIDE.md](PORTABLE_TECHNICAL_GUIDE.md) §2.5。
+技术细节见 [PORTABLE_TECHNICAL_GUIDE.md](PORTABLE_TECHNICAL_GUIDE.md) §2.5。

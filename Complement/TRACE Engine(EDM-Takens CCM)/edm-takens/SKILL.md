@@ -241,7 +241,7 @@ Full treatment in `references/forbidden_rules_reference.md` (14 rules specified)
 | 14 | Sampling Adequacy | ✅ ADOPTED | WARN | SovereignHAVOK.fit() |
 
 **Adoption rate**: 14/14 fully adopted (Secret 1 is data-conditional with SURROGATE-LB fallback for N<100; Secret 4 has full numpy combinatorial fallback since Round 13).
-Full details in [secret_adoption_audit.md](secret_adoption_audit.md).
+Full details in [docs/ALGORITHM_AUDIT.md](docs/ALGORITHM_AUDIT.md).
 
 ## Decision Guide
 

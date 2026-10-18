@@ -1,6 +1,6 @@
 # 五大项目微服务 API 路由方案 + 前端鲁棒性 + 网页关闭重连机制
 
-> 范围：`f:\攻略\研发测试\.skills` 下五个项目（edm-takens、edm-takens-web、trace-engine、trace-engine-web、trace-to-edm）。
+> 范围：`Complement\TRACE Engine(EDM-Takens CCM)\` 下五个项目（edm-takens、edm-takens-web、trace-engine、trace-engine-web、trace-to-edm）。
 > 目标：在 **不破坏现有 33 + 26 + 29 端点** 的前提下，沉淀一份微服务 API 路由契约、前端鲁棒性方案与网页关闭重连机制，作为后续渐进式微服务化的蓝图。
 > 备注：原始任务卡列 trace-to-edm 为 13 端点，Q5 盘点为 25 端点，Q8+ 新增 `/api/edm/poll/:id` 代理端点（CORS 修复），Round 12 续新增 `/api/version`（版本查询），R13+ 新增 `/api/replay-uuids`、`/api/work-uuid/:uuid/text`、`/api/pipeline/run` 等端点，ROUND26 同步后为 33 端点。edm-takens-web 经 routes/* 细化为 29 端点。trace-engine-web 经 routes/* 拆分为 26 端点（system=8 / jobs=8 / analysis=8 / admin=1 + 1 静态 `GET /`，ROUND26 校正）。
 
@@ -296,7 +296,7 @@ medium
 
 ### 3.4 edm-takens-web → edm-takens：Python import 契约
 
-**调用方式**：`edm-takens-web/backend/edmtakens/` 是 `edm-takens/src/` 的镜像副本，通过 `import` 直接调用。
+**调用方式**：`edm-takens-web` 直接导入唯一的 `edm-takens/src/` 源码；`backend/edmtakens/` 副本已删除，`sync_check.py` 会阻止其复活。
 
 **关键模块契约**：
 | 模块 | 入口函数 | 输入 | 输出 |
@@ -788,8 +788,8 @@ async function fetchResult(jobId) {
 **背景**: §13.4.3 文档歧义修正后，threshold 默认值明确为双轨制。
 
 **权威来源**:
-- [presets.yaml:23](../TRACE Engine(EDM-Takens CCM)/trace-engine/examples/counterfactual_hybrid/presets.yaml) `threshold: 0.03`，注释 "默认取模型文档推荐标准值 0.03"
-- [TRACE Interpretation Dictionary.md:34](../TRACE Engine(EDM-Takens CCM)/trace-engine-web/TRACE Interpretation Dictionary.md) "Web 默认值 0.03 适合通用文本"
+- [presets.yaml:23](../TRACE%20Engine%28EDM-Takens%20CCM%29/trace-engine/examples/counterfactual_hybrid/presets.yaml) `threshold: 0.03`，注释 "默认取模型文档推荐标准值 0.03"
+- [TRACE Interpretation Dictionary.md:34](../TRACE%20Engine%28EDM-Takens%20CCM%29/trace-engine-web/TRACE%20Interpretation%20Dictionary.md) "Web 默认值 0.03 适合通用文本"
 
 **取值规则**:
 
@@ -1038,7 +1038,7 @@ Complement\
 |--------|--------|--------|
 | `chcp 65001` 缺失 | 中文路径在 cmd 中乱码 | 全部 bat 增加 `chcp 65001 >nul` |
 | cloudflared 预检缺失 | 未安装时直接报错，提示不明 | 增加 `where cloudflared` 检测 + 安装链接 |
-| `trace-to-edm/启动隧道.ps1` 硬编码路径 | `$root = "F:\攻略\..."` 在便携式目录失效 | 改用 `Split-Path -Parent $MyInvocation...` 相对路径 |
+| `trace-to-edm/启动隧道.ps1` 硬编码路径 | 旧脚本写死开发目录，移动便携目录后失效 | 改用 `Split-Path -Parent $MyInvocation...` 相对路径 |
 | 后端进程阻塞隧道 | `start /B` + `pause` 导致主流程阻塞 | 改用 `start "标题" cmd /c "..."` 独立窗口 + 端口探测 |
 | 隧道关闭后子进程残留 | Ctrl+C 后后端窗口不关闭 | bat 增加 `taskkill /fi "WINDOWTITLE..."`，ps1 增加 `try/finally + Stop-Process` |
 | npm 依赖缺失未自愈 | 首次运行直接报错 | 增加 `if not exist node_modules` 自动 `npm install` |

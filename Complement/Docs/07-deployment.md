@@ -20,7 +20,7 @@ Complement/
 
 ## 2. 唯一代码源与同步边界
 
-本仓库自身就是唯一可维护代码源，不再依赖仓库外的 `.skills`、`F:\攻略` 或其他制作目录。
+本仓库自身就是唯一可维护代码源，不再依赖仓库外的 `.skills` 或其他制作目录。
 
 - `edm-takens/src/` 是 EDM 算法唯一真源。
 - `edm-takens-web` 直接导入上述算法源，不再维护 `backend/edmtakens/` 副本。
@@ -55,7 +55,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools\clean_runtime.ps1 -App
 powershell -NoProfile -ExecutionPolicy Bypass -File tools\clean_runtime.ps1 -Apply -IncludeTaskHistory
 ```
 
-`-IncludeTaskHistory` 会清理 `results/`、`archive/`、`work/`、`jobs.sqlite` 和测试任务数据。执行前应先做好需要的备份。
+`-IncludeTaskHistory` 会清理 `results/`、`archive/`、`work/`、`jobs.sqlite`、trace-to-edm 项目脚手架和测试任务数据。执行前应先做好需要的备份。
 
 ### 3.2 构建干净源码包
 
@@ -64,13 +64,13 @@ cd "Complement"
 powershell -NoProfile -ExecutionPolicy Bypass -File tools\build_release.ps1
 ```
 
-脚本要求工作树干净，并先运行 `verify_portable.py --no-e2e`，随后使用：
+脚本要求工作树干净，并先运行 Markdown 相对链接检查与 `verify_portable.py --no-e2e`，随后使用：
 
 ```text
 git archive HEAD
 ```
 
-生成 `release/Annals-of-the-Great-Simplicity-<commit>.zip` 和对应的 SHA256 manifest。由于只打包 Git 跟踪文件，以下内容不会进入源码包：
+生成 `release/Annals-of-the-Great-Simplicity-<commit>.zip` 和对应的 SHA256 manifest。脚本会拒绝缺少必需文件或包含运行状态/密钥的 ZIP。由于只打包 Git 跟踪文件，以下内容不会进入源码包：
 
 - `node_modules/`
 - `results/`、`archive/`、`work/`
@@ -78,6 +78,9 @@ git archive HEAD
 - 本地模型权重
 
 模型权重继续作为独立 artifact 分发；Node 依赖通过 lockfile + `npm ci` 重建，Python 依赖通过 `requirements*.txt` 重建。
+GraphRAG 的 `llama-server` 与 bge-m3 GGUF 属于外部运行时依赖。机器相关路径放在被 Git
+忽略的 `Complement/GraphRAG-神纪图谱/scripts/local-paths.ps1`（从 `local-paths.example.ps1`
+复制），不写死进脚本，也不会进入发布包。
 
 ### 3.3 发布前检查
 
@@ -88,7 +91,7 @@ python tools\check_env.py
 python "TRACE Engine(EDM-Takens CCM)\verify_portable.py" --no-e2e
 ```
 
-要求：工作树干净、便携审计 0 FAIL、发布 zip 的 manifest 已生成。
+要求：工作树干净、文档相对链接 0 失效、便携审计 0 FAIL、发布 ZIP 的 prohibited-entry 检查为 0，且 manifest 的 SHA256 与 ZIP 一致。
 
 ## 4. Cloudflare 隧道
 
@@ -150,6 +153,7 @@ Get-NetTCPConnection -State Listen |
 | `EDM_TRUST_PROXY` | 设为 `1` 才信任转发头 | `0` |
 | `TUNNEL_ACCESS_TOKEN` | 隧道网关访问令牌 | 启动时生成 |
 | `GRAPHRAG_JSON_MODE` | GraphRAG JSON mode 能力覆盖 | `auto` |
+| `COMPLEMENT_PYTHON_CANDIDATES` | 额外 Python 候选（分号分隔） | 空 |
 
 ## 7. 维护清单
 

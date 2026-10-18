@@ -75,7 +75,7 @@
 
 ## 1. Layer 1-2: TRACE Auditor（环境 + 配置防火墙）
 
-**实现**: [TRACE/scripts/trace_plus.py](../../../TRACE/scripts/trace_plus.py)
+**实现**: `TRACE/scripts/trace_plus.py`（历史设计路径，当前归档未携带该脚本）
 
 | 检查项 | 类型 | 说明 |
 |--------|------|------|

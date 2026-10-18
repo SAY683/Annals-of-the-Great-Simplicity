@@ -251,7 +251,7 @@ LIGHT 模式只执行 Skill 的**核心因果推断管线**：
 可通过环境变量指向成品目录（或任意独立部署位置）：
 
 ```powershell
-$env:TRACE_ENGINE_SKILL_DIR = "G:\git\Annals-of-the-Great-Simplicity-main\Annals-of-the-Great-Simplicity\Complement\TRACE Engine(EDM-Takens CCM)\trace-engine\examples\counterfactual_hybrid"
+$env:TRACE_ENGINE_SKILL_DIR = (Resolve-Path "..\trace-engine\examples\counterfactual_hybrid").Path
 npm start
 ```
 

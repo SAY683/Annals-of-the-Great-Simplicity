@@ -189,7 +189,7 @@
 **完成度评分**：★★★☆☆（3/5）
 - 启发式实现完整 + 话语标记优先选择
 - **名实不符风险已通过 Tier-B 标注消除**
-- 与 edm-takens 真算法的桥接未实现（建议后续通过 MVE 集成，见 [MVE_OPTIMIZATION.md](MVE_OPTIMIZATION.md)）
+- 与 edm-takens 真算法的桥接未实现（建议后续通过 MVE 集成，见 [MVE_OPTIMIZATION.md](../edm-takens/docs/MVE_OPTIMIZATION.md)）
 
 ---
 
@@ -288,7 +288,7 @@
 - `train_shenji_llama.py` — 在 TRACE 主项目
 - `run_tests.py` — 标注为 ❌ DEFERRED
 
-**修复方案**：保留原文件作为"设计规则采纳审计"，但补充说明这些文件位于 TRACE 主项目而非 Skill 目录。详见 [secret_adoption_audit.md](secret_adoption_audit.md) §6 引用范围说明。
+**修复方案**：保留原文件作为"设计规则采纳审计"，但补充说明这些文件位于 TRACE 主项目而非 Skill 目录。详见第 9 节引用范围说明。
 
 ### 5.3 2026-07-30 全量审计修缮（侦探级嗅探）
 
@@ -354,7 +354,7 @@
 ### 6.1 算法深化
 
 1. **CCM 真算法桥接**：✅ 已完成 (ALG-02 修复, _deploy_ccm 实际调用 ccm_with_convergence)
-2. **EDM 真算法桥接**：通过 MVE（多视角嵌入）实现真正的 Sugihara EDM，详见 [MVE_OPTIMIZATION.md](MVE_OPTIMIZATION.md)
+2. **EDM 真算法桥接**：通过 MVE（多视角嵌入）实现真正的 Sugihara EDM，详见 [MVE_OPTIMIZATION.md](../edm-takens/docs/MVE_OPTIMIZATION.md)
 3. **causallearn FCI 实现**：✅ 已完成 (DOC-04 修复, 含端点常量与节点索引修复)
 4. **HAVOK surrogate 检验**：强迫项峰值的统计显著性检验
 

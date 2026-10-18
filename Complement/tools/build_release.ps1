@@ -7,6 +7,7 @@
   The archive is produced with `git archive HEAD`, so ignored runtime state
   (results, work, logs, caches, node_modules, local models) is never included.
   Model weights and multi-GB base models remain separate distribution artifacts.
+  The script also rejects archives containing known runtime or secret paths.
 
 .EXAMPLE
   powershell -NoProfile -ExecutionPolicy Bypass -File tools\build_release.ps1
@@ -31,15 +32,33 @@ try {
     }
 
     if (-not $SkipAudit) {
+        $candidates = [System.Collections.Generic.List[string]]::new()
+        foreach ($value in @($env:TRACE_PYTHON_CMD, $env:EDM_PYTHON_CMD, $env:GRAPHRAG_PYTHON)) {
+            if (-not [string]::IsNullOrWhiteSpace($value)) { $candidates.Add($value) }
+        }
+        $candidates.Add((Join-Path $repoRoot 'Complement\.venv\Scripts\python.exe'))
+        $candidates.Add((Join-Path $repoRoot 'Complement\.venv\bin\python'))
+        if ($env:COMPLEMENT_PYTHON_CANDIDATES) {
+            foreach ($value in ($env:COMPLEMENT_PYTHON_CANDIDATES -split [IO.Path]::PathSeparator)) {
+                if (-not [string]::IsNullOrWhiteSpace($value)) { $candidates.Add($value.Trim()) }
+            }
+        }
+        $pyLauncher = Get-Command py -ErrorAction SilentlyContinue
+        if ($pyLauncher) {
+            foreach ($ver in @('-3.13', '-3.12', '-3.11', '-3.10')) {
+                try {
+                    $resolved = & py $ver -c "import sys; print(sys.executable)" 2>$null
+                    if ($LASTEXITCODE -eq 0 -and $resolved) { $candidates.Add($resolved.Trim()) }
+                } catch { }
+            }
+        }
+        foreach ($name in @('python', 'python3')) {
+            $cmd = Get-Command $name -ErrorAction SilentlyContinue
+            if ($cmd) { $candidates.Add($cmd.Source) }
+        }
+
         $python = $null
-        $candidates = @(
-            $env:TRACE_PYTHON_CMD,
-            $env:EDM_PYTHON_CMD,
-            $env:GRAPHRAG_PYTHON,
-            (Join-Path $repoRoot 'Complement\.venv\Scripts\python.exe'),
-            'G:\Python\python.exe',
-            'python'
-        )
+        $seen = @{}
         foreach ($candidate in $candidates) {
             if ([string]::IsNullOrWhiteSpace($candidate)) { continue }
             $exe = $candidate
@@ -48,12 +67,16 @@ try {
                 if (-not $cmd) { continue }
                 $exe = $cmd.Source
             }
+            if ($seen.ContainsKey($exe)) { continue }
+            $seen[$exe] = $true
             try {
                 & $exe -c "import numpy,pandas,scipy,sklearn,jieba,dowhy,causallearn" 2>$null
                 if ($LASTEXITCODE -eq 0) { $python = $exe; break }
             } catch { }
         }
-        if (-not $python) { $python = 'python' }
+        if (-not $python) {
+            throw 'No complete Python interpreter found. Set TRACE_PYTHON_CMD or run tools\bootstrap.ps1.'
+        }
         Write-Host "[release] audit interpreter: $python" -ForegroundColor DarkGray
         & $python 'Complement\TRACE Engine(EDM-Takens CCM)\verify_portable.py' --no-e2e
         if ($LASTEXITCODE -ne 0) { throw 'Portable audit failed; release was not built.' }
@@ -75,6 +98,41 @@ try {
         throw 'git archive failed.'
     }
 
+    # Fail closed: a source package must never contain runtime or secret artifacts.
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    $prefix = 'Annals-of-the-Great-Simplicity/'
+    $required = @(
+        'README.md',
+        'LICENSE',
+        'Complement/tools/build_release.ps1',
+        'Complement/tools/clean_runtime.ps1',
+        'Complement/tools/check_env.py',
+        'Complement/tools/check_docs.py',
+        'Complement/Docs/07-deployment.md',
+        'Complement/TRACE Engine(EDM-Takens CCM)/verify_portable.py'
+    )
+    $forbiddenPattern = '(^|/)(node_modules|__pycache__|\.pytest_cache|tunnel_logs|results|work|logs?)(/|$)|(^|/)jobs\.sqlite$|(^|/)tunnel_url\.txt$|(^|/)trace_to_edm_.*\.csv$|(^|/)\.env(\.|$)|\.(safetensors|pyc|pyo|log|pem|key)$'
+    $zip = [IO.Compression.ZipFile]::OpenRead($OutputPath)
+    $validationError = $null
+    try {
+        $entries = @($zip.Entries | ForEach-Object { $_.FullName.Replace('\', '/') })
+        $badEntries = @($entries | Where-Object { $_ -match $forbiddenPattern })
+        $missingEntries = @($required | Where-Object { $entries -notcontains ($prefix + $_) })
+        if ($badEntries.Count -gt 0) {
+            $validationError = "Archive contains forbidden runtime/secret entries:`n$($badEntries -join "`n")"
+        } elseif ($missingEntries.Count -gt 0) {
+            $validationError = "Archive is missing required files:`n$($missingEntries -join "`n")"
+        }
+    } finally {
+        $zip.Dispose()
+    }
+    if ($validationError) {
+        Remove-Item -LiteralPath $OutputPath -Force
+        throw $validationError
+    }
+    Write-Host "[release] archive check: $($entries.Count) entries, 0 forbidden, required files present" -ForegroundColor DarkGray
+
+
     $file = Get-Item -LiteralPath $OutputPath
     $hash = (Get-FileHash -LiteralPath $OutputPath -Algorithm SHA256).Hash
     $manifest = [ordered]@{
@@ -84,10 +142,10 @@ try {
         size_bytes = $file.Length
         sha256 = $hash
         source = 'git archive HEAD'
-        excluded = @('node_modules', 'runtime results/work/logs/caches', 'local model weights')
+        excluded = @('node_modules', 'runtime results/work/logs/caches', 'local model weights', 'secrets')
     }
     $manifestPath = [IO.Path]::ChangeExtension($OutputPath, '.manifest.json')
-    $manifest | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $manifestPath -Encoding UTF8
+    [IO.File]::WriteAllText($manifestPath, ($manifest | ConvertTo-Json -Depth 4), [Text.UTF8Encoding]::new($false))
 
     Write-Host "[release] archive : $OutputPath" -ForegroundColor Green
     Write-Host "[release] manifest: $manifestPath" -ForegroundColor Green

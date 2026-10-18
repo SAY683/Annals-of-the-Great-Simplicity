@@ -28,7 +28,6 @@ import re
 import sys
 
 GRAPH = "graphrag"
-DEFAULT_SP = r"G:\Python\Lib\site-packages"
 
 def _auto_site_packages():
     """Detect site-packages from the running interpreter (works on any machine)."""
@@ -184,7 +183,10 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--site-packages", default=None)
     args = ap.parse_args()
-    sp = args.site_packages or _auto_site_packages() or DEFAULT_SP
+    sp = args.site_packages or _auto_site_packages()
+    if not sp:
+        print("[ERROR] GraphRAG is not importable by this interpreter; pass --site-packages PATH")
+        sys.exit(1)
     if not os.path.isdir(os.path.join(sp, GRAPH)):
         print(f"[ERROR] {GRAPH} not found under {sp}")
         sys.exit(1)

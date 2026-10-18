@@ -97,7 +97,7 @@ print(bridge.report())
 
 The Web bridge in `trace-engine-web/py_bridge.py` calls the same modules and
 streams JSON Lines via Server-Sent Events. See
-[`../../trace-engine-web/README.md`](../../trace-engine-web/README.md).
+[`../../../trace-engine-web/README.md`](../../../trace-engine-web/README.md).
 
 ## Files
 

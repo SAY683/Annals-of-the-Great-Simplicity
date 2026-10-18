@@ -6,7 +6,9 @@ Usage:
   python tools/check_env.py --json
   python tools/check_env.py --required numpy,pandas,jieba,dowhy,causallearn
 
-Exit code 0 means at least one candidate has every required module.
+Candidate order is portable-first: explicit component variables, .venv,
+COMPLEMENT_PYTHON_CANDIDATES, Windows py launcher, then PATH. No machine-specific
+drive is assumed. Exit code 0 means at least one candidate has every required module.
 """
 from __future__ import annotations
 
@@ -18,6 +20,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+ROOT = Path(__file__).resolve().parents[1]
 PROBE = r'''
 import importlib.util, json, sys
 mods = ["numpy","pandas","scipy","sklearn","jieba","dowhy","causallearn",
@@ -50,12 +53,11 @@ def _candidates() -> list[str]:
         value = os.environ.get(key)
         if value:
             out.append(value)
-    out.append(sys.executable)
-    out.append(r"G:\Python\python.exe")
-    out.extend([rf"C:\Python31{v}\python.exe" for v in (3, 2, 1, 0)])
-    found = shutil.which("python")
-    if found:
-        out.append(found)
+    out.append(str(ROOT / ".venv" / "Scripts" / "python.exe"))
+    out.append(str(ROOT / ".venv" / "bin" / "python"))
+    for value in os.environ.get("COMPLEMENT_PYTHON_CANDIDATES", "").split(os.pathsep):
+        if value.strip():
+            out.append(value.strip())
     py = shutil.which("py")
     if py:
         for ver in ("-3.13", "-3.12", "-3.11", "-3.10"):
@@ -66,6 +68,11 @@ def _candidates() -> list[str]:
                     out.append(p.stdout.strip())
             except Exception:
                 pass
+    for name in ("python", "python3"):
+        found = shutil.which(name)
+        if found:
+            out.append(found)
+    out.append(sys.executable)
     return out
 
 

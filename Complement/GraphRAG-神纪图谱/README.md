@@ -50,11 +50,11 @@ GraphRAG-神纪图谱\
 
 ## 三、快速开始（开箱即用）
 
-前置依赖（本机已具备，换机器需安装）：
-- Python 3.10+ 且已安装 `graphrag` 包（本归档在 `G:\Python` 环境构建）
+前置依赖（仓库不携带 Python 包；按环境安装）：
+- Python 3.10+ 且已安装 `graphrag`；脚本依次尝试 `GRAPHRAG_PYTHON`、项目 `.venv`、`py -3.13` 与 PATH
 - **LLM 通道（当前实际链路为 DeepSeek 官方）**：现有 `settings.yaml` 走 `127.0.0.1:15721` 代理（`api_key: dummy`）即可
 - 直连官方：`api_base: https://api.deepseek.com` + 环境变量 `GRAPHRAG_API_KEY`；**opencode Go 不是实际链路**
-- `llama-server` + bge-m3 GGUF（提供本地向量，见脚本默认路径）
+- `llama-server` + bge-m3 GGUF（提供本地向量；复制 `scripts\local-paths.example.ps1` 为 `local-paths.ps1` 后填写路径）
 
 步骤：
 
@@ -68,7 +68,7 @@ GraphRAG-神纪图谱\
 > 若移动整个文件夹：**无需改任何配置**——MCP 与脚本均按自身位置解析 `project\`。
 > 唯一可能需调整的是 `scripts` 中 llama-server / 模型 / Python 的默认路径（可用环境变量覆盖）。
 
-> **脚本可配置环境变量**（全部有默认值，换机器时按需设置）：
+> **脚本可配置环境变量**（Python/端口等有默认值；外部 llama-server 与 GGUF 用 local-paths 配置）：
 > `GRAPHRAG_PYTHON`（Python 路径）、`GRAPHRAG_API_KEY`（官方 DeepSeek key）、`LLAMA_SERVER` / `BGE_MODEL` / `EMBED_PORT`（向量服务）、
 > `EMBED_WAIT_SECONDS`（加载等待秒数，默认 90）、`GRAPHRAG_JSON_MODE=auto|on|off`（provider JSON mode 能力覆盖）。Python 会自动探测能 `import graphrag` 的解释器。
 >
@@ -77,11 +77,11 @@ GraphRAG-神纪图谱\
 
 | 组件 | 用途 | 位置/来源 |
 |---|---|---|
-| graphrag (Python) | 索引与查询引擎 | G:\Python（pip install graphrag） |
-| llama-server | 本地向量（bge-m3） | G:\AI\llama-cpp\llama-server.exe |
-| bge-m3 FP16 GGUF | 嵌入模型（1024 维） | G:\AI\轻量大模型\bge-m3\bge-m3-FP16.gguf |
+| graphrag (Python) | 索引与查询引擎 | 项目 `.venv` 或 `GRAPHRAG_PYTHON` 指向的环境 |
+| llama-server | 本地向量服务 | `LLAMA_SERVER` 指向的 llama-server 可执行文件 |
+| bge-m3 FP16 GGUF | 嵌入模型（1024 维） | `BGE_MODEL` 指向的 GGUF 文件 |
 | DeepSeek 官方 API | 生成 LLM（deepseek-v4-flash，OpenAI 兼容） | https://api.deepseek.com + GRAPHRAG_API_KEY |
-| CC Switch（可选） | 本地代理；实测路由到官方 DeepSeek | G:\AI\CC-Switch（127.0.0.1:15721） |
+| 本地代理（可选） | 路由到官方 DeepSeek | `127.0.0.1:15721`（由外部代理提供） |
 
 ## 五、常见问题速查（详见 docs\04）
 

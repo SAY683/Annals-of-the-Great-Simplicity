@@ -139,8 +139,8 @@ TRACE Engine(EDM-Takens CCM)/       <- 便携成品根
 └── test_cross_project_http.py       <- 跨项目 HTTP 测试
 ```
 
-> **注**: META_THINKING/ 完整归档仅保留在工作目录 `f:\攻略\研发测试\Docs\META_THINKING/`，
-> 成品目录仅通过 `研究汇报/` 文件夹携带最近2轮元反思，避免冗余。
+> **注**: `META_THINKING/` 的完整开发归档不属于发布物；成品目录通过 `研究汇报/` 携带
+> 最近两轮元反思，避免把内部工作状态混入源码包。
 
 ---
 

@@ -70,9 +70,10 @@
 
 ```powershell
 # 1. 验证便携目录完整性
+# 用 check_env 中标记为 [OK] 的解释器；本机 Windows 可直接用 py -3.13
 cd "Complement"
-python tools\check_env.py          # 选择具备 jieba/dowhy/causallearn 的解释器
-python "TRACE Engine(EDM-Takens CCM)\verify_portable.py"
+py -3.13 tools\check_env.py
+py -3.13 "TRACE Engine(EDM-Takens CCM)\verify_portable.py"
 # 若缺依赖：powershell -File tools\bootstrap.ps1
 
 # 2. 启动所有 Web 服务（默认仅本地）

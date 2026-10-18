@@ -5,8 +5,9 @@
 
 .DESCRIPTION
   Default mode is a dry run. Logs/caches are listed without being deleted unless
-  -Apply is supplied. Task outputs, work directories, archives and job databases
-  are only included with -IncludeTaskHistory, because they may contain user data.
+  -Apply is supplied. Task outputs, work directories, archives, empty project
+  scaffolds and job databases are only included with -IncludeTaskHistory, because
+  they may contain user data.
 
 .EXAMPLES
   powershell -NoProfile -ExecutionPolicy Bypass -File tools\clean_runtime.ps1
@@ -28,6 +29,9 @@ function Add-Target {
     param([string]$Path)
     if ([string]::IsNullOrWhiteSpace($Path)) { return }
     $full = [IO.Path]::GetFullPath($Path)
+    if ($full -eq $repoRoot -or $full.StartsWith($repoRoot + '\.git\', [StringComparison]::OrdinalIgnoreCase)) {
+        throw "Refusing unsafe repository target: $full"
+    }
     if (-not $full.StartsWith($repoRoot + '\', [StringComparison]::OrdinalIgnoreCase)) {
         throw "Refusing path outside repository: $full"
     }
@@ -41,7 +45,8 @@ $logDirs = @(
     'Complement\tunnel_logs',
     'Complement\TRACE Engine(EDM-Takens CCM)\edm-takens-web\tunnel_logs',
     'Complement\TRACE Engine(EDM-Takens CCM)\trace-engine-web\tunnel_logs',
-    'Complement\TRACE Engine(EDM-Takens CCM)\trace-to-edm\tunnel_logs'
+    'Complement\TRACE Engine(EDM-Takens CCM)\trace-to-edm\tunnel_logs',
+    'Complement\TRACE Engine(EDM-Takens CCM)\trace-to-edm\data\logs'
 )
 foreach ($relative in $logDirs) { Add-Target (Join-Path $repoRoot $relative) }
 
@@ -65,7 +70,7 @@ Add-Target (Join-Path $repoRoot '__pycache__')
 Get-ChildItem -LiteralPath $repoRoot -Force -File -Filter '.tmp_*.py' -ErrorAction SilentlyContinue |
     ForEach-Object { Add-Target $_.FullName }
 
-# User/task history is opt-in.
+# User/task history is opt-in. These paths can contain uploaded inputs and outputs.
 if ($IncludeTaskHistory) {
     $historyTargets = @(
         'Complement\TRACE Engine(EDM-Takens CCM)\edm-takens-web\results',
@@ -74,6 +79,11 @@ if ($IncludeTaskHistory) {
         'Complement\TRACE Engine(EDM-Takens CCM)\edm-takens-web\jobs.sqlite',
         'Complement\TRACE Engine(EDM-Takens CCM)\trace-engine-web\work',
         'Complement\TRACE Engine(EDM-Takens CCM)\trace-to-edm\work',
+        'Complement\TRACE Engine(EDM-Takens CCM)\trace-to-edm\data\outputs',
+        'Complement\TRACE Engine(EDM-Takens CCM)\trace-to-edm\archive',
+        'Complement\TRACE Engine(EDM-Takens CCM)\trace-to-edm\projects\default\outputs',
+        'Complement\TRACE Engine(EDM-Takens CCM)\trace-to-edm\projects\default\cache',
+        'Complement\TRACE Engine(EDM-Takens CCM)\trace-to-edm\projects\default\inputs',
         'Complement\TRACE Engine(EDM-Takens CCM)\trace-to-edm\projects\_index.json',
         'Complement\TRACE Engine(EDM-Takens CCM)\trace-engine\examples\counterfactual_hybrid\outputs'
     )
@@ -85,12 +95,14 @@ if ($IncludeTaskHistory) {
         ForEach-Object { Add-Target $_.FullName }
 }
 
-if ($targets.Count -eq 0) {
+# Remove deepest paths first so nested runtime folders do not invalidate parents.
+$orderedTargets = @($targets | Sort-Object Length -Descending)
+if ($orderedTargets.Count -eq 0) {
     Write-Host '[clean] No known runtime artifacts found.' -ForegroundColor Green
     exit 0
 }
 
-Write-Host "[clean] $($targets.Count) runtime target(s) detected." -ForegroundColor Cyan
+Write-Host "[clean] $($orderedTargets.Count) runtime target(s) detected." -ForegroundColor Cyan
 if (-not $Apply) {
     Write-Host '[clean] DRY RUN: nothing will be deleted. Re-run with -Apply to remove.' -ForegroundColor Yellow
 }
@@ -98,11 +110,12 @@ if ($IncludeTaskHistory) {
     Write-Host '[clean] Task history/work/archive outputs are included.' -ForegroundColor Yellow
 }
 
-foreach ($target in $targets) {
+foreach ($target in $orderedTargets) {
     if (-not $Apply) {
         Write-Host "  WOULD REMOVE  $target"
         continue
     }
+    if (-not (Test-Path -LiteralPath $target)) { continue }
     if ($PSCmdlet.ShouldProcess($target, 'Remove runtime artifact')) {
         Remove-Item -LiteralPath $target -Recurse -Force
         Write-Host "  REMOVED       $target" -ForegroundColor DarkGray

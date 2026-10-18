@@ -494,14 +494,15 @@ await mcpCall(3000, 'tools/call', {
 ### 8.2 运行方式
 
 ```powershell
-# 启动三大WEB（分别在新终端）
-cd "f:\攻略\研发测试\TRACE Engine(EDM-Takens CCM)\trace-engine-web"; node server.js
-cd "f:\攻略\研发测试\TRACE Engine(EDM-Takens CCM)\trace-to-edm"; node server.js
-cd "f:\攻略\研发测试\TRACE Engine(EDM-Takens CCM)\edm-takens-web"; python run_backend.py
+# 从仓库根目录启动三大 Web（分别在新终端）
+cd "Complement\TRACE Engine(EDM-Takens CCM)\trace-engine-web"; node server.js
+cd "Complement\TRACE Engine(EDM-Takens CCM)\trace-to-edm"; node server.js
+cd "Complement\TRACE Engine(EDM-Takens CCM)\edm-takens-web"; python run_backend.py
 
 # 运行核查
-python "f:\攻略\研发测试\TRACE Engine(EDM-Takens CCM)\test_mcp_protocol.py"
+python "Complement\TRACE Engine(EDM-Takens CCM)\test_mcp_protocol.py"
 ```
+
 
 ### 8.3 通过标准
 
@@ -516,38 +517,35 @@ python "f:\攻略\研发测试\TRACE Engine(EDM-Takens CCM)\test_mcp_protocol.py
 
 ## 九、同步与维护
 
-### 9.1 便携目录同步
+### 9.1 单一源码树
 
-便携目录 `Complement\TRACE Engine(EDM-Takens CCM)\edm-takens-web\backend\` 需与工作目录 `F:\攻略\研发测试\TRACE Engine(EDM-Takens CCM)\edm-takens-web\backend\` 保持以下文件 SHA256 一致：
+`Complement` 内的文件就是唯一维护源，不存在需要与仓库外工作目录比对的“镜像副本”。
+特别地，`edm-takens-web/backend/` 不再保留 `edmtakens/` 算法副本，而是直接导入
+`edm-takens/src/`。
 
-| 文件 | 同步方向 | 验证方式 |
-|------|----------|----------|
-| `mcp.py` | 工作目录 → 便携目录 | `Get-FileHash` SHA256 比对 |
-| `api.py` | 工作目录 → 便携目录 | `Get-FileHash` SHA256 比对 |
-| `edmtakens/*.py` | 双向 | `python sync_check.py` |
-
-> **注**：trace-engine-web 和 trace-to-edm 直接位于 `Complement\TRACE Engine(EDM-Takens CCM)\` 下，与 edm-takens-web 同级，均在工作目录维护后同步。
+| 检查 | 通过标准 |
+|------|----------|
+| MCP 协议 | initialize、tools/list、health tool 正常 |
+| 算法副本 | `backend/edmtakens/` 不存在 |
+| 算法导入 | Web 后端从 `edm-takens/src` 导入 |
+| 文档同步 | 工具表、路由与测试用例一致 |
 
 ### 9.2 sync_check.py 验证
 
 ```powershell
-python "f:\攻略\研发测试\TRACE Engine(EDM-Takens CCM)\edm-takens-web\backend\sync_check.py"
+python "Complement\TRACE Engine(EDM-Takens CCM)\edm-takens-web\backend\sync_check.py"
 ```
 
-预期输出：
-```
-源码汇总: 20 一致 / 2 预期差异 / 0 不一致 / 0 副本缺失
-披露字段检查通过 (8 项)
-文档同步检查通过
-```
+预期输出：确认 0 个算法副本、披露字段完整、文档同步检查通过。
 
 ### 9.3 新增工具流程
 
-1. 在 MCP 模块的 `TOOLS` 数组追加工具定义（含完整 `inputSchema`）
-2. 在 `callTool`/`call_tool` 函数追加 `case` 分支，映射到现有 HTTP 路由
-3. 在 `test_mcp_protocol.py` 追加业务工具核查用例
-4. 同步 `mcp.py`/`mcp.js` 到便携目录（仅 edm-takens-web）
-5. 更新本文档对应章节
+1. 在 MCP 模块的 `TOOLS` 数组追加工具定义（含完整 `inputSchema`）。
+2. 在 `callTool` / `call_tool` 函数追加分支，并映射到现有 HTTP 路由。
+3. 在 `test_mcp_protocol.py` 追加业务工具核查用例。
+4. 更新本文档对应章节。
+5. 运行 `verify_portable.py --no-e2e` 与相关 MCP 测试。
+
 
 ---
 

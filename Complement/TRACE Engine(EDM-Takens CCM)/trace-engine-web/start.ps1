@@ -79,7 +79,7 @@ Write-Log "Node: $(node --version)"
 Write-Log "npm:  $(npm --version)"
 
 # 可选：指定成品目录 Skill 路径（注意 trace-engine 子目录）
-# $env:TRACE_ENGINE_SKILL_DIR = "G:\git\Annals-of-the-Great-Simplicity-main\Annals-of-the-Great-Simplicity\Complement\TRACE Engine(EDM-Takens CCM)\trace-engine\examples\counterfactual_hybrid"
+# $env:TRACE_ENGINE_SKILL_DIR = (Resolve-Path (Join-Path $PSScriptRoot '..\trace-engine\examples\counterfactual_hybrid')).Path
 # 可选：指定工作/输出目录（便于容器化或避免默认目录无写入权限）
 # $env:TRACE_WORK_DIR = "$env:TEMP\trace-engine-web"
 # 可选：跨域部署时限制 CORS Origin
