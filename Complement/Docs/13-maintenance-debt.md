@@ -46,7 +46,8 @@
 | 发布卫生 | `check_docs.py` 校验 82 条相对链接；`build_release.ps1` fail-closed 检查 709 个 ZIP 条目，拒绝运行状态、密钥与本地模型；源码包 115.5 MB，SHA256 manifest 一致 |
 | 真实新闻试点 | 新增 `smoke_e2e.py --corpus-dir`；15 篇微信公众号公开文章完成 LIGHT→89 列轨迹→EDM，15/15 TRACE 成功；N=15 时 CCM 0/6 显著、HAVOK 退化，作为“可运行但不可过度解释”的实证边界 |
 | TRACE 失败显式化 | `result.success=false` 不再被当作成功；E2E 要求全部轨迹行 `trace_status=OK/PARTIAL`，并用当前 Python 解释器注入 `TRACE_PYTHON_CMD`，避免误用缺依赖的 PATH Python |
-| 运行速度观测 | 15 篇长文 LIGHT 文本阶段约 2.6 分钟（首篇冷启动 46.7 秒，后续 4-10 秒/篇），EDM 约 1.3 分钟；后续优化重点为缓存、并行与减少冷启动 |
+| 运行速度观测 | 优化前 15 篇长文 LIGHT 文本阶段约 2.6 分钟；加入常驻 worker、内容缓存与 L1 预取后，warm run 约 30–45 秒，首篇 L2/L3 模型加载仍约 23–30 秒，EDM 约 50–70 秒 |
+| 结构化性能优化 | `py_bridge_worker.py` 复用 Python/skill 导入；TRACE/EDM/语义嵌入三类内容缓存；`TRACE_PREFETCH_WORKERS` 有界预取；N<30 exploratory 时跳过不可靠的 CCM 批次；`edm_only.py` 避免 full bridge 冷启动 |`n| 推理内存回退 | CUDA 显存不足时自动转 CPU FP32；15 篇语料语义嵌入冷预热约 32 秒，缓存命中后单条约 5ms。避免了 4 GiB 显卡 FP16 溢出的数量级退化 |
 
 ## 3. 仍需作者决策
 

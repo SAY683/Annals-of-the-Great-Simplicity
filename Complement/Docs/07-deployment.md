@@ -57,6 +57,21 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools\clean_runtime.ps1 -App
 
 `-IncludeTaskHistory` 会清理 `results/`、`archive/`、`work/`、`jobs.sqlite`、trace-to-edm 项目脚手架和测试任务数据。执行前应先做好需要的备份。
 
+### 3.1.1 新闻 HTML 批量预处理
+
+公开新闻 HTML 可在本地并行清洗，不依赖网络：
+
+```powershell
+python -m pip install -r tools\requirements-news.txt
+python tools\prepare_news_corpus.py --html-dir news\html --out-dir news\normalized --workers 4
+# 可选：预计算 Qwen 语义嵌入，避免重复批处理时再次运行模型
+$env:TRACE_EMBEDDING_CACHE_DIR = "$env:TEMP\semantic-news"
+python tools\warm_semantic_cache.py --corpus-dir news\normalized
+python "TRACE Engine(EDM-Takens CCM)\smoke_e2e.py" --corpus-dir news\normalized --timeout-min 30
+```
+
+新闻正文默认保存在被 Git 忽略的本地目录；发布包只包含处理工具与论文元数据。
+
 ### 3.2 构建干净源码包
 
 ```powershell
@@ -154,6 +169,19 @@ Get-NetTCPConnection -State Listen |
 | `TUNNEL_ACCESS_TOKEN` | 隧道网关访问令牌 | 启动时生成 |
 | `GRAPHRAG_JSON_MODE` | GraphRAG JSON mode 能力覆盖 | `auto` |
 | `COMPLEMENT_PYTHON_CANDIDATES` | 额外 Python 候选（分号分隔） | 空 |
+| `TRACE_USE_WORKER` | 启用 batch TRACE 常驻 worker | `1` |
+| `TRACE_CACHE_DIR` | TRACE result.json 内容缓存目录 | `work/cache/trace` |
+| `TRACE_CACHE_DISABLE` | 设为 `1` 禁用 TRACE 缓存 | `0` |
+| `TRACE_CACHE_VERSION` | TRACE 缓存键版本；算法或结果格式变更时递增 | `v1` |
+| `TRACE_PREFETCH_WORKERS` | 批量文本 L1 预取并发数 | `2` |
+| `EDM_CACHE_DIR` | batch EDM 结果缓存目录 | `work/cache/edm` |
+| `EDM_CACHE_DISABLE` | 设为 `1` 禁用 EDM 缓存 | `0` |
+| `EDM_CACHE_VERSION` | EDM 缓存键版本；分析实现变更时递增 | `v1` |
+| `TRACE_EMBEDDING_CACHE_DIR` | Qwen 文本嵌入缓存目录；跨 E2E 复用时建议显式指定 | 项目 cache/embeddings |
+| `TRACE_EMBEDDING_CACHE_DISABLE` | 设为 `1` 禁用语义嵌入缓存 | `0` |
+| `TRACE_EMBEDDING_CACHE_VERSION` | 语义嵌入缓存键版本 | `v1` |
+| `QWEN_DEVICE` | Qwen 推理设备：`auto` / `cuda` / `cpu`；显存紧张时建议 `cpu` | `auto` |
+| `QWEN_LOAD_IN_4BIT` | CUDA 4-bit 量化：`auto` / `1` / `0` | `auto` |
 
 ## 7. 维护清单
 
