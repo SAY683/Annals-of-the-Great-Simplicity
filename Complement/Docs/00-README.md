@@ -66,6 +66,13 @@
 | [12-security.md](12-security.md) | 本地/隧道鉴权、API Key、网关边界 |
 | [13-maintenance-debt.md](13-maintenance-debt.md) | P2 维护债务与后续顺序 |
 
+## 研究论文
+
+| 文件 | 内容 |
+|------|------|
+| [系统实现与可复现性评估-6.7.0.md](<../TRACE Engine(EDM-Takens CCM)/研究汇报/系统实现与可复现性评估-6.7.0.md>) | 6.7.0 系统实现、测试结果、可复现性与完成度评估 |
+| [五大项目算法模型论文.md](<../TRACE Engine(EDM-Takens CCM)/研究汇报/五大项目算法模型论文.md>) | 历史算法叙事与早期实验记录，引用前需核验原始输出 |
+
 ## 快速开始
 
 ```powershell
