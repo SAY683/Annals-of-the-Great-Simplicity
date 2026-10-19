@@ -44,6 +44,9 @@
 | `render.js` | 从 1641 行降到 556 行；拓扑、矩阵、3D/2D、切换器拆为独立浏览器脚本，版本号更新防止旧缓存 |
 | 算法副本 | 删除 `edm-takens-web/backend/edmtakens/` 副本；Web 直接导入 `edm-takens/src` 唯一真源，`sync_check.py` 改为拒绝副本复活 |
 | 发布卫生 | `check_docs.py` 校验 82 条相对链接；`build_release.ps1` fail-closed 检查 709 个 ZIP 条目，拒绝运行状态、密钥与本地模型；源码包 115.5 MB，SHA256 manifest 一致 |
+| 真实新闻试点 | 新增 `smoke_e2e.py --corpus-dir`；15 篇微信公众号公开文章完成 LIGHT→89 列轨迹→EDM，15/15 TRACE 成功；N=15 时 CCM 0/6 显著、HAVOK 退化，作为“可运行但不可过度解释”的实证边界 |
+| TRACE 失败显式化 | `result.success=false` 不再被当作成功；E2E 要求全部轨迹行 `trace_status=OK/PARTIAL`，并用当前 Python 解释器注入 `TRACE_PYTHON_CMD`，避免误用缺依赖的 PATH Python |
+| 运行速度观测 | 15 篇长文 LIGHT 文本阶段约 2.6 分钟（首篇冷启动 46.7 秒，后续 4-10 秒/篇），EDM 约 1.3 分钟；后续优化重点为缓存、并行与减少冷启动 |
 
 ## 3. 仍需作者决策
 
