@@ -90,6 +90,130 @@ def _get_sacred_cache_dir() -> Path:
     # 按模型名隔离缓存 (1536 vs 2048 维)
     return base / _ACTIVE_MODEL
 
+
+def _embedding_cache_dir() -> Path:
+    """Content-addressed embedding cache; project-local unless overridden."""
+    override = os.environ.get("TRACE_EMBEDDING_CACHE_DIR", "").strip()
+    if override:
+        return Path(override)
+    return _get_sacred_cache_dir() / "embeddings"
+
+
+_MODEL_SIGNATURE_CACHE: Dict[str, str] = {}
+
+
+def _model_signature(cfg: dict) -> str:
+    """Stable model metadata signature, computed once per process."""
+    import hashlib
+    model_path = str(cfg.get("path", ""))
+    if model_path in _MODEL_SIGNATURE_CACHE:
+        return _MODEL_SIGNATURE_CACHE[model_path]
+    h = hashlib.sha256()
+    h.update(model_path.encode("utf-8"))
+    model_dir = Path(model_path)
+    try:
+        model_files = [
+            p for p in model_dir.iterdir()
+            if p.is_file() and (p.suffix in (".safetensors", ".bin") or p.name == "config.json")
+        ] if model_dir.is_dir() else []
+    except OSError:
+        model_files = []
+    for model_file in sorted(model_files, key=lambda p: p.name):
+        try:
+            stat = model_file.stat()
+            h.update(f"\0{model_file.name}:{stat.st_size}:{stat.st_mtime_ns}".encode("utf-8"))
+        except OSError:
+            pass
+    signature = h.hexdigest()
+    _MODEL_SIGNATURE_CACHE[model_path] = signature
+    return signature
+
+
+_RUNTIME_TAG_CACHE: Dict[str, str] = {}
+
+
+def _runtime_cache_slot(cfg: dict) -> str:
+    return "|".join([
+        str(cfg.get("path", "")),
+        os.environ.get("QWEN_DEVICE", "auto"),
+        os.environ.get("QWEN_LOAD_IN_4BIT", "auto"),
+        str(bool(cfg.get("quantize", False))),
+    ])
+
+
+def _planned_runtime_tag(cfg: dict) -> str:
+    """Describe the inference backend; freeze it before weights consume VRAM."""
+    slot = _runtime_cache_slot(cfg)
+    if slot in _RUNTIME_TAG_CACHE:
+        return _RUNTIME_TAG_CACHE[slot]
+    device = _get_device()
+    use_quantize = bool(cfg.get("quantize", False))
+    if device == "cuda":
+        import torch
+        if not use_quantize and _cuda_needs_4bit(torch):
+            use_quantize = True
+        if not use_quantize and os.environ.get("QWEN_DEVICE", "auto").strip().lower() != "cuda":
+            try:
+                free, _ = torch.cuda.mem_get_info()
+                if free < 3 * 1024**3:
+                    device = "cpu"
+            except Exception:
+                pass
+    tag = f"{device}:4bit={int(use_quantize)}"
+    _RUNTIME_TAG_CACHE[slot] = tag
+    return tag
+
+
+def _embedding_cache_key(text: str) -> str:
+    """Hash model metadata, backend and text so stale vectors cannot be reused."""
+    import hashlib
+    cfg = MODEL_REGISTRY.get(_ACTIVE_MODEL, MODEL_REGISTRY["qwen2.5-1.5b"])
+    if cfg.get("trace_model", False):
+        cfg = MODEL_REGISTRY["qwen2.5-1.5b"]
+    h = hashlib.sha256()
+    h.update(os.environ.get("TRACE_EMBEDDING_CACHE_VERSION", "v1").encode("utf-8"))
+    h.update(b"\0")
+    h.update(_model_signature(cfg).encode("utf-8"))
+    h.update(b"\0")
+    h.update(_planned_runtime_tag(cfg).encode("utf-8"))
+    h.update(b"\0")
+    h.update(text.encode("utf-8"))
+    return h.hexdigest()
+
+
+def _load_embedding_cache(cache_key: str, expected_size: int) -> Optional[np.ndarray]:
+    if os.environ.get("TRACE_EMBEDDING_CACHE_DISABLE", "0") == "1":
+        return None
+    path = _embedding_cache_dir() / f"{cache_key}.npy"
+    try:
+        vec = np.load(path, allow_pickle=False)
+        if vec.ndim != 1 or vec.shape[0] != expected_size:
+            return None
+        if not np.all(np.isfinite(vec)):
+            return None
+        norm = np.linalg.norm(vec)
+        if norm <= 0:
+            return None
+        return (vec / norm).astype(np.float64)
+    except Exception:
+        return None
+
+
+def _store_embedding_cache(cache_key: str, vec: np.ndarray) -> None:
+    if os.environ.get("TRACE_EMBEDDING_CACHE_DISABLE", "0") == "1":
+        return
+    try:
+        import uuid
+        out_dir = _embedding_cache_dir()
+        out_dir.mkdir(parents=True, exist_ok=True)
+        target = out_dir / f"{cache_key}.npy"
+        tmp = out_dir / f".{cache_key}.{os.getpid()}.{uuid.uuid4().hex}.tmp"
+        with open(tmp, "wb") as handle:
+            np.save(handle, vec, allow_pickle=False)
+        os.replace(tmp, target)
+    except Exception:
+        pass
+
 # ── 模型注册表 ──────────────────────────────────────────────
 MODEL_REGISTRY = {
     "qwen2.5-1.5b": {
@@ -225,11 +349,34 @@ _SACRED_VECTORS: Optional[Dict[str, np.ndarray]] = None  # 缓存的八正道方
 
 
 def _get_device() -> str:
-    """检测可用设备"""
+    """检测可用设备；QWEN_DEVICE=cpu 可强制使用 CPU 作为内存受限回退。"""
+    setting = os.environ.get("QWEN_DEVICE", "auto").strip().lower()
+    if setting == "cpu":
+        return "cpu"
     import torch
-    if torch.cuda.is_available():
+    if torch.cuda.is_available() and setting in ("auto", "cuda", ""):
         return "cuda"
     return "cpu"
+
+
+def _cuda_needs_4bit(torch_module) -> bool:
+    """Prefer 4-bit on small/occupied GPUs to avoid VRAM spill thrashing."""
+    setting = os.environ.get("QWEN_LOAD_IN_4BIT", "auto").strip().lower()
+    if setting in ("1", "true", "yes", "on"):
+        return True
+    if setting in ("0", "false", "no", "off"):
+        return False
+    try:
+        total = torch_module.cuda.get_device_properties(0).total_memory
+        free, _ = torch_module.cuda.mem_get_info()
+        # A 4-bit 1.5B model plus inference works needs roughly 2.5 GiB free.
+        # Below that, let device_map=auto offload FP16 instead of failing first.
+        if free < 2.5 * 1024**3:
+            return False
+        # 6 GiB is the practical FP16 ceiling for a 1.5B model plus activations.
+        return total <= 6 * 1024**3 or free <= 4 * 1024**3
+    except Exception:
+        return True
 
 
 def _load_model():
@@ -249,9 +396,23 @@ def _load_model():
         print(f"[L3] ⚠ 活动模型 '{_ACTIVE_MODEL}' 为展示模型，加载时回退到 qwen2.5-1.5b")
         cfg = MODEL_REGISTRY["qwen2.5-1.5b"]
     model_path = cfg["path"]
-    use_quantize = cfg.get("quantize", False)
+    use_quantize = bool(cfg.get("quantize", False))
+    if _DEVICE == "cuda" and not use_quantize and _cuda_needs_4bit(torch):
+        use_quantize = True
+    if (_DEVICE == "cuda" and not use_quantize
+            and os.environ.get("QWEN_DEVICE", "auto").strip().lower() != "cuda"):
+        try:
+            free, _ = torch.cuda.mem_get_info()
+            if free < 3 * 1024**3:
+                # FP16 weights plus activations cannot fit. device_map=auto can
+                # leave embedding layers on CPU while callers move inputs to GPU,
+                # which fails; an explicit CPU model is slower but correct.
+                print("[L3] CUDA 可用显存不足 3 GiB，改用 CPU 推理")
+                _DEVICE = "cpu"
+        except Exception:
+            pass
 
-    if VERBOSE:
+    if VERBOSE or _DEVICE == "cpu":
         print(f"[L3] 加载 {cfg['name']} (device={_DEVICE}, 4bit={use_quantize})")
 
     _TOKENIZER = AutoTokenizer.from_pretrained(
@@ -271,19 +432,32 @@ def _load_model():
                 ),
                 attn_implementation="sdpa",
                 device_map="auto",
+                dtype=torch.float16,
+                low_cpu_mem_usage=True,
             )
         except Exception as e:
-            print(f"[L3] 4-bit量化失败({e}), 回退FP16")
+            print(f"[L3] 4-bit量化失败({e}), 回退 CPU FP32")
+            _DEVICE = "cpu"
             _MODEL = AutoModel.from_pretrained(
                 model_path, trust_remote_code=True,
-                dtype=torch.float16, device_map="auto",
-            )
+                dtype=torch.float32,
+                attn_implementation="eager",
+                low_cpu_mem_usage=True,
+            ).to(_DEVICE)
     else:
         _MODEL = AutoModel.from_pretrained(
             model_path, trust_remote_code=True,
             dtype=torch.float16 if _DEVICE == "cuda" else torch.float32,
+            # PyTorch SDPA uses flash/memory-efficient kernels where available.
+            # Eager attention is substantially slower and uses more VRAM.
+            attn_implementation="sdpa" if _DEVICE == "cuda" else "eager",
+            low_cpu_mem_usage=True,
         ).to(_DEVICE)
     _MODEL.eval()
+    _MODEL.config.use_cache = False
+    _RUNTIME_TAG_CACHE[_runtime_cache_slot(cfg)] = (
+        f"{_DEVICE}:4bit={int(use_quantize and _DEVICE == 'cuda')}"
+    )
 
     if VERBOSE:
         print(f"[L3] 模型加载完成 ✓ (hidden_size={_MODEL.config.hidden_size})")
@@ -295,15 +469,30 @@ def encode_text(text: str) -> np.ndarray:
     """
     用 Qwen 编码文本，返回 mean-pooled 隐状态向量。
 
+    Embeddings are content-addressed and cached outside the analysis result so
+    repeated corpus runs do not re-run the expensive CPU/GPU forward pass.
+
     Args:
         text: 输入文本 (任意长度)
 
     Returns:
         np.ndarray shape=(hidden_size,), 已 L2 归一化
     """
-    model, tokenizer, device = _load_model()
-    import torch
     cfg = MODEL_REGISTRY.get(_ACTIVE_MODEL, MODEL_REGISTRY["qwen2.5-1.5b"])
+    if cfg.get("trace_model", False):
+        cfg = MODEL_REGISTRY["qwen2.5-1.5b"]
+    cache_key = _embedding_cache_key(text)
+    cached = _load_embedding_cache(cache_key, int(cfg["hidden_size"]))
+    if cached is not None:
+        if VERBOSE:
+            print("[L3] embedding cache hit")
+        return cached
+
+    model, tokenizer, device = _load_model()
+    # The loader may have fallen back from CUDA to CPU; refresh the cache key
+    # so the vector is stored under the backend that actually produced it.
+    cache_key = _embedding_cache_key(text)
+    import torch
     middle_layer = cfg.get("middle_layer", 14)
     max_len = model.config.max_position_embeddings
 
@@ -315,7 +504,7 @@ def encode_text(text: str) -> np.ndarray:
     chunk_embeddings = []
 
     model.eval()
-    with torch.no_grad():
+    with torch.inference_mode():
         for start in range(0, len(tokens), step):
             chunk = tokens[start:start + chunk_size]
             if len(chunk) < 10:
@@ -372,6 +561,7 @@ def encode_text(text: str) -> np.ndarray:
     if norm > 0:
         vec = vec / norm
 
+    _store_embedding_cache(cache_key, vec)
     return vec
 
 

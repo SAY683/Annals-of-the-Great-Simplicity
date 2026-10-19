@@ -35,3 +35,39 @@ def test_copy_to_edm_data_uses_project_specific_filename(tmp_path, monkeypatch):
 
     assert result["job_id"] == "job-test"
     assert captured["data"]["filename"] == "trace_to_edm_proj-a.csv"
+    assert captured["data"]["intensity"] == "auto"
+
+def test_edm_result_cache_roundtrip_and_invalidation(tmp_path):
+    csv_path = tmp_path / "trajectory.csv"
+    csv_path.write_text("time_step,ate\n1,0.1\n2,0.2\n", encoding="utf-8")
+    trigger = edm_trigger.EDMTrigger(csv_path=csv_path)
+    trigger.cache_dir = tmp_path / "cache"
+    trigger.cache_disabled = False
+
+    key = trigger._cache_key("ate", 3)
+    assert trigger._load_cache(key) == {}
+    trigger._store_cache(key, {
+        "success": True,
+        "status": "done",
+        "result_summary": {"pipeline": "ok"},
+    })
+    cached = trigger._load_cache(key)
+    assert cached["cached"] is True
+    assert cached["status"] == "done"
+    assert cached["result_summary"]["pipeline"] == "ok"
+
+    assert trigger._cache_key("ate", 4) != key
+    assert trigger._cache_key("adj_density", 3) != key
+    csv_path.write_text("time_step,ate\n1,0.1\n2,0.3\n", encoding="utf-8")
+    assert trigger._cache_key("ate", 3) != key
+
+
+def test_edm_result_cache_rejects_failed_jobs(tmp_path):
+    csv_path = tmp_path / "trajectory.csv"
+    csv_path.write_text("time_step,ate\n1,0.1\n", encoding="utf-8")
+    trigger = edm_trigger.EDMTrigger(csv_path=csv_path)
+    trigger.cache_dir = tmp_path / "cache"
+    trigger.cache_disabled = False
+    key = trigger._cache_key("ate", 3)
+    trigger._store_cache(key, {"success": False, "status": "done"})
+    assert trigger._load_cache(key) == {}

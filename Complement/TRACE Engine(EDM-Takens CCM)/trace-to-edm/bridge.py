@@ -35,11 +35,16 @@ trace-to-edm 三层元因果控制论桥接系统
 """
 
 import argparse
+import atexit
 import csv
+import hashlib
 import json
 import os
+import queue
+import shutil
 import subprocess
 import sys
+import threading
 import time
 import tempfile
 import uuid
@@ -82,6 +87,210 @@ _singleton_project = None  # 当前单例绑定的项目名
 # Phase 2 L3-1 修缮: per-project z-score 归一化器单例
 # 项目切换时同样需要重建（与 L2/L3 同生命周期）
 _zscore_normalizer = None
+
+# ── TRACE result cache / persistent worker ─────────────────
+# Cache is content-addressed and lives under the ignored work tree. It never
+# changes the CSV contract; it only avoids re-running identical text+mode.
+_TRACE_CACHE_VERSION = os.environ.get("TRACE_CACHE_VERSION", "v1")
+_TRACE_CACHE_DISABLED = os.environ.get("TRACE_CACHE_DISABLE", "0") == "1"
+_TRACE_CACHE_DIR = Path(os.environ.get(
+    "TRACE_CACHE_DIR", str(TRACE_WORK_DIR.parent / "cache" / "trace")
+))
+_TRACE_WORKER_SCRIPT = TRACE_BRIDGE_SCRIPT.parent / "py_bridge_worker.py"
+_TRACE_WORKER_ENABLED = os.environ.get("TRACE_USE_WORKER", "1") != "0"
+
+
+def _env_int(name: str, default: int, minimum: int, maximum: int) -> int:
+    """Read a bounded integer environment setting without crashing batch runs."""
+    try:
+        value = int(os.environ.get(name, str(default)))
+    except (TypeError, ValueError):
+        return default
+    return max(minimum, min(maximum, value))
+
+
+def _trace_cache_key(text: str, mode: str) -> str:
+    h = hashlib.sha256()
+    h.update(_TRACE_CACHE_VERSION.encode("utf-8"))
+    h.update(b"\0")
+    h.update(mode.encode("utf-8"))
+    h.update(b"\0")
+    h.update(text.encode("utf-8"))
+    return h.hexdigest()
+
+
+def _load_trace_cache(key: str, output_dir: Path) -> bool:
+    if _TRACE_CACHE_DISABLED:
+        return False
+    cached = _TRACE_CACHE_DIR / key / "result.json"
+    if not cached.exists():
+        return False
+    try:
+        payload = json.loads(cached.read_text(encoding="utf-8"))
+        if isinstance(payload, dict) and payload.get("success") is False:
+            return False
+        output_dir.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(cached, output_dir / "result.json")
+        return True
+    except Exception:
+        return False
+
+
+def _store_trace_cache(key: str, result_json: Path) -> None:
+    if _TRACE_CACHE_DISABLED or not result_json.exists():
+        return
+    try:
+        target_dir = _TRACE_CACHE_DIR / key
+        target_dir.mkdir(parents=True, exist_ok=True)
+        target = target_dir / "result.json"
+        tmp = target_dir / f".result.{os.getpid()}.{uuid.uuid4().hex}.tmp"
+        shutil.copy2(result_json, tmp)
+        os.replace(tmp, target)
+        (target_dir / "meta.json").write_text(json.dumps({
+            "created_at": datetime.now().isoformat(timespec="seconds"),
+            "cache_version": _TRACE_CACHE_VERSION,
+        }, ensure_ascii=False), encoding="utf-8")
+    except Exception:
+        pass
+
+
+class _PersistentTraceWorker:
+    def __init__(self):
+        self.process = None
+        self.queue = None
+        self.reader = None
+        self.stderr_tail = ""
+
+    def _start(self) -> bool:
+        if self.process is not None and self.process.poll() is None:
+            return True
+        if not _TRACE_WORKER_ENABLED or not _TRACE_WORKER_SCRIPT.exists():
+            return False
+        env = os.environ.copy()
+        env["PYTHONIOENCODING"] = "utf-8"
+        env["PYTHONDONTWRITEBYTECODE"] = "1"
+        try:
+            self.process = subprocess.Popen(
+                [PYTHON_CMD, str(_TRACE_WORKER_SCRIPT)],
+                cwd=str(TRACE_BRIDGE_SCRIPT.parent),
+                env=env,
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                bufsize=1,
+            )
+        except Exception:
+            self.process = None
+            return False
+        self.queue = queue.Queue()
+        self.reader = threading.Thread(
+            target=self._read_stdout, args=(self.process, self.queue), daemon=True
+        )
+        self.reader.start()
+        # Drain stderr unconditionally; otherwise a native/import-time write can
+        # fill the pipe and deadlock a long-lived worker.
+        threading.Thread(
+            target=self._drain_stderr, args=(self.process,), daemon=True
+        ).start()
+        return True
+
+    def _read_stdout(self, process, response_queue: queue.Queue):
+        try:
+            for line in process.stdout:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    response_queue.put(json.loads(line))
+                except Exception:
+                    response_queue.put({"ok": False, "stderr": line})
+        finally:
+            # Bind the queue at thread start. If this worker is restarted, an
+            # old reader must never poison the new request queue with None.
+            response_queue.put(None)
+
+    def _drain_stderr(self, process):
+        tail = []
+        try:
+            for line in process.stderr:
+                tail.append(line)
+                if len(tail) > 100:
+                    del tail[:-100]
+        except Exception:
+            pass
+        finally:
+            self.stderr_tail = "".join(tail)[-8000:]
+
+    def run(self, skill_dir: Path, output_dir: Path, input_file: Path,
+            mode: str, timeout_sec: int) -> Optional[dict]:
+        if not self._start():
+            return None
+        request = {
+            "skill_dir": str(skill_dir),
+            "out_dir": str(output_dir),
+            "input_file": str(input_file),
+            "mode": mode,
+            "config": {},
+        }
+        try:
+            self.process.stdin.write(json.dumps(request, ensure_ascii=False) + "\n")
+            self.process.stdin.flush()
+            response = self.queue.get(timeout=timeout_sec)
+            if response is None:
+                return None
+            return response
+        except Exception:
+            self.close()
+            return None
+
+    def close(self):
+        proc = self.process
+        self.process = None
+        if proc is not None:
+            try:
+                proc.terminate()
+                proc.wait(timeout=3)
+            except Exception:
+                try:
+                    proc.kill()
+                except Exception:
+                    pass
+            finally:
+                for stream in (proc.stdin, proc.stdout, proc.stderr):
+                    try:
+                        if stream is not None:
+                            stream.close()
+                    except Exception:
+                        pass
+
+
+_trace_workers = []
+_trace_workers_lock = threading.Lock()
+_trace_worker_local = threading.local()
+
+
+def _get_trace_worker() -> _PersistentTraceWorker:
+    worker = getattr(_trace_worker_local, "worker", None)
+    if worker is None:
+        worker = _PersistentTraceWorker()
+        _trace_worker_local.worker = worker
+        with _trace_workers_lock:
+            _trace_workers.append(worker)
+    return worker
+
+
+def _close_trace_workers():
+    with _trace_workers_lock:
+        workers = list(_trace_workers)
+        _trace_workers.clear()
+    for worker in workers:
+        worker.close()
+
+
+atexit.register(_close_trace_workers)
 
 
 def _to_float_safe(v, default=0.0) -> float:
@@ -293,51 +502,52 @@ def _run_semantic_layers(
 
 # ── TRACE 分析 ──────────────────────────────────────────────
 
+def _validate_trace_result(output_dir: Path, cache_key: str):
+    result_json = output_dir / "result.json"
+    if not result_json.exists():
+        return None, "result.json 未生成"
+    try:
+        payload = json.loads(result_json.read_text(encoding="utf-8"))
+    except Exception as e:
+        return None, f"result.json 无法解析: {type(e).__name__}: {e}"
+    if isinstance(payload, dict) and payload.get("success") is False:
+        return None, "TRACE result.success=false: " + str(payload.get("error", "unknown"))
+    _store_trace_cache(cache_key, result_json)
+    return output_dir, None
+
+
 def run_trace_analysis(text: str, mode: str = "deep", timeout_sec: int = 600):
     """
-    调用 TRACE py_bridge.py 对单段文本进行因果分析。
+    对单段文本执行 TRACE 分析，返回 (output_dir, error_detail)。
 
-    使用 subprocess 将文本通过 stdin 传给 Python 桥接器,
-    等待分析完成后读取 result.json。
-
-    Args:
-        text: 输入文本
-        mode: "light" | "deep" | "super"
-        timeout_sec: 超时时间
-
-    Returns:
-        (output_dir, error_detail) 元组：
-          - 成功: (Path, None)
-          - 失败: (None, str)  其中 error_detail 描述失败原因，便于上游显式记录
-          - 部分成功（result.json 存在但 subprocess 非零退出）: (Path, "partial: ...")
-        向后兼容：调用方若按旧约定解包 `out = run_trace_analysis(...)`，会把 tuple 当 truthy；
-        因此本函数的调用方应使用元组解包 `out, err = run_trace_analysis(...)`。
+    优先使用内容 hash 缓存与常驻 Python worker；worker 不可用时回退到独立
+    subprocess。无论哪条路径，result.success=false 都会被视为失败。
     """
-    # 生成任务 ID
     task_id = str(uuid.uuid4())
     output_dir = TRACE_WORK_DIR / task_id
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # 写入输入文件
+    cache_key = _trace_cache_key(text, mode)
+    if _load_trace_cache(cache_key, output_dir):
+        if VERBOSE:
+            print(f"[TRACE] cache hit: {task_id[:8]}... mode={mode}")
+        return output_dir, None
+
+    # Only materialize the input file on a cache miss; repeated corpus runs
+    # should not accumulate duplicate text files under work/inputs.
     input_file = TRACE_WORK_DIR.parent / "inputs" / f"{task_id}.txt"
     input_file.parent.mkdir(parents=True, exist_ok=True)
     with open(input_file, "w", encoding="utf-8") as f:
         f.write(text)
 
-    # 构建命令 — py_bridge.py 使用位置参数:
-    #   python py_bridge.py <skill_dir> <out_dir> [light|deep] [config_json] [input_file]
     skill_dir = TRACE_BRIDGE_SCRIPT.parent.parent / "examples" / "counterfactual_hybrid"
-    # 如果相对路径不可用，尝试使用环境变量
     if not skill_dir.exists():
-        import os as _os
-        env_skill = _os.environ.get("TRACE_ENGINE_SKILL_DIR", "")
+        env_skill = os.environ.get("TRACE_ENGINE_SKILL_DIR", "")
         if env_skill:
             skill_dir = Path(env_skill)
         else:
-            # 回退: 假设 trace-engine 和 trace-engine-web 是兄弟目录
             skill_dir = TRACE_BRIDGE_SCRIPT.parent.parent / "trace-engine" / "examples" / "counterfactual_hybrid"
 
-    # 前置存在性校验：让"配置错位"显形而非静默吞掉
     if not TRACE_BRIDGE_SCRIPT.exists():
         err = f"py_bridge.py 不存在: {TRACE_BRIDGE_SCRIPT}（请检查 trace-engine-web 安装）"
         print(f"[TRACE] ✖ {err}")
@@ -348,64 +558,61 @@ def run_trace_analysis(text: str, mode: str = "deep", timeout_sec: int = 600):
         print(f"[TRACE] ✖ {err}")
         return None, err
 
-    cmd = [
-        PYTHON_CMD, str(TRACE_BRIDGE_SCRIPT),
-        str(skill_dir),
-        str(output_dir),
-        mode,
-        "{}",  # config_json (空)
-        str(input_file),
-    ]
-
     if VERBOSE:
         print(f"[TRACE] 启动分析: task_id={task_id[:8]}..., mode={mode}")
-        print(f"[TRACE] 命令: {' '.join(cmd[:5])}...")
 
+    worker_response = _get_trace_worker().run(skill_dir, output_dir, input_file, mode, timeout_sec)
+    if worker_response is not None:
+        if not worker_response.get("ok"):
+            stderr_tail = str(worker_response.get("stderr") or worker_response.get("stdout") or "")[-800:]
+            validated, validate_err = _validate_trace_result(output_dir, cache_key)
+            if validated is not None:
+                return validated, f"partial: worker exit={worker_response.get('exit_code')}, stderr_tail={stderr_tail[:200]}"
+            err = f"worker 失败: {validate_err}; {stderr_tail[:300]}"
+            print(f"[TRACE] ✖ {err}")
+            return None, err
+        validated, validate_err = _validate_trace_result(output_dir, cache_key)
+        if validated is None:
+            print(f"[TRACE] ✖ {validate_err}")
+            return None, validate_err
+        if VERBOSE:
+            print(f"[TRACE] ✓ 分析完成: {output_dir / 'result.json'}")
+        return validated, None
+
+    # Fallback: isolated subprocess (also used when TRACE_USE_WORKER=0).
+    cmd = [PYTHON_CMD, str(TRACE_BRIDGE_SCRIPT), str(skill_dir), str(output_dir), mode, "{}", str(input_file)]
+    if VERBOSE:
+        print(f"[TRACE] worker unavailable, fallback subprocess: {' '.join(cmd[:5])}...")
     try:
+        child_env = os.environ.copy()
+        child_env["PYTHONIOENCODING"] = "utf-8"
+        child_env["PYTHONUTF8"] = "1"
         result = subprocess.run(
             cmd,
             capture_output=True,
             text=True,
-            encoding="utf-8",  # 强制 UTF-8 避免 GBK 解码错误
+            encoding="utf-8",
+            errors="replace",
             timeout=timeout_sec,
             cwd=str(TRACE_BRIDGE_SCRIPT.parent),
+            env=child_env,
         )
-
         result_json = output_dir / "result.json"
-
         if result.returncode != 0:
-            # 截取 stderr 末尾 800 字符（最相关的 traceback 在末尾）
             stderr_tail = (result.stderr or "")[-800:]
-            print(f"[TRACE] ✖ 进程返回非零: {result.returncode}")
-            print(f"[TRACE] ✖ stderr: {stderr_tail}")
-
-            # 即使非零退出，检查 result.json 是否已生成（部分阶段失败但已落盘）
-            if result_json.exists():
-                print(f"[TRACE] ⚠ result.json 存在，尝试使用 (可能部分阶段失败)")
-                return output_dir, f"partial: subprocess exit={result.returncode}, stderr_tail={stderr_tail[:200]}"
-            else:
-                return None, f"subprocess exit={result.returncode}, stderr_tail={stderr_tail}"
-
-        if result_json.exists():
-            try:
-                payload = json.loads(result_json.read_text(encoding="utf-8"))
-            except Exception as e:
-                err = f"result.json 无法解析: {type(e).__name__}: {e}"
-                print(f"[TRACE] ✖ {err}")
-                return None, err
-            if isinstance(payload, dict) and payload.get("success") is False:
-                err = "TRACE result.success=false: " + str(payload.get("error", "unknown"))
-                print(f"[TRACE] ✖ {err[:300]}")
-                return None, err
-            if VERBOSE:
-                print(f"[TRACE] ✓ 分析完成: {result_json}")
-            return output_dir, None
-        else:
-            stdout_tail = (result.stdout or "")[-300:]
-            err = f"result.json 未生成 (returncode=0, stdout_tail={stdout_tail})"
+            validated, validate_err = _validate_trace_result(output_dir, cache_key)
+            if validated is not None:
+                return validated, f"partial: subprocess exit={result.returncode}, stderr_tail={stderr_tail[:200]}"
+            err = f"subprocess exit={result.returncode}, stderr_tail={stderr_tail}; {validate_err}"
             print(f"[TRACE] ✖ {err}")
             return None, err
-
+        validated, validate_err = _validate_trace_result(output_dir, cache_key)
+        if validated is None:
+            print(f"[TRACE] ✖ {validate_err}")
+            return None, validate_err
+        if VERBOSE:
+            print(f"[TRACE] ✓ 分析完成: {result_json}")
+        return validated, None
     except subprocess.TimeoutExpired:
         err = f"分析超时 ({timeout_sec}s): task_id={task_id[:8]}"
         print(f"[TRACE] ✖ {err}")
@@ -426,6 +633,7 @@ def process_single_text(
     skip_trace: bool = False,
     l3_history: list = None,
     l3_timestamps: list = None,
+    trace_result=None,
 ) -> Optional[Dict]:
     """
     处理单条文本: TRACE → L1(元SCM) → L2(世俗PCA) → L3(八正道)。
@@ -461,7 +669,10 @@ def process_single_text(
     row["trace_mode"] = trace_mode
     row["trace_data_source"] = "unknown"
     if not skip_trace:
-        trace_output_dir, trace_err = run_trace_analysis(text, mode=trace_mode)
+        if trace_result is None:
+            trace_output_dir, trace_err = run_trace_analysis(text, mode=trace_mode)
+        else:
+            trace_output_dir, trace_err = trace_result
         if trace_output_dir is None:
             # 不再静默继续：在 row 中显式标记失败，让 CSV/前端能识别"全 0 行"的真正原因
             row["trace_status"] = "FAILED"
@@ -555,6 +766,33 @@ def process_input_csv(
     session_l3_history: list = []
     session_l3_timestamps: list = []
 
+    # Optional bounded prefetch: TRACE L1 is independent per text, while
+    # L2/L3 must remain sequential because Layer 3 uses session history.
+    prefetch_workers = _env_int("TRACE_PREFETCH_WORKERS", 2, 0, 8)
+    prefetched = {}
+    if prefetch_workers > 1 and not skip_trace and len(reader) > 1:
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+        def _prefetch(index_row):
+            index, row = index_row
+            text_value = row.get(INPUT_COL_TEXT) or row.get("content") or row.get("body") or ""
+            if not text_value.strip():
+                return index, (None, "empty text")
+            try:
+                return index, run_trace_analysis(text_value, mode=trace_mode)
+            except Exception as exc:
+                return index, (None, f"prefetch: {type(exc).__name__}: {exc}")
+        print(f"⏩ 预取 TRACE L1: {len(reader)} 条, workers={prefetch_workers}")
+        with ThreadPoolExecutor(max_workers=prefetch_workers) as pool:
+            futures = [pool.submit(_prefetch, (i, row)) for i, row in enumerate(reader)]
+            for future in as_completed(futures):
+                index, result = future.result()
+                prefetched[index] = result
+        print(f"⏩ TRACE L1 预取完成: {len(prefetched)}/{len(reader)}")
+        # Free worker-process memory before L2/L3 loads the embedding model.
+        _close_trace_workers()
+    else:
+        print(f"TRACE L1 prefetch: disabled (workers={prefetch_workers})")
+
     success_count = 0
     for i, row in enumerate(reader):
         # 检测列名变体
@@ -577,6 +815,7 @@ def process_input_csv(
             skip_trace=skip_trace,
             l3_history=session_l3_history,
             l3_timestamps=session_l3_timestamps,
+            trace_result=prefetched.get(i),
         )
 
         if result_row:

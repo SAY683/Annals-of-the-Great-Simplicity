@@ -17,11 +17,13 @@ EDM-Takens 分析触发器
   # → {"job_id": "job_xxx", "status": "pending", ...}
 """
 
+import hashlib
 import os
 import time
 import re
 import shutil
 import json
+import uuid
 import urllib.request
 import urllib.parse
 import urllib.error
@@ -29,7 +31,7 @@ from pathlib import Path
 from typing import Dict, Optional
 
 from config import (
-    TRAJECTORY_CSV, EDM_DATA_DIR, EDM_API_URL,
+    TRAJECTORY_CSV, EDM_DATA_DIR, EDM_API_URL, TRACE_WORK_DIR,
     EDM_MIN_ROWS_FOR_ANALYSIS, EDM_DEFAULT_TARGET, EDM_DEFAULT_Q,
     VERBOSE,
 )
@@ -85,9 +87,60 @@ class EDMTrigger:
             except Exception:
                 self.csv_path = TRAJECTORY_CSV
         self.api_base = EDM_API_URL.replace("localhost", "127.0.0.1").rstrip("/")
+        self.cache_dir = Path(os.environ.get(
+            "EDM_CACHE_DIR", str(TRACE_WORK_DIR.parent / "cache" / "edm")
+        ))
+        self.cache_version = os.environ.get("EDM_CACHE_VERSION", "v1")
+        self.cache_disabled = os.environ.get("EDM_CACHE_DISABLE", "0") == "1"
         # ROB-01 断路器状态 (实例级, 跨方法共享)
         self._circuit_failures = 0   # 连续失败计数
         self._circuit_open_until = 0.0  # 熔断到期时间戳 (time.monotonic)
+
+    def _cache_key(self, target_col: str, q: int, time_start=None, time_end=None) -> str:
+        h = hashlib.sha256()
+        h.update(self.cache_version.encode("utf-8"))
+        h.update(b"\0")
+        h.update(Path(self.csv_path).read_bytes())
+        h.update(b"\0")
+        h.update(str(target_col).encode("utf-8"))
+        h.update(b"\0")
+        h.update(str(q).encode("utf-8"))
+        h.update(b"\0")
+        h.update(str(time_start or "").encode("utf-8"))
+        h.update(b"\0")
+        h.update(str(time_end or "").encode("utf-8"))
+        return h.hexdigest()
+
+    def _load_cache(self, key: str) -> Dict:
+        if self.cache_disabled:
+            return {}
+        path = self.cache_dir / f"{key}.json"
+        if not path.exists():
+            return {}
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+            if isinstance(data, dict) and data.get("success") is True:
+                data["cached"] = True
+                data["job_id"] = f"cache_{key[:12]}"
+                data["status"] = "done"
+                return data
+        except Exception:
+            return {}
+        return {}
+
+    def _store_cache(self, key: str, result: Dict) -> None:
+        if self.cache_disabled or not isinstance(result, dict):
+            return
+        if result.get("status") not in ("done", "completed") or result.get("success") is not True:
+            return
+        try:
+            self.cache_dir.mkdir(parents=True, exist_ok=True)
+            path = self.cache_dir / f"{key}.json"
+            tmp = path.with_name(f".{path.name}.{os.getpid()}.{uuid.uuid4().hex}.tmp")
+            tmp.write_text(json.dumps(result, ensure_ascii=False, default=str), encoding="utf-8")
+            os.replace(tmp, path)
+        except Exception:
+            pass
 
     def check_readiness(self) -> Dict:
         """
@@ -305,12 +358,21 @@ class EDMTrigger:
                 marker = " ← target" if orig == target_col else ""
                 print(f"  {orig} → {alias}{marker}")
 
-        # 提交分析任务
+        # Small samples should use exploratory/auto intensity rather than the
+        # API default medium (which maps to confirmatory CCM correction).
+        try:
+            import csv as _csv
+            with open(self.csv_path, "r", encoding="utf-8") as _f:
+                _n_rows = sum(1 for _ in _csv.DictReader(_f))
+        except Exception:
+            _n_rows = 0
+        intensity = "auto" if 0 < _n_rows < 30 else "medium"
         result = self._api_call("POST", "/api/analyze/jobs", {
             "filename": self.uploaded_filename,
             "target_col": target_col,
             "q": str(q),
             "auto_fix": str(auto_fix).lower(),
+            "intensity": intensity,
         })
 
         if "error" in result:
@@ -383,6 +445,17 @@ class EDMTrigger:
         if not readiness["ready"]:
             return {"error": readiness["reason"], "success": False}
 
+        cache_key = None
+        if wait:
+            try:
+                cache_key = self._cache_key(target_col, q, time_start, time_end)
+                cached = self._load_cache(cache_key)
+                if cached:
+                    print(f"[EDM] cache hit: {cache_key[:12]}... target={target_col}")
+                    return cached
+            except Exception:
+                cache_key = None
+
         # 提交任务
         submit_result = self.submit_job(target_col=target_col, q=q, time_start=time_start, time_end=time_end)
         if "error" in submit_result:
@@ -395,6 +468,8 @@ class EDMTrigger:
 
         # 等待完成
         final = self.poll_job(job_id, timeout_sec=timeout_sec)
+        if cache_key:
+            self._store_cache(cache_key, final)
         return final
 
     def list_recommended_targets(self) -> Dict[str, str]:

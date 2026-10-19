@@ -16,7 +16,7 @@ _SKILL_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _SKILL_SRC = os.path.join(_SKILL_ROOT, 'src')
 sys.path.insert(0, _SKILL_SRC)
 
-from ccm_causality import ccm_causality_test
+from ccm_causality import ccm_batch_test, ccm_causality_test
 from final_interpretation import ccm_with_convergence
 from enhanced_cross_validate import verify_ccm_direction
 
@@ -55,3 +55,12 @@ def test_wrapper_smoke_consistency():
     assert r_cross['forward_skill'] > 0.5
     assert r_final['forward']['is_converging'] is True
     assert r_cross['forward_converging'] is True
+
+def test_ccm_batch_zero_pairs_is_explicit_skip():
+    """Small-sample fast mode must disclose a skip, not a 0-pair success."""
+    result = ccm_batch_test(None, [], 3)
+    assert result['method'] == 'skipped'
+    assert result['n_pairs'] == 0
+    assert result['out_of_sample_used'] is False
+    assert result['effective_lib_sizes'] == []
+    assert 'skipped' in result['methodology_disclaimer'].lower()

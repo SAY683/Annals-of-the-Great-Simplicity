@@ -1,5 +1,6 @@
 module.exports = function mount(app, ctx) {
 const { fs, path, spawn, crypto, ROOT, PROJECTS_DIR, TRAJECTORY_CSV, PYTHON_CMD, BRIDGE_SCRIPT, PACKAGE_VERSION, serverLog, reqLog, getActiveTrajectoryCSV, pyCall, pyScript, errorResponse, activeJobs, jobHistory, createJobId, emitSSE, streamBridgeProcess, readTrajectoryCSV, buildTrajectoryReport, buildTrajectoryReportHTML, getCached, setCached, invalidateCache, pyDS, getDatasetExports, markDatasetProcessed, pipelineState } = ctx;
+const EDM_ONLY_SCRIPT = path.join(path.dirname(BRIDGE_SCRIPT), 'edm_only.py');
 
 app.post('/api/edm/trigger', (req, res) => {
   const { target, q, time_start, time_end, predict_window } = req.body;
@@ -37,8 +38,7 @@ app.post('/api/edm/trigger', (req, res) => {
   }
 
   const args = [
-    BRIDGE_SCRIPT,
-    '--edm-only',
+    EDM_ONLY_SCRIPT,
     '--target', target || 'ate',
     '--q', String(qNum || 3),
     '--no-wait',  // 不等待EDM完成, 立即返回job_id

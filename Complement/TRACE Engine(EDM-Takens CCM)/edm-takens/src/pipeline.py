@@ -176,6 +176,7 @@ class PipelineConfig:
     auto_fix: bool = False        # enable auto-correction
     corrections: List[AutoCorrection] = field(default_factory=list)
     analysis_type: str = "exploratory"  # 'exploratory' | 'confirmatory' | 'preregistered'
+    fast_small_sample: bool = False     # N<30 exploratory: skip expensive CCM batch
                                           # — drives Secret 13's multiple-
                                           # comparison correction method
                                           # AND sensitivity_config's config
@@ -660,7 +661,10 @@ def run_pipeline(config: PipelineConfig = None,
         _GAME_LOG_CAUSES = ['kills', 'damage', 'deaths']
         _dynamic_causes = [c for c in config.columns
                           if c != config.target_col and c in df.columns]
-        if _dynamic_causes:
+        if config.fast_small_sample:
+            candidate_pairs = []
+            print(f"    [CCM Causes] skipped: N={n} < 30 in exploratory fast mode")
+        elif _dynamic_causes:
             candidate_pairs = [(cause, config.target_col) for cause in _dynamic_causes]
             print(f"    [CCM Causes] 动态选择: {_dynamic_causes}")
         else:

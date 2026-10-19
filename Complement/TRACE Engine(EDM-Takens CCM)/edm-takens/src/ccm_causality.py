@@ -509,8 +509,19 @@ def ccm_batch_test(df, pairs, E, analysis_label: str = 'exploratory',
     """
     K = len(pairs)
     if K == 0:
-        return {"pairs": [], "method": None, "n_pairs": 0,
-                "note": "No pairs provided"}
+        return {
+            "pairs": [], "method": "skipped", "alpha_or_q": None,
+            "n_pairs": 0, "n_significant_raw": 0,
+            "n_significant_corrected": 0, "warn": False,
+            "note": "No pairs provided; CCM batch skipped",
+            "is_strict_confirmatory": False,
+            "methodology_disclaimer": (
+                "CCM batch was skipped because no candidate pairs were requested "
+                "(for example, N<30 exploratory fast mode)."
+            ),
+            "effective_lib_sizes": [],
+            "out_of_sample_used": False,
+        }
 
     results = []
     for cause, effect in pairs:

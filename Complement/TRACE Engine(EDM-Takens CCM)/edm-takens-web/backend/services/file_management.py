@@ -277,8 +277,14 @@ def _make_config(csv_path, target_col, selected_vars, q, max_e, auto_fix, intens
     }
     analysis_type = _intensity_to_analysis_type.get(
         (intensity or 'auto').lower().strip(), 'exploratory')
+    try:
+        n_rows = len(pd.read_csv(csv_path))
+    except Exception:
+        n_rows = 0
+    fast_small_sample = bool(n_rows and n_rows < 30 and analysis_type == 'exploratory')
     print(f"[API] target_col={target_col}, selected_vars={selected_vars}, q={q}, max_e={max_e}, "
-          f"auto_fix={auto_fix}, intensity={intensity}, analysis_type={analysis_type}")
+          f"auto_fix={auto_fix}, intensity={intensity}, analysis_type={analysis_type}, "
+          f"n_rows={n_rows}, fast_small_sample={fast_small_sample}")
     return PipelineConfig(
         data_path=csv_path,
         target_col=target_col,
@@ -287,6 +293,7 @@ def _make_config(csv_path, target_col, selected_vars, q, max_e, auto_fix, intens
         max_E=max_e,
         auto_fix=auto_fix,
         analysis_type=analysis_type,
+        fast_small_sample=fast_small_sample,
     )
 
 

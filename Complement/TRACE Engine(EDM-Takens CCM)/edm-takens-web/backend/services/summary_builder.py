@@ -155,6 +155,9 @@ def _build_summary(
             #   False -> "Exploratory FDR estimate (effect-size gated Spearman, BH)"
             "is_strict_confirmatory": bool(ccm_batch.get("is_strict_confirmatory", False)),
             "methodology_disclaimer": ccm_batch.get("methodology_disclaimer"),
+            "effective_lib_sizes": ccm_batch.get("effective_lib_sizes", []),
+            "out_of_sample_used": bool(ccm_batch.get("out_of_sample_used", False)),
+            "note": ccm_batch.get("note"),
         }
 
     # P1 修复项 4：暴露 post-audit verdict 给前端。

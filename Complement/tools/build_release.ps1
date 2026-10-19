@@ -110,7 +110,12 @@ try {
         'Complement/tools/clean_runtime.ps1',
         'Complement/tools/check_env.py',
         'Complement/tools/check_docs.py',
+        'Complement/tools/prepare_news_corpus.py',
+        'Complement/tools/requirements-news.txt',
+        'Complement/tools/warm_semantic_cache.py',
         'Complement/Docs/07-deployment.md',
+        'Complement/TRACE Engine(EDM-Takens CCM)/trace-engine-web/py_bridge_worker.py',
+        'Complement/TRACE Engine(EDM-Takens CCM)/trace-to-edm/edm_only.py',
         'Complement/TRACE Engine(EDM-Takens CCM)/verify_portable.py'
     )
     $forbiddenPattern = '(^|/)(node_modules|__pycache__|\.pytest_cache|tunnel_logs|results|work|logs?)(/|$)|(^|/)jobs\.sqlite$|(^|/)tunnel_url\.txt$|(^|/)trace_to_edm_.*\.csv$|(^|/)\.env(\.|$)|\.(safetensors|pyc|pyo|log|pem|key)$'
