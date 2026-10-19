@@ -387,6 +387,16 @@ def run_trace_analysis(text: str, mode: str = "deep", timeout_sec: int = 600):
                 return None, f"subprocess exit={result.returncode}, stderr_tail={stderr_tail}"
 
         if result_json.exists():
+            try:
+                payload = json.loads(result_json.read_text(encoding="utf-8"))
+            except Exception as e:
+                err = f"result.json 无法解析: {type(e).__name__}: {e}"
+                print(f"[TRACE] ✖ {err}")
+                return None, err
+            if isinstance(payload, dict) and payload.get("success") is False:
+                err = "TRACE result.success=false: " + str(payload.get("error", "unknown"))
+                print(f"[TRACE] ✖ {err[:300]}")
+                return None, err
             if VERBOSE:
                 print(f"[TRACE] ✓ 分析完成: {result_json}")
             return output_dir, None

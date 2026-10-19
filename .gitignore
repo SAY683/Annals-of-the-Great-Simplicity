@@ -53,5 +53,8 @@ Complement/TRACE Engine(EDM-Takens CCM)/trace-to-edm/projects/_index.json
 # GraphRAG machine-local external paths (copy local-paths.example.ps1)
 Complement/GraphRAG-神纪图谱/scripts/local-paths.ps1
 
+# Local news corpus for reproducibility pilots (copyrighted article bodies stay local)
+Complement/TRACE Engine(EDM-Takens CCM)/研究汇报/news_corpus_2024_auto/
+
 # Generated release artifacts
 release/

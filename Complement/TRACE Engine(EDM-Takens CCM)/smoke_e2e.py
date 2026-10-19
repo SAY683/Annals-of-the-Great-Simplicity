@@ -35,6 +35,7 @@ smoke_e2e.py — 便携目录端到端冒烟测试 (ROUND51)
 
 用法:
   python smoke_e2e.py [--verbose] [--timeout-min N] [--texts N]
+  python smoke_e2e.py --corpus-dir <directory-of-txt-articles>
 """
 import os
 import sys
@@ -398,16 +399,27 @@ def main():
     parser.add_argument("--keep", action="store_true", help="失败时保留临时目录 (调试用)")
     parser.add_argument("--timeout-min", type=float, default=12.0, help="整链超时 (分钟)")
     parser.add_argument("--texts", type=int, default=DEFAULT_TEXTS, help=f"测试文本数 (默认 {DEFAULT_TEXTS})")
+    parser.add_argument("--corpus-dir", type=Path, default=None, help="可选: 从目录读取 .txt 语料 (每篇一个文件, 至少 15 篇)")
     args = parser.parse_args()
     VERBOSE = args.verbose
     keep_workdir = args.keep
-    n_texts = max(args.texts, EDM_MIN_ROWS)
+    corpus_files = []
+    if args.corpus_dir:
+        corpus_dir = args.corpus_dir.resolve()
+        corpus_files = sorted(corpus_dir.glob("*.txt"))
+        if len(corpus_files) < EDM_MIN_ROWS:
+            parser.error(f"--corpus-dir 至少需要 {EDM_MIN_ROWS} 篇 .txt, 当前 {len(corpus_files)} 篇")
+        n_texts = len(corpus_files)
+    else:
+        n_texts = max(args.texts, EDM_MIN_ROWS)
     chain_timeout = args.timeout_min * 60.0
 
     print("=" * 70)
     print("便携目录 E2E 全链路冒烟测试 (smoke_e2e)")
     print(f"目录: {SCRIPT_DIR}")
     print(f"文本数: {n_texts} | 总超时: {chain_timeout:.0f}s")
+    if args.corpus_dir:
+        print(f"语料目录: {args.corpus_dir.resolve()}")
     print("=" * 70)
 
     # ── 前置检查: 目录 + node/npm ──────────────────────────
@@ -477,6 +489,7 @@ def main():
             "trace-engine-web", TRACE_WEB_DIR, find_free_port(3400, 3500), {
                 "TRACE_WORK_DIR": str(trace_work),
                 "TRACE_ENGINE_SKILL_DIR": str(TRACE_ENGINE_DIR / "examples" / "counterfactual_hybrid"),
+                "TRACE_PYTHON_CMD": sys.executable,
             }, work_root
         )
         services.append(tew_svc)
@@ -501,6 +514,7 @@ def main():
                 # 指向临时目录, 防止每次 TRACE 分析把 task 输出写进便携
                 # trace-engine-web/work/outputs 造成污染.
                 "TRACE_WORK_DIR": str(trace_work),
+                "TRACE_PYTHON_CMD": sys.executable,
             }, work_root
         )
         services.append(t2e_svc)
@@ -524,13 +538,20 @@ def main():
             raise RuntimeError("健康/契约检查失败")
 
         # ── 阶段 A: 文本 → 数据集 ────────────────────────────
-        texts = SAMPLE_TEXTS[:n_texts]
-        while len(texts) < n_texts:
-            texts.append(texts[len(texts) % len(SAMPLE_TEXTS)])
-        rows = [
-            {"timestamp": f"2026-08-05 09:{i:02d}", "text": t, "source": "smoke_e2e"}
-            for i, t in enumerate(texts)
-        ]
+        if corpus_files:
+            texts = [p.read_text(encoding="utf-8", errors="replace") for p in corpus_files]
+            rows = [
+                {"timestamp": f"2024-01-01 00:{i:02d}", "text": t, "source": p.stem}
+                for i, (p, t) in enumerate(zip(corpus_files, texts))
+            ]
+        else:
+            texts = SAMPLE_TEXTS[:n_texts]
+            while len(texts) < n_texts:
+                texts.append(texts[len(texts) % len(SAMPLE_TEXTS)])
+            rows = [
+                {"timestamp": f"2026-08-05 09:{i:02d}", "text": t, "source": "smoke_e2e"}
+                for i, t in enumerate(texts)
+            ]
         log(f"喂入 {len(rows)} 条文本到 trace-to-edm 数据集...")
         # 注意: add-text 需要 JSON body (express.json 解析), urlencoded 会把
         # texts 变成字符串, Python 端逐字符迭代崩溃且无 error 字段返回.
@@ -594,7 +615,7 @@ def main():
                 csv_check.require(col in headers, f"列 {col} 存在", f"列 {col} 缺失")
             n_ok = sum(1 for r in reader if r.get("trace_status") in ("OK", "PARTIAL"))
             csv_check.require(all(r.get("trace_data_source") in ("synthetic_sem", "observed", "unknown") for r in reader), "trace_data_source 值有效", "trace_data_source 含非法值")
-            csv_check.require(n_ok >= 1, f"{n_ok}/{len(reader)} 行 trace_status=OK/PARTIAL", "无成功行 (trace_status 全失败)")
+            csv_check.require(n_ok == len(reader), f"{n_ok}/{len(reader)} 行 trace_status=OK/PARTIAL", "存在 FAILED/EXTRACT_FAILED 行，TRACE 结果未完全成功")
             csv_check.require(len(reader) >= EDM_MIN_ROWS, f"轨迹行数 {len(reader)} >= {EDM_MIN_ROWS}", f"行数不足: {len(reader)}")
         if not csv_check.finish():
             raise RuntimeError("轨迹 CSV 契约断言失败")
